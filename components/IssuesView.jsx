@@ -53,7 +53,10 @@ const StatusBadge = ({ status }) => {
   const s = (status||'').toLowerCase();
   const map = {
     open:[T.accent,'#1a2e3a'], closed:[T.text2,T.bg3],
-    high:[T.danger,'#3d1f1f'], medium:[T.warn,'#3d2e1a'], low:[T.success,'#1e2a1e'],
+    urgent:[T.danger,'#3d1f1f'],
+    high:[T.warn,'#3d2e1a'],
+    medium:[T.success,'#1e2a1e'],
+    low:[T.accent,'#1a2e3a'],
     '???':[T.text2,T.bg3],
   };
   const [color,bg] = map[s]||[T.text2,T.bg3];
@@ -191,7 +194,7 @@ const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
 // Priority dot
 // ─────────────────────────────────────────────────────────────────────────────
 const PriorityDot = ({ priority }) => {
-  const colors = { High:T.danger, Medium:T.warn, Low:T.success, '???':T.text3 };
+  const colors = { '???':T.text3, Urgent:T.danger, High:T.warn, Medium:T.success, Low:T.accent };
   return (
     <span style={{
       display:'inline-block', width:'7px', height:'7px', borderRadius:'50%',
@@ -288,7 +291,7 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
                 <div style={{marginBottom:'10px'}}>
                   <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Priority</div>
                   <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                    {['High','Medium','Low','???'].map(p=>(
+                    {['???','Urgent','High','Medium','Low'].map(p=>(
                       <button key={p} onClick={()=>save('priority',p)}
                         style={{
                           padding:'3px 10px', borderRadius:'4px', cursor:'pointer', fontSize:F.sm,
@@ -393,6 +396,8 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Issues List
 // ─────────────────────────────────────────────────────────────────────────────
+const PRIORITY_ORDER = { '???': 0, 'Urgent': 1, 'High': 2, 'Medium': 3, 'Low': 4 };
+
 const IssuesList = ({ onSelect }) => {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -400,15 +405,21 @@ const IssuesList = ({ onSelect }) => {
   const [statusFilter, setStatusFilter] = useState('Open');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [propFilter, setPropFilter] = useState('');
+  const [propInfo, setPropInfo] = useState(null);
   const [search, setSearch] = useState('');
   const [activeProps, setActiveProps] = useState([]);
+  const [sortCol, setSortCol] = useState('prop_code');
+  const [sortDir, setSortDir] = useState('asc');
 
-  const { sorted, Th } = useSortable(issues, 'create_date', 'desc');
+  const toggleSort = c => {
+    if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(c); setSortDir('asc'); }
+  };
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    sbFetch('issues', 'select=*&order=create_date.desc')
+    sbFetch('issues', 'select=*&order=prop_code.asc')
       .then(data => { setIssues(data); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
@@ -419,6 +430,13 @@ const IssuesList = ({ onSelect }) => {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!propFilter) { setPropInfo(null); return; }
+    sbFetch('properties', `select=property_name,address&prop_code=eq.${propFilter}`)
+      .then(data => setPropInfo(data[0] || null))
+      .catch(() => setPropInfo(null));
+  }, [propFilter]);
+
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
@@ -427,13 +445,28 @@ const IssuesList = ({ onSelect }) => {
 
   const counts = {
     open: issues.filter(isOpen).length,
-    high: issues.filter(iss => iss.priority === 'High' && isOpen(iss)).length,
+    urgentHigh: issues.filter(iss => (iss.priority === 'Urgent' || iss.priority === 'High') && isOpen(iss)).length,
     resolvedThisMonth: issues.filter(iss => {
       if (!iss.close_date) return false;
       const d = new Date(iss.close_date);
       return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
     }).length,
   };
+
+  const priRank = p => PRIORITY_ORDER[p] ?? 99;
+
+  const sorted = [...issues].sort((a, b) => {
+    let cmp = 0;
+    if (sortCol === 'priority') {
+      cmp = priRank(a.priority) - priRank(b.priority);
+    } else {
+      const av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
+      cmp = String(av).localeCompare(String(bv));
+    }
+    if (cmp !== 0) return sortDir === 'asc' ? cmp : -cmp;
+    if (sortCol !== 'priority') return priRank(a.priority) - priRank(b.priority);
+    return String(a.prop_code ?? '').localeCompare(String(b.prop_code ?? ''));
+  });
 
   const filtered = sorted.filter(iss => {
     if (statusFilter === 'Open' && !isOpen(iss)) return false;
@@ -452,12 +485,22 @@ const IssuesList = ({ onSelect }) => {
     return true;
   });
 
+  const Th = ({ c, label, align }) => (
+    <th style={{...css.th,textAlign:align||'left'}} onClick={()=>toggleSort(c)}>
+      {label}{sortCol===c?<span style={{marginLeft:'3px'}}>{sortDir==='asc'?'↑':'↓'}</span>:<span style={{marginLeft:'3px',color:T.bg3}}>↕</span>}
+    </th>
+  );
+
+  const heading = propFilter && propInfo
+    ? `Issues — ${propFilter} · ${propInfo.property_name || ''}${propInfo.address ? ' · ' + propInfo.address : ''}`
+    : 'Issues';
+
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
       <div style={{padding:'12px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Issues</span>
+          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{heading}</span>
           <span style={{fontSize:F.sm,color:T.text2}}>{filtered.length.toLocaleString()} shown</span>
         </div>
 
@@ -465,7 +508,7 @@ const IssuesList = ({ onSelect }) => {
         <div style={{display:'flex',gap:'10px',marginBottom:'12px'}}>
           {[
             ['Total Open', counts.open, T.accent],
-            ['High Priority', counts.high, T.danger],
+            ['High / Urgent', counts.urgentHigh, T.danger],
             ['Resolved This Month', counts.resolvedThisMonth, T.success],
           ].map(([label,count,color])=>(
             <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 14px',minWidth:'120px'}}>
@@ -492,7 +535,7 @@ const IssuesList = ({ onSelect }) => {
 
           {/* Priority */}
           <div style={{display:'flex',gap:'2px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`}}>
-            {['All','High','Medium','Low'].map(p=>(
+            {['All','???','Urgent','High','Medium','Low'].map(p=>(
               <button key={p} onClick={()=>setPriorityFilter(p)}
                 style={{padding:'4px 10px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.sm,
                   background:priorityFilter===p?T.bg3:'transparent',
@@ -526,22 +569,22 @@ const IssuesList = ({ onSelect }) => {
         {!loading && !error && (
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'auto'}}/>  {/* Title */}
-              <col style={{width:'60px'}}/>  {/* Prop */}
-              <col style={{width:'110px'}}/> {/* Type */}
-              <col style={{width:'80px'}}/>  {/* Priority */}
-              <col style={{width:'70px'}}/>  {/* Status */}
-              <col style={{width:'105px'}}/> {/* Reported */}
-              <col style={{width:'105px'}}/> {/* Resolved */}
+              <col style={{width:'auto'}}/>
+              <col style={{width:'60px'}}/>
+              <col style={{width:'110px'}}/>
+              <col style={{width:'80px'}}/>
+              <col style={{width:'70px'}}/>
+              <col style={{width:'105px'}}/>
+              <col style={{width:'105px'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:1}}>
               <tr>
-                <Th c="issue_name"    label="Issue Title"/>
-                <Th c="prop_code"      label="Prop"/>
-                <Th c="category"     label="Type"/>
-                <Th c="priority"       label="Priority"/>
-                <Th c="status"         label="Status"/>
-                <Th c="create_date"  label="Reported"/>
+                <Th c="issue_name"  label="Issue Title"/>
+                <Th c="prop_code"   label="Prop"/>
+                <Th c="category"    label="Type"/>
+                <Th c="priority"    label="Priority"/>
+                <Th c="status"      label="Status"/>
+                <Th c="create_date" label="Reported"/>
                 <Th c="close_date"  label="Resolved"/>
               </tr>
             </thead>
@@ -551,7 +594,10 @@ const IssuesList = ({ onSelect }) => {
               )}
               {filtered.map((iss,i) => (
                 <tr key={iss.id}
-                  onClick={()=>onSelect(iss)}
+                  onClick={e => {
+                    if (e.ctrlKey || e.metaKey) window.open(`${window.location.origin}/?view=issues&id=${iss.id}`, '_blank');
+                    else onSelect(iss);
+                  }}
                   style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
