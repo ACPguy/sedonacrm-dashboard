@@ -82,7 +82,7 @@ export default function AppShell({ children, activeView }) {
           <NavBtn label="Properties"  active={is('properties')}  onClick={()=>go('/?view=properties')}  collapsed={collapsed}/>
           <NavBtn label="Tenants"     active={is('tenants')}     onClick={()=>go('/?view=tenants')}     collapsed={collapsed}/>
           <NavBtn label="Suites"      active={is('suites')}      onClick={()=>go('/?view=suites')}      collapsed={collapsed}/>
-          <NavBtn label="Work Orders" active={is('work-orders')} onClick={()=>go('/?view=work-orders')} collapsed={collapsed}/>
+          <NavBtn label="Work Orders" active={is('work-orders')} onClick={()=>go('/work-orders')} collapsed={collapsed}/>
           <NavBtn label="Issues"      active={is('issues')}      onClick={()=>go('/issues')}             collapsed={collapsed}/>
           <SectionLabel label="Leasing" collapsed={collapsed}/>
           <NavBtn label="Pipeline" active={is('leasing')}  onClick={()=>go('/?view=leasing')}  collapsed={collapsed}/>

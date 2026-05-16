@@ -80,6 +80,7 @@ const isInRange = (dateVal, range) => {
   return false;
 };
 
+// Stage badge — maps wo_status values (New / Request Sent / Re-Opened / Closed / Closed - Not Done)
 export const StatusBadge = ({ status }) => {
   const map = {
     'New':               [T.accent,  '#1a2e3a'],
@@ -90,6 +91,15 @@ export const StatusBadge = ({ status }) => {
   };
   const [color, bg] = map[status] || [T.text2, T.bg3];
   return <span style={css.badge(color, bg)}>{status || '—'}</span>;
+};
+
+// Open/Closed badge derived from wo_status
+const OpenClosedBadge = ({ wo }) => {
+  const closed = isWoClosed(wo);
+  return <span style={css.badge(
+    closed ? T.text2 : T.accent,
+    closed ? T.bg3   : '#1a2e3a'
+  )}>{closed ? 'Closed' : 'Open'}</span>;
 };
 
 export const PriorityDot = ({ priority }) => {
@@ -104,16 +114,9 @@ export const PriorityDot = ({ priority }) => {
 };
 
 export const PRIORITY_ORDER = { '???': 0, 'Urgent': 1, 'High': 2, 'Medium': 3, 'Low': 4 };
-const PRIORITY_OPTIONS  = ['???', 'Urgent', 'High', 'Medium', 'Low'];
-const WO_STATUS_OPTIONS = ['New', 'Request Sent', 'Re-Opened', 'Closed', 'Closed - Not Done'];
+const PRIORITY_OPTIONS = ['???', 'Urgent', 'High', 'Medium', 'Low'];
 
-const STATUS_DOT_COLORS = {
-  'New':               T.accent,
-  'Request Sent':      T.purple,
-  'Re-Opened':         T.warn,
-  'Closed':            T.success,
-  'Closed - Not Done': T.danger,
-};
+const NCOLS = 12; // WO# | Title | FU Date | Prop | Priority | Stage | Status | Vendor | Tenant | Updated | Opened | Closed
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ActivityPanel
@@ -182,7 +185,7 @@ export const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => 
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Kanban (columns = Status)
+// Kanban — columns by Priority (like Issues)
 // ─────────────────────────────────────────────────────────────────────────────
 const KanbanCardContent = ({ wo, vendors }) => {
   const vendor    = vendors.find(v => v.id === wo.vendor_id);
@@ -194,27 +197,31 @@ const KanbanCardContent = ({ wo, vendors }) => {
 
   return (
     <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'9px 10px',userSelect:'none'}}>
-      <div style={{fontSize:F.sm,color:T.text0,fontWeight:'500',lineHeight:'1.35',marginBottom:'6px',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+      <div style={{fontSize:F.sm,color:T.text0,fontWeight:'500',lineHeight:'1.35',marginBottom:'5px',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
         {wo.short_description || 'Untitled'}
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:'5px',flexWrap:'wrap',marginBottom:'4px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'5px',flexWrap:'wrap',marginBottom:'5px'}}>
         <span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>
           {wo.prop_code || '—'}
         </span>
-        <PriorityDot priority={wo.priority || '???'}/>
-        <span style={{fontSize:F.xs,color:T.text2}}>{wo.priority || '???'}</span>
+        {wo.podio_wo_number && (
+          <span style={{fontSize:F.xs,color:T.text2}}>#{wo.podio_wo_number}</span>
+        )}
       </div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'6px'}}>
-        <div style={{display:'flex',gap:'5px',alignItems:'center'}}>
-          {shortName && (
-            <span style={{fontSize:F.xs,color:T.text2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'90px'}}>{shortName}</span>
-          )}
-          {fuDate && (
-            <span style={{fontSize:F.xs,color:fuOverdue?T.warn:T.text2,fontWeight:fuOverdue?'600':'400'}}>
-              {fuOverdue && '⚠ '}{fuDate}
-            </span>
-          )}
+      {wo.wo_status && (
+        <div style={{marginBottom:'5px'}}>
+          <StatusBadge status={wo.wo_status}/>
         </div>
+      )}
+      <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
+        {shortName && (
+          <span style={{fontSize:F.xs,color:T.text2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'90px'}}>{shortName}</span>
+        )}
+        {fuDate && (
+          <span style={{fontSize:F.xs,color:fuOverdue?T.warn:T.text2,fontWeight:fuOverdue?'600':'400'}}>
+            {fuOverdue && '⚠ '}{fuDate}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -237,16 +244,17 @@ const KanbanCard = ({ wo, vendors, onCardClick }) => {
   );
 };
 
-const KanbanColumn = ({ status, wos, vendors, onCardClick }) => {
-  const { setNodeRef, isOver } = useDroppable({ id: status });
-  const color  = STATUS_DOT_COLORS[status] || T.text2;
-  const sorted = [...wos].sort((a, b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
+const KanbanColumn = ({ priority, wos, vendors, onCardClick }) => {
+  const { setNodeRef, isOver } = useDroppable({ id: priority });
+  const priColor = { '???':T.text2, Urgent:T.danger, High:T.warn, Medium:T.success, Low:T.accent };
+  const color    = priColor[priority] || T.text2;
+  const sorted   = [...wos].sort((a, b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
 
   return (
     <div style={{flex:'1 1 0',minWidth:'180px',maxWidth:'280px',display:'flex',flexDirection:'column'}}>
       <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 8px 8px',borderBottom:`0.5px solid ${T.border}`,marginBottom:'8px',flexShrink:0}}>
-        <span style={{width:'7px',height:'7px',borderRadius:'50%',background:color,display:'inline-block',flexShrink:0}}/>
-        <span style={{fontSize:F.xs,fontWeight:'700',color,textTransform:'uppercase',letterSpacing:'0.05em'}}>{status}</span>
+        <PriorityDot priority={priority}/>
+        <span style={{fontSize:F.xs,fontWeight:'700',color,textTransform:'uppercase',letterSpacing:'0.05em'}}>{priority}</span>
         <span style={{fontSize:F.xs,color:T.text3,marginLeft:'auto'}}>({wos.length})</span>
       </div>
       <div ref={setNodeRef} style={{
@@ -265,13 +273,13 @@ const KanbanColumn = ({ status, wos, vendors, onCardClick }) => {
   );
 };
 
-const KanbanView = ({ wos, vendors, onCardClick, onStatusChange }) => {
+const KanbanView = ({ wos, vendors, onCardClick, onPriorityChange }) => {
   const [activeWo, setActiveWo] = useState(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-  const byStatus = useMemo(() =>
-    WO_STATUS_OPTIONS.reduce((acc, s) => {
-      acc[s] = wos.filter(wo => (wo.wo_status || 'New') === s);
+  const byPriority = useMemo(() =>
+    PRIORITY_OPTIONS.reduce((acc, p) => {
+      acc[p] = wos.filter(wo => (wo.priority || '???') === p);
       return acc;
     }, {})
   , [wos]);
@@ -283,19 +291,19 @@ const KanbanView = ({ wos, vendors, onCardClick, onStatusChange }) => {
   const handleDragEnd = ({ active, over }) => {
     setActiveWo(null);
     if (!over) return;
-    const newStatus = over.id;
+    const newPriority = over.id;
     const wo = wos.find(w => w.id === active.id);
     if (!wo) return;
-    const currentStatus = wo.wo_status || 'New';
-    if (currentStatus === newStatus) return;
-    onStatusChange(wo.id, newStatus, currentStatus);
+    const currentPriority = wo.priority || '???';
+    if (currentPriority === newPriority) return;
+    onPriorityChange(wo.id, newPriority, currentPriority);
   };
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div style={{display:'flex',gap:'10px',height:'100%',overflow:'hidden',padding:'12px 14px'}}>
-        {WO_STATUS_OPTIONS.map(s => (
-          <KanbanColumn key={s} status={s} wos={byStatus[s]||[]} vendors={vendors} onCardClick={onCardClick}/>
+        {PRIORITY_OPTIONS.map(p => (
+          <KanbanColumn key={p} priority={p} wos={byPriority[p]||[]} vendors={vendors} onCardClick={onCardClick}/>
         ))}
       </div>
       <DragOverlay dropAnimation={null}>
@@ -382,6 +390,7 @@ const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) 
 // ─────────────────────────────────────────────────────────────────────────────
 const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
   const [vendors, setVendors]               = useState([]);
+  const [tenants, setTenants]               = useState([]);
   const [statusFilter, setStatusFilter]     = useState('Open');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [propFilter, setPropFilter]         = useState([]);
@@ -400,6 +409,9 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
       .catch(() => {});
     sbFetch('vendors', 'select=id,company_dba&order=company_dba.asc')
       .then(data => setVendors(data))
+      .catch(() => {});
+    sbFetch('tenants', 'select=id,tenant_dba&order=tenant_dba.asc')
+      .then(data => setTenants(data))
       .catch(() => {});
   }, []);
 
@@ -425,7 +437,9 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
       ? priRank(a.priority) - priRank(b.priority)
       : sortCol === 'follow_up_date'
         ? (a.follow_up_date||'9999') > (b.follow_up_date||'9999') ? 1 : -1
-        : String(a[sortCol] ?? '').localeCompare(String(b[sortCol] ?? ''));
+        : sortCol === 'podio_wo_number'
+          ? (a.podio_wo_number||0) - (b.podio_wo_number||0)
+          : String(a[sortCol] ?? '').localeCompare(String(b[sortCol] ?? ''));
     if (cmp !== 0) return sortDir === 'asc' ? cmp : -cmp;
     if (sortCol !== 'priority') return priRank(a.priority) - priRank(b.priority);
     return String(a.prop_code ?? '').localeCompare(String(b.prop_code ?? ''));
@@ -445,17 +459,21 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
       if (search) {
         const q     = search.toLowerCase();
         const vName = vendors.find(v => v.id === wo.vendor_id)?.company_dba || '';
+        const tName = tenants.find(t => t.id === wo.tenant_id)?.tenant_dba  || '';
+        const woNum = wo.podio_wo_number ? String(wo.podio_wo_number) : '';
         return (
+          woNum.includes(q) ||
           (wo.short_description||'').toLowerCase().includes(q) ||
           (wo.prop_code||'').toLowerCase().includes(q) ||
           (wo.category||'').toLowerCase().includes(q) ||
           (wo.internal_notes||'').toLowerCase().includes(q) ||
-          vName.toLowerCase().includes(q)
+          vName.toLowerCase().includes(q) ||
+          tName.toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [statusFilter, priorityFilter, propFilter, search, dateFilters, vendors]);
+  }, [statusFilter, priorityFilter, propFilter, search, dateFilters, vendors, tenants]);
 
   const filtered           = useMemo(() => applyFilters(sorted),       [sorted, applyFilters]);
   const filteredNoPriority = useMemo(() => applyFilters(sorted, true), [sorted, applyFilters]);
@@ -487,12 +505,12 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
     setDateFilters({ opened: null, updated: null, closed: null });
   };
 
-  const handleStatusChange = async (woId, newStatus, prevStatus) => {
-    setWos(prev => prev.map(w => w.id === woId ? { ...w, wo_status: newStatus } : w));
+  const handlePriorityChange = async (woId, newPriority, prevPriority) => {
+    setWos(prev => prev.map(w => w.id === woId ? { ...w, priority: newPriority } : w));
     try {
-      await sbPatch('work_orders', woId, { wo_status: newStatus });
+      await sbPatch('work_orders', woId, { priority: newPriority });
     } catch {
-      setWos(prev => prev.map(w => w.id === woId ? { ...w, wo_status: prevStatus } : w));
+      setWos(prev => prev.map(w => w.id === woId ? { ...w, priority: prevPriority } : w));
     }
   };
 
@@ -515,26 +533,33 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
   const renderRow = (wo, i) => {
     const vendor     = vendors.find(v => v.id === wo.vendor_id);
     const vendorName = vendor?.company_dba || '';
+    const tenant     = tenants.find(t => t.id === wo.tenant_id);
+    const tenantName = tenant?.tenant_dba || '';
     const fuOverdue  = isFuOverdue(wo.follow_up_date, wo);
     const fuDisplay  = wo.follow_up_date ? fmtNumDate(wo.follow_up_date) : '';
-
-    const openDetail = e => {
-      if (e.ctrlKey || e.metaKey) {
-        const tab = window.open(`${window.location.origin}/work-orders/${wo.id}`, '_blank');
-        if (tab) tab.focus();
-      } else {
-        onSelect(wo);
-      }
-    };
-
-    const rowBg = i % 2 === 0 ? 'transparent' : T.bg0;
+    const woUrl      = `/work-orders/${wo.id}`;
+    const rowBg      = i % 2 === 0 ? 'transparent' : T.bg0;
 
     return (
       <tr key={wo.id}
         style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
         onMouseEnter={e => e.currentTarget.style.background = T.bg2}
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
-        onClick={openDetail}>
+        onClick={e => { if (!e.target.closest('a')) onSelect(wo); }}>
+
+        {/* WO # — real anchor enables ctrl+click, middle-click, right-click → open in new tab */}
+        <td style={{...css.td, minWidth:'52px', fontSize:F.xs, color:T.text1}}>
+          <a href={woUrl}
+            onClick={e => {
+              if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
+                e.preventDefault();
+                onSelect(wo);
+              }
+            }}
+            style={{color:T.text1, textDecoration:'none'}}>
+            {wo.podio_wo_number || '—'}
+          </a>
+        </td>
 
         {/* WO Title */}
         <td style={{...css.td}} title={wo.short_description}>
@@ -549,7 +574,7 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
         </td>
 
         {/* Prop */}
-        <td style={{...css.td, color:T.accent, fontWeight:'500', fontSize:F.xs, minWidth:'70px'}}>
+        <td style={{...css.td, color:T.accent, fontWeight:'500', fontSize:F.xs}}>
           {wo.prop_code || ''}
         </td>
 
@@ -560,12 +585,24 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
           </span>
         </td>
 
-        {/* Assigned (vendor) */}
-        <td style={{...css.td, fontSize:F.xs, color:T.text1}}>{vendorName}</td>
-
-        {/* Status */}
-        <td style={{...css.td, minWidth:'120px', overflow:'visible', whiteSpace:'nowrap'}}>
+        {/* Stage (wo_status) — no truncation */}
+        <td style={{...css.td, overflow:'visible', whiteSpace:'nowrap'}}>
           <StatusBadge status={wo.wo_status || 'New'}/>
+        </td>
+
+        {/* Status (open/closed) — no truncation */}
+        <td style={{...css.td, overflow:'visible', whiteSpace:'nowrap'}}>
+          <OpenClosedBadge wo={wo}/>
+        </td>
+
+        {/* Vendor */}
+        <td style={{...css.td, fontSize:F.xs, color:T.text1}} title={vendorName}>
+          {vendorName}
+        </td>
+
+        {/* Tenant */}
+        <td style={{...css.td, fontSize:F.xs, color:T.text1}} title={tenantName}>
+          {tenantName}
         </td>
 
         {/* Updated */}
@@ -707,7 +744,7 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
             wos={filtered}
             vendors={vendors}
             onCardClick={onSelect}
-            onStatusChange={handleStatusChange}
+            onPriorityChange={handlePriorityChange}
           />
         </div>
       )}
@@ -716,38 +753,48 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
         <div style={{flex:1,overflowY:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'auto'}}/>
-              <col style={{width:'82px'}}/>
-              <col style={{width:'68px',minWidth:'68px'}}/>
-              <col style={{width:'90px'}}/>
-              <col style={{width:'120px'}}/>
-              <col style={{width:'120px',minWidth:'120px'}}/>
-              <col style={{width:'86px'}}/>
-              <col style={{width:'82px'}}/>
-              <col style={{width:'82px'}}/>
+              {/* WO # */}    <col style={{width:'54px',  minWidth:'54px'}}/>
+              {/* Title */}   <col style={{width:'auto'}}/>
+              {/* FU Date */} <col style={{width:'82px',  minWidth:'76px'}}/>
+              {/* Prop */}    <col style={{width:'58px',  minWidth:'58px'}}/>
+              {/* Priority */}<col style={{width:'88px',  minWidth:'80px'}}/>
+              {/* Stage */}   <col style={{width:'136px', minWidth:'136px'}}/>
+              {/* Status */}  <col style={{width:'68px',  minWidth:'60px'}}/>
+              {/* Vendor */}  <col style={{width:'110px', minWidth:'80px'}}/>
+              {/* Tenant */}  <col style={{width:'100px', minWidth:'80px'}}/>
+              {/* Updated */} <col style={{width:'82px',  minWidth:'76px'}}/>
+              {/* Opened */}  <col style={{width:'82px',  minWidth:'76px'}}/>
+              {/* Closed */}  <col style={{width:'82px',  minWidth:'76px'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
-                {renderTh('short_description','WO Title')}
-                {renderTh('follow_up_date','FU Date')}
-                {renderTh('prop_code','Prop', {paddingLeft:'10px'})}
-                {renderTh('priority','Priority')}
-                {renderTh('vendor_id','Assigned')}
-                <th style={{...css.th,minWidth:'120px',overflow:'visible'}}>Status</th>
-                {renderTh('updated_at','Updated')}
-                {renderTh('created_at','Opened')}
-                {renderTh('closed_at','Closed')}
+                {renderTh('podio_wo_number', 'WO #')}
+                {renderTh('short_description', 'WO Title')}
+                {renderTh('follow_up_date', 'FU Date')}
+                {renderTh('prop_code', 'Prop')}
+                {renderTh('priority', 'Priority')}
+                {renderTh('wo_status', 'Stage')}
+                <th style={{...css.th, minWidth:'60px', overflow:'visible'}}>Status</th>
+                {renderTh('vendor_id', 'Vendor')}
+                {renderTh('tenant_id', 'Tenant')}
+                {renderTh('updated_at', 'Updated')}
+                {renderTh('created_at', 'Opened')}
+                {renderTh('closed_at',  'Closed')}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={9} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No work orders match filters</td></tr>
+                <tr>
+                  <td colSpan={NCOLS} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>
+                    No work orders match filters
+                  </td>
+                </tr>
               )}
               {grouped ? (
                 grouped.map(group => (
                   <React.Fragment key={group.prop_code}>
                     <tr style={{background:T.bg3,position:'sticky',top:'29px',zIndex:1}}>
-                      <td colSpan={9} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
+                      <td colSpan={NCOLS} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
                         {group.prop_code} <span style={{color:T.text3,fontWeight:'400'}}>({group.rows.length})</span>
                       </td>
                     </tr>
@@ -833,6 +880,9 @@ export const WorkOrderDetail = ({ wo, onBack }) => {
             ← Work Orders
           </button>
           <span style={{color:T.text3,fontSize:F.sm}}>{data.prop_code || '—'}</span>
+          {data.podio_wo_number && (
+            <span style={{color:T.text2,fontSize:F.xs}}>#{data.podio_wo_number}</span>
+          )}
           <span style={{marginLeft:'auto',display:'flex',gap:'8px',alignItems:'center'}}>
             <StatusBadge status={data.wo_status || 'New'}/>
             <StatusBadge status={data.priority || '???'}/>
@@ -864,12 +914,12 @@ export const WorkOrderDetail = ({ wo, onBack }) => {
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
               <div style={css.card}>
                 <div style={css.secTitle}>Work Order Info</div>
+                {data.podio_wo_number != null && field('WO Number', String(data.podio_wo_number))}
                 {field('WO Title', data.short_description)}
                 {field('Category', data.category || data.wo_category)}
                 {field('WO Type', data.wo_type)}
                 {field('Priority', data.priority)}
-                {field('Status', data.wo_status)}
-                {data.wo_num != null && field('WO Number', String(data.wo_num))}
+                {field('Stage', data.wo_status)}
               </div>
               <div style={css.card}>
                 <div style={css.secTitle}>Dates</div>
