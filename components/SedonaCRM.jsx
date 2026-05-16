@@ -2,6 +2,7 @@ import WorkOrdersView from './WorkOrdersView';
 import SuitesView from './SuitesView';
 import IssuesView from './IssuesView';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/router';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -1093,12 +1094,17 @@ const StubView = ({ title, note }) => (
 
 // ── Root Component ────────────────────────────────────────────────────────────
 export default function SedonaCRM() {
+  const router = useRouter();
   const [currentView,setCurrentView] = useState('morning-briefing');
   const [sidebarCollapsed,setSidebarCollapsed] = useState(false);
   const [sidebarWidth,setSidebarWidth] = useState(190);
   const [expandedMenu,setExpandedMenu] = useState(null);
   const [resetKey,setResetKey] = useState(0);
   const resizingSidebar = useRef(false);
+
+  useEffect(() => {
+    if (router.query.view) setCurrentView(router.query.view);
+  }, [router.query.view]);
 
   const startSidebarResize = useCallback((e)=>{
     resizingSidebar.current=true;
@@ -1156,7 +1162,7 @@ export default function SedonaCRM() {
           <NavItem icon="ti-users"          label="Tenants"     active={currentView==='tenants'}     onClick={()=>navTo('tenants')}     {...navProps}/>
           <NavItem icon="ti-door"           label="Suites"      active={currentView==='suites'}      onClick={()=>navTo('suites')}      {...navProps}/>
           <NavItem icon="ti-tool"           label="Work Orders" active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
-          <NavItem icon="ti-alert-triangle" label="Issues"      active={currentView==='issues'}      onClick={()=>navTo('issues')}      {...navProps}/>
+          <NavItem icon="ti-alert-triangle" label="Issues"      active={currentView==='issues'}      onClick={()=>router.push('/issues')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
           <NavItem icon="ti-pipeline"   label="Pipeline" active={currentView==='leasing'}   onClick={()=>navTo('leasing')}   {...navProps}/>
           <NavItem icon="ti-file-text"  label="Leases"   active={currentView==='leases'}    onClick={()=>navTo('leases')}    {...navProps}/>

@@ -143,6 +143,36 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 
 2. **npm run dev before every commit** — After every set of changes, run `npm run dev` (or `npm run build`) and confirm no build errors before committing or pushing. Fix errors first, then push. Never push broken code to GitHub (it deploys broken to Vercel).
 
+## Routing Pattern (Issues as template for all modules)
+
+Modules get proper Next.js pages. Issues is the template — replicate this for Work Orders, Suites, Tenants, etc.
+
+**File structure:**
+```
+pages/issues/index.jsx        — list page, wraps component in AppShell
+pages/issues/[id].jsx         — cold-loadable detail page
+components/AppShell.jsx       — shared sidebar/chrome for all routed pages
+components/IssuesView.jsx     — exports: sbFetch, sbPatch, T, F, css, fmtDate,
+                                  StatusBadge, EditableField, ActivityPanel,
+                                  PriorityDot, PRIORITY_ORDER, IssueDetail
+                                  default export: IssuesView (SPA, used by index page)
+```
+
+**Navigation rules:**
+- Issues nav in SedonaCRM → `router.push('/issues')` (not navTo)
+- AppShell nav: Issues → `/issues`, all others → `/?view=xxx`
+- SedonaCRM reads `router.query.view` on load and sets currentView
+- Ctrl+click a row → `window.open('/issues/${id}', '_blank')`
+- Back button in detail → `sessionStorage.getItem('issuesBackUrl') || '/issues'`
+- Escape key in detail → calls onBack()
+
+**When adding a new routed module:**
+1. Add named exports to the component (sbFetch, T, F, Detail component, etc.)
+2. Create `pages/<module>/index.jsx` wrapping the view in AppShell
+3. Create `pages/<module>/[id].jsx` loading the record by ID and rendering Detail
+4. Add nav item to AppShell pointing to `/<module>`
+5. Change SedonaCRM nav onClick to `router.push('/<module>')`
+
 ## Next Priorities
 
 1. Build complete Property detail with all 5 tab groups using lazy-loaded reusable components

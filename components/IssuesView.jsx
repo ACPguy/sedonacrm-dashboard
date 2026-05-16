@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
 
-const sbFetch = async (table, params = '') => {
+export const sbFetch = async (table, params = '') => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
   });
@@ -19,7 +19,7 @@ const sbFetch = async (table, params = '') => {
   return res.json();
 };
 
-const sbPatch = async (table, id, updates) => {
+export const sbPatch = async (table, id, updates) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
     method: 'PATCH',
     headers: {
@@ -32,14 +32,14 @@ const sbPatch = async (table, id, updates) => {
   return res.json();
 };
 
-const T = {
+export const T = {
   bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
   text0:'#c9cdd6', text1:'#8a95a8', text2:'#5a6272', text3:'#4a5264',
   accent:'#6e9fd8', border:'#2e3240',
   danger:'#e07070', warn:'#d4924a', success:'#6ab06a', purple:'#9a7ad4',
 };
-const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
-const css = {
+export const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
+export const css = {
   card: { background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'6px', padding:'12px 14px' },
   secTitle: { fontSize:F.xs, fontWeight:'600', color:T.text2, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' },
   badge: (color,bg) => ({ fontSize:F.xs, padding:'2px 7px', borderRadius:'3px', fontWeight:'500', whiteSpace:'nowrap', color, background:bg }),
@@ -47,9 +47,9 @@ const css = {
   td: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
 };
 
-const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+export const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
 
-const StatusBadge = ({ status }) => {
+export const StatusBadge = ({ status }) => {
   const s = (status||'').toLowerCase();
   const map = {
     open:[T.accent,'#1a2e3a'], closed:[T.text2,T.bg3],
@@ -63,7 +63,7 @@ const StatusBadge = ({ status }) => {
   return <span style={css.badge(color,bg)}>{status||'—'}</span>;
 };
 
-const EditableField = ({ label, value, onSave, type='text' }) => {
+export const EditableField = ({ label, value, onSave, type='text' }) => {
   const [editing,setEditing] = useState(false);
   const [val,setVal] = useState(value||'');
   const [saving,setSaving] = useState(false);
@@ -127,7 +127,7 @@ const useSortable = (data, defaultCol, defaultDir='asc') => {
 // ─────────────────────────────────────────────────────────────────────────────
 // ActivityPanel
 // ─────────────────────────────────────────────────────────────────────────────
-const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
+export const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
   const [tab,setTab] = useState('comments');
   return (
     <div style={{display:'flex',flexShrink:0,height:'100%'}}>
@@ -193,7 +193,7 @@ const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Priority dot
 // ─────────────────────────────────────────────────────────────────────────────
-const PriorityDot = ({ priority }) => {
+export const PriorityDot = ({ priority }) => {
   const colors = { '???':T.text3, Urgent:T.danger, High:T.warn, Medium:T.success, Low:T.accent };
   return (
     <span style={{
@@ -207,7 +207,7 @@ const PriorityDot = ({ priority }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Issue Detail
 // ─────────────────────────────────────────────────────────────────────────────
-const IssueDetail = ({ issue, onBack, onUpdate }) => {
+export const IssueDetail = ({ issue, onBack, onUpdate }) => {
   const [tab, setTab] = useState('info');
   const [data, setData] = useState(issue);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -407,7 +407,7 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Issues List
 // ─────────────────────────────────────────────────────────────────────────────
-const PRIORITY_ORDER = { '???': 0, 'Urgent': 1, 'High': 2, 'Medium': 3, 'Low': 4 };
+export const PRIORITY_ORDER = { '???': 0, 'Urgent': 1, 'High': 2, 'Medium': 3, 'Low': 4 };
 
 const IssuesList = ({ onSelect, refreshTick }) => {
   const [issues, setIssues] = useState([]);
@@ -512,7 +512,7 @@ const IssuesList = ({ onSelect, refreshTick }) => {
     <tr key={iss.id}
       onClick={e => {
         if (e.ctrlKey || e.metaKey) {
-          const tab = window.open(`${window.location.origin}/?view=issues&id=${iss.id}`, '_blank');
+          const tab = window.open(`${window.location.origin}/issues/${iss.id}`, '_blank');
           if (tab) tab.focus();
         } else {
           onSelect(iss);
