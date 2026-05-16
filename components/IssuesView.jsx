@@ -217,92 +217,6 @@ export const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => 
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// InlineCell — Priority and FU Date only
-// ─────────────────────────────────────────────────────────────────────────────
-const InlineCell = ({ value, displayNode, field, issueId, onOptimistic, type='text', options=null, tdStyle={} }) => {
-  const [editing, setEditing] = useState(false);
-  const [val, setVal]         = useState(value ?? '');
-  const [flash, setFlash]     = useState(null);
-  const [hovered, setHovered] = useState(false);
-  const inputRef = useRef(null);
-
-  useEffect(() => { if (!editing) setVal(value ?? ''); }, [value, editing]);
-
-  // Auto-open native date picker when entering edit mode for date fields
-  useEffect(() => {
-    if (editing && type === 'date' && inputRef.current) {
-      try { inputRef.current.showPicker(); } catch { inputRef.current.focus(); }
-    }
-  }, [editing, type]);
-
-  const doSave = useCallback(async (newVal) => {
-    const prev = value;
-    const dbVal = newVal === '' ? null : newVal;
-    onOptimistic(issueId, field, dbVal);
-    setEditing(false);
-    try {
-      await sbPatch('issues', issueId, { [field]: dbVal });
-      setFlash('success');
-      setTimeout(() => setFlash(null), 700);
-    } catch {
-      onOptimistic(issueId, field, prev);
-      setFlash('error');
-      setTimeout(() => setFlash(null), 700);
-    }
-  }, [value, issueId, field, onOptimistic]);
-
-  const flashBg = flash === 'success' ? 'rgba(106,176,106,0.18)' : flash === 'error' ? 'rgba(224,112,112,0.18)' : undefined;
-  const base = { ...tdStyle, transition:'background 0.4s', background: flashBg };
-
-  if (editing) {
-    if (options) {
-      return (
-        <td style={{...base, padding:'2px 4px'}} onClick={e => e.stopPropagation()}>
-          <select autoFocus value={val}
-            onChange={e => { const v = e.target.value; setVal(v); doSave(v); }}
-            onBlur={() => setEditing(false)}
-            onKeyDown={e => { if (e.key==='Escape') { setVal(value??''); setEditing(false); } }}
-            style={{width:'100%',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'3px',color:T.text0,fontSize:F.xs,padding:'3px 4px',outline:'none',cursor:'pointer'}}>
-            {options.map(o => {
-              const v = o.value !== undefined ? o.value : o;
-              const l = o.label !== undefined ? o.label : o;
-              return <option key={String(v)} value={String(v??'')} style={{background:T.bg1}}>{l||'—'}</option>;
-            })}
-          </select>
-        </td>
-      );
-    }
-    return (
-      <td style={{...base, padding:'2px 4px'}} onClick={e => e.stopPropagation()}>
-        <input ref={inputRef} type={type==='date'?'date':'text'} value={val}
-          onChange={e => setVal(e.target.value)}
-          onBlur={() => doSave(val)}
-          onKeyDown={e => {
-            if (e.key==='Escape') { setVal(value??''); setEditing(false); }
-            if (e.key==='Enter')  doSave(val);
-          }}
-          style={{width:'100%',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'3px',color:T.text0,fontSize:F.xs,padding:'3px 4px',outline:'none'}}
-        />
-      </td>
-    );
-  }
-
-  return (
-    <td style={base}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={e => { e.stopPropagation(); setEditing(true); }}>
-      <div style={{display:'flex',alignItems:'center',gap:'3px',cursor:'pointer',minHeight:'18px',padding:'4px 8px'}}>
-        <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>
-          {displayNode ?? (val || '')}
-        </span>
-        {hovered && <span style={{color:T.text3,fontSize:'9px',flexShrink:0,opacity:0.8}}>✏</span>}
-      </div>
-    </td>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Kanban components
 // ─────────────────────────────────────────────────────────────────────────────
 const KanbanCardContent = ({ issue, users }) => {
@@ -557,10 +471,6 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
     return () => { document.title = 'SedonaCRM'; };
   }, []);
 
-  const updateIssue = useCallback((id, field, value) => {
-    setIssues(prev => prev.map(iss => iss.id === id ? { ...iss, [field]: value } : iss));
-  }, [setIssues]);
-
   const toggleProp = code => {
     if (code === 'All') { setPropFilter([]); return; }
     setPropFilter(prev => prev.includes(code) ? prev.filter(p => p !== code) : [...prev, code]);
@@ -700,40 +610,24 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
           {iss.issue_name||''}
         </td>
 
-        {/* FU Date — inline editable, stops propagation */}
-        <InlineCell
-          value={iss.follow_up_date||''}
-          field="follow_up_date"
-          issueId={iss.id}
-          type="date"
-          onOptimistic={updateIssue}
-          tdStyle={{...css.td, color: fuOverdue ? T.warn : T.text2}}
-          displayNode={
-            fuDisplay
-              ? <span style={{fontWeight:fuOverdue?'600':'400'}}>{fuOverdue&&'⚠ '}{fuDisplay}</span>
-              : <span/>
-          }
-        />
+        {/* FU Date — read-only */}
+        <td style={{...css.td, color: fuOverdue ? T.warn : T.text2}}>
+          {fuDisplay
+            ? <span style={{fontWeight:fuOverdue?'600':'400'}}>{fuOverdue&&'⚠ '}{fuDisplay}</span>
+            : ''}
+        </td>
 
         {/* Prop — read-only */}
         <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs,minWidth:'70px'}}>
           {iss.prop_code||''}
         </td>
 
-        {/* Priority — inline editable */}
-        <InlineCell
-          value={iss.priority||'???'}
-          field="priority"
-          issueId={iss.id}
-          options={PRIORITY_OPTIONS.map(p => ({value:p,label:p}))}
-          onOptimistic={updateIssue}
-          tdStyle={css.td}
-          displayNode={
-            <span style={{display:'flex',alignItems:'center'}}>
-              <PriorityDot priority={iss.priority||'???'}/>{iss.priority||'???'}
-            </span>
-          }
-        />
+        {/* Priority — read-only */}
+        <td style={css.td}>
+          <span style={{display:'flex',alignItems:'center'}}>
+            <PriorityDot priority={iss.priority||'???'}/>{iss.priority||'???'}
+          </span>
+        </td>
 
         {/* Assigned — read-only */}
         <td style={{...css.td,fontSize:F.xs,color:T.text1}}>{userName||''}</td>
@@ -782,19 +676,16 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
           </div>
         </div>
 
-        {/* Single filter row: Property | Priority | Open/Closed | More... | Clear | Search */}
+        {/* Row 1: Property buttons — scrollable single line */}
+        <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
+          <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
+          {activeProps.map(pc => (
+            <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
+          ))}
+        </div>
+
+        {/* Row 2: Priority | Status | More... | Clear | Search */}
         <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0}}>
-
-          {/* Property buttons — scrollable single line */}
-          <div style={{display:'flex',gap:'4px',overflowX:'auto',flexShrink:1,minWidth:0,scrollbarWidth:'none'}}>
-            <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
-            {activeProps.map(pc => (
-              <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
-            ))}
-          </div>
-
-          {/* Separator */}
-          <div style={{width:'0.5px',height:'20px',background:T.border,flexShrink:0}}/>
 
           {/* Priority filter with counts */}
           <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
