@@ -227,6 +227,17 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
     window.addEventListener('mouseup', onUp);
   }, [rightWidth]);
 
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'Escape') return;
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      onBack();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onBack]);
+
   const save = async (field, val) => {
     await sbPatch('issues', data.id, { [field]: val || null });
     const updated = { ...data, [field]: val };
@@ -398,31 +409,26 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const PRIORITY_ORDER = { '???': 0, 'Urgent': 1, 'High': 2, 'Medium': 3, 'Low': 4 };
 
-const IssuesList = ({ onSelect }) => {
+const IssuesList = ({ onSelect, refreshTick }) => {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('Open');
   const [priorityFilter, setPriorityFilter] = useState('All');
-  const [propFilter, setPropFilter] = useState('');
-  const [propInfo, setPropInfo] = useState(null);
+  const [propFilter, setPropFilter] = useState([]); // multi-select array of prop_codes
   const [search, setSearch] = useState('');
   const [activeProps, setActiveProps] = useState([]);
-  const [sortCol, setSortCol] = useState('prop_code');
+  const [sortCol, setSortCol] = useState('priority');
   const [sortDir, setSortDir] = useState('asc');
 
-  const toggleSort = c => {
-    if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortCol(c); setSortDir('asc'); }
-  };
-
+  // Re-fetch whenever refreshTick increments (on return from detail) or on mount
   useEffect(() => {
     setLoading(true);
     setError(null);
-    sbFetch('issues', 'select=*&order=prop_code.asc')
+    sbFetch('issues', 'select=*')
       .then(data => { setIssues(data); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
-  }, []);
+  }, [refreshTick]);
 
   useEffect(() => {
     sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
@@ -430,18 +436,21 @@ const IssuesList = ({ onSelect }) => {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (!propFilter) { setPropInfo(null); return; }
-    sbFetch('properties', `select=property_name,address&prop_code=eq.${propFilter}`)
-      .then(data => setPropInfo(data[0] || null))
-      .catch(() => setPropInfo(null));
-  }, [propFilter]);
+  const toggleProp = code => {
+    if (code === 'All') { setPropFilter([]); return; }
+    setPropFilter(prev => prev.includes(code) ? prev.filter(p => p !== code) : [...prev, code]);
+  };
+
+  const toggleSort = c => {
+    if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(c); setSortDir('asc'); }
+  };
 
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
-
   const isOpen = iss => !iss.status || iss.status === 'Open';
+  const priRank = p => PRIORITY_ORDER[p] ?? 99;
 
   const counts = {
     open: issues.filter(isOpen).length,
@@ -453,16 +462,10 @@ const IssuesList = ({ onSelect }) => {
     }).length,
   };
 
-  const priRank = p => PRIORITY_ORDER[p] ?? 99;
-
   const sorted = [...issues].sort((a, b) => {
-    let cmp = 0;
-    if (sortCol === 'priority') {
-      cmp = priRank(a.priority) - priRank(b.priority);
-    } else {
-      const av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
-      cmp = String(av).localeCompare(String(bv));
-    }
+    let cmp = sortCol === 'priority'
+      ? priRank(a.priority) - priRank(b.priority)
+      : String(a[sortCol] ?? '').localeCompare(String(b[sortCol] ?? ''));
     if (cmp !== 0) return sortDir === 'asc' ? cmp : -cmp;
     if (sortCol !== 'priority') return priRank(a.priority) - priRank(b.priority);
     return String(a.prop_code ?? '').localeCompare(String(b.prop_code ?? ''));
@@ -472,7 +475,7 @@ const IssuesList = ({ onSelect }) => {
     if (statusFilter === 'Open' && !isOpen(iss)) return false;
     if (statusFilter === 'Closed' && iss.status !== 'Closed') return false;
     if (priorityFilter !== 'All' && iss.priority !== priorityFilter) return false;
-    if (propFilter && iss.prop_code !== propFilter) return false;
+    if (propFilter.length > 0 && !propFilter.includes(iss.prop_code)) return false;
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -485,42 +488,94 @@ const IssuesList = ({ onSelect }) => {
     return true;
   });
 
-  const Th = ({ c, label, align }) => (
-    <th style={{...css.th,textAlign:align||'left'}} onClick={()=>toggleSort(c)}>
-      {label}{sortCol===c?<span style={{marginLeft:'3px'}}>{sortDir==='asc'?'↑':'↓'}</span>:<span style={{marginLeft:'3px',color:T.bg3}}>↕</span>}
+  // Group by property when 2+ props selected; sort each group by priority rank
+  const grouped = propFilter.length > 1
+    ? propFilter
+        .map(pc => ({
+          prop_code: pc,
+          rows: filtered
+            .filter(i => i.prop_code === pc)
+            .sort((a, b) => priRank(a.priority) - priRank(b.priority)),
+        }))
+        .filter(g => g.rows.length > 0)
+    : null;
+
+  const renderTh = (c, label) => (
+    <th key={c} style={css.th} onClick={() => toggleSort(c)}>
+      {label}{sortCol === c
+        ? <span style={{marginLeft:'3px'}}>{sortDir==='asc'?'↑':'↓'}</span>
+        : <span style={{marginLeft:'3px',color:T.bg3}}>↕</span>}
     </th>
   );
 
-  const heading = propFilter && propInfo
-    ? `Issues — ${propFilter} · ${propInfo.property_name || ''}${propInfo.address ? ' · ' + propInfo.address : ''}`
-    : 'Issues';
+  const renderRow = (iss, i) => (
+    <tr key={iss.id}
+      onClick={e => {
+        if (e.ctrlKey || e.metaKey) {
+          const tab = window.open(`${window.location.origin}/?view=issues&id=${iss.id}`, '_blank');
+          if (tab) tab.focus();
+        } else {
+          onSelect(iss);
+        }
+      }}
+      style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
+      onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
+      <td style={css.td} title={iss.issue_name}>{iss.issue_name||'—'}</td>
+      <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{iss.prop_code}</td>
+      <td style={{...css.td,color:T.text2}}>{iss.category||'—'}</td>
+      <td style={css.td}>
+        <span style={{display:'flex',alignItems:'center'}}>
+          <PriorityDot priority={iss.priority}/>{iss.priority||'—'}
+        </span>
+      </td>
+      <td style={css.td}><StatusBadge status={iss.status||'Open'}/></td>
+      <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{iss.create_date ? fmtDate(iss.create_date) : '—'}</td>
+      <td style={{...css.td,color:iss.close_date?T.success:T.text3,fontSize:F.xs}}>
+        {iss.close_date ? fmtDate(iss.close_date) : '—'}
+      </td>
+    </tr>
+  );
+
+  const propBtnStyle = active => ({
+    padding:'4px 8px', borderRadius:'4px', cursor:'pointer', fontSize:F.xs, whiteSpace:'nowrap', flexShrink:0,
+    border:`0.5px solid ${active ? T.accent : T.border}`,
+    background: active ? T.accent : 'transparent',
+    color: active ? '#fff' : T.text2,
+    fontWeight: active ? '600' : '400',
+  });
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
       <div style={{padding:'12px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{heading}</span>
+          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Issues</span>
           <span style={{fontSize:F.sm,color:T.text2}}>{filtered.length.toLocaleString()} shown</span>
         </div>
 
-        {/* Summary stat cards */}
-        <div style={{display:'flex',gap:'10px',marginBottom:'12px'}}>
+        {/* Stat cards + property quick-filter buttons */}
+        <div style={{display:'flex',gap:'10px',marginBottom:'12px',alignItems:'flex-start'}}>
           {[
             ['Total Open', counts.open, T.accent],
             ['High / Urgent', counts.urgentHigh, T.danger],
             ['Resolved This Month', counts.resolvedThisMonth, T.success],
           ].map(([label,count,color])=>(
-            <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 14px',minWidth:'120px'}}>
+            <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 14px',minWidth:'120px',flexShrink:0}}>
               <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
               <div style={{fontSize:F.xl,fontWeight:'700',color,marginTop:'2px'}}>{count}</div>
             </div>
           ))}
+          <div style={{flex:1,display:'flex',flexWrap:'wrap',gap:'4px',alignItems:'flex-start',paddingTop:'2px'}}>
+            <button onClick={()=>toggleProp('All')} style={propBtnStyle(propFilter.length===0)}>All</button>
+            {activeProps.map(pc => (
+              <button key={pc} onClick={()=>toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
+            ))}
+          </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters row */}
         <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-          {/* Status */}
           <div style={{display:'flex',gap:'2px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`}}>
             {['Open','Closed','All'].map(s=>(
               <button key={s} onClick={()=>setStatusFilter(s)}
@@ -532,8 +587,6 @@ const IssuesList = ({ onSelect }) => {
               </button>
             ))}
           </div>
-
-          {/* Priority */}
           <div style={{display:'flex',gap:'2px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`}}>
             {['All','???','Urgent','High','Medium','Low'].map(p=>(
               <button key={p} onClick={()=>setPriorityFilter(p)}
@@ -545,15 +598,6 @@ const IssuesList = ({ onSelect }) => {
               </button>
             ))}
           </div>
-
-          {/* Property dropdown */}
-          <select value={propFilter} onChange={e=>setPropFilter(e.target.value)}
-            style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 10px',color:propFilter?T.text0:T.text2,fontSize:F.sm,outline:'none',cursor:'pointer'}}>
-            <option value="">All Properties</option>
-            {activeProps.map(c=><option key={c} value={c}>{c}</option>)}
-          </select>
-
-          {/* Search */}
           <input
             value={search} onChange={e=>setSearch(e.target.value)}
             placeholder="Search issues…"
@@ -569,53 +613,38 @@ const IssuesList = ({ onSelect }) => {
         {!loading && !error && (
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'auto'}}/>
-              <col style={{width:'60px'}}/>
-              <col style={{width:'110px'}}/>
-              <col style={{width:'80px'}}/>
-              <col style={{width:'70px'}}/>
-              <col style={{width:'105px'}}/>
-              <col style={{width:'105px'}}/>
+              <col style={{width:'auto'}}/><col style={{width:'60px'}}/><col style={{width:'110px'}}/>
+              <col style={{width:'80px'}}/><col style={{width:'70px'}}/><col style={{width:'105px'}}/><col style={{width:'105px'}}/>
             </colgroup>
-            <thead style={{position:'sticky',top:0,zIndex:1}}>
+            <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
-                <Th c="issue_name"  label="Issue Title"/>
-                <Th c="prop_code"   label="Prop"/>
-                <Th c="category"    label="Type"/>
-                <Th c="priority"    label="Priority"/>
-                <Th c="status"      label="Status"/>
-                <Th c="create_date" label="Reported"/>
-                <Th c="close_date"  label="Resolved"/>
+                {renderTh('issue_name','Issue Title')}
+                {renderTh('prop_code','Prop')}
+                {renderTh('category','Type')}
+                {renderTh('priority','Priority')}
+                {renderTh('status','Status')}
+                {renderTh('create_date','Reported')}
+                {renderTh('close_date','Resolved')}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
                 <tr><td colSpan={7} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No issues match filters</td></tr>
               )}
-              {filtered.map((iss,i) => (
-                <tr key={iss.id}
-                  onClick={e => {
-                    if (e.ctrlKey || e.metaKey) window.open(`${window.location.origin}/?view=issues&id=${iss.id}`, '_blank');
-                    else onSelect(iss);
-                  }}
-                  style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
-                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
-                  onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
-                  <td style={css.td} title={iss.issue_name}>{iss.issue_name||'—'}</td>
-                  <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{iss.prop_code}</td>
-                  <td style={{...css.td,color:T.text2}}>{iss.category||'—'}</td>
-                  <td style={css.td}>
-                    <span style={{display:'flex',alignItems:'center'}}>
-                      <PriorityDot priority={iss.priority}/>{iss.priority||'—'}
-                    </span>
-                  </td>
-                  <td style={css.td}><StatusBadge status={iss.status||'Open'}/></td>
-                  <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{iss.create_date ? fmtDate(iss.create_date) : '—'}</td>
-                  <td style={{...css.td,color:iss.close_date?T.success:T.text3,fontSize:F.xs}}>
-                    {iss.close_date ? fmtDate(iss.close_date) : '—'}
-                  </td>
-                </tr>
-              ))}
+              {grouped ? (
+                grouped.map(group => (
+                  <React.Fragment key={group.prop_code}>
+                    <tr style={{background:T.bg3,position:'sticky',top:'29px',zIndex:1}}>
+                      <td colSpan={7} style={{...css.td,fontWeight:'600',color:T.accent,padding:'5px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
+                        {group.prop_code}
+                      </td>
+                    </tr>
+                    {group.rows.map((iss, i) => renderRow(iss, i))}
+                  </React.Fragment>
+                ))
+              ) : (
+                filtered.map((iss, i) => renderRow(iss, i))
+              )}
             </tbody>
           </table>
         )}
@@ -629,19 +658,44 @@ const IssuesList = ({ onSelect }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function IssuesView() {
   const [selected, setSelected] = useState(null);
-  const [resetKey, setResetKey] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Push a history entry when opening a detail so browser back works
+  const handleSelect = useCallback((iss) => {
+    history.pushState({ issueId: iss.id }, '');
+    setSelected(iss);
+  }, []);
+
+  // Return to list: clear detail, increment refreshTick to trigger data re-fetch
+  const handleBack = useCallback(() => {
+    if (window.history.state?.issueId) history.replaceState({}, '');
+    setSelected(null);
+    setRefreshTick(t => t + 1);
+  }, []);
+
+  // Browser back button: popstate fires when user navigates back
+  useEffect(() => {
+    const onPop = () => {
+      setSelected(null);
+      setRefreshTick(t => t + 1);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>
-      {selected ? (
+      {/* Keep IssuesList mounted so filters, sort, and scroll position are preserved on back */}
+      <div style={{display:selected?'none':'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+        <IssuesList onSelect={handleSelect} refreshTick={refreshTick}/>
+      </div>
+      {selected && (
         <IssueDetail
           key={selected.id}
           issue={selected}
-          onBack={()=>{ setSelected(null); setResetKey(k=>k+1); }}
-          onUpdate={updated=>setSelected(updated)}
+          onBack={handleBack}
+          onUpdate={updated => setSelected(updated)}
         />
-      ) : (
-        <IssuesList key={resetKey} onSelect={setSelected}/>
       )}
     </div>
   );
