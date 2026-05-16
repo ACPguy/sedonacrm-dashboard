@@ -1,4 +1,5 @@
 import WorkOrdersView from './WorkOrdersView';
+import SuitesView from './SuitesView';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -702,7 +703,7 @@ const PropertiesView = () => {
   const [selected,setSelected] = useState(null);
   const [filter,setFilter] = useState('active');
   const [search,setSearch] = useState('');
-  const { sorted, Th } = useSortable(properties, 'prop_code');
+  const { sorted, Th } = useSortable(properties, 'prop_code', 'asc');
 
   useEffect(()=>{
     setLoading(true);
@@ -1119,7 +1120,7 @@ export default function SedonaCRM() {
       case 'properties':         return <PropertiesView key={resetKey}/>;
       case 'tenants':            return <TenantsView key={resetKey}/>;
       case 'work-orders':        return <WorkOrdersView key={resetKey}/>;
-      case 'suites':             return <StubView title="Suites" note="Suite details and lease info — coming soon."/>;
+      case 'suites':             return <SuitesView />;
       case 'leasing':            return <StubView title="Leasing Pipeline" note="Pipeline and stage tracking — coming soon."/>;
       case 'leases':             return <StubView title="Leases" note="Lease management — coming soon."/>;
       case 'tnt-cois':           return <StubView title="Tenant COIs" note="Insurance certificate tracking — coming soon."/>;
