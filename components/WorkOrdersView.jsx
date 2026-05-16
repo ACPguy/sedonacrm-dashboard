@@ -557,22 +557,33 @@ const WorkOrdersList = ({ onSelect }) => {
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [propFilter, setPropFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [activeProps, setActiveProps] = useState([]);
 
-  const { sorted, Th } = useSortable(wos, 'wo_num', 'desc');
+  const { sorted, Th } = useSortable(wos, 'created_at', 'desc');
 
+  // Fetch all WOs (status is null in seeded data — filter client-side)
   useEffect(() => {
     setLoading(true);
     setError(null);
-    let params = 'select=*&order=wo_num.desc';
-    if (statusFilter !== 'All') params += `&status=eq.${statusFilter}`;
-    sbFetch('work_orders', params)
+    sbFetch('work_orders', 'select=*&order=created_at.desc')
       .then(data => { setWos(data); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
-  }, [statusFilter]);
+  }, []);
+
+  // Fetch active properties for dropdown
+  useEffect(() => {
+    sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
+      .then(data => setActiveProps(data.map(p => p.prop_code)))
+      .catch(() => {});
+  }, []);
 
   const priorities = ['All','High','Medium','Low'];
 
   const filtered = sorted.filter(w => {
+    // Status filter — treat null/empty as Open
+    if (statusFilter === 'Open' && w.status && w.status !== 'Open') return false;
+    if (statusFilter === 'Open' && !w.status) { /* null = treat as open, keep */ }
+    if (statusFilter === 'Closed' && w.status !== 'Closed') return false;
     if (priorityFilter !== 'All' && w.priority !== priorityFilter) return false;
     if (propFilter && w.prop_code !== propFilter) return false;
     if (search) {
@@ -581,19 +592,16 @@ const WorkOrdersList = ({ onSelect }) => {
         (w.short_description||'').toLowerCase().includes(q) ||
         (w.prop_code||'').toLowerCase().includes(q) ||
         (w.category||'').toLowerCase().includes(q) ||
-        String(w.wo_num||'').includes(q)
+        String(w.wo_num||w.podio_id||'').toLowerCase().includes(q)
       );
     }
     return true;
   });
 
-  // Unique prop codes for filter dropdown
-  const propCodes = [...new Set(wos.map(w=>w.prop_code).filter(Boolean))].sort();
-
-  // Summary counts
+  // Summary counts — treat null status as open
   const counts = {
-    open: wos.filter(w=>w.status==='Open').length,
-    high: wos.filter(w=>w.priority==='High'&&w.status==='Open').length,
+    open: wos.filter(w=>!w.status||w.status==='Open').length,
+    high: wos.filter(w=>w.priority==='High'&&(!w.status||w.status==='Open')).length,
     invoicePending: wos.filter(w=>w.invoice_stage==='Received'||w.invoice_stage==='Approved').length,
   };
 
@@ -648,11 +656,11 @@ const WorkOrdersList = ({ onSelect }) => {
             ))}
           </div>
 
-          {/* Property filter */}
+          {/* Property filter — active properties only, alphabetical */}
           <select value={propFilter} onChange={e=>setPropFilter(e.target.value)}
             style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 10px',color:propFilter?T.text0:T.text2,fontSize:F.sm,outline:'none',cursor:'pointer'}}>
             <option value="">All Properties</option>
-            {propCodes.map(c=><option key={c} value={c}>{c}</option>)}
+            {activeProps.map(c=><option key={c} value={c}>{c}</option>)}
           </select>
 
           {/* Search */}
@@ -671,25 +679,25 @@ const WorkOrdersList = ({ onSelect }) => {
         {!loading && !error && (
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'60px'}}/>  {/* WO# */}
-              <col style={{width:'60px'}}/>  {/* Prop */}
               <col style={{width:'auto'}}/>  {/* Description */}
-              <col style={{width:'110px'}}/> {/* Category */}
+              <col style={{width:'55px'}}/>  {/* Prop */}
+              <col style={{width:'60px'}}/>  {/* WO# */}
               <col style={{width:'80px'}}/>  {/* Priority */}
+              <col style={{width:'110px'}}/> {/* Category */}
+              <col style={{width:'60px'}}/>  {/* Budget */}
               <col style={{width:'130px'}}/> {/* Stage */}
-              <col style={{width:'90px'}}/>  {/* Status */}
               <col style={{width:'90px'}}/>  {/* Invoice */}
-              <col style={{width:'90px'}}/>  {/* Follow-up */}
+              <col style={{width:'90px'}}/>  {/* Follow-Up */}
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:1}}>
               <tr>
-                <Th c="wo_num" label="WO#"/>
+                <Th c="short_description" label="Short Description"/>
                 <Th c="prop_code" label="Prop"/>
-                <Th c="short_description" label="Description"/>
-                <Th c="category" label="Category"/>
+                <Th c="wo_num" label="WO#"/>
                 <Th c="priority" label="Priority"/>
+                <Th c="category" label="Category"/>
+                <Th c="is_budget_item" label="Budget"/>
                 <Th c="stage" label="Stage"/>
-                <Th c="status" label="Status"/>
                 <Th c="invoice_stage" label="Invoice"/>
                 <Th c="follow_up_date" label="Follow-Up"/>
               </tr>
@@ -704,17 +712,17 @@ const WorkOrdersList = ({ onSelect }) => {
                   style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
-                  <td style={{...css.td,color:T.text2,fontSize:F.xs}}>#{w.wo_num||'—'}</td>
-                  <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{w.prop_code}</td>
                   <td style={css.td} title={w.short_description}>{w.short_description}</td>
-                  <td style={{...css.td,color:T.text2}}>{w.category||'—'}</td>
+                  <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{w.prop_code}</td>
+                  <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{w.wo_num||w.podio_id||'—'}</td>
                   <td style={css.td}>
                     <span style={{display:'flex',alignItems:'center'}}>
                       <PriorityDot priority={w.priority}/>{w.priority||'—'}
                     </span>
                   </td>
+                  <td style={{...css.td,color:T.text2}}>{w.category||'—'}</td>
+                  <td style={{...css.td,textAlign:'center',color:w.is_budget_item?T.warn:T.text3,fontSize:F.xs}}>{w.is_budget_item?'Yes':'No'}</td>
                   <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{w.stage||'—'}</td>
-                  <td style={css.td}><StatusBadge status={w.status}/></td>
                   <td style={css.td}>{w.invoice_stage ? <StatusBadge status={w.invoice_stage}/> : <span style={{color:T.text3,fontSize:F.xs}}>—</span>}</td>
                   <td style={{...css.td,color:w.follow_up_date&&new Date(w.follow_up_date)<new Date()?T.danger:T.text2,fontSize:F.xs}}>
                     {w.follow_up_date?fmtDate(w.follow_up_date):'—'}
