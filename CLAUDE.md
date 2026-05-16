@@ -77,7 +77,7 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
 - Suites — built
 - Tenants — built
 - Properties list — built
-- Issues — **next to build**
+- Issues — built
 - Leasing Pipeline — pending
 - Calendar — pending
 - Morning Briefing / Dashboard — pending
@@ -127,6 +127,16 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - **Phase 2:** IN PROGRESS — UI build
 - **Phase 3+:** Pending
 
+## Session Management
+
+1. **Run /compact before closing** — At the end of every working session, run `/compact` to summarize the conversation and reduce context size before closing.
+
+2. **Start a fresh session after each major feature or ~2 hours** — Exit and re-launch Claude Code after completing each major feature or after approximately 2 hours of work, whichever comes first. This keeps context lean and prevents slowdowns.
+
+3. **Read CLAUDE.md first on every new session** — Before doing anything else at the start of a new session, read this file to restore full project context.
+
+4. **Update Next Priorities after every session** — After completing work, update the "Next Priorities" section below with what was finished and what comes next, so the next session picks up exactly where this one left off.
+
 ## Development Rules
 
 1. **SELECT DISTINCT before any UI field from Podio** — Before building any dropdown, filter, badge, or component that displays or filters a field sourced from Podio data, always run `SELECT DISTINCT col FROM table ORDER BY col;` to confirm the exact values in the database. Never hardcode options without checking first.
@@ -135,6 +145,6 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 
 ## Next Priorities
 
-1. Build Issues standalone view
-2. Build complete Property detail with all 5 tab groups using lazy-loaded reusable components
-3. Wire Home dashboard urgent items to real data
+1. Build complete Property detail with all 5 tab groups using lazy-loaded reusable components
+2. Wire Home dashboard urgent items to real data
+3. Build Leasing Pipeline standalone view
