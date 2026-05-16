@@ -1,29 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // WorkOrdersView.jsx  —  SedonaCRM Phase 2 UI
-// Drop this file into ~/sedonacrm-dashboard/components/WorkOrdersView.jsx
-//
-// USAGE in SedonaCRM.jsx:
-//   import WorkOrdersView from './WorkOrdersView';
-//   // In the nav, add:  { icon: 'ti-tool', label: 'Work Orders', view: 'work-orders' }
-//   // In the render switch, add:
-//   case 'work-orders': return <WorkOrdersView sbFetch={sbFetch} sbPatch={sbPatch} T={T} F={F} css={css} fmtDate={fmtDate} fmtMoney={fmtMoney} StatusBadge={StatusBadge} EditableField={EditableField} ActivityPanel={ActivityPanel} useSortable={useSortable} />;
-//
-// OR if you haven't split yet, paste the three components (WorkOrdersList,
-// WorkOrderDetail, WorkOrdersView) into SedonaCRM.jsx and add the nav/case above.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  useDraggable, useDroppable,
+} from '@dnd-kit/core';
 
-// ── Re-export-friendly: accepts all shared utilities as props so this file
-//    works whether imported standalone OR inlined in the monolith.
-// ── If you paste into the monolith, delete the prop destructuring below and
-//    reference the already-defined constants directly.
-
-// ─── Inline constants (only needed if using as standalone file) ───────────────
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
 
-const sbFetch = async (table, params = '') => {
+export const sbFetch = async (table, params = '') => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
   });
@@ -31,7 +19,7 @@ const sbFetch = async (table, params = '') => {
   return res.json();
 };
 
-const sbPatch = async (table, id, updates) => {
+export const sbPatch = async (table, id, updates) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
     method: 'PATCH',
     headers: {
@@ -44,106 +32,94 @@ const sbPatch = async (table, id, updates) => {
   return res.json();
 };
 
-const T = {
+export const T = {
   bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
   text0:'#c9cdd6', text1:'#8a95a8', text2:'#5a6272', text3:'#4a5264',
   accent:'#6e9fd8', border:'#2e3240',
   danger:'#e07070', warn:'#d4924a', success:'#6ab06a', purple:'#9a7ad4',
 };
-const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
-const css = {
+export const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
+export const css = {
   card: { background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'6px', padding:'12px 14px' },
   secTitle: { fontSize:F.xs, fontWeight:'600', color:T.text2, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' },
   badge: (color,bg) => ({ fontSize:F.xs, padding:'2px 7px', borderRadius:'3px', fontWeight:'500', whiteSpace:'nowrap', color, background:bg }),
   th: { fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', padding:'5px 8px', fontWeight:'600', whiteSpace:'nowrap', textAlign:'left', cursor:'pointer', userSelect:'none', background:T.bg2 },
   td: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
-  tdNum: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'nowrap', textAlign:'right' },
 };
 
-const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
-const fmtMoney = n => n != null && n !== '' ? '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+const fmtNumDate = d => {
+  if (!d) return '';
+  const date = new Date(typeof d === 'string' && d.length === 10 ? d + 'T00:00:00' : d);
+  if (isNaN(date.getTime())) return '';
+  const m   = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${m}-${day}-${date.getFullYear()}`;
+};
 
-const StatusBadge = ({ status }) => {
-  const s = (status||'').toLowerCase();
+export const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+
+const WO_CLOSED_STATUSES = ['Closed', 'Closed - Not Done'];
+const isWoClosed = wo => WO_CLOSED_STATUSES.includes(wo.wo_status);
+
+const isFuOverdue = (d, wo) => {
+  if (!d || isWoClosed(wo)) return false;
+  const date = new Date(d + 'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  return date <= today;
+};
+
+const isInRange = (dateVal, range) => {
+  if (!dateVal || !range) return false;
+  const d = new Date(typeof dateVal === 'string' && dateVal.length === 10
+    ? dateVal + 'T00:00:00' : dateVal);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  if (range === 'week')  { const w = new Date(now); w.setDate(w.getDate()-7); return d >= w; }
+  if (range === 'month') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  if (range === 'year')  return d.getFullYear()===now.getFullYear();
+  return false;
+};
+
+export const StatusBadge = ({ status }) => {
   const map = {
-    open:[T.accent,'#1a2e3a'], closed:[T.text2,T.bg3], 'in progress':[T.warn,'#3d2e1a'],
-    new:[T.purple,'#2a1e3a'], complete:[T.success,'#1e2a1e'],
-    'waiting on vendor':[T.warn,'#3d2e1a'], 'waiting on parts':[T.warn,'#3d2e1a'],
-    high:[T.danger,'#3d1f1f'], medium:[T.warn,'#3d2e1a'], low:[T.success,'#1e2a1e'],
-    '???':[T.text2,T.bg3],
-    received:[T.accent,'#1a2e3a'], approved:[T.success,'#1e2a1e'], paid:[T.text2,T.bg3],
-    'not received':[T.text2,T.bg3],
+    'New':               [T.accent,  '#1a2e3a'],
+    'Request Sent':      [T.purple,  '#2a1f3a'],
+    'Re-Opened':         [T.warn,    '#3d2e1a'],
+    'Closed':            [T.success, '#1e2a1e'],
+    'Closed - Not Done': [T.danger,  '#3d1f1f'],
   };
-  const [color,bg] = map[s]||[T.text2,T.bg3];
-  return <span style={css.badge(color,bg)}>{status||'—'}</span>;
+  const [color, bg] = map[status] || [T.text2, T.bg3];
+  return <span style={css.badge(color, bg)}>{status || '—'}</span>;
 };
 
-const EditableField = ({ label, value, onSave, type='text' }) => {
-  const [editing,setEditing] = useState(false);
-  const [val,setVal] = useState(value||'');
-  const [saving,setSaving] = useState(false);
-  const inputRef = useRef(null);
-  useEffect(()=>{ if(editing) inputRef.current?.focus(); },[editing]);
-  useEffect(()=>{ setVal(value||''); },[value]);
-  const save = async () => {
-    setSaving(true);
-    try { await onSave(val); setEditing(false); }
-    catch { alert('Save failed'); }
-    finally { setSaving(false); }
-  };
-  const cancel = () => { setVal(value||''); setEditing(false); };
+export const PriorityDot = ({ priority }) => {
+  const colors = { '???':T.text3, Urgent:T.danger, High:T.warn, Medium:T.success, Low:T.accent };
   return (
-    <div style={{marginBottom:'10px'}}>
-      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
-      {editing ? (
-        <div style={{display:'flex',alignItems:'flex-start',gap:'6px'}}>
-          {type==='textarea'?(
-            <textarea ref={inputRef} value={val} onChange={e=>setVal(e.target.value)}
-              style={{flex:1,background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,resize:'vertical',minHeight:'60px',outline:'none'}}/>
-          ):(
-            <input ref={inputRef} type={type} value={val} onChange={e=>setVal(e.target.value)}
-              onKeyDown={e=>{if(e.key==='Enter')save();if(e.key==='Escape')cancel();}}
-              style={{flex:1,background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}/>
-          )}
-          <button onClick={save} disabled={saving} style={{background:T.accent,border:'none',borderRadius:'4px',padding:'5px 10px',color:'#fff',fontSize:F.sm,cursor:'pointer',whiteSpace:'nowrap'}}>
-            {saving?'…':'Save'}
-          </button>
-          <button onClick={cancel} style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text1,fontSize:F.sm,cursor:'pointer'}}>✕</button>
-        </div>
-      ):(
-        <div onClick={()=>setEditing(true)} title="Click to edit"
-          style={{fontSize:F.base,color:val?T.text0:T.text3,cursor:'text',padding:'3px 5px',borderRadius:'4px',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4'}}
-          onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
-          onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
-          {val||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>click to edit</span>}
-        </div>
-      )}
-    </div>
+    <span style={{
+      display:'inline-block', width:'7px', height:'7px', borderRadius:'50%',
+      background:colors[priority]||T.text3, marginRight:'5px', flexShrink:0,
+      verticalAlign:'middle', position:'relative', top:'-1px'
+    }}/>
   );
 };
 
-const useSortable = (data, defaultCol, defaultDir='asc') => {
-  const [col,setCol] = useState(defaultCol);
-  const [dir,setDir] = useState(defaultDir);
-  const toggle = c => { if(c===col) setDir(d=>d==='asc'?'desc':'asc'); else{setCol(c);setDir('asc');} };
-  const sorted = [...(data||[])].sort((a,b)=>{
-    const av=a[col]??'', bv=b[col]??'';
-    const cmp = typeof av==='number'?av-bv : isNaN(Number(av))||av===''?String(av).localeCompare(String(bv)):Number(av)-Number(bv);
-    return dir==='asc'?cmp:-cmp;
-  });
-  const Th = ({c,label,align}) => (
-    <th style={{...css.th,textAlign:align||'left'}} onClick={()=>toggle(c)}>
-      {label}{col===c?<span style={{marginLeft:'3px'}}>{dir==='asc'?'↑':'↓'}</span>:<span style={{marginLeft:'3px',color:T.bg3}}>↕</span>}
-    </th>
-  );
-  return { sorted, toggle, Th };
+export const PRIORITY_ORDER = { '???': 0, 'Urgent': 1, 'High': 2, 'Medium': 3, 'Low': 4 };
+const PRIORITY_OPTIONS  = ['???', 'Urgent', 'High', 'Medium', 'Low'];
+const WO_STATUS_OPTIONS = ['New', 'Request Sent', 'Re-Opened', 'Closed', 'Closed - Not Done'];
+
+const STATUS_DOT_COLORS = {
+  'New':               T.accent,
+  'Request Sent':      T.purple,
+  'Re-Opened':         T.warn,
+  'Closed':            T.success,
+  'Closed - Not Done': T.danger,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ActivityPanel (inline copy — remove if using shared version from monolith)
+// ActivityPanel
 // ─────────────────────────────────────────────────────────────────────────────
-const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
-  const [tab,setTab] = useState('comments');
+export const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
+  const [tab, setTab] = useState('comments');
   return (
     <div style={{display:'flex',flexShrink:0,height:'100%'}}>
       <div onMouseDown={onMouseDown}
@@ -152,10 +128,10 @@ const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
         onMouseLeave={e=>e.currentTarget.style.background=T.border}/>
       <div style={{width:collapsed?'36px':`${width}px`,background:T.bg0,borderLeft:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',overflow:'hidden',transition:'width 200ms ease',flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:collapsed?'center':'space-between',padding:collapsed?'9px 0':'8px 12px',borderBottom:`0.5px solid ${T.border}`,minHeight:'42px',flexShrink:0}}>
-          {!collapsed&&(
+          {!collapsed && (
             <div style={{display:'flex',gap:'2px'}}>
-              {['Comments','Activity'].map(t=>(
-                <button key={t} onClick={()=>setTab(t.toLowerCase())}
+              {['Comments','Activity'].map(t => (
+                <button key={t} onClick={() => setTab(t.toLowerCase())}
                   style={{background:tab===t.toLowerCase()?T.bg2:'transparent',border:'none',padding:'4px 10px',borderRadius:'4px',cursor:'pointer',fontSize:F.sm,color:tab===t.toLowerCase()?T.accent:T.text1,fontWeight:tab===t.toLowerCase()?'600':'400'}}>
                   {t}
                 </button>
@@ -170,13 +146,13 @@ const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
             {collapsed ? '«' : '»'}
           </button>
         </div>
-        {!collapsed&&(
+        {!collapsed && (
           <div style={{flex:1,overflowY:'auto',padding:'12px'}}>
-            {tab==='comments'&&(
+            {tab==='comments' && (
               <div>
                 <div style={{...css.card,marginBottom:'10px'}}>
                   <p style={{fontSize:F.sm,color:T.text2,fontStyle:'italic',lineHeight:'1.6',margin:0}}>
-                    Comments and attached files will sync from Podio via API at go-live. All existing comment history will appear here.
+                    Comments and attached files will sync from Podio via API at go-live.
                   </p>
                 </div>
                 <div style={{textAlign:'center',marginTop:'32px'}}>
@@ -185,11 +161,11 @@ const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
                 </div>
               </div>
             )}
-            {tab==='activity'&&(
+            {tab==='activity' && (
               <div>
                 <div style={{...css.card,marginBottom:'10px'}}>
                   <p style={{fontSize:F.sm,color:T.text2,fontStyle:'italic',lineHeight:'1.6',margin:0}}>
-                    Activity tracking begins at go-live. Field changes and status updates will appear here.
+                    Activity tracking begins at go-live.
                   </p>
                 </div>
                 <div style={{textAlign:'center',marginTop:'32px'}}>
@@ -206,75 +182,648 @@ const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Priority dot indicator
+// Kanban (columns = Status)
 // ─────────────────────────────────────────────────────────────────────────────
-const PriorityDot = ({ priority }) => {
-  const colors = { High:T.danger, Medium:T.warn, Low:T.success, '???':T.text3 };
+const KanbanCardContent = ({ wo, vendors }) => {
+  const vendor    = vendors.find(v => v.id === wo.vendor_id);
+  const shortName = vendor?.company_dba
+    ? vendor.company_dba.split(' ').slice(0, 2).join(' ')
+    : null;
+  const fuDate    = wo.follow_up_date ? fmtNumDate(wo.follow_up_date) : null;
+  const fuOverdue = isFuOverdue(wo.follow_up_date, wo);
+
   return (
-    <span style={{
-      display:'inline-block', width:'7px', height:'7px', borderRadius:'50%',
-      background:colors[priority]||T.text3, marginRight:'6px', flexShrink:0,
-      verticalAlign:'middle', position:'relative', top:'-1px'
-    }}/>
+    <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'9px 10px',userSelect:'none'}}>
+      <div style={{fontSize:F.sm,color:T.text0,fontWeight:'500',lineHeight:'1.35',marginBottom:'6px',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+        {wo.short_description || 'Untitled'}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:'5px',flexWrap:'wrap',marginBottom:'4px'}}>
+        <span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>
+          {wo.prop_code || '—'}
+        </span>
+        <PriorityDot priority={wo.priority || '???'}/>
+        <span style={{fontSize:F.xs,color:T.text2}}>{wo.priority || '???'}</span>
+      </div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'6px'}}>
+        <div style={{display:'flex',gap:'5px',alignItems:'center'}}>
+          {shortName && (
+            <span style={{fontSize:F.xs,color:T.text2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'90px'}}>{shortName}</span>
+          )}
+          {fuDate && (
+            <span style={{fontSize:F.xs,color:fuOverdue?T.warn:T.text2,fontWeight:fuOverdue?'600':'400'}}>
+              {fuOverdue && '⚠ '}{fuDate}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const KanbanCard = ({ wo, vendors, onCardClick }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: wo.id });
+  const style = {
+    transform: transform ? `translate(${transform.x}px,${transform.y}px)` : undefined,
+    opacity: isDragging ? 0.4 : 1,
+    cursor: isDragging ? 'grabbing' : 'grab',
+    marginBottom: '7px',
+    touchAction: 'none',
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}
+      onClick={e => { e.stopPropagation(); if (!isDragging) onCardClick(wo); }}>
+      <KanbanCardContent wo={wo} vendors={vendors}/>
+    </div>
+  );
+};
+
+const KanbanColumn = ({ status, wos, vendors, onCardClick }) => {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+  const color  = STATUS_DOT_COLORS[status] || T.text2;
+  const sorted = [...wos].sort((a, b) => new Date(b.updated_at||0) - new Date(a.updated_at||0));
+
+  return (
+    <div style={{flex:'1 1 0',minWidth:'180px',maxWidth:'280px',display:'flex',flexDirection:'column'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 8px 8px',borderBottom:`0.5px solid ${T.border}`,marginBottom:'8px',flexShrink:0}}>
+        <span style={{width:'7px',height:'7px',borderRadius:'50%',background:color,display:'inline-block',flexShrink:0}}/>
+        <span style={{fontSize:F.xs,fontWeight:'700',color,textTransform:'uppercase',letterSpacing:'0.05em'}}>{status}</span>
+        <span style={{fontSize:F.xs,color:T.text3,marginLeft:'auto'}}>({wos.length})</span>
+      </div>
+      <div ref={setNodeRef} style={{
+        flex:1, overflowY:'auto', padding:'0 2px', minHeight:'80px', borderRadius:'4px',
+        background: isOver ? 'rgba(110,159,216,0.07)' : 'transparent',
+        transition: 'background 0.15s',
+      }}>
+        {sorted.map(wo => (
+          <KanbanCard key={wo.id} wo={wo} vendors={vendors} onCardClick={onCardClick}/>
+        ))}
+        {wos.length === 0 && (
+          <div style={{color:T.text3,fontSize:F.xs,textAlign:'center',padding:'16px 0',fontStyle:'italic'}}>empty</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const KanbanView = ({ wos, vendors, onCardClick, onStatusChange }) => {
+  const [activeWo, setActiveWo] = useState(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const byStatus = useMemo(() =>
+    WO_STATUS_OPTIONS.reduce((acc, s) => {
+      acc[s] = wos.filter(wo => (wo.wo_status || 'New') === s);
+      return acc;
+    }, {})
+  , [wos]);
+
+  const handleDragStart = ({ active }) => {
+    setActiveWo(wos.find(w => w.id === active.id) || null);
+  };
+
+  const handleDragEnd = ({ active, over }) => {
+    setActiveWo(null);
+    if (!over) return;
+    const newStatus = over.id;
+    const wo = wos.find(w => w.id === active.id);
+    if (!wo) return;
+    const currentStatus = wo.wo_status || 'New';
+    if (currentStatus === newStatus) return;
+    onStatusChange(wo.id, newStatus, currentStatus);
+  };
+
+  return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div style={{display:'flex',gap:'10px',height:'100%',overflow:'hidden',padding:'12px 14px'}}>
+        {WO_STATUS_OPTIONS.map(s => (
+          <KanbanColumn key={s} status={s} wos={byStatus[s]||[]} vendors={vendors} onCardClick={onCardClick}/>
+        ))}
+      </div>
+      <DragOverlay dropAnimation={null}>
+        {activeWo ? (
+          <div style={{width:'220px',opacity:0.9,boxShadow:'0 8px 24px rgba(0,0,0,0.5)',cursor:'grabbing'}}>
+            <KanbanCardContent wo={activeWo} vendors={vendors}/>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Stage progress bar
+// More... popover (date filters)
 // ─────────────────────────────────────────────────────────────────────────────
-const STAGES = ['New','In Progress','Waiting on Vendor','Waiting on Parts','Complete'];
-const StageBar = ({ stage }) => {
-  const idx = STAGES.indexOf(stage);
+const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handle = e => {
+      if (ref.current && !ref.current.contains(e.target) &&
+          anchorRef.current && !anchorRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const toggleDate = (row, period) => {
+    setDateFilters(prev => {
+      const isActive = prev[row] === period;
+      if (isActive) return { opened: null, updated: null, closed: null };
+      return { opened: null, updated: null, closed: null, [row]: period };
+    });
+  };
+
+  const dateRows = [
+    { key:'opened',  label:'Opened'  },
+    { key:'updated', label:'Updated' },
+    { key:'closed',  label:'Closed'  },
+  ];
+  const periods = [
+    { key:'week',  label:'This Week'  },
+    { key:'month', label:'This Month' },
+    { key:'year',  label:'This Year'  },
+  ];
+
+  const filterBtnStyle = active => ({
+    padding:'3px 9px', borderRadius:'4px', fontSize:F.xs, cursor:'pointer',
+    border:`0.5px solid ${active ? T.warn : T.border}`,
+    background: active ? 'rgba(212,146,74,0.18)' : 'transparent',
+    color: active ? T.warn : T.text2,
+    fontWeight: active ? '600' : '400',
+    transition:'all 0.15s',
+  });
+
   return (
-    <div style={{display:'flex',gap:'3px',alignItems:'center'}}>
-      {STAGES.map((s,i) => (
-        <div key={s} title={s} style={{
-          flex:1, height:'4px', borderRadius:'2px',
-          background: i <= idx ? (stage==='Complete'?T.success:T.accent) : T.bg3,
-          transition:'background 0.2s',
-        }}/>
+    <div ref={ref} style={{
+      position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:200,
+      background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'6px',
+      padding:'10px 12px', minWidth:'280px', boxShadow:'0 6px 20px rgba(0,0,0,0.5)',
+    }}>
+      {dateRows.map(({ key, label }, idx) => (
+        <div key={key} style={{marginBottom: idx < dateRows.length - 1 ? 10 : 0}}>
+          <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'5px',fontWeight:'600'}}>{label}</div>
+          <div style={{display:'flex',gap:'4px'}}>
+            {periods.map(({ key:pk, label:pl }) => (
+              <button key={pk} onClick={() => toggleDate(key, pk)} style={filterBtnStyle(dateFilters[key] === pk)}>
+                {pl}
+              </button>
+            ))}
+          </div>
+        </div>
       ))}
-      <span style={{fontSize:F.xs,color:T.text2,whiteSpace:'nowrap',marginLeft:'6px'}}>{stage||'—'}</span>
     </div>
   );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Work Order Detail
+// WorkOrders List
 // ─────────────────────────────────────────────────────────────────────────────
-const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
-  const [tab, setTab] = useState('info');
-  const [data, setData] = useState(wo);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [rightWidth, setRightWidth] = useState(280);
-  const resizingRight = useRef(false);
+const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
+  const [vendors, setVendors]               = useState([]);
+  const [statusFilter, setStatusFilter]     = useState('Open');
+  const [priorityFilter, setPriorityFilter] = useState('All');
+  const [propFilter, setPropFilter]         = useState([]);
+  const [search, setSearch]                 = useState('');
+  const [activeProps, setActiveProps]       = useState([]);
+  const [sortCol, setSortCol]               = useState('priority');
+  const [sortDir, setSortDir]               = useState('asc');
+  const [viewMode, setViewMode]             = useState('table');
+  const [dateFilters, setDateFilters]       = useState({ opened: null, updated: null, closed: null });
+  const [moreOpen, setMoreOpen]             = useState(false);
+  const moreAnchorRef = useRef(null);
 
-  // Right panel resize
-  const startRightResize = useCallback((e) => {
-    resizingRight.current = true;
-    const startX = e.clientX;
-    const startW = rightWidth;
-    const onMove = (me) => {
-      if (!resizingRight.current) return;
-      setRightWidth(Math.max(180, Math.min(500, startW - (me.clientX - startX))));
-    };
-    const onUp = () => { resizingRight.current = false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [rightWidth]);
+  useEffect(() => {
+    sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
+      .then(data => setActiveProps(data.map(p => p.prop_code)))
+      .catch(() => {});
+    sbFetch('vendors', 'select=id,company_dba&order=company_dba.asc')
+      .then(data => setVendors(data))
+      .catch(() => {});
+  }, []);
 
-  const save = async (field, val) => {
-    await sbPatch('work_orders', data.id, { [field]: val || null });
-    const updated = { ...data, [field]: val };
-    setData(updated);
-    onUpdate?.(updated);
+  useEffect(() => {
+    document.title = 'Work Orders | SedonaCRM';
+    return () => { document.title = 'SedonaCRM'; };
+  }, []);
+
+  const toggleProp = code => {
+    if (code === 'All') { setPropFilter([]); return; }
+    setPropFilter(prev => prev.includes(code) ? prev.filter(p => p !== code) : [...prev, code]);
   };
 
-  const TABS = ['Info','Vendor & Cost','Timeline','Notes'];
+  const toggleSort = c => {
+    if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(c); setSortDir('asc'); }
+  };
+
+  const priRank = p => PRIORITY_ORDER[p] ?? 99;
+
+  const sorted = useMemo(() => [...wos].sort((a, b) => {
+    let cmp = sortCol === 'priority'
+      ? priRank(a.priority) - priRank(b.priority)
+      : sortCol === 'follow_up_date'
+        ? (a.follow_up_date||'9999') > (b.follow_up_date||'9999') ? 1 : -1
+        : String(a[sortCol] ?? '').localeCompare(String(b[sortCol] ?? ''));
+    if (cmp !== 0) return sortDir === 'asc' ? cmp : -cmp;
+    if (sortCol !== 'priority') return priRank(a.priority) - priRank(b.priority);
+    return String(a.prop_code ?? '').localeCompare(String(b.prop_code ?? ''));
+  }), [wos, sortCol, sortDir]);
+
+  const applyFilters = useCallback((list, skipPriority = false) => {
+    return list.filter(wo => {
+      const closed = isWoClosed(wo);
+      if (dateFilters.closed && !closed) return false;
+      if (statusFilter === 'Open'   && closed)  return false;
+      if (statusFilter === 'Closed' && !closed) return false;
+      if (dateFilters.opened  && !isInRange(wo.created_at, dateFilters.opened))  return false;
+      if (dateFilters.updated && !isInRange(wo.updated_at, dateFilters.updated)) return false;
+      if (dateFilters.closed  && !isInRange(wo.closed_at,  dateFilters.closed))  return false;
+      if (!skipPriority && priorityFilter !== 'All' && (wo.priority || '???') !== priorityFilter) return false;
+      if (propFilter.length > 0 && !propFilter.includes(wo.prop_code)) return false;
+      if (search) {
+        const q     = search.toLowerCase();
+        const vName = vendors.find(v => v.id === wo.vendor_id)?.company_dba || '';
+        return (
+          (wo.short_description||'').toLowerCase().includes(q) ||
+          (wo.prop_code||'').toLowerCase().includes(q) ||
+          (wo.category||'').toLowerCase().includes(q) ||
+          (wo.internal_notes||'').toLowerCase().includes(q) ||
+          vName.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [statusFilter, priorityFilter, propFilter, search, dateFilters, vendors]);
+
+  const filtered           = useMemo(() => applyFilters(sorted),       [sorted, applyFilters]);
+  const filteredNoPriority = useMemo(() => applyFilters(sorted, true), [sorted, applyFilters]);
+
+  const priorityCounts = useMemo(() => {
+    const c = { '???': 0, Urgent: 0, High: 0, Medium: 0, Low: 0 };
+    filteredNoPriority.forEach(wo => { const p = wo.priority || '???'; c[p] = (c[p]||0) + 1; });
+    return c;
+  }, [filteredNoPriority]);
+
+  const grouped = useMemo(() => propFilter.length >= 1
+    ? [...propFilter].sort()
+        .map(pc => ({
+          prop_code: pc,
+          rows: filtered.filter(i => i.prop_code === pc)
+            .sort((a, b) => priRank(a.priority) - priRank(b.priority)),
+        }))
+        .filter(g => g.rows.length > 0)
+    : null
+  , [filtered, propFilter]);
+
+  const hasActiveDateFilter = !!(dateFilters.opened || dateFilters.updated || dateFilters.closed);
+  const hasActiveFilters    = propFilter.length > 0 || priorityFilter !== 'All' ||
+    statusFilter !== 'Open' || search !== '' || hasActiveDateFilter;
+
+  const clearFilters = () => {
+    setStatusFilter('Open'); setPriorityFilter('All'); setPropFilter([]);
+    setSearch('');
+    setDateFilters({ opened: null, updated: null, closed: null });
+  };
+
+  const handleStatusChange = async (woId, newStatus, prevStatus) => {
+    setWos(prev => prev.map(w => w.id === woId ? { ...w, wo_status: newStatus } : w));
+    try {
+      await sbPatch('work_orders', woId, { wo_status: newStatus });
+    } catch {
+      setWos(prev => prev.map(w => w.id === woId ? { ...w, wo_status: prevStatus } : w));
+    }
+  };
+
+  const propBtnStyle = active => ({
+    padding:'3px 7px', borderRadius:'4px', cursor:'pointer', fontSize:F.xs, whiteSpace:'nowrap', flexShrink:0,
+    border:`0.5px solid ${active ? T.accent : T.border}`,
+    background: active ? T.accent : 'transparent',
+    color: active ? '#fff' : T.text2,
+    fontWeight: active ? '600' : '400',
+  });
+
+  const renderTh = (c, label, extraStyle={}) => (
+    <th key={c} style={{...css.th, ...extraStyle}} onClick={() => toggleSort(c)}>
+      {label}{sortCol === c
+        ? <span style={{marginLeft:'3px'}}>{sortDir==='asc'?'↑':'↓'}</span>
+        : <span style={{marginLeft:'3px',color:T.bg3}}>↕</span>}
+    </th>
+  );
+
+  const renderRow = (wo, i) => {
+    const vendor     = vendors.find(v => v.id === wo.vendor_id);
+    const vendorName = vendor?.company_dba || '';
+    const fuOverdue  = isFuOverdue(wo.follow_up_date, wo);
+    const fuDisplay  = wo.follow_up_date ? fmtNumDate(wo.follow_up_date) : '';
+
+    const openDetail = e => {
+      if (e.ctrlKey || e.metaKey) {
+        const tab = window.open(`${window.location.origin}/work-orders/${wo.id}`, '_blank');
+        if (tab) tab.focus();
+      } else {
+        onSelect(wo);
+      }
+    };
+
+    const rowBg = i % 2 === 0 ? 'transparent' : T.bg0;
+
+    return (
+      <tr key={wo.id}
+        style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
+        onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+        onMouseLeave={e => e.currentTarget.style.background = rowBg}
+        onClick={openDetail}>
+
+        {/* WO Title */}
+        <td style={{...css.td}} title={wo.short_description}>
+          {wo.short_description || ''}
+        </td>
+
+        {/* FU Date */}
+        <td style={{...css.td, color: fuOverdue ? T.warn : T.text2}}>
+          {fuDisplay
+            ? <span style={{fontWeight:fuOverdue?'600':'400'}}>{fuOverdue && '⚠ '}{fuDisplay}</span>
+            : ''}
+        </td>
+
+        {/* Prop */}
+        <td style={{...css.td, color:T.accent, fontWeight:'500', fontSize:F.xs, minWidth:'70px'}}>
+          {wo.prop_code || ''}
+        </td>
+
+        {/* Priority */}
+        <td style={css.td}>
+          <span style={{display:'flex',alignItems:'center'}}>
+            <PriorityDot priority={wo.priority||'???'}/>{wo.priority||'???'}
+          </span>
+        </td>
+
+        {/* Assigned (vendor) */}
+        <td style={{...css.td, fontSize:F.xs, color:T.text1}}>{vendorName}</td>
+
+        {/* Status */}
+        <td style={{...css.td, minWidth:'120px', overflow:'visible', whiteSpace:'nowrap'}}>
+          <StatusBadge status={wo.wo_status || 'New'}/>
+        </td>
+
+        {/* Updated */}
+        <td style={{...css.td, color:T.text2, fontSize:F.xs}}>
+          {wo.updated_at ? fmtNumDate(wo.updated_at) : ''}
+        </td>
+
+        {/* Opened */}
+        <td style={{...css.td, color:T.text2, fontSize:F.xs}}>
+          {wo.created_at ? fmtNumDate(wo.created_at) : ''}
+        </td>
+
+        {/* Closed */}
+        <td style={{...css.td, color:wo.closed_at?T.success:T.text3, fontSize:F.xs}}>
+          {wo.closed_at ? fmtNumDate(wo.closed_at) : ''}
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
+      <div style={{padding:'7px 14px 6px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+
+        {/* Title + count + view toggle */}
+        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
+          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Work Orders</span>
+          <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
+          <div style={{marginLeft:'auto',display:'flex',gap:'2px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'2px'}}>
+            {[{mode:'table',icon:'≡',title:'Table view'},{mode:'kanban',icon:'⊞',title:'Kanban view'}].map(({mode,icon,title}) => (
+              <button key={mode} onClick={() => setViewMode(mode)} title={title}
+                style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:'14px',lineHeight:1,
+                  background:viewMode===mode?T.bg3:'transparent',
+                  color:viewMode===mode?T.text0:T.text2,fontWeight:viewMode===mode?'600':'400'}}>
+                {icon}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 1: Property buttons — scrollable */}
+        <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
+          <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
+          {activeProps.map(pc => (
+            <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
+          ))}
+        </div>
+
+        {/* Row 2: Priority | Status | More... | Clear | Search */}
+        <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0}}>
+
+          {/* Priority filter with counts */}
+          <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+            {['All','???','Urgent','High','Medium','Low'].map(p => {
+              const cnt    = p === 'All' ? null : priorityCounts[p] ?? 0;
+              const active = priorityFilter === p;
+              return (
+                <button key={p} onClick={() => setPriorityFilter(p)}
+                  style={{padding:'3px 6px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
+                    background:active?T.bg3:'transparent',
+                    color:active?T.text0:T.text2,
+                    fontWeight:active?'600':'400',display:'flex',alignItems:'center',gap:'2px',whiteSpace:'nowrap'}}>
+                  {p !== 'All' && <PriorityDot priority={p}/>}
+                  {p}
+                  {cnt !== null && <span style={{color:active?T.text1:T.text3,fontSize:'10px'}}>·{cnt}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Open / Closed / All */}
+          <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+            {['Open','Closed','All'].map(s => (
+              <button key={s} onClick={() => setStatusFilter(s)}
+                style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
+                  background:statusFilter===s?T.bg3:'transparent',
+                  color:statusFilter===s?T.text0:T.text2,
+                  fontWeight:statusFilter===s?'600':'400'}}>
+                {s}
+              </button>
+            ))}
+          </div>
+
+          {/* More... button */}
+          <div style={{position:'relative',flexShrink:0}} ref={moreAnchorRef}>
+            <button onClick={() => setMoreOpen(o => !o)}
+              style={{padding:'3px 9px',borderRadius:'5px',cursor:'pointer',fontSize:F.xs,
+                border:`0.5px solid ${hasActiveDateFilter ? T.warn : T.border}`,
+                background: moreOpen ? T.bg3 : 'transparent',
+                color: hasActiveDateFilter ? T.warn : T.text1,
+                display:'flex',alignItems:'center',gap:'5px'}}>
+              More…
+              {hasActiveDateFilter && <span style={{width:'5px',height:'5px',borderRadius:'50%',background:T.warn,flexShrink:0,display:'inline-block'}}/>}
+            </button>
+            <MorePopover
+              open={moreOpen} onClose={() => setMoreOpen(false)} anchorRef={moreAnchorRef}
+              dateFilters={dateFilters} setDateFilters={setDateFilters}
+            />
+          </div>
+
+          {/* Clear Filters — orange when active, hidden when none */}
+          <button onClick={clearFilters}
+            style={{
+              padding:'3px 9px', borderRadius:'5px', cursor:'pointer', fontSize:F.xs,
+              border:`0.5px solid ${hasActiveFilters ? T.warn : T.border}`,
+              background:'transparent',
+              color: hasActiveFilters ? T.warn : T.text3,
+              display:'flex', alignItems:'center', gap:'3px',
+              transition:'all 0.15s',
+              visibility: hasActiveFilters ? 'visible' : 'hidden',
+            }}>
+            <span style={{fontSize:'12px'}}>×</span> Clear
+          </button>
+
+          {/* Search */}
+          <div style={{marginLeft:'auto',position:'relative',display:'flex',alignItems:'center',flexShrink:0}}>
+            {search && (
+              <button onClick={() => setSearch('')}
+                style={{position:'absolute',left:'7px',background:'transparent',border:'none',cursor:'pointer',color:T.text2,fontSize:'14px',lineHeight:1,padding:0,zIndex:1}}>
+                ×
+              </button>
+            )}
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search…"
+              style={{width:'180px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:`4px 10px 4px ${search?'26px':'10px'}`,color:T.text0,fontSize:F.xs,outline:'none'}}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      {loading && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>Loading work orders…</div>}
+      {error   && <div style={{padding:'32px',textAlign:'center',color:T.danger,fontSize:F.sm}}>Error: {error}</div>}
+
+      {!loading && !error && viewMode === 'kanban' && (
+        <div style={{flex:1,overflowX:'auto',overflowY:'hidden'}}>
+          <KanbanView
+            wos={filtered}
+            vendors={vendors}
+            onCardClick={onSelect}
+            onStatusChange={handleStatusChange}
+          />
+        </div>
+      )}
+
+      {!loading && !error && viewMode === 'table' && (
+        <div style={{flex:1,overflowY:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+            <colgroup>
+              <col style={{width:'auto'}}/>
+              <col style={{width:'82px'}}/>
+              <col style={{width:'68px',minWidth:'68px'}}/>
+              <col style={{width:'90px'}}/>
+              <col style={{width:'120px'}}/>
+              <col style={{width:'120px',minWidth:'120px'}}/>
+              <col style={{width:'86px'}}/>
+              <col style={{width:'82px'}}/>
+              <col style={{width:'82px'}}/>
+            </colgroup>
+            <thead style={{position:'sticky',top:0,zIndex:2}}>
+              <tr>
+                {renderTh('short_description','WO Title')}
+                {renderTh('follow_up_date','FU Date')}
+                {renderTh('prop_code','Prop', {paddingLeft:'10px'})}
+                {renderTh('priority','Priority')}
+                {renderTh('vendor_id','Assigned')}
+                <th style={{...css.th,minWidth:'120px',overflow:'visible'}}>Status</th>
+                {renderTh('updated_at','Updated')}
+                {renderTh('created_at','Opened')}
+                {renderTh('closed_at','Closed')}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={9} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No work orders match filters</td></tr>
+              )}
+              {grouped ? (
+                grouped.map(group => (
+                  <React.Fragment key={group.prop_code}>
+                    <tr style={{background:T.bg3,position:'sticky',top:'29px',zIndex:1}}>
+                      <td colSpan={9} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
+                        {group.prop_code} <span style={{color:T.text3,fontWeight:'400'}}>({group.rows.length})</span>
+                      </td>
+                    </tr>
+                    {group.rows.map((wo, i) => renderRow(wo, i))}
+                  </React.Fragment>
+                ))
+              ) : (
+                filtered.map((wo, i) => renderRow(wo, i))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WorkOrder Detail (read-only)
+// ─────────────────────────────────────────────────────────────────────────────
+export const WorkOrderDetail = ({ wo, onBack }) => {
+  const [tab, setTab]                       = useState('info');
+  const [data]                              = useState(wo);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightWidth, setRightWidth]         = useState(280);
+  const resizingRight = useRef(false);
+
+  const startRightResize = useCallback((e) => {
+    resizingRight.current = true;
+    const startX = e.clientX;
+    const startW = rightWidth;
+    const onMove = me => {
+      if (!resizingRight.current) return;
+      setRightWidth(Math.max(180, Math.min(500, startW - (me.clientX - startX))));
+    };
+    const onUp = () => {
+      resizingRight.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [rightWidth]);
+
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'Escape') return;
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      onBack();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onBack]);
+
+  useEffect(() => {
+    const raw = data.short_description || '';
+    const truncated = raw.length > 30 ? raw.substring(0, 30) + '…' : raw;
+    document.title = `${data.prop_code || ''} – ${truncated} | SedonaCRM`;
+    return () => { document.title = 'SedonaCRM'; };
+  }, [data.prop_code, data.short_description]);
+
+  const TABS   = ['Info', 'Notes'];
+  const tabKey = t => t.toLowerCase();
+
+  const field = (label, value, color) => (
+    <div style={{marginBottom:'10px'}}>
+      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
+      <div style={{fontSize:F.base,color:color||(value?T.text0:T.text3),padding:'3px 5px',lineHeight:'1.4',fontStyle:value?'normal':'italic'}}>
+        {value || '—'}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
           <button onClick={onBack}
@@ -283,261 +832,85 @@ const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             ← Work Orders
           </button>
-          <span style={{color:T.text3,fontSize:F.sm}}>WO #{data.wo_num||'—'}</span>
+          <span style={{color:T.text3,fontSize:F.sm}}>{data.prop_code || '—'}</span>
           <span style={{marginLeft:'auto',display:'flex',gap:'8px',alignItems:'center'}}>
-            <StatusBadge status={data.status}/>
-            <StatusBadge status={data.priority}/>
+            <StatusBadge status={data.wo_status || 'New'}/>
+            <StatusBadge status={data.priority || '???'}/>
           </span>
         </div>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'16px'}}>
-          <div>
-            <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3'}}>{data.short_description}</div>
-            <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>
-              {data.prop_code} · {data.category||'Uncategorized'} · {data.wo_type||'Standard'}
-            </div>
-          </div>
+        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3'}}>
+          {data.short_description || 'Untitled Work Order'}
         </div>
-        {/* Stage bar */}
-        <div style={{marginTop:'10px'}}>
-          <StageBar stage={data.stage}/>
+        <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>
+          {data.prop_code} · {data.category || data.wo_category || 'Uncategorized'}
         </div>
       </div>
 
-      {/* Tab bar */}
       <div style={{display:'flex',gap:'2px',padding:'6px 16px 0',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,flexShrink:0}}>
-        {TABS.map(t=>(
-          <button key={t} onClick={()=>setTab(t.toLowerCase().replace(/ & /g,'-').replace(/ /g,'-'))}
-            style={{
-              background:'transparent', border:'none', padding:'6px 12px',
-              fontSize:F.sm, cursor:'pointer', borderRadius:'4px 4px 0 0',
-              color: tab===t.toLowerCase().replace(/ & /g,'-').replace(/ /g,'-') ? T.accent : T.text1,
-              borderBottom: tab===t.toLowerCase().replace(/ & /g,'-').replace(/ /g,'-') ? `2px solid ${T.accent}` : '2px solid transparent',
-              fontWeight: tab===t.toLowerCase().replace(/ & /g,'-').replace(/ /g,'-') ? '600' : '400',
-            }}>
+        {TABS.map(t => (
+          <button key={t} onClick={() => setTab(tabKey(t))}
+            style={{background:'transparent',border:'none',padding:'6px 12px',fontSize:F.sm,cursor:'pointer',borderRadius:'4px 4px 0 0',
+              color:tab===tabKey(t)?T.accent:T.text1,
+              borderBottom:tab===tabKey(t)?`2px solid ${T.accent}`:'2px solid transparent',
+              fontWeight:tab===tabKey(t)?'600':'400'}}>
             {t}
           </button>
         ))}
       </div>
 
-      {/* Body */}
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
         <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
-
-          {/* ── INFO TAB ── */}
-          {tab==='info' && (
+          {tab === 'info' && (
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
               <div style={css.card}>
                 <div style={css.secTitle}>Work Order Info</div>
-                <EditableField label="Short Description" value={data.short_description} onSave={v=>save('short_description',v)}/>
-                <EditableField label="Category" value={data.category} onSave={v=>save('category',v)}/>
-                <div style={{marginBottom:'10px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Priority</div>
-                  <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                    {['High','Medium','Low','???'].map(p=>(
-                      <button key={p} onClick={()=>save('priority',p)}
-                        style={{
-                          padding:'3px 10px', borderRadius:'4px', cursor:'pointer', fontSize:F.sm,
-                          border: data.priority===p ? `1px solid ${T.accent}` : `1px solid ${T.border}`,
-                          background: data.priority===p ? T.bg3 : 'transparent',
-                          color: data.priority===p ? T.text0 : T.text2,
-                        }}>
-                        <PriorityDot priority={p}/>{p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div style={{marginBottom:'10px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Status</div>
-                  <div style={{display:'flex',gap:'6px'}}>
-                    {['Open','Closed'].map(s=>(
-                      <button key={s} onClick={()=>save('status',s)}
-                        style={{
-                          padding:'3px 10px', borderRadius:'4px', cursor:'pointer', fontSize:F.sm,
-                          border: data.status===s ? `1px solid ${T.accent}` : `1px solid ${T.border}`,
-                          background: data.status===s ? T.bg3 : 'transparent',
-                          color: data.status===s ? T.text0 : T.text2,
-                        }}>
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div style={{marginBottom:'10px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Stage</div>
-                  <select value={data.stage||''} onChange={e=>save('stage',e.target.value)}
-                    style={{width:'100%',background:T.bg3,border:`1px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',cursor:'pointer'}}>
-                    <option value="">— select —</option>
-                    {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
+                {field('WO Title', data.short_description)}
+                {field('Category', data.category || data.wo_category)}
+                {field('WO Type', data.wo_type)}
+                {field('Priority', data.priority)}
+                {field('Status', data.wo_status)}
+                {data.wo_num != null && field('WO Number', String(data.wo_num))}
               </div>
-
-              <div style={css.card}>
-                <div style={css.secTitle}>Property & Tenant</div>
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>Property</div>
-                  <div style={{fontSize:F.base,color:T.text0,padding:'3px 5px'}}>{data.prop_code||'—'}</div>
-                </div>
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>WO Type</div>
-                  <select value={data.wo_type||''} onChange={e=>save('wo_type',e.target.value)}
-                    style={{width:'100%',background:T.bg3,border:`1px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',cursor:'pointer'}}>
-                    <option value="">— select —</option>
-                    {['Standard','Recurring','Budget Item'].map(s=><option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <EditableField label="Key Safe Info" value={data.key_safe_info} onSave={v=>save('key_safe_info',v)}/>
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>Budget Item</div>
-                  <button onClick={()=>save('is_budget_item',!data.is_budget_item)}
-                    style={{padding:'3px 10px',borderRadius:'4px',cursor:'pointer',fontSize:F.sm,border:`1px solid ${T.border}`,background:data.is_budget_item?T.accent:'transparent',color:data.is_budget_item?'#fff':T.text2}}>
-                    {data.is_budget_item ? '✓ Budget Item' : 'Mark as Budget Item'}
-                  </button>
-                </div>
-              </div>
-
-              <div style={{...css.card,gridColumn:'1 / -1'}}>
-                <div style={css.secTitle}>Instructions to Vendor</div>
-                <EditableField label="" value={data.instructions_to_vendor} onSave={v=>save('instructions_to_vendor',v)} type="textarea"/>
-              </div>
-            </div>
-          )}
-
-          {/* ── VENDOR & COST TAB ── */}
-          {tab==='vendor-&-cost' && (
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-              <div style={css.card}>
-                <div style={css.secTitle}>Vendor</div>
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>Vendor ID</div>
-                  <div style={{fontSize:F.sm,color:T.text2,fontStyle:'italic',padding:'3px 5px'}}>
-                    {data.vendor_id ? `UUID: ${data.vendor_id.slice(0,8)}…` : 'No vendor assigned — will wire at go-live via Podio API'}
-                  </div>
-                </div>
-                <EditableField label="Estimate Amount" value={data.estimate_amount} onSave={v=>save('estimate_amount',v)} type="number"/>
-                <EditableField label="Estimate Log / Notes" value={data.estimate_log} onSave={v=>save('estimate_log',v)} type="textarea"/>
-              </div>
-
-              <div style={css.card}>
-                <div style={css.secTitle}>Invoice</div>
-                <div style={{marginBottom:'10px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Invoice Stage</div>
-                  <select value={data.invoice_stage||''} onChange={e=>save('invoice_stage',e.target.value)}
-                    style={{width:'100%',background:T.bg3,border:`1px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',cursor:'pointer'}}>
-                    <option value="">— select —</option>
-                    {['Not Received','Received','Approved','Paid'].map(s=><option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <EditableField label="Invoice Location / Reference" value={data.invoice_location} onSave={v=>save('invoice_location',v)}/>
-                <EditableField label="Payment Instructions to Bookkeeper" value={data.pmt_instructions_to_bk} onSave={v=>save('pmt_instructions_to_bk',v)} type="textarea"/>
-              </div>
-
-              <div style={{...css.card,gridColumn:'1 / -1'}}>
-                <div style={css.secTitle}>Estimate Summary</div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px'}}>
-                  {[
-                    ['Estimate',fmtMoney(data.estimate_amount)],
-                    ['Invoice Stage',data.invoice_stage||'—'],
-                    ['WO Type',data.wo_type||'—'],
-                  ].map(([label,val])=>(
-                    <div key={label} style={{background:T.bg3,borderRadius:'6px',padding:'10px 12px'}}>
-                      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'4px'}}>{label}</div>
-                      <div style={{fontSize:F.md,color:T.text0,fontWeight:'500'}}>{val}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── TIMELINE TAB ── */}
-          {tab==='timeline' && (
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
               <div style={css.card}>
                 <div style={css.secTitle}>Dates</div>
-                <EditableField label="Follow-Up Date" value={data.follow_up_date} onSave={v=>save('follow_up_date',v)} type="date"/>
-                <EditableField label="Follow-Up End Date" value={data.follow_up_end_date} onSave={v=>save('follow_up_end_date',v)} type="date"/>
-                <EditableField label="Close Date" value={data.close_date} onSave={v=>save('close_date',v)} type="date"/>
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>Created</div>
-                  <div style={{fontSize:F.base,color:T.text1,padding:'3px 5px'}}>{fmtDate(data.created_at)}</div>
-                </div>
+                {field(
+                  'Follow-Up Date',
+                  data.follow_up_date ? fmtNumDate(data.follow_up_date) : null,
+                  data.follow_up_date && isFuOverdue(data.follow_up_date, data) ? T.warn : undefined
+                )}
+                {field('Close Date', data.close_date ? fmtNumDate(data.close_date) : null)}
+                {field('Closed At', data.closed_at ? fmtNumDate(data.closed_at) : null, data.closed_at ? T.success : undefined)}
+                {field('Opened', data.created_at ? fmtNumDate(data.created_at) : null)}
+                {field('Last Updated', data.updated_at ? fmtNumDate(data.updated_at) : null)}
               </div>
-              <div style={css.card}>
-                <div style={css.secTitle}>Follow-Up Topic</div>
-                <EditableField label="" value={data.follow_up_topic} onSave={v=>save('follow_up_topic',v)} type="textarea"/>
-                <div style={{marginTop:'8px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Email Request Sent</div>
-                  <button onClick={()=>save('email_request_sent',!data.email_request_sent)}
-                    style={{padding:'3px 10px',borderRadius:'4px',cursor:'pointer',fontSize:F.sm,border:`1px solid ${T.border}`,background:data.email_request_sent?T.success:'transparent',color:data.email_request_sent?'#fff':T.text2}}>
-                    {data.email_request_sent ? '✓ Email Sent' : 'Mark Email Sent'}
-                  </button>
-                </div>
-                <div style={{marginTop:'12px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Make Recurring</div>
-                  <button onClick={()=>save('make_recurring',!data.make_recurring)}
-                    style={{padding:'3px 10px',borderRadius:'4px',cursor:'pointer',fontSize:F.sm,border:`1px solid ${T.border}`,background:data.make_recurring?T.accent:'transparent',color:data.make_recurring?'#fff':T.text2}}>
-                    {data.make_recurring ? '✓ Recurring' : 'Set Recurring'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Timeline summary cards */}
-              <div style={{...css.card,gridColumn:'1 / -1'}}>
-                <div style={css.secTitle}>Status Overview</div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'10px'}}>
-                  {[
-                    ['Status',<StatusBadge status={data.status}/>],
-                    ['Stage',data.stage||'—'],
-                    ['Follow-Up',data.follow_up_date?fmtDate(data.follow_up_date):'Not set'],
-                    ['Closed',data.close_date?fmtDate(data.close_date):'Open'],
-                  ].map(([label,val])=>(
-                    <div key={label} style={{background:T.bg3,borderRadius:'6px',padding:'10px 12px'}}>
-                      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'4px'}}>{label}</div>
-                      <div style={{fontSize:F.sm,color:T.text0}}>{val}</div>
-                    </div>
-                  ))}
+              <div style={{...css.card, gridColumn:'1 / -1'}}>
+                <div style={css.secTitle}>Instructions &amp; Details</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
+                  <div>
+                    {field('Instructions to Vendor', data.instructions_to_vendor || data.vendor_instructions)}
+                    {field('Key Safe Info', data.key_safe_info || data.keys_keysafes)}
+                  </div>
+                  <div>
+                    {field('Alert', data.alert)}
+                    {data.estimate_amount != null && field('Estimate', `$${Number(data.estimate_amount).toLocaleString()}`)}
+                    {field('Final Closeout Notes', data.final_closeout_notes || data.final_close_notes)}
+                  </div>
                 </div>
               </div>
             </div>
           )}
-
-          {/* ── NOTES TAB ── */}
-          {tab==='notes' && (
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-              <div style={css.card}>
-                <div style={css.secTitle}>Internal Notes</div>
-                <EditableField label="" value={data.internal_notes} onSave={v=>save('internal_notes',v)} type="textarea"/>
+          {tab === 'notes' && (
+            <div style={css.card}>
+              <div style={css.secTitle}>Internal Notes</div>
+              <div style={{fontSize:F.base,color:data.internal_notes?T.text0:T.text3,lineHeight:'1.6',whiteSpace:'pre-wrap',padding:'3px 5px',fontStyle:data.internal_notes?'normal':'italic'}}>
+                {data.internal_notes || 'No notes recorded.'}
               </div>
-              <div style={css.card}>
-                <div style={css.secTitle}>Final Closeout Notes</div>
-                <EditableField label="" value={data.final_closeout_notes} onSave={v=>save('final_closeout_notes',v)} type="textarea"/>
-              </div>
-              <div style={css.card}>
-                <div style={css.secTitle}>Alert</div>
-                <EditableField label="Alert / Flag" value={data.alert} onSave={v=>save('alert',v)}/>
-              </div>
-              {data.podio_id && (
-                <div style={css.card}>
-                  <div style={css.secTitle}>Podio</div>
-                  <div style={{fontSize:F.sm,color:T.text2,marginBottom:'4px'}}>Podio ID: {data.podio_id}</div>
-                  {data.podio_url && (
-                    <a href={data.podio_url} target="_blank" rel="noreferrer"
-                      style={{fontSize:F.sm,color:T.accent,textDecoration:'none'}}>
-                      View in Podio ↗
-                    </a>
-                  )}
-                </div>
-              )}
             </div>
           )}
-
         </div>
-
-        {/* Right activity panel */}
         <ActivityPanel
           collapsed={rightCollapsed}
-          onCollapse={()=>setRightCollapsed(c=>!c)}
+          onCollapse={() => setRightCollapsed(c => !c)}
           width={rightWidth}
           onMouseDown={startRightResize}
         />
@@ -547,214 +920,52 @@ const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Work Orders List
-// ─────────────────────────────────────────────────────────────────────────────
-const WorkOrdersList = ({ onSelect }) => {
-  const [wos, setWos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [priorityFilter, setPriorityFilter] = useState('All');
-  const [propFilter, setPropFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [activeProps, setActiveProps] = useState([]);
-
-  const { sorted, Th } = useSortable(wos, 'created_at', 'desc');
-
-  // Fetch all WOs (status is null in seeded data — filter client-side)
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    sbFetch('work_orders', 'select=*&order=created_at.desc')
-      .then(data => { setWos(data); setLoading(false); })
-      .catch(e => { setError(e.message); setLoading(false); });
-  }, []);
-
-  // Fetch active properties for dropdown
-  useEffect(() => {
-    sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
-      .then(data => setActiveProps(data.map(p => p.prop_code)))
-      .catch(() => {});
-  }, []);
-
-  const priorities = ['All','High','Medium','Low'];
-
-  const filtered = sorted.filter(w => {
-    // Status filter — treat null/empty as Open
-    if (statusFilter === 'Open' && w.status && w.status !== 'Open') return false;
-    if (statusFilter === 'Open' && !w.status) { /* null = treat as open, keep */ }
-    if (statusFilter === 'Closed' && w.status !== 'Closed') return false;
-    if (priorityFilter !== 'All' && w.priority !== priorityFilter) return false;
-    if (propFilter && w.prop_code !== propFilter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        (w.short_description||'').toLowerCase().includes(q) ||
-        (w.prop_code||'').toLowerCase().includes(q) ||
-        (w.category||'').toLowerCase().includes(q) ||
-        String(w.wo_num||w.podio_id||'').toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
-
-  // Summary counts — treat null status as open
-  const counts = {
-    open: wos.filter(w=>!w.status||w.status==='Open').length,
-    high: wos.filter(w=>w.priority==='High'&&(!w.status||w.status==='Open')).length,
-    invoicePending: wos.filter(w=>w.invoice_stage==='Received'||w.invoice_stage==='Approved').length,
-  };
-
-  return (
-    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
-      {/* Header */}
-      <div style={{padding:'12px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Work Orders</span>
-          <span style={{fontSize:F.sm,color:T.text2}}>{filtered.length.toLocaleString()} shown</span>
-        </div>
-
-        {/* Summary stat cards */}
-        <div style={{display:'flex',gap:'10px',marginBottom:'12px'}}>
-          {[
-            ['Open WOs', counts.open, T.accent],
-            ['High Priority', counts.high, T.danger],
-            ['Invoice Pending', counts.invoicePending, T.warn],
-          ].map(([label,count,color])=>(
-            <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 14px',minWidth:'110px'}}>
-              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
-              <div style={{fontSize:F.xl,fontWeight:'700',color,marginTop:'2px'}}>{count}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Filters */}
-        <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
-          {/* Status */}
-          <div style={{display:'flex',gap:'2px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`}}>
-            {['Open','Closed','All'].map(s=>(
-              <button key={s} onClick={()=>setStatusFilter(s)}
-                style={{padding:'4px 12px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.sm,
-                  background:statusFilter===s?T.bg3:'transparent',
-                  color:statusFilter===s?T.text0:T.text2,
-                  fontWeight:statusFilter===s?'600':'400'}}>
-                {s}
-              </button>
-            ))}
-          </div>
-
-          {/* Priority */}
-          <div style={{display:'flex',gap:'2px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`}}>
-            {priorities.map(p=>(
-              <button key={p} onClick={()=>setPriorityFilter(p)}
-                style={{padding:'4px 10px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.sm,
-                  background:priorityFilter===p?T.bg3:'transparent',
-                  color:priorityFilter===p?T.text0:T.text2,
-                  fontWeight:priorityFilter===p?'600':'400'}}>
-                {p!=='All'&&<PriorityDot priority={p}/>}{p}
-              </button>
-            ))}
-          </div>
-
-          {/* Property filter — active properties only, alphabetical */}
-          <select value={propFilter} onChange={e=>setPropFilter(e.target.value)}
-            style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 10px',color:propFilter?T.text0:T.text2,fontSize:F.sm,outline:'none',cursor:'pointer'}}>
-            <option value="">All Properties</option>
-            {activeProps.map(c=><option key={c} value={c}>{c}</option>)}
-          </select>
-
-          {/* Search */}
-          <input
-            value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="Search WOs…"
-            style={{flex:1,minWidth:'180px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 10px',color:T.text0,fontSize:F.sm,outline:'none'}}
-          />
-        </div>
-      </div>
-
-      {/* Table */}
-      <div style={{flex:1,overflowY:'auto'}}>
-        {loading && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>Loading work orders…</div>}
-        {error && <div style={{padding:'32px',textAlign:'center',color:T.danger,fontSize:F.sm}}>Error: {error}</div>}
-        {!loading && !error && (
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
-            <colgroup>
-              <col style={{width:'auto'}}/>  {/* Description */}
-              <col style={{width:'55px'}}/>  {/* Prop */}
-              <col style={{width:'60px'}}/>  {/* WO# */}
-              <col style={{width:'80px'}}/>  {/* Priority */}
-              <col style={{width:'110px'}}/> {/* Category */}
-              <col style={{width:'60px'}}/>  {/* Budget */}
-              <col style={{width:'130px'}}/> {/* Stage */}
-              <col style={{width:'90px'}}/>  {/* Invoice */}
-              <col style={{width:'90px'}}/>  {/* Follow-Up */}
-            </colgroup>
-            <thead style={{position:'sticky',top:0,zIndex:1}}>
-              <tr>
-                <Th c="short_description" label="Short Description"/>
-                <Th c="prop_code" label="Prop"/>
-                <Th c="wo_num" label="WO#"/>
-                <Th c="priority" label="Priority"/>
-                <Th c="category" label="Category"/>
-                <Th c="is_budget_item" label="Budget"/>
-                <Th c="stage" label="Stage"/>
-                <Th c="invoice_stage" label="Invoice"/>
-                <Th c="follow_up_date" label="Follow-Up"/>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr><td colSpan={9} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No work orders match filters</td></tr>
-              )}
-              {filtered.map((w,i) => (
-                <tr key={w.id}
-                  onClick={()=>onSelect(w)}
-                  style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
-                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
-                  onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
-                  <td style={css.td} title={w.short_description}>{w.short_description}</td>
-                  <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{w.prop_code}</td>
-                  <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{w.wo_num||w.podio_id||'—'}</td>
-                  <td style={css.td}>
-                    <span style={{display:'flex',alignItems:'center'}}>
-                      <PriorityDot priority={w.priority}/>{w.priority||'—'}
-                    </span>
-                  </td>
-                  <td style={{...css.td,color:T.text2}}>{w.category||'—'}</td>
-                  <td style={{...css.td,textAlign:'center',color:w.is_budget_item?T.warn:T.text3,fontSize:F.xs}}>{w.is_budget_item?'Yes':'No'}</td>
-                  <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{w.stage||'—'}</td>
-                  <td style={css.td}>{w.invoice_stage ? <StatusBadge status={w.invoice_stage}/> : <span style={{color:T.text3,fontSize:F.xs}}>—</span>}</td>
-                  <td style={{...css.td,color:w.follow_up_date&&new Date(w.follow_up_date)<new Date()?T.danger:T.text2,fontSize:F.xs}}>
-                    {w.follow_up_date?fmtDate(w.follow_up_date):'—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main export
+// Main export — WO state lives here so Kanban drags survive detail/back
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WorkOrdersView() {
+  const [wos, setWos]           = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
   const [selected, setSelected] = useState(null);
-  const [resetKey, setResetKey] = useState(0);
 
-  const handleSelect = (wo) => setSelected(wo);
-  const handleBack = () => setSelected(null);
-  const handleUpdate = (updated) => setSelected(updated);
+  useEffect(() => {
+    setLoading(true); setError(null);
+    sbFetch('work_orders', 'select=*')
+      .then(data => { setWos(data); setLoading(false); })
+      .catch(e   => { setError(e.message); setLoading(false); });
+  }, []);
 
-  // Re-mounts list when returning from detail to pick up any edits
+  const handleSelect = useCallback((wo) => {
+    history.pushState({ woId: wo.id }, '');
+    setSelected(wo);
+  }, []);
+
+  const handleBack = useCallback(() => {
+    if (window.history.state?.woId) history.replaceState({}, '');
+    setSelected(null);
+  }, []);
+
+  useEffect(() => {
+    const onPop = () => setSelected(null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>
-      {selected ? (
-        <WorkOrderDetail key={selected.id} wo={selected} onBack={handleBack} onUpdate={handleUpdate}/>
-      ) : (
-        <WorkOrdersList key={resetKey} onSelect={handleSelect}/>
+      <div style={{display:selected?'none':'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+        <WorkOrdersList
+          wos={wos} setWos={setWos}
+          loading={loading} error={error}
+          onSelect={handleSelect}
+        />
+      </div>
+      {selected && (
+        <WorkOrderDetail
+          key={selected.id}
+          wo={selected}
+          onBack={handleBack}
+        />
       )}
     </div>
   );
