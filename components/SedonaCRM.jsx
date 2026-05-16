@@ -313,7 +313,6 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
   <script>window.onload=()=>window.print();</script></body></html>`);
   win.document.close();
 };
-const fmtNum = n => n!=null&&n!==''?Number(n).toLocaleString():'—';
 
 // ── Property Detail ───────────────────────────────────────────────────────────
 const PropertyDetail = ({ property, onBack, onUpdate }) => {
