@@ -1,5 +1,6 @@
 import WorkOrdersView from './WorkOrdersView';
 import SuitesView from './SuitesView';
+import IssuesView from './IssuesView';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -1121,6 +1122,7 @@ export default function SedonaCRM() {
       case 'tenants':            return <TenantsView key={resetKey}/>;
       case 'work-orders':        return <WorkOrdersView key={resetKey}/>;
       case 'suites':             return <SuitesView />;
+      case 'issues':             return <IssuesView key={resetKey}/>;
       case 'leasing':            return <StubView title="Leasing Pipeline" note="Pipeline and stage tracking — coming soon."/>;
       case 'leases':             return <StubView title="Leases" note="Lease management — coming soon."/>;
       case 'tnt-cois':           return <StubView title="Tenant COIs" note="Insurance certificate tracking — coming soon."/>;
@@ -1154,6 +1156,7 @@ export default function SedonaCRM() {
           <NavItem icon="ti-users"          label="Tenants"     active={currentView==='tenants'}     onClick={()=>navTo('tenants')}     {...navProps}/>
           <NavItem icon="ti-door"           label="Suites"      active={currentView==='suites'}      onClick={()=>navTo('suites')}      {...navProps}/>
           <NavItem icon="ti-tool"           label="Work Orders" active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
+          <NavItem icon="ti-alert-triangle" label="Issues"      active={currentView==='issues'}      onClick={()=>navTo('issues')}      {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
           <NavItem icon="ti-pipeline"   label="Pipeline" active={currentView==='leasing'}   onClick={()=>navTo('leasing')}   {...navProps}/>
           <NavItem icon="ti-file-text"  label="Leases"   active={currentView==='leases'}    onClick={()=>navTo('leases')}    {...navProps}/>
