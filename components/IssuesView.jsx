@@ -252,9 +252,9 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
             <StatusBadge status={data.priority}/>
           </span>
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3'}}>{data.issue_title||'Untitled Issue'}</div>
+        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3'}}>{data.issue_name||'Untitled Issue'}</div>
         <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>
-          {data.prop_code} · {data.issue_type||'Uncategorized'}
+          {data.prop_code} · {data.category||'Uncategorized'}
         </div>
       </div>
 
@@ -283,8 +283,8 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
               <div style={css.card}>
                 <div style={css.secTitle}>Issue Info</div>
-                <EditableField label="Issue Title" value={data.issue_title} onSave={v=>save('issue_title',v)}/>
-                <EditableField label="Issue Type" value={data.issue_type} onSave={v=>save('issue_type',v)}/>
+                <EditableField label="Issue Title" value={data.issue_name} onSave={v=>save('issue_name',v)}/>
+                <EditableField label="Issue Type" value={data.category} onSave={v=>save('category',v)}/>
                 <div style={{marginBottom:'10px'}}>
                   <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Priority</div>
                   <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
@@ -329,7 +329,7 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
 
               <div style={{...css.card,gridColumn:'1 / -1'}}>
                 <div style={css.secTitle}>Description</div>
-                <EditableField label="" value={data.description} onSave={v=>save('description',v)} type="textarea"/>
+                <EditableField label="" value={data.issue_details} onSave={v=>save('issue_details',v)} type="textarea"/>
               </div>
             </div>
           )}
@@ -339,8 +339,8 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
               <div style={css.card}>
                 <div style={css.secTitle}>Dates</div>
-                <EditableField label="Reported Date" value={data.reported_date} onSave={v=>save('reported_date',v)} type="date"/>
-                <EditableField label="Resolved Date" value={data.resolved_date} onSave={v=>save('resolved_date',v)} type="date"/>
+                <EditableField label="Reported Date" value={data.create_date} onSave={v=>save('create_date',v)} type="date"/>
+                <EditableField label="Resolved Date" value={data.close_date} onSave={v=>save('close_date',v)} type="date"/>
                 <div style={{marginBottom:'8px'}}>
                   <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>Created</div>
                   <div style={{fontSize:F.base,color:T.text1,padding:'3px 5px'}}>{fmtDate(data.created_at)}</div>
@@ -353,8 +353,8 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
                   {[
                     ['Status', <StatusBadge status={data.status}/>],
                     ['Priority', <StatusBadge status={data.priority}/>],
-                    ['Reported', data.reported_date ? fmtDate(data.reported_date) : 'Not set'],
-                    ['Resolved', data.resolved_date ? fmtDate(data.resolved_date) : 'Open'],
+                    ['Reported', data.create_date ? fmtDate(data.create_date) : 'Not set'],
+                    ['Resolved', data.close_date ? fmtDate(data.close_date) : 'Open'],
                   ].map(([label,val])=>(
                     <div key={label} style={{background:T.bg3,borderRadius:'6px',padding:'10px 12px'}}>
                       <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'4px'}}>{label}</div>
@@ -371,7 +371,7 @@ const IssueDetail = ({ issue, onBack, onUpdate }) => {
             <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'16px'}}>
               <div style={css.card}>
                 <div style={css.secTitle}>Notes</div>
-                <EditableField label="" value={data.notes} onSave={v=>save('notes',v)} type="textarea"/>
+                <EditableField label="" value={data.strategy_notes} onSave={v=>save('strategy_notes',v)} type="textarea"/>
               </div>
             </div>
           )}
@@ -403,12 +403,12 @@ const IssuesList = ({ onSelect }) => {
   const [search, setSearch] = useState('');
   const [activeProps, setActiveProps] = useState([]);
 
-  const { sorted, Th } = useSortable(issues, 'reported_date', 'desc');
+  const { sorted, Th } = useSortable(issues, 'create_date', 'desc');
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    sbFetch('issues', 'select=*&order=reported_date.desc')
+    sbFetch('issues', 'select=*&order=create_date.desc')
       .then(data => { setIssues(data); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
@@ -429,8 +429,8 @@ const IssuesList = ({ onSelect }) => {
     open: issues.filter(isOpen).length,
     high: issues.filter(iss => iss.priority === 'High' && isOpen(iss)).length,
     resolvedThisMonth: issues.filter(iss => {
-      if (!iss.resolved_date) return false;
-      const d = new Date(iss.resolved_date);
+      if (!iss.close_date) return false;
+      const d = new Date(iss.close_date);
       return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
     }).length,
   };
@@ -443,10 +443,10 @@ const IssuesList = ({ onSelect }) => {
     if (search) {
       const q = search.toLowerCase();
       return (
-        (iss.issue_title||'').toLowerCase().includes(q) ||
+        (iss.issue_name||'').toLowerCase().includes(q) ||
         (iss.prop_code||'').toLowerCase().includes(q) ||
-        (iss.issue_type||'').toLowerCase().includes(q) ||
-        (iss.description||'').toLowerCase().includes(q)
+        (iss.category||'').toLowerCase().includes(q) ||
+        (iss.issue_details||'').toLowerCase().includes(q)
       );
     }
     return true;
@@ -536,13 +536,13 @@ const IssuesList = ({ onSelect }) => {
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:1}}>
               <tr>
-                <Th c="issue_title"    label="Issue Title"/>
+                <Th c="issue_name"    label="Issue Title"/>
                 <Th c="prop_code"      label="Prop"/>
-                <Th c="issue_type"     label="Type"/>
+                <Th c="category"     label="Type"/>
                 <Th c="priority"       label="Priority"/>
                 <Th c="status"         label="Status"/>
-                <Th c="reported_date"  label="Reported"/>
-                <Th c="resolved_date"  label="Resolved"/>
+                <Th c="create_date"  label="Reported"/>
+                <Th c="close_date"  label="Resolved"/>
               </tr>
             </thead>
             <tbody>
@@ -555,18 +555,18 @@ const IssuesList = ({ onSelect }) => {
                   style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
-                  <td style={css.td} title={iss.issue_title}>{iss.issue_title||'—'}</td>
+                  <td style={css.td} title={iss.issue_name}>{iss.issue_name||'—'}</td>
                   <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{iss.prop_code}</td>
-                  <td style={{...css.td,color:T.text2}}>{iss.issue_type||'—'}</td>
+                  <td style={{...css.td,color:T.text2}}>{iss.category||'—'}</td>
                   <td style={css.td}>
                     <span style={{display:'flex',alignItems:'center'}}>
                       <PriorityDot priority={iss.priority}/>{iss.priority||'—'}
                     </span>
                   </td>
                   <td style={css.td}><StatusBadge status={iss.status||'Open'}/></td>
-                  <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{iss.reported_date ? fmtDate(iss.reported_date) : '—'}</td>
-                  <td style={{...css.td,color:iss.resolved_date?T.success:T.text3,fontSize:F.xs}}>
-                    {iss.resolved_date ? fmtDate(iss.resolved_date) : '—'}
+                  <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{iss.create_date ? fmtDate(iss.create_date) : '—'}</td>
+                  <td style={{...css.td,color:iss.close_date?T.success:T.text3,fontSize:F.xs}}>
+                    {iss.close_date ? fmtDate(iss.close_date) : '—'}
                   </td>
                 </tr>
               ))}
