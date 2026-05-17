@@ -263,6 +263,16 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
   const hasMoreActive       = statusFilters.includes('Past') || hasActiveDateFilter;
   const hasActiveFilters    = propFilter.length > 0 || !isDefaultStatus || search !== '' || hasActiveDateFilter;
 
+  const grouped = useMemo(() => propFilter.length >= 1
+    ? [...propFilter].sort()
+        .map(pc => ({
+          prop_code: pc,
+          rows: filtered.filter(r => r.prop_code === pc),
+        }))
+        .filter(g => g.rows.length > 0)
+    : null
+  , [filtered, propFilter]);
+
   const clearFilters = () => {
     setStatusFilters([...DEFAULT_STATUSES]);
     setPropFilter([]);
@@ -288,8 +298,18 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
 
   const tdR = { ...css.td, textAlign:'right', fontVariantNumeric:'tabular-nums' };
 
+  const isEndingSoon = row => {
+    if (!row.rent_ends || row.rent_status === 'Past') return false;
+    const end = new Date(row.rent_ends + 'T00:00:00');
+    if (isNaN(end.getTime())) return false;
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const diff = (end - now) / (1000 * 60 * 60 * 24);
+    return diff >= 0 && diff <= 30;
+  };
+
   const renderRow = (row, i) => {
     const rowBg = i % 2 === 0 ? 'transparent' : T.bg0;
+    const endSoon = isEndingSoon(row);
 
     const openDetail = e => {
       if (e.ctrlKey || e.metaKey) {
@@ -311,7 +331,10 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
         <td style={css.td}>{row.suite_num||''}</td>
         <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{row.tenants?.lease_type||''}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(row.rent_starts)}</td>
-        <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(row.rent_ends)}</td>
+        <td style={{...css.td,color:T.text2,fontSize:F.xs,
+          ...(endSoon ? {background:'rgba(239,68,68,0.20)',color:'#f87171'} : {})}}>
+          {fmtNumDate(row.rent_ends)}
+        </td>
         <td style={{...tdR,color:T.text0}}>{fmtCurrency(row.base_rent)}</td>
         <td style={{...tdR,color:T.text2}}>{fmtCurrency(row.nnn)}</td>
         <td style={{...tdR,color:T.text2}}>{fmtCurrency(row.other_amt)}</td>
@@ -418,18 +441,18 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
         <div style={{flex:1,overflowY:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              {/* Prop     */} <col style={{width:'56px'}}/>
-              {/* Tenant   */} <col style={{width:'auto'}}/>
-              {/* Suite    */} <col style={{width:'58px'}}/>
-              {/* Type     */} <col style={{width:'50px'}}/>
-              {/* Start    */} <col style={{width:'80px'}}/>
-              {/* End      */} <col style={{width:'80px'}}/>
-              {/* Base Rent*/} <col style={{width:'90px'}}/>
-              {/* NNN      */} <col style={{width:'82px'}}/>
-              {/* Other    */} <col style={{width:'78px'}}/>
-              {/* CAMi     */} <col style={{width:'78px'}}/>
-              {/* TPT Tax  */} <col style={{width:'80px'}}/>
-              {/* Total    */} <col style={{width:'88px'}}/>
+              {/* Prop     */} <col style={{width:'5%'}}/>
+              {/* Tenant   */} <col style={{width:'17%'}}/>
+              {/* Suite    */} <col style={{width:'5%'}}/>
+              {/* Type     */} <col style={{width:'5%'}}/>
+              {/* Start    */} <col style={{width:'7%'}}/>
+              {/* End      */} <col style={{width:'7%'}}/>
+              {/* Base Rent*/} <col style={{width:'9%'}}/>
+              {/* NNN      */} <col style={{width:'9%'}}/>
+              {/* Other    */} <col style={{width:'9%'}}/>
+              {/* CAMi     */} <col style={{width:'9%'}}/>
+              {/* TPT Tax  */} <col style={{width:'9%'}}/>
+              {/* Total    */} <col style={{width:'9%'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
@@ -439,19 +462,32 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
                 {renderTh('lease_type', 'Type')}
                 {renderTh('rent_starts','Start')}
                 {renderTh('rent_ends',  'End')}
-                <th style={{...css.th,textAlign:'right',cursor:'default'}}>Base Rent</th>
-                <th style={{...css.th,textAlign:'right',cursor:'default'}}>NNN</th>
-                <th style={{...css.th,textAlign:'right',cursor:'default'}}>Other</th>
-                <th style={{...css.th,textAlign:'right',cursor:'default'}}>CAMi</th>
-                <th style={{...css.th,textAlign:'right',cursor:'default'}}>TPT Tax</th>
-                <th style={{...css.th,textAlign:'right',cursor:'default'}}>Total</th>
+                {renderTh('base_rent',  'Base Rent', {textAlign:'right'})}
+                {renderTh('nnn',        'NNN',       {textAlign:'right'})}
+                {renderTh('other_amt',  'Other',     {textAlign:'right'})}
+                {renderTh('cam_impound','CAMi',      {textAlign:'right'})}
+                {renderTh('tpt_tax',    'TPT Tax',   {textAlign:'right'})}
+                {renderTh('total',      'Total',     {textAlign:'right'})}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
                 <tr><td colSpan={NCOLS} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No records match filters</td></tr>
               )}
-              {filtered.map((row, i) => renderRow(row, i))}
+              {grouped ? (
+                grouped.map(group => (
+                  <React.Fragment key={group.prop_code}>
+                    <tr style={{background:T.bg3,position:'sticky',top:'29px',zIndex:1}}>
+                      <td colSpan={NCOLS} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
+                        {group.prop_code} <span style={{color:T.text3,fontWeight:'400'}}>({group.rows.length})</span>
+                      </td>
+                    </tr>
+                    {group.rows.map((row, i) => renderRow(row, i))}
+                  </React.Fragment>
+                ))
+              ) : (
+                filtered.map((row, i) => renderRow(row, i))
+              )}
             </tbody>
           </table>
         </div>
