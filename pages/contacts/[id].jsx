@@ -14,18 +14,23 @@ export default function ContactDetailPage() {
     const { id } = router.query;
     if (!id) return;
     setLoading(true);
-    sbFetch('contacts', `id=eq.${id}&select=*`)
+    setError(null);
+    sbFetch('contacts', `select=*&id=eq.${id}`)
       .then(data => {
-        if (data.length === 0) { setError('Contact not found'); setLoading(false); return; }
+        if (!Array.isArray(data) || data.length === 0) {
+          setError('Contact not found');
+          setLoading(false);
+          return;
+        }
         setContact(data[0]);
+        document.title = `${data[0].full_name || 'Contact'} | SedonaCRM`;
         setLoading(false);
       })
       .catch(e => { setError(e.message); setLoading(false); });
   }, [router.isReady, router.query.id]);
 
   const handleBack = () => {
-    const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('contactsBackUrl')) || '/contacts';
-    router.push(backUrl);
+    router.push('/contacts');
   };
 
   return (

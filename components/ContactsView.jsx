@@ -132,6 +132,8 @@ const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) 
 // ─────────────────────────────────────────────────────────────────────────────
 // ContactsList
 // ─────────────────────────────────────────────────────────────────────────────
+const NCOLS = 7;
+
 const ContactsList = ({ contacts, loading, error, onSelect }) => {
   const [statusFilter, setStatusFilter]     = useState('Active');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -206,6 +208,16 @@ const ContactsList = ({ contacts, loading, error, onSelect }) => {
     return c;
   }, [filteredNoCategory]);
 
+  const grouped = useMemo(() => propFilter.length >= 1
+    ? [...propFilter].sort()
+        .map(pc => ({
+          prop_code: pc,
+          rows: filtered.filter(c => c.prop_code === pc),
+        }))
+        .filter(g => g.rows.length > 0)
+    : null
+  , [filtered, propFilter]);
+
   const hasActiveDateFilter = !!(dateFilters.updated || dateFilters.added);
   const hasMoreActive       = hasActiveDateFilter;
   const hasActiveFilters    = propFilter.length > 0 || categoryFilter !== 'All' ||
@@ -248,21 +260,17 @@ const ContactsList = ({ contacts, loading, error, onSelect }) => {
         onMouseEnter={e => e.currentTarget.style.background = T.bg2}
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
         onClick={openDetail}>
-        <td style={{...css.td}} title={contact.full_name}>{contact.full_name||''}</td>
+        <td style={{...css.td,fontWeight:'500'}} title={contact.full_name}>{contact.full_name||''}</td>
+        <td style={{...css.td,color:T.accent,fontWeight:'600',fontSize:F.xs}}>{contact.prop_code||''}</td>
+        <td style={{...css.td,color:T.text1}} title={contact.company_dba}>{contact.company_dba||''}</td>
         <td style={{...css.td,fontSize:F.xs}}>
           {contact.category
             ? <span style={css.badge(T.text1, T.bg3)}>{contact.category}</span>
             : ''}
         </td>
-        <td style={{...css.td,color:T.text1}} title={contact.company_dba}>{contact.company_dba||''}</td>
-        <td style={{...css.td,color:T.text2,fontSize:F.xs}} title={contact.email}>{contact.email||''}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{contact.primary_phone||''}</td>
-        <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{contact.prop_code||''}</td>
-        <td style={{...css.td,minWidth:'72px',overflow:'visible'}}>
-          <ContactStatusBadge status={contact.status}/>
-        </td>
-        <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(contact.updated_at)}</td>
-        <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(contact.created_at)}</td>
+        <td style={{...css.td,color:T.text2,fontSize:F.xs}} title={contact.email}>{contact.email||''}</td>
+        <td style={{...css.td,overflow:'visible'}}><ContactStatusBadge status={contact.status}/></td>
       </tr>
     );
   };
@@ -375,34 +383,43 @@ const ContactsList = ({ contacts, loading, error, onSelect }) => {
         <div style={{flex:1,overflowY:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'auto'}}/>
-              <col style={{width:'140px'}}/>
-              <col style={{width:'150px'}}/>
-              <col style={{width:'170px'}}/>
-              <col style={{width:'110px'}}/>
-              <col style={{width:'58px'}}/>
-              <col style={{width:'72px'}}/>
-              <col style={{width:'82px'}}/>
-              <col style={{width:'82px'}}/>
+              {/* Name     */} <col style={{width:'22%'}}/>
+              {/* Prop     */} <col style={{width:'6%'}}/>
+              {/* Company  */} <col style={{width:'20%'}}/>
+              {/* Category */} <col style={{width:'16%'}}/>
+              {/* Phone    */} <col style={{width:'11%'}}/>
+              {/* Email    */} <col style={{width:'18%'}}/>
+              {/* Status   */} <col style={{width:'7%'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
                 {renderTh('full_name',     'Name')}
-                {renderTh('category',      'Category')}
+                {renderTh('prop_code',     'Prop')}
                 {renderTh('company_dba',   'Company')}
-                {renderTh('email',         'Email')}
+                {renderTh('category',      'Category')}
                 {renderTh('primary_phone', 'Phone')}
-                {renderTh('prop_code',     'Props')}
-                <th style={{...css.th,minWidth:'72px'}}>Status</th>
-                {renderTh('updated_at', 'Updated')}
-                {renderTh('created_at', 'Added')}
+                {renderTh('email',         'Email')}
+                {renderTh('status',        'Status')}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={9} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No contacts match filters</td></tr>
+                <tr><td colSpan={NCOLS} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No contacts match filters</td></tr>
               )}
-              {filtered.map((contact, i) => renderRow(contact, i))}
+              {grouped ? (
+                grouped.map(group => (
+                  <React.Fragment key={group.prop_code}>
+                    <tr style={{background:T.bg3,position:'sticky',top:'29px',zIndex:1}}>
+                      <td colSpan={NCOLS} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
+                        {group.prop_code} <span style={{color:T.text3,fontWeight:'400'}}>({group.rows.length})</span>
+                      </td>
+                    </tr>
+                    {group.rows.map((contact, i) => renderRow(contact, i))}
+                  </React.Fragment>
+                ))
+              ) : (
+                filtered.map((contact, i) => renderRow(contact, i))
+              )}
             </tbody>
           </table>
         </div>
