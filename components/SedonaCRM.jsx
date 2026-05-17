@@ -1164,6 +1164,8 @@ export default function SedonaCRM() {
           <NavItem icon="ti-tool"           label="Work Orders" active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
           <NavItem icon="ti-alert-triangle" label="Issues"      active={currentView==='issues'}      onClick={()=>router.push('/issues')}   {...navProps}/>
           <NavItem icon="ti-address-book"  label="Contacts"    active={currentView==='contacts'}    onClick={()=>router.push('/contacts')} {...navProps}/>
+          <NavItem icon="ti-building"      label="Vendors"     active={currentView==='vendors'}     onClick={()=>router.push('/vendors')}  {...navProps}/>
+          <NavItem icon="ti-home"          label="Owners"      active={currentView==='owners'}      onClick={()=>router.push('/owners')}   {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
           <NavItem icon="ti-pipeline"   label="Pipeline" active={currentView==='leasing'}   onClick={()=>navTo('leasing')}   {...navProps}/>
           <NavItem icon="ti-file-text"  label="Leases"   active={currentView==='leases'}    onClick={()=>navTo('leases')}             {...navProps}/>
