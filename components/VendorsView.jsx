@@ -59,7 +59,9 @@ const catIncludes = (vendorCat, selected) => {
   return vendorCat.split('; ').map(c => c.trim()).includes(selected);
 };
 
-const STATUS_OPTIONS = ['Active', 'Inactive', 'Unrated Currently'];
+const STATUS_OPTIONS  = ['Active', 'Inactive', 'Unrated Currently'];
+const TEN99_OPTIONS   = ['Yes', 'No', 'Unknown'];
+const tenNinetyNineRank = v => v === true ? 0 : v === false ? 1 : 2;
 
 const STORE_KEY = 'vendorsViewState';
 const loadSaved = () => { try { const s = sessionStorage.getItem(STORE_KEY); return s ? JSON.parse(s) : null; } catch { return null; } };
@@ -163,20 +165,13 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
 
   const [statusFilter, setStatusFilter] = useState(saved?.statusFilter ?? 'All');
   const [catFilter,    setCatFilter]    = useState(saved?.catFilter    ?? '');
-  const [propFilter,   setPropFilter]   = useState(saved?.propFilter   ?? []);
+  const [ten99Filter,  setTen99Filter]  = useState(saved?.ten99Filter  ?? 'All');
   const [search,       setSearch]       = useState(saved?.search       ?? '');
   const [sortCol,      setSortCol]      = useState(saved?.sortCol      ?? 'company_dba');
   const [sortDir,      setSortDir]      = useState(saved?.sortDir      ?? 'asc');
   const [dateFilters,  setDateFilters]  = useState(saved?.dateFilters  ?? { updated: null });
   const [moreOpen,     setMoreOpen]     = useState(false);
-  const [activeProps,  setActiveProps]  = useState([]);
   const moreAnchorRef = useRef(null);
-
-  useEffect(() => {
-    sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
-      .then(data => setActiveProps(data.map(p => p.prop_code)))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     document.title = 'Vendors | SedonaCRM';
@@ -186,9 +181,9 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
   // Persist filter state
   useEffect(() => {
     try {
-      sessionStorage.setItem(STORE_KEY, JSON.stringify({ statusFilter, catFilter, propFilter, search, sortCol, sortDir, dateFilters }));
+      sessionStorage.setItem(STORE_KEY, JSON.stringify({ statusFilter, catFilter, ten99Filter, search, sortCol, sortDir, dateFilters }));
     } catch {}
-  }, [statusFilter, catFilter, propFilter, search, sortCol, sortDir, dateFilters]);
+  }, [statusFilter, catFilter, ten99Filter, search, sortCol, sortDir, dateFilters]);
 
   // Derive individual categories from data
   const allCategories = useMemo(() => {
@@ -201,26 +196,28 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
     return [...set].sort();
   }, [vendors]);
 
-  const toggleProp = code => {
-    if (code === 'All') { setPropFilter([]); return; }
-    setPropFilter(prev => prev.includes(code) ? prev.filter(p => p !== code) : [...prev, code]);
-  };
-
   const toggleSort = c => {
     if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortCol(c); setSortDir('asc'); }
   };
 
   const sorted = useMemo(() => [...vendors].sort((a, b) => {
+    if (sortCol === 'gets_1099') {
+      const cmp = tenNinetyNineRank(a.gets_1099) - tenNinetyNineRank(b.gets_1099);
+      return sortDir === 'asc' ? cmp : -cmp;
+    }
     const cmp = String(a[sortCol] ?? '').localeCompare(String(b[sortCol] ?? ''));
     return sortDir === 'asc' ? cmp : -cmp;
   }), [vendors, sortCol, sortDir]);
 
-  const applyFilters = useCallback((list, { skipCat = false } = {}) => {
+  const applyFilters = useCallback((list, { skipCat = false, skip1099 = false } = {}) => {
     return list.filter(v => {
       if (statusFilter !== 'All' && (v.vendor_status || '') !== statusFilter) return false;
       if (!skipCat && catFilter && !catIncludes(v.vendor_category, catFilter)) return false;
-      if (propFilter.length > 0 && !propFilter.includes(v.prop_code)) return false;
+      if (!skip1099 && ten99Filter !== 'All') {
+        const val = v.gets_1099 === true ? 'Yes' : v.gets_1099 === false ? 'No' : 'Unknown';
+        if (val !== ten99Filter) return false;
+      }
       if (dateFilters.updated && !isInRange(v.updated_at, dateFilters.updated)) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -234,10 +231,11 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
       }
       return true;
     });
-  }, [statusFilter, catFilter, propFilter, search, dateFilters]);
+  }, [statusFilter, catFilter, ten99Filter, search, dateFilters]);
 
-  const filtered       = useMemo(() => applyFilters(sorted),                [sorted, applyFilters]);
-  const filteredNoCat  = useMemo(() => applyFilters(sorted, {skipCat:true}), [sorted, applyFilters]);
+  const filtered       = useMemo(() => applyFilters(sorted),                        [sorted, applyFilters]);
+  const filteredNoCat  = useMemo(() => applyFilters(sorted, {skipCat:true}),        [sorted, applyFilters]);
+  const filteredNo1099 = useMemo(() => applyFilters(sorted, {skip1099:true}),       [sorted, applyFilters]);
 
   // Category counts against filtered-without-category set
   const catCounts = useMemo(() => {
@@ -253,13 +251,24 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
     return c;
   }, [filteredNoCat]);
 
-  // Status counts (excluding status filter itself)
+  const ten99Counts = useMemo(() => {
+    const c = { All: filteredNo1099.length, Yes: 0, No: 0, Unknown: 0 };
+    filteredNo1099.forEach(v => {
+      if (v.gets_1099 === true)       c.Yes++;
+      else if (v.gets_1099 === false) c.No++;
+      else                            c.Unknown++;
+    });
+    return c;
+  }, [filteredNo1099]);
+
+  // Status counts (all filters except status)
   const statusCounts = useMemo(() => {
-    const base = applyFilters(sorted, {skipCat:true});
-    // Re-apply all filters except status
-    const noStatus = base.filter(v => {
+    const noStatus = sorted.filter(v => {
       if (catFilter && !catIncludes(v.vendor_category, catFilter)) return false;
-      if (propFilter.length > 0 && !propFilter.includes(v.prop_code)) return false;
+      if (ten99Filter !== 'All') {
+        const val = v.gets_1099 === true ? 'Yes' : v.gets_1099 === false ? 'No' : 'Unknown';
+        if (val !== ten99Filter) return false;
+      }
       if (dateFilters.updated && !isInRange(v.updated_at, dateFilters.updated)) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -276,24 +285,16 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
     const c = { All: noStatus.length };
     STATUS_OPTIONS.forEach(s => { c[s] = noStatus.filter(v => (v.vendor_status||'') === s).length; });
     return c;
-  }, [vendors, sorted, catFilter, propFilter, search, dateFilters]);
+  }, [sorted, catFilter, ten99Filter, search, dateFilters]);
 
   const hasMoreActive    = !!catFilter || !!dateFilters.updated;
-  const hasActiveFilters = statusFilter !== 'All' || !!catFilter || propFilter.length > 0 ||
+  const hasActiveFilters = statusFilter !== 'All' || !!catFilter || ten99Filter !== 'All' ||
     search !== '' || !!dateFilters.updated;
 
   const clearFilters = () => {
-    setStatusFilter('All'); setCatFilter(''); setPropFilter([]);
+    setStatusFilter('All'); setCatFilter(''); setTen99Filter('All');
     setSearch(''); setDateFilters({ updated: null });
   };
-
-  const propBtnStyle = active => ({
-    padding:'3px 7px', borderRadius:'4px', cursor:'pointer', fontSize:F.xs, whiteSpace:'nowrap', flexShrink:0,
-    border:`0.5px solid ${active ? T.accent : T.border}`,
-    background: active ? T.accent : 'transparent',
-    color: active ? '#fff' : T.text2,
-    fontWeight: active ? '600' : '400',
-  });
 
   const renderTh = (c, label, extraStyle={}) => (
     <th key={c} style={{...css.th, ...extraStyle}} onClick={() => toggleSort(c)}>
@@ -354,15 +355,7 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
         </div>
 
-        {/* Row 1: property strip */}
-        <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
-          <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
-          {activeProps.map(pc => (
-            <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
-          ))}
-        </div>
-
-        {/* Row 2: Status | More… | Clear | Search */}
+        {/* Filter bar: Status | 1099 | More… | Clear | Search */}
         <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0}}>
 
           {/* Status pills */}
@@ -378,6 +371,25 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
                     fontWeight:active?'600':'400',
                     display:'flex',alignItems:'center',gap:'2px',whiteSpace:'nowrap'}}>
                   {s}
+                  <span style={{color:active?T.text1:T.text3,fontSize:'10px'}}>·{cnt}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 1099 pills */}
+          <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+            {['All',...TEN99_OPTIONS].map(t => {
+              const cnt    = ten99Counts[t] ?? 0;
+              const active = ten99Filter === t;
+              return (
+                <button key={t} onClick={() => setTen99Filter(t)}
+                  style={{padding:'3px 7px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
+                    background:active?T.bg3:'transparent',
+                    color:active?T.text0:T.text2,
+                    fontWeight:active?'600':'400',
+                    display:'flex',alignItems:'center',gap:'2px',whiteSpace:'nowrap'}}>
+                  {t}
                   <span style={{color:active?T.text1:T.text3,fontSize:'10px'}}>·{cnt}</span>
                 </button>
               );
@@ -457,7 +469,7 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
                 {renderTh('main_phone','Phone')}
                 {renderTh('city','City/State')}
                 {renderTh('prop_code','Prop', {paddingLeft:'10px'})}
-                <th style={css.th}>1099</th>
+                {renderTh('gets_1099','1099')}
                 {renderTh('vendor_status','Status')}
                 {renderTh('updated_at','Updated')}
               </tr>

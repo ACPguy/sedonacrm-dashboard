@@ -126,20 +126,12 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
   const saved = useMemo(() => loadSaved(), []);
 
   const [catFilter,   setCatFilter]   = useState(saved?.catFilter   ?? 'Active');
-  const [propFilter,  setPropFilter]  = useState(saved?.propFilter  ?? []);
   const [search,      setSearch]      = useState(saved?.search      ?? '');
   const [sortCol,     setSortCol]     = useState(saved?.sortCol     ?? 'prop_code');
   const [sortDir,     setSortDir]     = useState(saved?.sortDir     ?? 'asc');
   const [dateFilters, setDateFilters] = useState(saved?.dateFilters ?? { updated: null });
   const [moreOpen,    setMoreOpen]    = useState(false);
-  const [activeProps, setActiveProps] = useState([]);
   const moreAnchorRef = useRef(null);
-
-  useEffect(() => {
-    sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
-      .then(data => setActiveProps(data.map(p => p.prop_code)))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     document.title = 'Owners | SedonaCRM';
@@ -149,14 +141,9 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
   // Persist filter state
   useEffect(() => {
     try {
-      sessionStorage.setItem(STORE_KEY, JSON.stringify({ catFilter, propFilter, search, sortCol, sortDir, dateFilters }));
+      sessionStorage.setItem(STORE_KEY, JSON.stringify({ catFilter, search, sortCol, sortDir, dateFilters }));
     } catch {}
-  }, [catFilter, propFilter, search, sortCol, sortDir, dateFilters]);
-
-  const toggleProp = code => {
-    if (code === 'All') { setPropFilter([]); return; }
-    setPropFilter(prev => prev.includes(code) ? prev.filter(p => p !== code) : [...prev, code]);
-  };
+  }, [catFilter, search, sortCol, sortDir, dateFilters]);
 
   const toggleSort = c => {
     if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -178,7 +165,6 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
   const applyFilters = useCallback((list, { skipCat = false } = {}) => {
     return list.filter(o => {
       if (!skipCat && catFilter !== 'All' && (o.category||'') !== catFilter) return false;
-      if (propFilter.length > 0 && !propFilter.includes(o.prop_code)) return false;
       if (dateFilters.updated && !isInRange(o.updated_at, dateFilters.updated)) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -191,7 +177,7 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
       }
       return true;
     });
-  }, [catFilter, propFilter, search, dateFilters]);
+  }, [catFilter, search, dateFilters]);
 
   const filtered      = useMemo(() => applyFilters(sorted),                [sorted, applyFilters]);
   const filteredNoCat = useMemo(() => applyFilters(sorted, {skipCat:true}), [sorted, applyFilters]);
@@ -203,21 +189,12 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
   }, [filteredNoCat]);
 
   const hasMoreActive    = !!dateFilters.updated;
-  const hasActiveFilters = catFilter !== 'Active' || propFilter.length > 0 ||
-    search !== '' || !!dateFilters.updated;
+  const hasActiveFilters = catFilter !== 'Active' || search !== '' || !!dateFilters.updated;
 
   const clearFilters = () => {
-    setCatFilter('Active'); setPropFilter([]);
+    setCatFilter('Active');
     setSearch(''); setDateFilters({ updated: null });
   };
-
-  const propBtnStyle = active => ({
-    padding:'3px 7px', borderRadius:'4px', cursor:'pointer', fontSize:F.xs, whiteSpace:'nowrap', flexShrink:0,
-    border:`0.5px solid ${active ? T.accent : T.border}`,
-    background: active ? T.accent : 'transparent',
-    color: active ? '#fff' : T.text2,
-    fontWeight: active ? '600' : '400',
-  });
 
   const renderTh = (c, label, extraStyle={}) => (
     <th key={c} style={{...css.th, ...extraStyle}} onClick={() => toggleSort(c)}>
@@ -269,15 +246,7 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
         </div>
 
-        {/* Row 1: property strip */}
-        <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
-          <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
-          {activeProps.map(pc => (
-            <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
-          ))}
-        </div>
-
-        {/* Row 2: Category pills | More… | Clear | Search */}
+        {/* Filter bar: Category pills | More… | Clear | Search */}
         <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0}}>
 
           {/* Category pills */}
