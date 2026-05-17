@@ -143,6 +143,16 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 
 2. **npm run dev before every commit** — After every set of changes, run `npm run dev` (or `npm run build`) and confirm no build errors before committing or pushing. Fix errors first, then push. Never push broken code to GitHub (it deploys broken to Vercel).
 
+3. **Destructive Database Operations — ALWAYS STOP AND CONFIRM** — Before executing ANY of the following, stop and tell me exactly what you are about to run and why, then wait for my explicit confirmation before proceeding:
+   - TRUNCATE (any table)
+   - DROP TABLE or DROP COLUMN
+   - DELETE FROM (any table)
+   - Any ALTER TABLE that removes or modifies existing data
+   - Any psql command that could result in data loss
+
+   This rule applies even when --dangerously-skip-permissions is active.
+   For all other operations (file reads, file writes, git, npm, SELECT queries), proceed without asking.
+
 ## Routing Pattern (Issues as template for all modules)
 
 Modules get proper Next.js pages. Issues is the template — replicate this for Work Orders, Suites, Tenants, etc.
@@ -175,6 +185,21 @@ components/IssuesView.jsx     — exports: sbFetch, sbPatch, T, F, css, fmtDate,
 
 ## Next Priorities
 
-1. Build complete Property detail with all 5 tab groups using lazy-loaded reusable components
-2. Wire Home dashboard urgent items to real data
-3. Build Leasing Pipeline standalone view
+1. Tenant detail form — refine into the definitive detail template for all future forms
+   - Tab structure: Info | Lease | Contact | Notes | Communications (stub)
+   - Info tab: two-column layout — Tenant Info left, Suite & Property right (see current screenshot as starting point — it's close)
+   - Lease tab: lease dates, term, type, options, security deposit, NNN prorata
+   - Contact tab: primary contact name, phone, email, entity info
+   - Notes tab: internal notes field (editable)
+   - Communications tab: placeholder panel — "Email thread syncs from Gmail at go-live"
+   - All fields editable via EditableField pattern (same as existing detail views)
+   - HelloSign button stub in header
+   - Drive folder link in header (gdrive_folder_id → linked icon)
+   - Back button → returns to Tenants list preserving filter/sort state
+   - Escape key closes detail
+   - Browser tab title: "RHS · 4 Pawz Pet Grooming | SedonaCRM" pattern
+
+2. Property detail form — hub of the entire system, built after Tenant template is solid
+   - 5 tab groups with embedded filtered views (Issues, Work Orders, Tenants, Rent Schedule, etc.)
+
+3. All other detail forms follow after Property — Vendors, Owners, Contacts, Work Orders
