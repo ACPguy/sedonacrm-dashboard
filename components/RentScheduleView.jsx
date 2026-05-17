@@ -30,7 +30,7 @@ export const css = {
   td: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
 };
 
-const NCOLS = 12;
+const NCOLS = 14;
 
 const STATUS_RANK = { Current: 0, Future: 1, Proposed: 2, Past: 3, Dead: 4, Archived: 5 };
 const DEFAULT_STATUSES = ['Current', 'Future'];
@@ -332,8 +332,12 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
         <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{row.tenants?.lease_type||''}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(row.rent_starts)}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs,
-          ...(endSoon ? {background:'rgba(239,68,68,0.20)',color:'#f87171'} : {})}}>
+          ...(endSoon ? {color:'#f87171',fontWeight:'700'} : {})}}>
           {fmtNumDate(row.rent_ends)}
+        </td>
+        <td style={{...css.td,overflow:'visible'}}><RentStatusBadge status={row.rent_status}/></td>
+        <td style={{...css.td,fontSize:F.xs,color:T.text2,textAlign:'center'}}>
+          {row.cpi_adjusted ? <span style={css.badge(T.purple,'#2a1f3a')}>CPI</span> : '—'}
         </td>
         <td style={{...tdR,color:T.text0}}>{fmtCurrency(row.base_rent)}</td>
         <td style={{...tdR,color:T.text2}}>{fmtCurrency(row.nnn)}</td>
@@ -441,33 +445,37 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
         <div style={{flex:1,overflowY:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              {/* Prop     */} <col style={{width:'5%'}}/>
-              {/* Tenant   */} <col style={{width:'17%'}}/>
-              {/* Suite    */} <col style={{width:'5%'}}/>
-              {/* Type     */} <col style={{width:'5%'}}/>
-              {/* Start    */} <col style={{width:'7%'}}/>
-              {/* End      */} <col style={{width:'7%'}}/>
-              {/* Base Rent*/} <col style={{width:'9%'}}/>
-              {/* NNN      */} <col style={{width:'9%'}}/>
-              {/* Other    */} <col style={{width:'9%'}}/>
-              {/* CAMi     */} <col style={{width:'9%'}}/>
-              {/* TPT Tax  */} <col style={{width:'9%'}}/>
-              {/* Total    */} <col style={{width:'9%'}}/>
+              {/* Prop      */} <col style={{width:'5%'}}/>
+              {/* Tenant    */} <col style={{width:'15%'}}/>
+              {/* Suite     */} <col style={{width:'4%'}}/>
+              {/* Type      */} <col style={{width:'5%'}}/>
+              {/* Start     */} <col style={{width:'6%'}}/>
+              {/* End       */} <col style={{width:'6%'}}/>
+              {/* Status    */} <col style={{width:'7%'}}/>
+              {/* CPI       */} <col style={{width:'4%'}}/>
+              {/* Base Rent */} <col style={{width:'8%'}}/>
+              {/* NNN       */} <col style={{width:'7%'}}/>
+              {/* Other     */} <col style={{width:'7%'}}/>
+              {/* CAMi      */} <col style={{width:'7%'}}/>
+              {/* TPT Tax   */} <col style={{width:'7%'}}/>
+              {/* Total     */} <col style={{width:'8%'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
-                {renderTh('prop_code',  'Prop')}
-                {renderTh('tenant_dba', 'Tenant')}
-                {renderTh('suite_num',  'Suite')}
-                {renderTh('lease_type', 'Type')}
-                {renderTh('rent_starts','Start')}
-                {renderTh('rent_ends',  'End')}
-                {renderTh('base_rent',  'Base Rent', {textAlign:'right'})}
-                {renderTh('nnn',        'NNN',       {textAlign:'right'})}
-                {renderTh('other_amt',  'Other',     {textAlign:'right'})}
-                {renderTh('cam_impound','CAMi',      {textAlign:'right'})}
-                {renderTh('tpt_tax',    'TPT Tax',   {textAlign:'right'})}
-                {renderTh('total',      'Total',     {textAlign:'right'})}
+                {renderTh('prop_code',    'Prop')}
+                {renderTh('tenant_dba',   'Tenant')}
+                {renderTh('suite_num',    'Suite')}
+                {renderTh('lease_type',   'Type')}
+                {renderTh('rent_starts',  'Start')}
+                {renderTh('rent_ends',    'End')}
+                {renderTh('rent_status',  'Status')}
+                {renderTh('cpi_adjusted', 'CPI')}
+                {renderTh('base_rent',    'Base Rent', {textAlign:'right'})}
+                {renderTh('nnn',          'NNN',       {textAlign:'right'})}
+                {renderTh('other_amt',    'Other',     {textAlign:'right'})}
+                {renderTh('cam_impound',  'CAMi',      {textAlign:'right'})}
+                {renderTh('tpt_tax',      'TPT Tax',   {textAlign:'right'})}
+                {renderTh('total',        'Total',     {textAlign:'right'})}
               </tr>
             </thead>
             <tbody>
