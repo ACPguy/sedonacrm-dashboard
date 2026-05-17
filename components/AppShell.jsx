@@ -77,16 +77,18 @@ export default function AppShell({ children, activeView }) {
         </div>
         {/* Nav */}
         <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
-          <NavBtn label="Morning Briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={collapsed}/>
+          <NavBtn label="Home" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={collapsed}/>
           <SectionLabel label="Operations" collapsed={collapsed}/>
           <NavBtn label="Properties"  active={is('properties')}  onClick={()=>go('/?view=properties')}  collapsed={collapsed}/>
           <NavBtn label="Tenants"     active={is('tenants')}     onClick={()=>go('/?view=tenants')}     collapsed={collapsed}/>
           <NavBtn label="Suites"      active={is('suites')}      onClick={()=>go('/?view=suites')}      collapsed={collapsed}/>
           <NavBtn label="Work Orders" active={is('work-orders')} onClick={()=>go('/work-orders')} collapsed={collapsed}/>
           <NavBtn label="Issues"      active={is('issues')}      onClick={()=>go('/issues')}             collapsed={collapsed}/>
+          <NavBtn label="Contacts"    active={is('contacts')}    onClick={()=>go('/contacts')}           collapsed={collapsed}/>
           <SectionLabel label="Leasing" collapsed={collapsed}/>
-          <NavBtn label="Pipeline" active={is('leasing')}  onClick={()=>go('/?view=leasing')}  collapsed={collapsed}/>
-          <NavBtn label="Leases"   active={is('leases')}   onClick={()=>go('/?view=leases')}   collapsed={collapsed}/>
+          <NavBtn label="Pipeline"      active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={collapsed}/>
+          <NavBtn label="Leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={collapsed}/>
+          <NavBtn label="Rents"         active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={collapsed}/>
           <SectionLabel label="Compliance" collapsed={collapsed}/>
           <NavBtn label="Insurance"   active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={collapsed}/>
           <NavBtn label="Inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={collapsed}/>

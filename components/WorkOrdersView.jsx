@@ -545,7 +545,15 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
         style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
         onMouseEnter={e => e.currentTarget.style.background = T.bg2}
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
-        onClick={e => { if (!e.target.closest('a')) onSelect(wo); }}>
+        onClick={e => {
+          if (e.target.closest('a')) return;
+          if (e.ctrlKey || e.metaKey) {
+            const tab = window.open(`${window.location.origin}/work-orders/${wo.id}`, '_blank');
+            if (tab) tab.focus();
+          } else {
+            onSelect(wo);
+          }
+        }}>
 
         {/* WO # — real anchor enables ctrl+click, middle-click, right-click → open in new tab */}
         <td style={{...css.td, minWidth:'52px', fontSize:F.xs, color:T.text1}}>
