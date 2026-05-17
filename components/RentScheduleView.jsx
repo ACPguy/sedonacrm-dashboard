@@ -30,6 +30,11 @@ export const css = {
   td: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
 };
 
+const NCOLS = 12;
+
+const STATUS_RANK = { Current: 0, Future: 1, Proposed: 2, Past: 3, Dead: 4, Archived: 5 };
+const DEFAULT_STATUSES = ['Current', 'Future'];
+
 const fmtNumDate = d => {
   if (!d) return '';
   const date = new Date(typeof d === 'string' && d.length === 10 ? d + 'T00:00:00' : d);
@@ -87,9 +92,9 @@ const RentStatusBadge = ({ status }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// More... popover — date filters: Start Date / End Date / Updated
+// More... popover — Past toggle + date filters
 // ─────────────────────────────────────────────────────────────────────────────
-const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) => {
+const MorePopover = ({ open, onClose, anchorRef, statusFilters, toggleStatus, dateFilters, setDateFilters }) => {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -132,12 +137,25 @@ const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) 
     transition:'all 0.15s',
   });
 
+  const pastActive = statusFilters.includes('Past');
+
   return (
     <div ref={ref} style={{
       position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:200,
       background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'6px',
       padding:'10px 12px', minWidth:'280px', boxShadow:'0 6px 20px rgba(0,0,0,0.5)',
     }}>
+      {/* Past toggle */}
+      <div style={{marginBottom:'10px'}}>
+        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'5px',fontWeight:'600'}}>Include</div>
+        <button onClick={() => toggleStatus('Past')} style={filterBtnStyle(pastActive)}>
+          Past
+        </button>
+      </div>
+
+      <div style={{borderTop:`0.5px solid ${T.border}`,margin:'8px 0 10px'}}/>
+
+      {/* Date filters */}
       {dateRows.map(({ key, label }, idx) => (
         <div key={key} style={{marginBottom: idx < dateRows.length - 1 ? 10 : 0}}>
           <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'5px',fontWeight:'600'}}>{label}</div>
@@ -158,14 +176,14 @@ const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) 
 // RentScheduleList
 // ─────────────────────────────────────────────────────────────────────────────
 const RentScheduleList = ({ rows, loading, error, onSelect }) => {
-  const [expiryFilter, setExpiryFilter] = useState('All');
-  const [propFilter, setPropFilter]     = useState([]);
-  const [search, setSearch]             = useState('');
-  const [activeProps, setActiveProps]   = useState([]);
-  const [sortCol, setSortCol]           = useState('prop_code');
-  const [sortDir, setSortDir]           = useState('asc');
-  const [dateFilters, setDateFilters]   = useState({ starts: null, ends: null, updated: null });
-  const [moreOpen, setMoreOpen]         = useState(false);
+  const [statusFilters, setStatusFilters] = useState([...DEFAULT_STATUSES]);
+  const [propFilter, setPropFilter]       = useState([]);
+  const [search, setSearch]               = useState('');
+  const [activeProps, setActiveProps]     = useState([]);
+  const [sortCol, setSortCol]             = useState('default');
+  const [sortDir, setSortDir]             = useState('asc');
+  const [dateFilters, setDateFilters]     = useState({ starts: null, ends: null, updated: null });
+  const [moreOpen, setMoreOpen]           = useState(false);
   const moreAnchorRef = useRef(null);
 
   useEffect(() => {
@@ -184,21 +202,23 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
     setPropFilter(prev => prev.includes(code) ? prev.filter(p => p !== code) : [...prev, code]);
   };
 
+  const toggleStatus = s => {
+    if (s === 'All') { setStatusFilters([]); return; }
+    setStatusFilters(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+  };
+
   const toggleSort = c => {
     if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortCol(c); setSortDir('asc'); }
   };
 
-  const matchesExpiry = (row, filter) => {
-    if (filter === 'All') return true;
-    const ml = calcMoLeft(row.rent_ends);
-    if (filter === 'Expiring 3mo')  return ml !== null && ml >= 0 && ml <= 3;
-    if (filter === 'Expiring 12mo') return ml !== null && ml >= 0 && ml <= 12;
-    if (filter === 'Expired')       return ml === null || ml < 0;
-    return true;
-  };
-
   const sorted = useMemo(() => [...rows].sort((a, b) => {
+    if (sortCol === 'default') {
+      const ra = STATUS_RANK[a.rent_status] ?? 99;
+      const rb = STATUS_RANK[b.rent_status] ?? 99;
+      if (ra !== rb) return ra - rb;
+      return (a.prop_code||'').localeCompare(b.prop_code||'');
+    }
     let av, bv;
     if (sortCol === 'tenant_dba') {
       av = a.tenants?.tenant_dba ?? '';
@@ -211,11 +231,17 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
       bv = b[sortCol] ?? '';
     }
     const cmp = typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv));
-    return sortDir === 'asc' ? cmp : -cmp;
+    if (cmp !== 0) return sortDir === 'asc' ? cmp : -cmp;
+    // Tiebreaker: status rank → prop_code
+    const ra = STATUS_RANK[a.rent_status] ?? 99;
+    const rb = STATUS_RANK[b.rent_status] ?? 99;
+    if (ra !== rb) return ra - rb;
+    return (a.prop_code||'').localeCompare(b.prop_code||'');
   }), [rows, sortCol, sortDir]);
 
   const filtered = useMemo(() => sorted.filter(row => {
-    if (!matchesExpiry(row, expiryFilter)) return false;
+    const allActive = statusFilters.length === 0;
+    if (!allActive && !statusFilters.includes(row.rent_status)) return false;
     if (propFilter.length > 0 && !propFilter.includes(row.prop_code)) return false;
     if (dateFilters.starts  && !isInRange(row.rent_starts, dateFilters.starts))  return false;
     if (dateFilters.ends    && !isInRange(row.rent_ends,   dateFilters.ends))    return false;
@@ -229,14 +255,18 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
       );
     }
     return true;
-  }), [sorted, expiryFilter, propFilter, dateFilters, search]);
+  }), [sorted, statusFilters, propFilter, dateFilters, search]);
 
+  const isDefaultStatus = statusFilters.length === 2 &&
+    statusFilters.includes('Current') && statusFilters.includes('Future');
   const hasActiveDateFilter = !!(dateFilters.starts || dateFilters.ends || dateFilters.updated);
-  const hasMoreActive       = hasActiveDateFilter;
-  const hasActiveFilters    = propFilter.length > 0 || expiryFilter !== 'All' || search !== '' || hasActiveDateFilter;
+  const hasMoreActive       = statusFilters.includes('Past') || hasActiveDateFilter;
+  const hasActiveFilters    = propFilter.length > 0 || !isDefaultStatus || search !== '' || hasActiveDateFilter;
 
   const clearFilters = () => {
-    setExpiryFilter('All'); setPropFilter([]); setSearch('');
+    setStatusFilters([...DEFAULT_STATUSES]);
+    setPropFilter([]);
+    setSearch('');
     setDateFilters({ starts: null, ends: null, updated: null });
   };
 
@@ -256,10 +286,10 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
     </th>
   );
 
+  const tdR = { ...css.td, textAlign:'right', fontVariantNumeric:'tabular-nums' };
+
   const renderRow = (row, i) => {
-    const moLeft = calcMoLeft(row.rent_ends);
-    const rowBg  = i % 2 === 0 ? 'transparent' : T.bg0;
-    const annual = row.base_rent != null ? Number(row.base_rent) * 12 : null;
+    const rowBg = i % 2 === 0 ? 'transparent' : T.bg0;
 
     const openDetail = e => {
       if (e.ctrlKey || e.metaKey) {
@@ -277,22 +307,22 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
         onClick={openDetail}>
         <td style={{...css.td,color:T.accent,fontWeight:'600',fontSize:F.xs}}>{row.prop_code||''}</td>
-        <td style={css.td}>{row.suite_num||''}</td>
         <td style={{...css.td,color:T.text1}} title={row.tenants?.tenant_dba}>{row.tenants?.tenant_dba||''}</td>
+        <td style={css.td}>{row.suite_num||''}</td>
         <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{row.tenants?.lease_type||''}</td>
-        <td style={{...css.td,textAlign:'right',fontVariantNumeric:'tabular-nums',color:T.text0}}>{fmtCurrency(row.base_rent)}</td>
-        <td style={{...css.td,textAlign:'right',fontVariantNumeric:'tabular-nums',color:T.text2}}>{fmtCurrency(annual)}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(row.rent_starts)}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(row.rent_ends)}</td>
-        <td style={{...css.td,textAlign:'center',fontWeight:'600',color:moLeftColor(moLeft),fontSize:F.xs}}>
-          {moLeft === null ? '—' : moLeft < 0 ? 'Exp' : String(moLeft)}
-        </td>
-        <td style={{...css.td,minWidth:'72px',overflow:'visible'}}>
-          <RentStatusBadge status={row.rent_status}/>
-        </td>
+        <td style={{...tdR,color:T.text0}}>{fmtCurrency(row.base_rent)}</td>
+        <td style={{...tdR,color:T.text2}}>{fmtCurrency(row.nnn)}</td>
+        <td style={{...tdR,color:T.text2}}>{fmtCurrency(row.other_amt)}</td>
+        <td style={{...tdR,color:T.text2}}>{fmtCurrency(row.cam_impound)}</td>
+        <td style={{...tdR,color:T.text2}}>{fmtCurrency(row.tpt_tax)}</td>
+        <td style={{...tdR,color:T.text0,fontWeight:'600'}}>{fmtCurrency(row.total)}</td>
       </tr>
     );
   };
+
+  const allActive = statusFilters.length === 0;
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -313,20 +343,23 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
           ))}
         </div>
 
-        {/* Row 2: Expiry | More... | Clear | Search */}
+        {/* Row 2: Status | More... | Clear | Search */}
         <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0}}>
 
-          {/* Expiry quick filter */}
+          {/* Status filter — multi-select: Current | Future | All */}
           <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
-            {['All','Expiring 3mo','Expiring 12mo','Expired'].map(f => (
-              <button key={f} onClick={() => setExpiryFilter(f)}
-                style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
-                  background:expiryFilter===f?T.bg3:'transparent',
-                  color:expiryFilter===f?T.text0:T.text2,
-                  fontWeight:expiryFilter===f?'600':'400',whiteSpace:'nowrap'}}>
-                {f}
-              </button>
-            ))}
+            {['Current','Future','All'].map(s => {
+              const active = s === 'All' ? allActive : statusFilters.includes(s);
+              return (
+                <button key={s} onClick={() => toggleStatus(s)}
+                  style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
+                    background:active?T.bg3:'transparent',
+                    color:active?T.text0:T.text2,
+                    fontWeight:active?'600':'400',whiteSpace:'nowrap'}}>
+                  {s}
+                </button>
+              );
+            })}
           </div>
 
           {/* More... */}
@@ -342,6 +375,7 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
             </button>
             <MorePopover
               open={moreOpen} onClose={() => setMoreOpen(false)} anchorRef={moreAnchorRef}
+              statusFilters={statusFilters} toggleStatus={toggleStatus}
               dateFilters={dateFilters} setDateFilters={setDateFilters}
             />
           </div>
@@ -384,34 +418,38 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
         <div style={{flex:1,overflowY:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'58px'}}/>
-              <col style={{width:'64px'}}/>
-              <col style={{width:'auto'}}/>
-              <col style={{width:'56px'}}/>
-              <col style={{width:'94px'}}/>
-              <col style={{width:'94px'}}/>
-              <col style={{width:'82px'}}/>
-              <col style={{width:'82px'}}/>
-              <col style={{width:'62px'}}/>
-              <col style={{width:'76px'}}/>
+              {/* Prop     */} <col style={{width:'56px'}}/>
+              {/* Tenant   */} <col style={{width:'auto'}}/>
+              {/* Suite    */} <col style={{width:'58px'}}/>
+              {/* Type     */} <col style={{width:'50px'}}/>
+              {/* Start    */} <col style={{width:'80px'}}/>
+              {/* End      */} <col style={{width:'80px'}}/>
+              {/* Base Rent*/} <col style={{width:'90px'}}/>
+              {/* NNN      */} <col style={{width:'82px'}}/>
+              {/* Other    */} <col style={{width:'78px'}}/>
+              {/* CAMi     */} <col style={{width:'78px'}}/>
+              {/* TPT Tax  */} <col style={{width:'80px'}}/>
+              {/* Total    */} <col style={{width:'88px'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
-                {renderTh('prop_code',   'Prop')}
-                {renderTh('suite_num',   'Suite')}
-                {renderTh('tenant_dba',  'Tenant')}
-                {renderTh('lease_type',  'Type')}
-                <th style={{...css.th,textAlign:'right',cursor:'default'}}>Monthly</th>
-                <th style={{...css.th,textAlign:'right',cursor:'default'}}>Annual</th>
-                {renderTh('rent_starts', 'Start')}
-                {renderTh('rent_ends',   'End')}
-                {renderTh('rent_ends',   'Mo. Left', {textAlign:'center'})}
-                <th style={{...css.th,cursor:'default'}}>Status</th>
+                {renderTh('prop_code',  'Prop')}
+                {renderTh('tenant_dba', 'Tenant')}
+                {renderTh('suite_num',  'Suite')}
+                {renderTh('lease_type', 'Type')}
+                {renderTh('rent_starts','Start')}
+                {renderTh('rent_ends',  'End')}
+                <th style={{...css.th,textAlign:'right',cursor:'default'}}>Base Rent</th>
+                <th style={{...css.th,textAlign:'right',cursor:'default'}}>NNN</th>
+                <th style={{...css.th,textAlign:'right',cursor:'default'}}>Other</th>
+                <th style={{...css.th,textAlign:'right',cursor:'default'}}>CAMi</th>
+                <th style={{...css.th,textAlign:'right',cursor:'default'}}>TPT Tax</th>
+                <th style={{...css.th,textAlign:'right',cursor:'default'}}>Total</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={10} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No records match filters</td></tr>
+                <tr><td colSpan={NCOLS} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No records match filters</td></tr>
               )}
               {filtered.map((row, i) => renderRow(row, i))}
             </tbody>
@@ -450,8 +488,7 @@ export const RentScheduleDetail = ({ row, onBack }) => {
     </div>
   );
 
-  const moLeft   = calcMoLeft(row.rent_ends);
-  const annual   = row.base_rent != null ? Number(row.base_rent) * 12 : null;
+  const moLeft = calcMoLeft(row.rent_ends);
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -471,7 +508,7 @@ export const RentScheduleDetail = ({ row, onBack }) => {
         </div>
         <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{row.tenants?.tenant_dba||'Unnamed Tenant'}</div>
         <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>
-          {row.tenants?.lease_type || 'Lease'} · {row.prop_code} {row.suite_num ? `· Suite ${row.suite_num}` : ''}
+          {row.tenants?.lease_type || 'Lease'} · {row.prop_code}{row.suite_num ? ` · Suite ${row.suite_num}` : ''}
         </div>
       </div>
 
@@ -487,12 +524,12 @@ export const RentScheduleDetail = ({ row, onBack }) => {
           </div>
           <div style={css.card}>
             <div style={css.secTitle}>Financials</div>
-            {field('Monthly Rent', fmtCurrency(row.base_rent))}
-            {field('Annual Rent',  fmtCurrency(annual))}
-            {field('NNN',          fmtCurrency(row.nnn))}
-            {field('CAM Impound',  fmtCurrency(row.cam_impound))}
-            {field('TPT Tax',      fmtCurrency(row.tpt_tax))}
-            {field('Total',        fmtCurrency(row.total))}
+            {field('Base Rent',   fmtCurrency(row.base_rent))}
+            {field('NNN',         fmtCurrency(row.nnn))}
+            {field('Other',       fmtCurrency(row.other_amt))}
+            {field('CAM Impound', fmtCurrency(row.cam_impound))}
+            {field('TPT Tax',     fmtCurrency(row.tpt_tax))}
+            {field('Total',       fmtCurrency(row.total))}
           </div>
           <div style={css.card}>
             <div style={css.secTitle}>Term</div>
@@ -509,12 +546,12 @@ export const RentScheduleDetail = ({ row, onBack }) => {
           </div>
           <div style={css.card}>
             <div style={css.secTitle}>Additional</div>
-            {field('Sq Ft',         row.sqft ? row.sqft.toLocaleString() : null)}
-            {field('Amendment #',   row.amendment_num != null ? String(row.amendment_num) : null)}
-            {field('Base / SF',     row.base_per_sf ? `$${Number(row.base_per_sf).toFixed(2)}` : null)}
-            {field('NNN / SF',      row.nnn_per_sf  ? `$${Number(row.nnn_per_sf).toFixed(2)}`  : null)}
-            {field('CPI Adjusted',  row.cpi_adjusted ? 'Yes' : 'No')}
-            {field('TPT Exempt',    row.tpt_tax_exempt ? 'Yes' : 'No')}
+            {field('Sq Ft',       row.sqft ? row.sqft.toLocaleString() : null)}
+            {field('Amendment #', row.amendment_num != null ? String(row.amendment_num) : null)}
+            {field('Base / SF',   row.base_per_sf ? `$${Number(row.base_per_sf).toFixed(2)}` : null)}
+            {field('NNN / SF',    row.nnn_per_sf  ? `$${Number(row.nnn_per_sf).toFixed(2)}`  : null)}
+            {field('CPI Adjusted', row.cpi_adjusted ? 'Yes' : 'No')}
+            {field('TPT Exempt',   row.tpt_tax_exempt ? 'Yes' : 'No')}
           </div>
           {row.notes && (
             <div style={{...css.card,gridColumn:'1 / -1'}}>
@@ -539,9 +576,13 @@ export default function RentScheduleView() {
 
   useEffect(() => {
     setLoading(true); setError(null);
-    sbFetch('rent_schedule',
-      'select=*,tenants!rent_schedule_tenant_id_fkey(tenant_dba,lease_type)&order=prop_code.asc,suite_num.asc'
-    )
+    sbFetch('properties', 'select=prop_code&status=eq.active')
+      .then(props => {
+        const codes = props.map(p => p.prop_code).join(',');
+        return sbFetch('rent_schedule',
+          `select=*,tenants!rent_schedule_tenant_id_fkey(tenant_dba,lease_type)&prop_code=in.(${codes})&order=prop_code.asc,suite_num.asc`
+        );
+      })
       .then(data => { setRows(data); setLoading(false); })
       .catch(e   => { setError(e.message); setLoading(false); });
   }, []);
