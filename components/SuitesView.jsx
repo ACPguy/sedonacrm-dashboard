@@ -226,12 +226,12 @@ const SuiteDetail = ({ suite, onBack, onUpdate }) => {
 // ── Suites List ───────────────────────────────────────────────────────────────
 const SuitesList = ({ onSelect }) => {
   const [suites, setSuites] = useState([]);
+  const [tenantMap, setTenantMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('current');
   const [propFilter, setPropFilter] = useState([]);
   const [search, setSearch] = useState('');
   const [activeProps, setActiveProps] = useState([]);
-  const { sorted, Th } = useSortable(suites, 'prop_code');
 
   useEffect(() => {
     setLoading(true);
@@ -246,7 +246,21 @@ const SuitesList = ({ onSelect }) => {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    sbFetch('tenants', 'select=id,tenant_dba,tenant_status&tenant_status=neq.Archived')
+      .then(d => {
+        const map = {};
+        d.forEach(t => { map[t.id] = t.tenant_dba; });
+        setTenantMap(map);
+      }).catch(() => {});
+  }, []);
+
   const activePropSet = new Set(activeProps);
+  const suitesWithTenant = suites.map(s => ({
+    ...s,
+    _tenant: s.current_tenant_id ? (tenantMap[s.current_tenant_id] || '') : '',
+  }));
+  const { sorted, Th } = useSortable(suitesWithTenant, 'prop_code');
 
   const toggleProp = code => {
     if (code === 'All') { setPropFilter([]); return; }
@@ -287,13 +301,15 @@ const SuitesList = ({ onSelect }) => {
     return true;
   });
 
-  // Grouped view when props selected
+  // Grouped view when props selected — always A→Z by prop_code
   const groups = propFilter.length > 0
-    ? propFilter.map(pc => ({
+    ? [...propFilter].sort().map(pc => ({
         prop_code: pc,
         rows: filtered.filter(s => s.prop_code === pc),
       })).filter(g => g.rows.length > 0)
     : null;
+
+  const hasActiveFilters = propFilter.length > 0 || statusFilter !== 'current' || search !== '';
 
   // Summary counts (from non-archived active suites)
   const activeSuites = suites.filter(s => s.status !== 'Archived' && activePropSet.has(s.prop_code));
@@ -311,33 +327,36 @@ const SuitesList = ({ onSelect }) => {
       <Th c="suite_num" label="Suite"/>
       <Th c="space_type" label="Type"/>
       <Th c="status" label="Status"/>
+      <Th c="_tenant" label="Tenant"/>
       <Th c="sqft" label="Sq Ft" align="right"/>
       <Th c="current_base_rent" label="Base Rent" align="right"/>
       <Th c="current_nnn" label="NNN" align="right"/>
       <Th c="current_total_rent" label="Total" align="right"/>
-      <Th c="location_desc" label="Location"/>
-      <Th c="available_date" label="Available"/>
     </tr>
   );
 
-  const renderSuiteRow = (s, i) => (
-    <tr key={s.id}
-      onClick={()=>onSelect(s)}
-      style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
-      onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
-      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
-      <td style={{...css.td,color:T.accent,fontWeight:'500'}}>{s.prop_code}</td>
-      <td style={{...css.td,fontWeight:'500'}}>{s.suite_num||'—'}</td>
-      <td style={{...css.td,color:T.text2}}>{s.space_type||'—'}</td>
-      <td style={css.td}><StatusBadge status={s.status}/></td>
-      <td style={css.tdNum}>{fmtNum(s.sqft)}</td>
-      <td style={css.tdNum}>{s.current_base_rent?fmtMoney(s.current_base_rent):<span style={{color:T.text3}}>—</span>}</td>
-      <td style={css.tdNum}>{s.current_nnn?fmtMoney(s.current_nnn):<span style={{color:T.text3}}>—</span>}</td>
-      <td style={{...css.tdNum,fontWeight:'600',color:s.current_total_rent?T.accent:T.text3}}>{s.current_total_rent?fmtMoney(s.current_total_rent):'—'}</td>
-      <td style={{...css.td,color:T.text2}}>{s.location_desc||'—'}</td>
-      <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{s.available_date?fmtDate(s.available_date):'—'}</td>
-    </tr>
-  );
+  const renderSuiteRow = (s, i) => {
+    const tenantName = s.current_tenant_id ? tenantMap[s.current_tenant_id] : null;
+    return (
+      <tr key={s.id}
+        onClick={()=>onSelect(s)}
+        style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
+        onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+        onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
+        <td style={{...css.td,color:T.accent,fontWeight:'500'}}>{s.prop_code}</td>
+        <td style={{...css.td,fontWeight:'500'}}>{s.suite_num||'—'}</td>
+        <td style={{...css.td,color:T.text2}}>{s.space_type||'—'}</td>
+        <td style={css.td}><StatusBadge status={s.status}/></td>
+        <td style={{...css.td,color:tenantName?T.text0:T.text3}}>
+          {tenantName || <span style={{color:T.text3,fontStyle:'italic'}}>Vacant</span>}
+        </td>
+        <td style={css.tdNum}>{fmtNum(s.sqft)}</td>
+        <td style={css.tdNum}>{s.current_base_rent?fmtMoney(s.current_base_rent):<span style={{color:T.text3}}>—</span>}</td>
+        <td style={css.tdNum}>{s.current_nnn?fmtMoney(s.current_nnn):<span style={{color:T.text3}}>—</span>}</td>
+        <td style={{...css.tdNum,fontWeight:'600',color:s.current_total_rent?T.accent:T.text3}}>{s.current_total_rent?fmtMoney(s.current_total_rent):'—'}</td>
+      </tr>
+    );
+  };
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -371,7 +390,7 @@ const SuitesList = ({ onSelect }) => {
           ))}
         </div>
 
-        {/* Row 2: Status pills + search */}
+        {/* Row 2: Status pills + clear + search */}
         <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
           <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
             {statuses.map(({key,label})=>(
@@ -384,6 +403,17 @@ const SuitesList = ({ onSelect }) => {
               </button>
             ))}
           </div>
+          <button
+            onClick={() => { setStatusFilter('current'); setPropFilter([]); setSearch(''); }}
+            style={{
+              padding:'3px 9px', borderRadius:'5px', cursor:'pointer', fontSize:F.xs,
+              border:`0.5px solid ${hasActiveFilters ? T.warn : T.border}`,
+              background:'transparent', color: hasActiveFilters ? T.warn : T.text3,
+              display:'flex', alignItems:'center', gap:'3px', transition:'all 0.15s',
+              visibility: hasActiveFilters ? 'visible' : 'hidden',
+            }}>
+            <span style={{fontSize:'12px'}}>×</span> Clear
+          </button>
           <div style={{marginLeft:'auto',position:'relative',display:'flex',alignItems:'center'}}>
             {search && (
               <button onClick={() => setSearch('')}
@@ -406,26 +436,25 @@ const SuitesList = ({ onSelect }) => {
               <col style={{width:'6%'}}/>   {/* Prop */}
               <col style={{width:'7%'}}/>   {/* Suite # */}
               <col style={{width:'8%'}}/>   {/* Type */}
-              <col style={{width:'12%'}}/>  {/* Status */}
+              <col style={{width:'11%'}}/>  {/* Status */}
+              <col style={{width:'auto'}}/> {/* Tenant */}
               <col style={{width:'7%'}}/>   {/* Sq Ft */}
               <col style={{width:'9%'}}/>   {/* Base Rent */}
               <col style={{width:'8%'}}/>   {/* NNN */}
               <col style={{width:'9%'}}/>   {/* Total */}
-              <col style={{width:'auto'}}/> {/* Location */}
-              <col style={{width:'8%'}}/>   {/* Available */}
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:1}}>
               {tableHeaders}
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={10} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No suites match filters</td></tr>
+                <tr><td colSpan={9} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No suites match filters</td></tr>
               )}
               {groups
                 ? groups.map(g => (
                     <React.Fragment key={g.prop_code}>
                       <tr style={{background:T.bg3, position:'sticky', top:'28px', zIndex:1}}>
-                        <td colSpan={10} style={{...css.td, color:T.accent, fontWeight:'600', padding:'4px 10px', fontSize:F.xs, textTransform:'uppercase', letterSpacing:'0.07em'}}>
+                        <td colSpan={9} style={{...css.td, color:T.accent, fontWeight:'600', padding:'4px 10px', fontSize:F.xs, textTransform:'uppercase', letterSpacing:'0.07em'}}>
                           {g.prop_code} <span style={{color:T.text3, fontWeight:'400'}}>({g.rows.length})</span>
                         </td>
                       </tr>

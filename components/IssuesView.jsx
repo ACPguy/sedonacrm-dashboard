@@ -553,6 +553,9 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
   const hasActiveFilters    = propFilter.length > 0 || priorityFilter !== 'All' ||
     statusFilter !== 'Open' || assignedFilter !== 'All' || search !== '' || hasActiveDateFilter;
 
+  const showClosed = statusFilter === 'Closed';
+  const showOpened = !showClosed;
+
   const clearFilters = () => {
     setStatusFilter('Open'); setPriorityFilter('All'); setPropFilter([]);
     setAssignedFilter('All'); setSearch('');
@@ -644,15 +647,19 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
           {iss.last_updated ? fmtNumDate(iss.last_updated) : iss.updated_at ? fmtNumDate(iss.updated_at) : ''}
         </td>
 
-        {/* Opened — read-only */}
-        <td style={{...css.td,color:T.text2,fontSize:F.xs}}>
-          {iss.create_date ? fmtNumDate(iss.create_date) : ''}
-        </td>
+        {/* Opened — hidden when filtering for Closed */}
+        {showOpened && (
+          <td style={{...css.td,color:T.text2,fontSize:F.xs}}>
+            {iss.create_date ? fmtNumDate(iss.create_date) : ''}
+          </td>
+        )}
 
-        {/* Closed — read-only */}
-        <td style={{...css.td,color:iss.close_date?T.success:T.text3,fontSize:F.xs}}>
-          {iss.close_date ? fmtNumDate(iss.close_date) : ''}
-        </td>
+        {/* Closed — only shown when filtering for Closed */}
+        {showClosed && (
+          <td style={{...css.td,color:iss.close_date?T.success:T.text3,fontSize:F.xs}}>
+            {iss.close_date ? fmtNumDate(iss.close_date) : ''}
+          </td>
+        )}
       </tr>
     );
   };
@@ -795,8 +802,8 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
               <col style={{width:'100px'}}/>
               <col style={{width:'76px',minWidth:'76px'}}/>
               <col style={{width:'86px'}}/>
-              <col style={{width:'82px'}}/>
-              <col style={{width:'82px'}}/>
+              {showOpened && <col style={{width:'82px'}}/>}
+              {showClosed && <col style={{width:'82px'}}/>}
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
@@ -807,19 +814,19 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
                 {renderTh('assigned_to_id','Assigned')}
                 <th style={{...css.th,minWidth:'76px',overflow:'visible'}}>Status</th>
                 {renderTh('last_updated','Updated')}
-                {renderTh('create_date','Opened')}
-                {renderTh('close_date','Closed')}
+                {showOpened && renderTh('create_date','Opened')}
+                {showClosed && renderTh('close_date','Closed')}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={9} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No issues match filters</td></tr>
+                <tr><td colSpan={8} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No issues match filters</td></tr>
               )}
               {grouped ? (
                 grouped.map(group => (
                   <React.Fragment key={group.prop_code}>
                     <tr style={{background:T.bg3,position:'sticky',top:'29px',zIndex:1}}>
-                      <td colSpan={9} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
+                      <td colSpan={8} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
                         {group.prop_code} <span style={{color:T.text3,fontWeight:'400'}}>({group.rows.length})</span>
                       </td>
                     </tr>

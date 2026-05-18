@@ -195,11 +195,12 @@ components/IssuesView.jsx     — exports: sbFetch, sbPatch, T, F, css, fmtDate,
 - Tenant Detail: Overview tab as default, 4-card layout, 3-row header with chip row
 - Rent tab: multi-select filter pills, 12 cols, 5-level expiry color coding, footer totals
 - COIs tab: full-width, no truncation, word-wrap
-- Properties list: 7 cols, Expires from property_agreements join, 5-level expiry color coding, sortable
-- Tenants list: property strip Row 1, grouped view when props selected, % colwidths
-- Suites list: defaults to current/active, property strip, grouped view
+- Properties list: 7 cols, Expires col fixed (RLS policy added for anon SELECT on property_agreements), color-coded
+- Tenants list: property strip, grouped view (A→Z), % colwidths
+- Suites list: defaults to current/active, property strip, grouped (A→Z), Tenant column, Location removed, Clear Filters
+- Issues list: Opened/Closed column toggle by status filter (same as Work Orders)
 - Work Orders list: no truncation, Closed/Updated columns toggle by filter
-- Rent Schedule list: Suite column word-wrap
+- Rent Schedule list: Suite column word-wrap, Tenant column truncates
 
 **Next:**
 1. Property detail form — hub of the entire system

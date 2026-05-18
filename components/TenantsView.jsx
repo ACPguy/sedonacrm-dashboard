@@ -337,7 +337,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
   }, [sorted, search, dateFilters, propFilter]);
 
   const groups = propFilter.length > 0
-    ? propFilter.map(pc => ({
+    ? [...propFilter].sort().map(pc => ({
         prop_code: pc,
         rows: filtered.filter(t => t.prop_code === pc),
       })).filter(g => g.rows.length > 0)
