@@ -249,6 +249,8 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
   const [sortCol,      setSortCol]      = useState(saved?.sortCol      ?? 'tenant_dba');
   const [sortDir,      setSortDir]      = useState(saved?.sortDir      ?? 'asc');
   const [dateFilters,  setDateFilters]  = useState(saved?.dateFilters  ?? { updated: null });
+  const [propFilter,   setPropFilter]   = useState(saved?.propFilter   ?? []);
+  const [activeProps,  setActiveProps]  = useState([]);
   const [moreOpen,     setMoreOpen]     = useState(false);
   const moreAnchorRef = useRef(null);
 
@@ -258,10 +260,16 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
   }, []);
 
   useEffect(() => {
+    sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
+      .then(d => setActiveProps(d.map(p => p.prop_code)))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     try {
-      sessionStorage.setItem(STORE_KEY, JSON.stringify({ statusFilter, search, sortCol, sortDir, dateFilters }));
+      sessionStorage.setItem(STORE_KEY, JSON.stringify({ statusFilter, search, sortCol, sortDir, dateFilters, propFilter }));
     } catch {}
-  }, [statusFilter, search, sortCol, sortDir, dateFilters]);
+  }, [statusFilter, search, sortCol, sortDir, dateFilters, propFilter]);
 
   const toggleSort = c => {
     if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -279,7 +287,21 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
     return sortDir === 'asc' ? cmp : -cmp;
   }), [tenants, sortCol, sortDir]);
 
+  const toggleProp = code => {
+    if (code === 'All') { setPropFilter([]); return; }
+    setPropFilter(prev => prev.includes(code) ? prev.filter(p => p !== code) : [...prev, code]);
+  };
+
+  const propBtnStyle = active => ({
+    padding:'3px 7px', borderRadius:'4px', cursor:'pointer', fontSize:F.xs, whiteSpace:'nowrap', flexShrink:0,
+    border:`0.5px solid ${active ? T.accent : T.border}`,
+    background: active ? T.accent : 'transparent',
+    color: active ? '#fff' : T.text2,
+    fontWeight: active ? '600' : '400',
+  });
+
   const filtered = useMemo(() => sorted.filter(t => {
+    if (propFilter.length > 0 && !propFilter.includes(t.prop_code)) return false;
     if (statusFilter !== 'All' && (t.tenant_status || '') !== statusFilter) return false;
     if (dateFilters.updated && !isInRange(t.updated_at, dateFilters.updated)) return false;
     if (search) {
@@ -292,10 +314,11 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
       );
     }
     return true;
-  }), [sorted, statusFilter, search, dateFilters]);
+  }), [sorted, statusFilter, search, dateFilters, propFilter]);
 
   const statusCounts = useMemo(() => {
     const base = sorted.filter(t => {
+      if (propFilter.length > 0 && !propFilter.includes(t.prop_code)) return false;
       if (dateFilters.updated && !isInRange(t.updated_at, dateFilters.updated)) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -311,13 +334,20 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
     const c = { All: base.length };
     TENANT_STATUS_OPTIONS.forEach(s => { c[s] = base.filter(t => (t.tenant_status || '') === s).length; });
     return c;
-  }, [sorted, search, dateFilters]);
+  }, [sorted, search, dateFilters, propFilter]);
+
+  const groups = propFilter.length > 0
+    ? propFilter.map(pc => ({
+        prop_code: pc,
+        rows: filtered.filter(t => t.prop_code === pc),
+      })).filter(g => g.rows.length > 0)
+    : null;
 
   const hasMoreActive    = !!dateFilters.updated;
-  const hasActiveFilters = statusFilter !== 'Active' || search !== '' || !!dateFilters.updated;
+  const hasActiveFilters = statusFilter !== 'Active' || search !== '' || !!dateFilters.updated || propFilter.length > 0;
 
   const clearFilters = () => {
-    setStatusFilter('Active'); setSearch(''); setDateFilters({ updated: null });
+    setStatusFilter('Active'); setSearch(''); setDateFilters({ updated: null }); setPropFilter([]);
   };
 
   const renderTh = (c, label, extraStyle = {}) => (
@@ -378,7 +408,15 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
           <span style={{fontSize:F.xs, color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
         </div>
 
-        {/* Filter bar */}
+        {/* Row 1: Property strip */}
+        <div style={{display:'flex', gap:'4px', overflowX:'auto', scrollbarWidth:'none', marginBottom:'5px'}}>
+          <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
+          {activeProps.map(pc => (
+            <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
+          ))}
+        </div>
+
+        {/* Row 2: Filter bar */}
         <div style={{display:'flex', gap:'6px', alignItems:'center', minWidth:0}}>
           {/* Status pills */}
           <div style={{display:'flex', gap:'1px', background:T.bg2, borderRadius:'5px', padding:'2px', border:`0.5px solid ${T.border}`, flexShrink:0}}>
@@ -452,20 +490,20 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
         <div style={{flex:1, overflowY:'auto'}}>
           <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'auto'}}/>
-              <col style={{width:'58px'}}/>
-              <col style={{width:'62px'}}/>
-              <col style={{width:'68px'}}/>
-              <col style={{width:'60px'}}/>
-              <col style={{width:'88px'}}/>
-              <col style={{width:'74px'}}/>
-              <col style={{width:'110px'}}/>
-              <col style={{width:'88px'}}/>
+              <col style={{width:'22%'}}/>
+              <col style={{width:'6%'}}/>
+              <col style={{width:'6%'}}/>
+              <col style={{width:'7%'}}/>
+              <col style={{width:'7%'}}/>
+              <col style={{width:'9%'}}/>
+              <col style={{width:'8%'}}/>
+              <col style={{width:'12%'}}/>
+              <col style={{width:'9%'}}/>
             </colgroup>
             <thead style={{position:'sticky', top:0, zIndex:2}}>
               <tr>
                 {renderTh('tenant_dba', 'Tenant')}
-                {renderTh('prop_code',  'Prop',   {paddingLeft:'10px'})}
+                {renderTh('prop_code',  'Prop')}
                 {renderTh('suite_num',  'Suite')}
                 {renderTh('sqft',       'Sq Ft',  {textAlign:'right'})}
                 {renderTh('lease_type', 'Type')}
@@ -479,7 +517,19 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
               {filtered.length === 0 && (
                 <tr><td colSpan={9} style={{...css.td, textAlign:'center', padding:'32px', color:T.text3}}>No tenants match filters</td></tr>
               )}
-              {filtered.map((t, i) => renderRow(t, i))}
+              {groups
+                ? groups.map(g => (
+                    <React.Fragment key={g.prop_code}>
+                      <tr style={{background:T.bg3, position:'sticky', top:'28px', zIndex:1}}>
+                        <td colSpan={9} style={{...css.td, color:T.accent, fontWeight:'600', padding:'4px 10px', fontSize:F.xs, textTransform:'uppercase', letterSpacing:'0.07em'}}>
+                          {g.prop_code} <span style={{color:T.text3, fontWeight:'400'}}>({g.rows.length})</span>
+                        </td>
+                      </tr>
+                      {g.rows.map((t, i) => renderRow(t, i))}
+                    </React.Fragment>
+                  ))
+                : filtered.map((t, i) => renderRow(t, i))
+              }
             </tbody>
           </table>
         </div>

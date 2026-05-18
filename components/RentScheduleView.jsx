@@ -331,7 +331,7 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
         onClick={openDetail}>
         <td style={{...css.td,color:T.accent,fontWeight:'600',fontSize:F.xs}}>{row.prop_code||''}</td>
         <td style={{...css.td,color:T.text1}} title={row.tenants?.tenant_dba}>{row.tenants?.tenant_dba||''}</td>
-        <td style={css.td}>{row.suite_num||''}</td>
+        <td style={{...css.td, whiteSpace:'normal', wordBreak:'break-word'}}>{row.suite_num||''}</td>
         <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{row.tenants?.lease_type||''}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(row.rent_starts)}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs,

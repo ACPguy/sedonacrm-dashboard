@@ -44,7 +44,7 @@ export const css = {
   secTitle: { fontSize:F.xs, fontWeight:'600', color:T.text2, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' },
   badge: (color,bg) => ({ fontSize:F.xs, padding:'2px 7px', borderRadius:'3px', fontWeight:'500', whiteSpace:'nowrap', color, background:bg }),
   th: { fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', padding:'5px 8px', fontWeight:'600', whiteSpace:'nowrap', textAlign:'left', cursor:'pointer', userSelect:'none', background:T.bg2 },
-  td: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
+  td: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'normal', wordBreak:'break-word' },
 };
 
 const fmtNumDate = d => {
@@ -498,6 +498,9 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
     : null
   , [filtered, propFilter]);
 
+  const showClosed  = statusFilter === 'Closed';
+  const showUpdated = !showClosed;
+
   const hasActiveDateFilter = !!(dateFilters.opened || dateFilters.updated || dateFilters.closed);
   const hasActiveFilters    = propFilter.length > 0 || priorityFilter !== 'All' ||
     statusFilter !== 'Open' || search !== '' || hasActiveDateFilter;
@@ -616,20 +619,24 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
           {tenantName}
         </td>
 
-        {/* Updated */}
-        <td style={{...css.td, color:T.text2, fontSize:F.xs}}>
-          {wo.updated_at ? fmtNumDate(wo.updated_at) : ''}
-        </td>
+        {/* Updated — shown when not in Closed filter */}
+        {showUpdated && (
+          <td style={{...css.td, color:T.text2, fontSize:F.xs}}>
+            {wo.updated_at ? fmtNumDate(wo.updated_at) : ''}
+          </td>
+        )}
 
         {/* Opened */}
         <td style={{...css.td, color:T.text2, fontSize:F.xs}}>
           {wo.created_at ? fmtNumDate(wo.created_at) : ''}
         </td>
 
-        {/* Closed */}
-        <td style={{...css.td, color:wo.closed_at?T.success:T.text3, fontSize:F.xs}}>
-          {wo.closed_at ? fmtNumDate(wo.closed_at) : ''}
-        </td>
+        {/* Closed — shown only when in Closed filter */}
+        {showClosed && (
+          <td style={{...css.td, color:wo.closed_at?T.success:T.text3, fontSize:F.xs}}>
+            {wo.closed_at ? fmtNumDate(wo.closed_at) : ''}
+          </td>
+        )}
       </tr>
     );
   };
@@ -773,9 +780,9 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
               {/* Status */}  <col style={{width:'68px',  minWidth:'60px'}}/>
               {/* Vendor */}  <col style={{width:'110px', minWidth:'80px'}}/>
               {/* Tenant */}  <col style={{width:'100px', minWidth:'80px'}}/>
-              {/* Updated */} <col style={{width:'82px',  minWidth:'76px'}}/>
+              {showUpdated && <col style={{width:'82px',  minWidth:'76px'}}/>/* Updated */}
               {/* Opened */}  <col style={{width:'82px',  minWidth:'76px'}}/>
-              {/* Closed */}  <col style={{width:'82px',  minWidth:'76px'}}/>
+              {showClosed  && <col style={{width:'82px',  minWidth:'76px'}}/>/* Closed */}
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
@@ -788,15 +795,15 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
                 <th style={{...css.th, minWidth:'60px', overflow:'visible'}}>Status</th>
                 {renderTh('vendor_id', 'Vendor')}
                 {renderTh('tenant_id', 'Tenant')}
-                {renderTh('updated_at', 'Updated')}
+                {showUpdated && renderTh('updated_at', 'Updated')}
                 {renderTh('created_at', 'Opened')}
-                {renderTh('closed_at',  'Closed')}
+                {showClosed  && renderTh('closed_at',  'Closed')}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={NCOLS} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>
+                  <td colSpan={11} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>
                     No work orders match filters
                   </td>
                 </tr>
@@ -805,7 +812,7 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
                 grouped.map(group => (
                   <React.Fragment key={group.prop_code}>
                     <tr style={{background:T.bg3,position:'sticky',top:'29px',zIndex:1}}>
-                      <td colSpan={NCOLS} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
+                      <td colSpan={11} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
                         {group.prop_code} <span style={{color:T.text3,fontWeight:'400'}}>({group.rows.length})</span>
                       </td>
                     </tr>

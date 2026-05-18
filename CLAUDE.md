@@ -137,6 +137,10 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 
 4. **Update Next Priorities after every session** — After completing work, update the "Next Priorities" section below with what was finished and what comes next, so the next session picks up exactly where this one left off.
 
+## Permanent Terminology Notes
+
+- **`property_agreements` table** (14 rows) = ACP's management agreement with property owners. Contains: commission structures, management fees, agreement start/end/expiration dates, and terms of ACP's contract to manage and lease the property. This is **NOT** the leasing pipeline. Never confuse these.
+
 ## Development Rules
 
 1. **SELECT DISTINCT before any UI field from Podio** — Before building any dropdown, filter, badge, or component that displays or filters a field sourced from Podio data, always run `SELECT DISTINCT col FROM table ORDER BY col;` to confirm the exact values in the database. Never hardcode options without checking first.
@@ -185,21 +189,24 @@ components/IssuesView.jsx     — exports: sbFetch, sbPatch, T, F, css, fmtDate,
 
 ## Next Priorities
 
-1. Tenant detail form — refine into the definitive detail template for all future forms
-   - Tab structure: Info | Lease | Contact | Notes | Communications (stub)
-   - Info tab: two-column layout — Tenant Info left, Suite & Property right (see current screenshot as starting point — it's close)
-   - Lease tab: lease dates, term, type, options, security deposit, NNN prorata
-   - Contact tab: primary contact name, phone, email, entity info
-   - Notes tab: internal notes field (editable)
-   - Communications tab: placeholder panel — "Email thread syncs from Gmail at go-live"
-   - All fields editable via EditableField pattern (same as existing detail views)
-   - HelloSign button stub in header
-   - Drive folder link in header (gdrive_folder_id → linked icon)
-   - Back button → returns to Tenants list preserving filter/sort state
-   - Escape key closes detail
-   - Browser tab title: "RHS · 4 Pawz Pet Grooming | SedonaCRM" pattern
+**Completed last session:**
+- Ctrl+click nav opens new tab (AppShell NavBtn → `<a>`, SedonaCRM NavItem → Ctrl+click handler)
+- Date format MM-DD-YYYY UTC everywhere (getUTC* methods in 9 files)
+- Tenant Detail: Overview tab as default, 4-card layout, 3-row header with chip row
+- Rent tab: multi-select filter pills, 12 cols, 5-level expiry color coding, footer totals
+- COIs tab: full-width, no truncation, word-wrap
+- Properties list: 7 cols, Expires from property_agreements join, 5-level expiry color coding, sortable
+- Tenants list: property strip Row 1, grouped view when props selected, % colwidths
+- Suites list: defaults to current/active, property strip, grouped view
+- Work Orders list: no truncation, Closed/Updated columns toggle by filter
+- Rent Schedule list: Suite column word-wrap
 
-2. Property detail form — hub of the entire system, built after Tenant template is solid
-   - 5 tab groups with embedded filtered views (Issues, Work Orders, Tenants, Rent Schedule, etc.)
+**Next:**
+1. Property detail form — hub of the entire system
+   - 5 tab groups: Overview, Leasing, Financial, Operations, Ownership
+   - Each tab embeds filtered views (Issues, Work Orders, Tenants, Rent Schedule, etc.)
+   - Map embed on Overview tab
 
-3. All other detail forms follow after Property — Vendors, Owners, Contacts, Work Orders
+2. Tenant detail form — continue refinements as needed after Property detail template is established
+
+3. All other detail forms follow — Vendors, Owners, Contacts, Work Orders

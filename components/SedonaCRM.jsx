@@ -709,11 +709,11 @@ const PropertyDetail = ({ property, onBack, onUpdate }) => {
 // ── Properties List ───────────────────────────────────────────────────────────
 const PropertiesView = () => {
   const [properties,setProperties] = useState([]);
+  const [agreementMap,setAgreementMap] = useState({});
   const [loading,setLoading] = useState(true);
   const [selected,setSelected] = useState(null);
   const [filter,setFilter] = useState('active');
   const [search,setSearch] = useState('');
-  const { sorted, Th } = useSortable(properties, 'prop_code', 'asc');
 
   useEffect(()=>{
     setLoading(true);
@@ -722,6 +722,35 @@ const PropertiesView = () => {
     params+='&order=prop_code.asc';
     sbFetch('properties',params).then(d=>{setProperties(d);setLoading(false);}).catch(()=>setLoading(false));
   },[filter]);
+
+  useEffect(()=>{
+    sbFetch('property_agreements','select=prop_code,listing_expiry_date&order=listing_expiry_date.desc')
+      .then(rows=>{
+        const map={};
+        rows.forEach(r=>{ if(r.prop_code && !map[r.prop_code]) map[r.prop_code]=r.listing_expiry_date; });
+        setAgreementMap(map);
+      }).catch(()=>{});
+  },[]);
+
+  const daysUntilExpiry = d => {
+    if(!d) return null;
+    const dt=new Date(d+'T00:00:00'); const now=new Date(); now.setHours(0,0,0,0);
+    return Math.round((dt-now)/(1000*60*60*24));
+  };
+
+  const expiryStyle = d => {
+    const days=daysUntilExpiry(d);
+    if(days===null) return {color:T.text3};
+    if(days<0)   return {color:'#fff',fontWeight:'700',background:'#7a0000',padding:'1px 5px',borderRadius:'3px',display:'inline-block'};
+    if(days<=30)  return {color:T.danger, fontWeight:'700'};
+    if(days<=60)  return {color:'#d4924a',fontWeight:'700'};
+    if(days<=90)  return {color:'#f0d060',fontWeight:'700'};
+    if(days<=120) return {color:T.success,fontWeight:'700'};
+    return {color:T.text1};
+  };
+
+  const propertiesWithExpiry = properties.map(p=>({...p,_expires:agreementMap[p.prop_code]||null}));
+  const { sorted, Th } = useSortable(propertiesWithExpiry, 'prop_code', 'asc');
 
   const filtered = sorted.filter(p=>{
     if(!search)return true;
@@ -758,33 +787,47 @@ const PropertiesView = () => {
         {!loading&&(
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'80px'}}/><col style={{width:'auto'}}/><col style={{width:'120px'}}/>
-              <col style={{width:'80px'}}/><col style={{width:'80px'}}/><col style={{width:'90px'}}/>
+              <col style={{width:'6%'}}/>  {/* Prop */}
+              <col style={{width:'auto'}}/> {/* Property Name */}
+              <col style={{width:'14%'}}/> {/* Address */}
+              <col style={{width:'9%'}}/>  {/* City */}
+              <col style={{width:'10%'}}/> {/* Status */}
+              <col style={{width:'9%'}}/>  {/* Expires */}
+              <col style={{width:'8%'}}/>  {/* Sq Ftg */}
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:1}}>
               <tr>
-                <Th c="prop_code" label="Code"/>
-                <Th c="property_name" label="Property Name"/>
-                <Th c="city" label="City"/>
-                <Th c="gross_sqft" label="Sq Ft" align="right"/>
-                <Th c="year_built" label="Built" align="right"/>
-                <Th c="status" label="Status"/>
+                <Th c="prop_code"      label="Prop"/>
+                <Th c="property_name"  label="Property Name"/>
+                <Th c="address"        label="Address"/>
+                <Th c="city"           label="City"/>
+                <Th c="status"         label="Status"/>
+                <Th c="_expires"       label="Expires"/>
+                <Th c="gross_sqft"     label="Sq Ftg" align="right"/>
               </tr>
             </thead>
             <tbody>
-              {filtered.length===0&&<tr><td colSpan={6} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No properties match</td></tr>}
-              {filtered.map((p,i)=>(
-                <tr key={p.id} onClick={()=>setSelected(p)} style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
-                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
-                  onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
-                  <td style={{...css.td,color:T.accent,fontWeight:'600'}}>{p.prop_code}</td>
-                  <td style={css.td}>{p.property_name||'—'}</td>
-                  <td style={{...css.td,color:T.text2}}>{p.city||'—'}</td>
-                  <td style={css.tdNum}>{fmtNum(p.gross_sqft)}</td>
-                  <td style={css.tdNum}>{p.year_built||'—'}</td>
-                  <td style={css.td}><StatusBadge status={p.status}/></td>
-                </tr>
-              ))}
+              {filtered.length===0&&<tr><td colSpan={7} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No properties match</td></tr>}
+              {filtered.map((p,i)=>{
+                const expStyle=expiryStyle(p._expires);
+                return (
+                  <tr key={p.id} onClick={()=>setSelected(p)} style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
+                    onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
+                    <td style={{...css.td,color:T.accent,fontWeight:'600'}}>{p.prop_code}</td>
+                    <td style={css.td}>{p.property_name||'—'}</td>
+                    <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{p.address||'—'}</td>
+                    <td style={{...css.td,color:T.text2}}>{p.city||'—'}</td>
+                    <td style={css.td}><StatusBadge status={p.status}/></td>
+                    <td style={{...css.td}}>
+                      {p._expires
+                        ? <span style={expStyle}>{fmtDate(p._expires)}</span>
+                        : <span style={{color:T.text3}}>—</span>}
+                    </td>
+                    <td style={css.tdNum}>{fmtNum(p.gross_sqft)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
