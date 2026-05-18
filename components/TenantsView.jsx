@@ -1,0 +1,1014 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// TenantsView.jsx  —  SedonaCRM Phase 2 UI  (definitive detail template)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+
+const SUPABASE_URL     = 'https://edxcvyleielzevpappui.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
+
+export const sbFetch = async (table, params = '') => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+};
+
+export const sbPatch = async (table, id, updates) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+};
+
+export const T = {
+  bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
+  text0:'#c9cdd6', text1:'#8a95a8', text2:'#5a6272', text3:'#4a5264',
+  accent:'#6e9fd8', border:'#2e3240',
+  danger:'#e07070', warn:'#d4924a', success:'#6ab06a', purple:'#9a7ad4',
+};
+export const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
+export const css = {
+  card: { background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'6px', padding:'12px 14px' },
+  secTitle: { fontSize:F.xs, fontWeight:'600', color:T.text2, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' },
+  badge: (color,bg) => ({ fontSize:F.xs, padding:'2px 7px', borderRadius:'3px', fontWeight:'500', whiteSpace:'nowrap', color, background:bg }),
+  th: { fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', padding:'5px 8px', fontWeight:'600', whiteSpace:'nowrap', textAlign:'left', cursor:'pointer', userSelect:'none', background:T.bg2 },
+  td: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
+};
+
+const fmtDate = d => {
+  if (!d) return '—';
+  const date = new Date(typeof d === 'string' && d.length === 10 ? d + 'T00:00:00' : d);
+  return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+};
+
+const fmtNumDate = d => {
+  if (!d) return '';
+  const date = new Date(typeof d === 'string' && d.length === 10 ? d + 'T00:00:00' : d);
+  if (isNaN(date.getTime())) return '';
+  return `${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}-${date.getFullYear()}`;
+};
+
+const fmtCurrency = n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+const fmtSqft     = n => n == null ? '—' : Number(n).toLocaleString() + ' sf';
+const fmtPct      = n => n == null ? '—' : Number(n).toFixed(4) + '%';
+
+const daysUntil = d => {
+  if (!d) return null;
+  const date = new Date(d + 'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((date - today) / (1000 * 60 * 60 * 24));
+};
+
+const isInRange = (dateVal, range) => {
+  if (!dateVal || !range) return false;
+  const d = new Date(typeof dateVal === 'string' && dateVal.length === 10 ? dateVal + 'T00:00:00' : dateVal);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  if (range === 'week')  { const w = new Date(now); w.setDate(w.getDate()-7); return d >= w; }
+  if (range === 'month') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  if (range === 'year')  return d.getFullYear()===now.getFullYear();
+  return false;
+};
+
+const TENANT_STATUS_OPTIONS = ['Active', 'Archived', 'Dead Prospect', 'LSG Prospect'];
+const LEASE_STATUS_OPTIONS  = ['Active', 'Expired', 'MTM'];
+const LEASE_TYPE_OPTIONS    = ['NNN', 'Gross', 'Other'];
+
+const STORE_KEY = 'tenantsViewState';
+const loadSaved = () => { try { const s = sessionStorage.getItem(STORE_KEY); return s ? JSON.parse(s) : null; } catch { return null; } };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Badges
+// ─────────────────────────────────────────────────────────────────────────────
+const TenantStatusBadge = ({ status }) => {
+  const map = {
+    'Active':         [T.success, '#1e2a1e'],
+    'Archived':       [T.text2,   T.bg3],
+    'Dead Prospect':  [T.danger,  '#3d1f1f'],
+    'LSG Prospect':   [T.accent,  '#1a2e3a'],
+  };
+  const [color, bg] = map[status] || [T.text2, T.bg3];
+  return <span style={css.badge(color, bg)}>{status || '—'}</span>;
+};
+
+const LeaseStatusBadge = ({ status }) => {
+  const map = {
+    'Active':  [T.success, '#1e2a1e'],
+    'Expired': [T.warn,    'rgba(212,146,74,0.15)'],
+    'MTM':     [T.purple,  '#2a1f3a'],
+  };
+  const [color, bg] = map[status] || [T.text2, T.bg3];
+  return <span style={css.badge(color, bg)}>{status || '—'}</span>;
+};
+
+const RentStatusBadge = ({ status }) => {
+  const map = {
+    'Current':  [T.success, '#1e2a1e'],
+    'Future':   [T.accent,  '#1a2e3a'],
+    'Past':     [T.text2,   T.bg3],
+    'Proposed': [T.purple,  '#2a1f3a'],
+    'Dead':     [T.text3,   T.bg3],
+  };
+  const [color, bg] = map[status] || [T.text2, T.bg3];
+  return <span style={css.badge(color, bg)}>{status || '—'}</span>;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EditableField — extended with type='select'
+// ─────────────────────────────────────────────────────────────────────────────
+export const EditableField = ({ label, value, onSave, type = 'text', options = [] }) => {
+  const [editing, setEditing] = useState(false);
+  const [val,     setVal]     = useState(value != null ? String(value) : '');
+  const [saving,  setSaving]  = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  useEffect(() => { setVal(value != null ? String(value) : ''); }, [value]);
+
+  const save = async () => {
+    setSaving(true);
+    try { await onSave(val || null); setEditing(false); }
+    catch { alert('Save failed'); }
+    finally { setSaving(false); }
+  };
+  const cancel = () => { setVal(value != null ? String(value) : ''); setEditing(false); };
+
+  const inputStyle = { flex:1, background:T.bg3, border:`1px solid ${T.accent}`, borderRadius:'4px', padding:'5px 8px', color:T.text0, fontSize:F.base, outline:'none' };
+
+  return (
+    <div style={{marginBottom:'10px'}}>
+      {label && <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>{label}</div>}
+      {editing ? (
+        <div style={{display:'flex', alignItems:'flex-start', gap:'6px'}}>
+          {type === 'textarea' ? (
+            <textarea ref={inputRef} value={val} onChange={e => setVal(e.target.value)}
+              style={{...inputStyle, resize:'vertical', minHeight:'80px'}}/>
+          ) : type === 'select' ? (
+            <select ref={inputRef} value={val} onChange={e => setVal(e.target.value)} style={inputStyle}>
+              <option value="">—</option>
+              {options.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            <input ref={inputRef} type={type} value={val} onChange={e => setVal(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
+              style={inputStyle}/>
+          )}
+          <button onClick={save} disabled={saving}
+            style={{background:T.accent, border:'none', borderRadius:'4px', padding:'5px 10px', color:'#fff', fontSize:F.sm, cursor:'pointer', whiteSpace:'nowrap'}}>
+            {saving ? '…' : 'Save'}
+          </button>
+          <button onClick={cancel}
+            style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'5px 8px', color:T.text1, fontSize:F.sm, cursor:'pointer'}}>✕</button>
+        </div>
+      ) : (
+        <div onClick={() => setEditing(true)} title="Click to edit"
+          style={{fontSize:F.base, color:val ? T.text0 : T.text3, cursor:'text', padding:'3px 5px', borderRadius:'4px', minHeight:'24px', border:'1px solid transparent', lineHeight:'1.4'}}
+          onMouseEnter={e => e.currentTarget.style.border = `1px solid ${T.border}`}
+          onMouseLeave={e => e.currentTarget.style.border = '1px solid transparent'}>
+          {val || <span style={{color:T.text3, fontStyle:'italic', fontSize:F.sm}}>click to edit</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ReadonlyField
+// ─────────────────────────────────────────────────────────────────────────────
+const ReadonlyField = ({ label, children, value, accent = false }) => (
+  <div style={{marginBottom:'10px'}}>
+    {label && <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>{label}</div>}
+    <div style={{fontSize:F.base, color:accent ? T.accent : T.text0, fontWeight:accent ? '600' : '400', padding:'3px 5px', lineHeight:'1.4'}}>
+      {children || value || <span style={{color:T.text3}}>—</span>}
+    </div>
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// More… popover (list — date filter only)
+// ─────────────────────────────────────────────────────────────────────────────
+const TenantsMorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handle = e => {
+      if (ref.current && !ref.current.contains(e.target) &&
+          anchorRef.current && !anchorRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const toggleDate = period => setDateFilters(prev => ({ updated: prev.updated === period ? null : period }));
+  const periods = [{ key:'week', label:'This Week' }, { key:'month', label:'This Month' }, { key:'year', label:'This Year' }];
+  const btnStyle = active => ({
+    padding:'3px 9px', borderRadius:'4px', fontSize:F.xs, cursor:'pointer',
+    border:`0.5px solid ${active ? T.warn : T.border}`,
+    background: active ? 'rgba(212,146,74,0.18)' : 'transparent',
+    color: active ? T.warn : T.text2,
+    fontWeight: active ? '600' : '400',
+    transition:'all 0.15s',
+  });
+
+  return (
+    <div ref={ref} style={{
+      position:'absolute', top:'calc(100% + 4px)', left:0, zIndex:200,
+      background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'6px',
+      padding:'10px 12px', minWidth:'260px', boxShadow:'0 6px 20px rgba(0,0,0,0.5)',
+    }}>
+      <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'5px', fontWeight:'600'}}>Updated</div>
+      <div style={{display:'flex', gap:'4px'}}>
+        {periods.map(({ key, label }) => (
+          <button key={key} onClick={() => toggleDate(key)} style={btnStyle(dateFilters.updated === key)}>{label}</button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tenants List
+// ─────────────────────────────────────────────────────────────────────────────
+const TenantsList = ({ tenants, loading, error, onSelect }) => {
+  const saved = useMemo(() => loadSaved(), []);
+
+  const [statusFilter, setStatusFilter] = useState(saved?.statusFilter ?? 'Active');
+  const [search,       setSearch]       = useState(saved?.search       ?? '');
+  const [sortCol,      setSortCol]      = useState(saved?.sortCol      ?? 'tenant_dba');
+  const [sortDir,      setSortDir]      = useState(saved?.sortDir      ?? 'asc');
+  const [dateFilters,  setDateFilters]  = useState(saved?.dateFilters  ?? { updated: null });
+  const [moreOpen,     setMoreOpen]     = useState(false);
+  const moreAnchorRef = useRef(null);
+
+  useEffect(() => {
+    document.title = 'Tenants | SedonaCRM';
+    return () => { document.title = 'SedonaCRM'; };
+  }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORE_KEY, JSON.stringify({ statusFilter, search, sortCol, sortDir, dateFilters }));
+    } catch {}
+  }, [statusFilter, search, sortCol, sortDir, dateFilters]);
+
+  const toggleSort = c => {
+    if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(c); setSortDir('asc'); }
+  };
+
+  const sorted = useMemo(() => [...tenants].sort((a, b) => {
+    if (sortCol === 'sqft' || sortCol === 'lease_ends') {
+      const av = a[sortCol] ?? '';
+      const bv = b[sortCol] ?? '';
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === 'asc' ? cmp : -cmp;
+    }
+    const cmp = String(a[sortCol] ?? '').localeCompare(String(b[sortCol] ?? ''));
+    return sortDir === 'asc' ? cmp : -cmp;
+  }), [tenants, sortCol, sortDir]);
+
+  const filtered = useMemo(() => sorted.filter(t => {
+    if (statusFilter !== 'All' && (t.tenant_status || '') !== statusFilter) return false;
+    if (dateFilters.updated && !isInRange(t.updated_at, dateFilters.updated)) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        (t.tenant_dba  ||'').toLowerCase().includes(q) ||
+        (t.prop_code   ||'').toLowerCase().includes(q) ||
+        (t.suite_num   ||'').toLowerCase().includes(q) ||
+        (t.entity_name ||'').toLowerCase().includes(q)
+      );
+    }
+    return true;
+  }), [sorted, statusFilter, search, dateFilters]);
+
+  const statusCounts = useMemo(() => {
+    const base = sorted.filter(t => {
+      if (dateFilters.updated && !isInRange(t.updated_at, dateFilters.updated)) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        return (
+          (t.tenant_dba  ||'').toLowerCase().includes(q) ||
+          (t.prop_code   ||'').toLowerCase().includes(q) ||
+          (t.suite_num   ||'').toLowerCase().includes(q) ||
+          (t.entity_name ||'').toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+    const c = { All: base.length };
+    TENANT_STATUS_OPTIONS.forEach(s => { c[s] = base.filter(t => (t.tenant_status || '') === s).length; });
+    return c;
+  }, [sorted, search, dateFilters]);
+
+  const hasMoreActive    = !!dateFilters.updated;
+  const hasActiveFilters = statusFilter !== 'Active' || search !== '' || !!dateFilters.updated;
+
+  const clearFilters = () => {
+    setStatusFilter('Active'); setSearch(''); setDateFilters({ updated: null });
+  };
+
+  const renderTh = (c, label, extraStyle = {}) => (
+    <th key={c} style={{...css.th, ...extraStyle}} onClick={() => toggleSort(c)}>
+      {label}
+      {sortCol === c
+        ? <span style={{marginLeft:'3px'}}>{sortDir === 'asc' ? '↑' : '↓'}</span>
+        : <span style={{marginLeft:'3px', color:T.bg3}}>↕</span>}
+    </th>
+  );
+
+  const renderRow = (t, i) => {
+    const rowBg  = i % 2 === 0 ? 'transparent' : T.bg0;
+    const exp    = daysUntil(t.lease_ends);
+    const expColor = exp === null ? T.text3 : exp < 0 ? T.danger : exp < 60 ? T.danger : exp < 180 ? T.warn : T.text2;
+    const expBg    = exp !== null && exp < 60 ? '#3d1f1f' : exp !== null && exp < 180 ? '#3d2e1a' : 'transparent';
+    const expLabel = exp === null ? '—' : exp < 0 ? `${Math.abs(exp)}d over` : `${exp}d`;
+
+    const openDetail = e => {
+      if (e.ctrlKey || e.metaKey) {
+        const tab = window.open(`${window.location.origin}/tenants/${t.id}`, '_blank');
+        if (tab) tab.focus();
+      } else {
+        try { sessionStorage.setItem('tenantsBackUrl', window.location.href); } catch {}
+        onSelect(t);
+      }
+    };
+
+    return (
+      <tr key={t.id}
+        style={{borderBottom:`0.5px solid ${T.border}`, background:rowBg, cursor:'pointer'}}
+        onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+        onMouseLeave={e => e.currentTarget.style.background = rowBg}
+        onClick={openDetail}>
+        <td style={{...css.td}} title={t.tenant_dba}>{t.tenant_dba || ''}</td>
+        <td style={{...css.td, color:T.accent, fontWeight:'500', fontSize:F.xs}}>{t.prop_code || ''}</td>
+        <td style={{...css.td, color:T.text1}}>{t.suite_num || '—'}</td>
+        <td style={{...css.td, color:T.text2, textAlign:'right'}}>{t.sqft ? Number(t.sqft).toLocaleString() : '—'}</td>
+        <td style={{...css.td, color:T.text2}}>{t.lease_type || '—'}</td>
+        <td style={{...css.td, color:T.text1}}>{fmtNumDate(t.lease_ends) || '—'}</td>
+        <td style={{...css.td}}>
+          <span style={{fontSize:F.xs, padding:'2px 6px', borderRadius:'3px', background:expBg, color:expColor}}>
+            {expLabel}
+          </span>
+        </td>
+        <td style={{...css.td}}><TenantStatusBadge status={t.tenant_status}/></td>
+        <td style={{...css.td, color:T.text2, fontSize:F.xs}}>{fmtNumDate(t.updated_at)}</td>
+      </tr>
+    );
+  };
+
+  return (
+    <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
+      {/* Header */}
+      <div style={{padding:'7px 14px 6px', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0}}>
+        <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'5px'}}>
+          <span style={{fontSize:F.lg, fontWeight:'600', color:T.text0}}>Tenants</span>
+          <span style={{fontSize:F.xs, color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
+        </div>
+
+        {/* Filter bar */}
+        <div style={{display:'flex', gap:'6px', alignItems:'center', minWidth:0}}>
+          {/* Status pills */}
+          <div style={{display:'flex', gap:'1px', background:T.bg2, borderRadius:'5px', padding:'2px', border:`0.5px solid ${T.border}`, flexShrink:0}}>
+            {['All', ...TENANT_STATUS_OPTIONS].map(s => {
+              const cnt    = statusCounts[s] ?? 0;
+              const active = statusFilter === s;
+              return (
+                <button key={s} onClick={() => setStatusFilter(s)}
+                  style={{padding:'3px 7px', borderRadius:'4px', border:'none', cursor:'pointer', fontSize:F.xs,
+                    background:active ? T.bg3 : 'transparent',
+                    color:active ? T.text0 : T.text2,
+                    fontWeight:active ? '600' : '400',
+                    display:'flex', alignItems:'center', gap:'2px', whiteSpace:'nowrap'}}>
+                  {s}
+                  <span style={{color:active ? T.text1 : T.text3, fontSize:'10px'}}>·{cnt}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* More… */}
+          <div style={{position:'relative', flexShrink:0}} ref={moreAnchorRef}>
+            <button onClick={() => setMoreOpen(o => !o)}
+              style={{padding:'3px 9px', borderRadius:'5px', cursor:'pointer', fontSize:F.xs,
+                border:`0.5px solid ${hasMoreActive ? T.warn : T.border}`,
+                background: moreOpen ? T.bg3 : 'transparent',
+                color: hasMoreActive ? T.warn : T.text1,
+                display:'flex', alignItems:'center', gap:'5px'}}>
+              More…
+              {hasMoreActive && <span style={{width:'5px', height:'5px', borderRadius:'50%', background:T.warn, flexShrink:0, display:'inline-block'}}/>}
+            </button>
+            <TenantsMorePopover
+              open={moreOpen} onClose={() => setMoreOpen(false)} anchorRef={moreAnchorRef}
+              dateFilters={dateFilters} setDateFilters={setDateFilters}
+            />
+          </div>
+
+          {/* Clear Filters */}
+          <button onClick={clearFilters}
+            style={{
+              padding:'3px 9px', borderRadius:'5px', cursor:'pointer', fontSize:F.xs,
+              border:`0.5px solid ${hasActiveFilters ? T.warn : T.border}`,
+              background:'transparent', color: hasActiveFilters ? T.warn : T.text3,
+              display:'flex', alignItems:'center', gap:'3px', transition:'all 0.15s',
+              visibility: hasActiveFilters ? 'visible' : 'hidden',
+            }}>
+            <span style={{fontSize:'12px'}}>×</span> Clear
+          </button>
+
+          {/* Search */}
+          <div style={{marginLeft:'auto', position:'relative', display:'flex', alignItems:'center', flexShrink:0}}>
+            {search && (
+              <button onClick={() => setSearch('')}
+                style={{position:'absolute', left:'7px', background:'transparent', border:'none', cursor:'pointer', color:T.text2, fontSize:'14px', lineHeight:1, padding:0, zIndex:1}}>
+                ×
+              </button>
+            )}
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search…"
+              style={{width:'220px', background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'5px', padding:`4px 10px 4px ${search ? '26px' : '10px'}`, color:T.text0, fontSize:F.xs, outline:'none'}}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      {loading && <div style={{padding:'32px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading tenants…</div>}
+      {error   && <div style={{padding:'32px', textAlign:'center', color:T.danger, fontSize:F.sm}}>Error: {error}</div>}
+
+      {!loading && !error && (
+        <div style={{flex:1, overflowY:'auto'}}>
+          <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
+            <colgroup>
+              <col style={{width:'auto'}}/>
+              <col style={{width:'58px'}}/>
+              <col style={{width:'62px'}}/>
+              <col style={{width:'68px'}}/>
+              <col style={{width:'60px'}}/>
+              <col style={{width:'88px'}}/>
+              <col style={{width:'74px'}}/>
+              <col style={{width:'110px'}}/>
+              <col style={{width:'88px'}}/>
+            </colgroup>
+            <thead style={{position:'sticky', top:0, zIndex:2}}>
+              <tr>
+                {renderTh('tenant_dba', 'Tenant')}
+                {renderTh('prop_code',  'Prop',   {paddingLeft:'10px'})}
+                {renderTh('suite_num',  'Suite')}
+                {renderTh('sqft',       'Sq Ft',  {textAlign:'right'})}
+                {renderTh('lease_type', 'Type')}
+                {renderTh('lease_ends', 'Lease End')}
+                <th style={css.th}>Expires</th>
+                {renderTh('tenant_status', 'Status')}
+                {renderTh('updated_at',    'Updated')}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={9} style={{...css.td, textAlign:'center', padding:'32px', color:T.text3}}>No tenants match filters</td></tr>
+              )}
+              {filtered.map((t, i) => renderRow(t, i))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tenant Detail
+// ─────────────────────────────────────────────────────────────────────────────
+export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
+  const [tab,      setTab]      = useState('info');
+  const [data,     setData]     = useState(tenant);
+  const [property, setProperty] = useState(null);
+  const [suite,    setSuite]    = useState(null);
+
+  // Lazy-loaded tab data
+  const [contacts,  setContacts]  = useState(null);   // { primary, accounting }
+  const [rent,      setRent]      = useState(null);   // array
+  const [cois,      setCois]      = useState(null);   // array
+  const loaded = useRef(new Set());
+
+  // Load property + suite immediately (needed for Info tab)
+  useEffect(() => {
+    if (data.prop_code) {
+      sbFetch('properties', `select=id,prop_code,property_name,address,city,state&prop_code=eq.${encodeURIComponent(data.prop_code)}`)
+        .then(r => setProperty(r[0] || null)).catch(() => {});
+    }
+    if (data.prop_code && data.suite_num) {
+      sbFetch('suites', `select=*&prop_code=eq.${encodeURIComponent(data.prop_code)}&suite_num=eq.${encodeURIComponent(data.suite_num)}`)
+        .then(r => setSuite(r[0] || null)).catch(() => {});
+    }
+  }, [data.prop_code, data.suite_num]);
+
+  // Lazy load Contacts tab
+  useEffect(() => {
+    if (tab !== 'contacts' || loaded.current.has('contacts')) return;
+    loaded.current.add('contacts');
+    const ids = [data.primary_contact_id, data.accounting_contact_id].filter(Boolean);
+    if (ids.length === 0) { setContacts({ primary: null, accounting: null }); return; }
+    Promise.all([
+      data.primary_contact_id    ? sbFetch('contacts', `select=*&id=eq.${data.primary_contact_id}`)    : Promise.resolve([]),
+      data.accounting_contact_id ? sbFetch('contacts', `select=*&id=eq.${data.accounting_contact_id}`) : Promise.resolve([]),
+    ]).then(([pc, ac]) => {
+      setContacts({ primary: pc[0] || null, accounting: ac[0] || null });
+    }).catch(() => setContacts({ primary: null, accounting: null }));
+  }, [tab, data.primary_contact_id, data.accounting_contact_id]);
+
+  // Lazy load Rent tab
+  useEffect(() => {
+    if (tab !== 'rent' || loaded.current.has('rent')) return;
+    loaded.current.add('rent');
+    sbFetch('rent_schedule', `select=*&tenant_id=eq.${data.id}&order=rent_starts.asc`)
+      .then(r => setRent(r)).catch(() => setRent([]));
+  }, [tab, data.id]);
+
+  // Lazy load COIs tab
+  useEffect(() => {
+    if (tab !== 'cois' || loaded.current.has('cois')) return;
+    loaded.current.add('cois');
+    sbFetch('tnt_cois', `select=*&tenant_id=eq.${data.id}&order=expiry_date.asc`)
+      .then(r => setCois(r)).catch(() => setCois([]));
+  }, [tab, data.id]);
+
+  // Browser tab title
+  useEffect(() => {
+    const prop  = data.prop_code || '';
+    const name  = data.tenant_dba || 'Tenant';
+    document.title = `${prop} · ${name} | SedonaCRM`;
+    return () => { document.title = 'SedonaCRM'; };
+  }, [data.prop_code, data.tenant_dba]);
+
+  // Escape key
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'Escape') return;
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      onBack();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onBack]);
+
+  const save = async (field, val) => {
+    await sbPatch('tenants', data.id, { [field]: val });
+    const updated = { ...data, [field]: val };
+    setData(updated);
+    onUpdate?.(updated);
+  };
+
+  const TABS = ['Info', 'Contacts', 'Rent', 'COIs', 'Activity', 'Communications'];
+  const tk   = t => t.toLowerCase();
+
+  const hdrBtnStyle = (active) => ({
+    padding:'3px 10px', borderRadius:'4px', fontSize:F.xs, cursor: active ? 'pointer' : 'default',
+    border:`0.5px solid ${active ? T.border : T.border}`,
+    background:'transparent',
+    color: active ? T.text1 : T.text3,
+    textDecoration:'none', display:'inline-flex', alignItems:'center', gap:'4px',
+    opacity: active ? 1 : 0.4,
+  });
+
+  const propAddr = property ? [property.address, property.city, property.state].filter(Boolean).join(', ') : null;
+
+  return (
+    <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
+
+      {/* ── Header ── */}
+      <div style={{padding:'10px 16px 0', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0}}>
+        {/* Row 1: breadcrumb + action buttons + podio id */}
+        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px'}}>
+          <button onClick={onBack}
+            style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0}}
+            onMouseEnter={e => e.currentTarget.style.color = T.text0}
+            onMouseLeave={e => e.currentTarget.style.color = T.text1}>
+            ← Tenants
+          </button>
+
+          {data.prop_code && (
+            <span style={{fontSize:F.sm, fontWeight:'600', color:T.accent, background:'#1a2e3a', padding:'2px 8px', borderRadius:'3px', flexShrink:0}}>
+              {data.prop_code}
+            </span>
+          )}
+          {data.suite_num && (
+            <span style={{fontSize:F.sm, color:T.text2, flexShrink:0}}>Suite {data.suite_num}</span>
+          )}
+
+          {/* Action buttons — right-aligned */}
+          <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'6px'}}>
+            {data.gdrive_folder_url ? (
+              <a href={data.gdrive_folder_url} target="_blank" rel="noreferrer"
+                style={{...hdrBtnStyle(true), color:T.accent, borderColor:T.accent}}>
+                Drive ↗
+              </a>
+            ) : (
+              <span style={hdrBtnStyle(false)}>Drive</span>
+            )}
+
+            {data.gdrive_lease_url ? (
+              <a href={data.gdrive_lease_url} target="_blank" rel="noreferrer"
+                style={{...hdrBtnStyle(true), color:T.warn, borderColor:T.warn}}>
+                Lease PDF ↗
+              </a>
+            ) : (
+              <span style={hdrBtnStyle(false)}>Lease PDF</span>
+            )}
+
+            <span title="HelloSign — Phase 3"
+              style={{...hdrBtnStyle(false), cursor:'not-allowed'}}>
+              eSign
+            </span>
+
+            {data.podio_id && (
+              <span style={{marginLeft:'8px', borderLeft:`0.5px solid ${T.border}`, paddingLeft:'10px', display:'flex', alignItems:'center', gap:'4px', flexShrink:0}}>
+                <span style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em'}}>Podio</span>
+                <span style={{fontSize:F.xs, color:T.text2}}>{data.podio_id}</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: title + status badges */}
+        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'12px', marginBottom:'4px'}}>
+          <div>
+            <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
+              {data.tenant_dba || 'Untitled Tenant'}
+            </div>
+            {data.entity_name && (
+              <div style={{fontSize:F.sm, color:T.text2, marginTop:'2px'}}>{data.entity_name}</div>
+            )}
+          </div>
+          <div style={{display:'flex', alignItems:'center', gap:'6px', flexShrink:0, paddingTop:'2px'}}>
+            {data.lease_type   && <span style={css.badge(T.text1, T.bg3)}>{data.lease_type}</span>}
+            {data.lease_status && <LeaseStatusBadge status={data.lease_status}/>}
+            <TenantStatusBadge status={data.tenant_status}/>
+          </div>
+        </div>
+
+        {/* Tab bar */}
+        <div style={{display:'flex', gap:'2px', marginTop:'4px'}}>
+          {TABS.map(t => (
+            <button key={t} onClick={() => setTab(tk(t))}
+              style={{background:'transparent', border:'none', padding:'6px 12px', fontSize:F.sm, cursor:'pointer', borderRadius:'4px 4px 0 0',
+                color: tab === tk(t) ? T.accent : T.text1,
+                borderBottom: tab === tk(t) ? `2px solid ${T.accent}` : '2px solid transparent',
+                fontWeight: tab === tk(t) ? '600' : '400'}}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tab content ── */}
+      <div style={{flex:1, overflowY:'auto', padding:'16px'}}>
+
+        {/* ── INFO TAB ── */}
+        {tab === 'info' && (
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+
+            {/* LEFT: Tenant Info */}
+            <div style={css.card}>
+              <div style={css.secTitle}>Tenant Info</div>
+              <EditableField label="Tenant DBA"    value={data.tenant_dba}    onSave={v => save('tenant_dba', v)}/>
+              <EditableField label="Legal Name"    value={data.entity_name}   onSave={v => save('entity_name', v)}/>
+              <EditableField label="Lease Type"    value={data.lease_type}    onSave={v => save('lease_type', v)}    type="select" options={LEASE_TYPE_OPTIONS}/>
+              <EditableField label="Lease Status"  value={data.lease_status}  onSave={v => save('lease_status', v)}  type="select" options={LEASE_STATUS_OPTIONS}/>
+              <EditableField label="Tenant Status" value={data.tenant_status} onSave={v => save('tenant_status', v)} type="select" options={TENANT_STATUS_OPTIONS}/>
+              <EditableField label="Tenant Use"    value={data.tenant_use}    onSave={v => save('tenant_use', v)}/>
+            </div>
+
+            {/* RIGHT: Property & Suite */}
+            <div>
+              <div style={{...css.card, marginBottom:'12px'}}>
+                <div style={css.secTitle}>Property</div>
+                <div style={{marginBottom:'8px'}}>
+                  <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'4px'}}>Prop Code</div>
+                  <span style={{fontSize:F.md, fontWeight:'600', color:T.accent, background:'#1a2e3a', padding:'2px 8px', borderRadius:'3px'}}>
+                    {data.prop_code || '—'}
+                  </span>
+                </div>
+                {property ? (
+                  <>
+                    <ReadonlyField label="Property Name" value={property.property_name}/>
+                    {propAddr && <ReadonlyField label="Address" value={propAddr}/>}
+                    <a href={`/properties/${property.id}`} target="_blank" rel="noreferrer"
+                      style={{fontSize:F.xs, color:T.accent, textDecoration:'none', display:'inline-flex', alignItems:'center', gap:'3px', padding:'3px 5px', borderRadius:'3px', border:`0.5px solid ${T.border}`}}>
+                      Open Property ↗
+                    </a>
+                  </>
+                ) : (
+                  <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic'}}>Loading property…</div>
+                )}
+              </div>
+
+              <div style={css.card}>
+                <div style={css.secTitle}>Suite</div>
+                <ReadonlyField label="Suite #"       value={data.suite_num}/>
+                <ReadonlyField label="Sq Ft"         value={fmtSqft(data.sqft)}/>
+                <ReadonlyField label="NNN Prorata %" value={data.nnn_prorata_share_pct != null ? fmtPct(data.nnn_prorata_share_pct) : null}/>
+                {suite && (
+                  <>
+                    {suite.space_type && <ReadonlyField label="Space Type" value={suite.space_type}/>}
+                    {suite.location_desc && <ReadonlyField label="Location" value={suite.location_desc}/>}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* BOTTOM LEFT: Lease Terms */}
+            <div style={css.card}>
+              <div style={css.secTitle}>Lease Terms</div>
+              <EditableField label="Lease Starts"       value={data.lease_starts}       onSave={v => save('lease_starts', v)}       type="date"/>
+              <EditableField label="Lease Ends"         value={data.lease_ends}         onSave={v => save('lease_ends', v)}         type="date"/>
+              <EditableField label="Term (months)"      value={data.lease_term_months}  onSave={v => save('lease_term_months', v != null ? parseInt(v) || null : null)} type="number"/>
+              <EditableField label="Amendment #"        value={data.amendment_num}      onSave={v => save('amendment_num', v != null ? parseInt(v) || null : null)} type="number"/>
+              <EditableField label="Security Deposit"   value={data.security_deposit}   onSave={v => save('security_deposit', v != null ? parseFloat(v) || null : null)} type="number"/>
+              <EditableField label="Day Rent Due"       value={data.day_rent_due}       onSave={v => save('day_rent_due', v != null ? parseInt(v) || null : null)} type="number"/>
+              <EditableField label="Pays Rent How"      value={data.pays_rent_how}      onSave={v => save('pays_rent_how', v)}/>
+              <div style={{marginBottom:'10px'}}>
+                <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>TPT Tax Exempt</div>
+                <div style={{display:'flex', gap:'6px'}}>
+                  {[true, false].map(v => (
+                    <button key={String(v)} onClick={() => save('tpt_tax_exempt', v)}
+                      style={{padding:'3px 10px', borderRadius:'4px', cursor:'pointer', fontSize:F.sm,
+                        border: data.tpt_tax_exempt === v ? `1px solid ${T.accent}` : `1px solid ${T.border}`,
+                        background: data.tpt_tax_exempt === v ? T.bg3 : 'transparent',
+                        color: data.tpt_tax_exempt === v ? T.text0 : T.text2}}>
+                      {v ? 'Yes' : 'No'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* BOTTOM RIGHT: Notes */}
+            <div style={css.card}>
+              <div style={css.secTitle}>Notes</div>
+              <EditableField label="Company Notes" value={data.company_notes}              onSave={v => save('company_notes', v)}              type="textarea"/>
+              <EditableField label="Lease Notes"   value={data.lease_notes}                onSave={v => save('lease_notes', v)}                type="textarea"/>
+              {(data.future_lease_change_notes || '') && (
+                <EditableField label="Future Lease Changes" value={data.future_lease_change_notes} onSave={v => save('future_lease_change_notes', v)} type="textarea"/>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── CONTACTS TAB ── */}
+        {tab === 'contacts' && (
+          contacts === null ? (
+            <div style={{padding:'32px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading contacts…</div>
+          ) : (
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+              {/* Primary Contact */}
+              <div style={css.card}>
+                <div style={css.secTitle}>Primary Contact</div>
+                {contacts.primary ? (
+                  <>
+                    <ReadonlyField label="Name"   value={contacts.primary.full_name}/>
+                    <ReadonlyField label="Title"  value={contacts.primary.title}/>
+                    <ReadonlyField label="Phone"  value={contacts.primary.primary_phone || contacts.primary.main_office_phone}/>
+                    <ReadonlyField label="Email"  value={contacts.primary.email}/>
+                    {contacts.primary.company_dba && <ReadonlyField label="Company" value={contacts.primary.company_dba}/>}
+                  </>
+                ) : (
+                  <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic', padding:'8px 0'}}>No primary contact linked.</div>
+                )}
+              </div>
+
+              {/* Accounting Contact */}
+              <div style={css.card}>
+                <div style={css.secTitle}>Accounting Contact</div>
+                {contacts.accounting ? (
+                  <>
+                    <ReadonlyField label="Name"   value={contacts.accounting.full_name}/>
+                    <ReadonlyField label="Title"  value={contacts.accounting.title}/>
+                    <ReadonlyField label="Phone"  value={contacts.accounting.primary_phone || contacts.accounting.main_office_phone}/>
+                    <ReadonlyField label="Email"  value={contacts.accounting.email}/>
+                    {contacts.accounting.company_dba && <ReadonlyField label="Company" value={contacts.accounting.company_dba}/>}
+                  </>
+                ) : (
+                  <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic', padding:'8px 0'}}>No accounting contact linked.</div>
+                )}
+              </div>
+
+              {/* Entity info from tenant record */}
+              <div style={{...css.card, gridColumn:'1 / -1'}}>
+                <div style={css.secTitle}>Entity Info</div>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'16px'}}>
+                  <ReadonlyField label="Entity Name"  value={data.entity_name}/>
+                  <ReadonlyField label="Entity Type"  value={data.entity_type}/>
+                  <ReadonlyField label="Entity State" value={data.entity_state}/>
+                </div>
+                {data.entity_sig_block && (
+                  <div style={{marginTop:'8px', padding:'8px', background:T.bg3, borderRadius:'4px', fontSize:F.sm, color:T.text1, lineHeight:'1.5', whiteSpace:'pre-wrap'}}>
+                    {data.entity_sig_block}
+                  </div>
+                )}
+                <div style={{marginTop:'12px'}}>
+                  <div style={css.secTitle}>Mailing Address</div>
+                  <ReadonlyField label="" value={[data.address, data.city, data.state, data.zip].filter(Boolean).join(', ')}/>
+                </div>
+              </div>
+            </div>
+          )
+        )}
+
+        {/* ── RENT TAB ── */}
+        {tab === 'rent' && (
+          rent === null ? (
+            <div style={{padding:'32px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading rent schedule…</div>
+          ) : rent.length === 0 ? (
+            <div style={{...css.card}}>
+              <div style={{padding:'16px 0', textAlign:'center', color:T.text3, fontSize:F.sm}}>No rent schedule records found for this tenant.</div>
+            </div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'700px'}}>
+                <colgroup>
+                  <col style={{width:'90px'}}/>
+                  <col style={{width:'90px'}}/>
+                  <col style={{width:'90px'}}/>
+                  <col style={{width:'90px'}}/>
+                  <col style={{width:'90px'}}/>
+                  <col style={{width:'90px'}}/>
+                  <col style={{width:'90px'}}/>
+                  <col style={{width:'auto'}}/>
+                </colgroup>
+                <thead style={{position:'sticky', top:0, zIndex:2}}>
+                  <tr>
+                    {['Status','Rent Start','Rent End','Base Rent','NNN','Total','Base/SF','Notes'].map(h => (
+                      <th key={h} style={{...css.th, cursor:'default'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rent.map((r, i) => (
+                    <tr key={r.id}
+                      style={{borderBottom:`0.5px solid ${T.border}`, background: i % 2 === 0 ? 'transparent' : T.bg0}}>
+                      <td style={css.td}><RentStatusBadge status={r.rent_status}/></td>
+                      <td style={{...css.td, color:T.text1}}>{fmtNumDate(r.rent_starts) || '—'}</td>
+                      <td style={{...css.td, color: r.rent_ends && daysUntil(r.rent_ends) != null && daysUntil(r.rent_ends) < 60 ? T.warn : T.text1}}>
+                        {fmtNumDate(r.rent_ends) || '—'}
+                      </td>
+                      <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(r.base_rent)}</td>
+                      <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(r.nnn)}</td>
+                      <td style={{...css.td, textAlign:'right', fontWeight:'500'}}>{fmtCurrency(r.total)}</td>
+                      <td style={{...css.td, textAlign:'right', color:T.text2}}>{r.base_per_sf != null ? '$' + Number(r.base_per_sf).toFixed(2) : '—'}</td>
+                      <td style={{...css.td, color:T.text2, fontSize:F.xs}} title={r.notes}>{r.notes || ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+
+        {/* ── COIS TAB ── */}
+        {tab === 'cois' && (
+          cois === null ? (
+            <div style={{padding:'32px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading COIs…</div>
+          ) : cois.length === 0 ? (
+            <div style={css.card}>
+              <div style={{padding:'16px 0', textAlign:'center', color:T.text3, fontSize:F.sm}}>No COI records found for this tenant.</div>
+            </div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
+                <colgroup>
+                  <col style={{width:'auto'}}/>
+                  <col style={{width:'90px'}}/>
+                  <col style={{width:'90px'}}/>
+                  <col style={{width:'110px'}}/>
+                  <col style={{width:'90px'}}/>
+                </colgroup>
+                <thead style={{position:'sticky', top:0, zIndex:2}}>
+                  <tr>
+                    {['Insured Company','Expiry','COI Status','Add\'l Insured','Notes'].map(h => (
+                      <th key={h} style={{...css.th, cursor:'default'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {cois.map((c, i) => {
+                    const exp  = daysUntil(c.expiry_date);
+                    const expiredColor = exp !== null && exp < 0 ? T.danger : exp !== null && exp < 30 ? T.warn : T.text1;
+                    const coiStatusColor = c.coi_status === 'Current' ? T.success : c.coi_status === 'Expired' ? T.danger : T.warn;
+                    const coiStatusBg   = c.coi_status === 'Current' ? '#1e2a1e'  : c.coi_status === 'Expired' ? '#3d1f1f'  : 'rgba(212,146,74,0.15)';
+                    const addlColor     = c.additional_insured_status === 'On File' ? T.success : T.warn;
+                    const addlBg        = c.additional_insured_status === 'On File' ? '#1e2a1e' : 'rgba(212,146,74,0.15)';
+                    return (
+                      <tr key={c.id}
+                        style={{borderBottom:`0.5px solid ${T.border}`, background: i % 2 === 0 ? 'transparent' : T.bg0}}>
+                        <td style={{...css.td}} title={c.insured_company}>{c.insured_company || ''}</td>
+                        <td style={{...css.td, color:expiredColor}}>{fmtNumDate(c.expiry_date) || '—'}</td>
+                        <td style={css.td}>
+                          {c.coi_status && <span style={css.badge(coiStatusColor, coiStatusBg)}>{c.coi_status}</span>}
+                        </td>
+                        <td style={css.td}>
+                          {c.additional_insured_status && (
+                            <span style={css.badge(addlColor, addlBg)}>{c.additional_insured_status}</span>
+                          )}
+                        </td>
+                        <td style={{...css.td, color:T.text2, fontSize:F.xs}} title={c.internal_notes}>{c.internal_notes || ''}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+
+        {/* ── ACTIVITY TAB ── */}
+        {tab === 'activity' && (
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+            <div style={css.card}>
+              <div style={css.secTitle}>Work Orders</div>
+              <div style={{padding:'20px 0', textAlign:'center'}}>
+                <div style={{fontSize:'28px', color:T.bg3, marginBottom:'6px'}}>🔧</div>
+                <div style={{fontSize:F.sm, color:T.text3}}>Work orders filtered by tenant — coming in a future build.</div>
+              </div>
+            </div>
+            <div style={css.card}>
+              <div style={css.secTitle}>Issues</div>
+              <div style={{padding:'20px 0', textAlign:'center'}}>
+                <div style={{fontSize:'28px', color:T.bg3, marginBottom:'6px'}}>⚠️</div>
+                <div style={{fontSize:F.sm, color:T.text3}}>Issues filtered by tenant — coming in a future build.</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── COMMUNICATIONS TAB ── */}
+        {tab === 'communications' && (
+          <div style={css.card}>
+            <div style={css.secTitle}>Communications</div>
+            <div style={{padding:'32px 0', textAlign:'center'}}>
+              <div style={{fontSize:'36px', color:T.bg3, marginBottom:'8px'}}>✉</div>
+              <div style={{fontSize:F.base, color:T.text2, marginBottom:'4px'}}>Email thread syncs from Gmail at go-live.</div>
+              <div style={{fontSize:F.sm, color:T.text3}}>SMS via Twilio — Phase 6</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main export — SPA (list + detail)
+// ─────────────────────────────────────────────────────────────────────────────
+export default function TenantsView() {
+  const [tenants,  setTenants]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    setLoading(true); setError(null);
+    sbFetch('tenants', 'select=*&order=tenant_dba.asc')
+      .then(data => { setTenants(data); setLoading(false); })
+      .catch(e   => { setError(e.message); setLoading(false); });
+  }, []);
+
+  const handleSelect = useCallback(t => {
+    history.pushState({ tenantId: t.id }, '');
+    setSelected(t);
+  }, []);
+
+  const handleBack = useCallback(() => {
+    if (window.history.state?.tenantId) history.replaceState({}, '');
+    setSelected(null);
+  }, []);
+
+  useEffect(() => {
+    const onPop = () => setSelected(null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  return (
+    <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:T.bg1}}>
+      <div style={{display:selected ? 'none' : 'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
+        <TenantsList tenants={tenants} loading={loading} error={error} onSelect={handleSelect}/>
+      </div>
+      {selected && (
+        <TenantDetail key={selected.id} tenant={selected} onBack={handleBack} onUpdate={updated => setSelected(updated)}/>
+      )}
+    </div>
+  );
+}
