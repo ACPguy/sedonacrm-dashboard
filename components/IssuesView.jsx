@@ -50,15 +50,17 @@ export const css = {
 // MM-DD-YYYY numeric format for table cells
 const fmtNumDate = d => {
   if (!d) return '';
-  const date = new Date(typeof d === 'string' && d.length === 10 ? d + 'T00:00:00' : d);
-  if (isNaN(date.getTime())) return '';
-  const m   = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${m}-${day}-${date.getFullYear()}`;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
 };
 
-// Short display format used in detail view only
-export const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+export const fmtDate = d => {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
+};
 
 const isFuOverdue = (d, status) => {
   if (!d || status === 'Closed') return false;

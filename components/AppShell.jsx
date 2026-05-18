@@ -9,8 +9,9 @@ const T = {
 };
 const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
 
-const NavBtn = ({ label, active, onClick, collapsed }) => (
-  <button onClick={onClick}
+const NavBtn = ({ label, active, href, onClick, collapsed }) => (
+  <a href={href}
+    onClick={e=>{ if(!e.ctrlKey && !e.metaKey){ e.preventDefault(); onClick?.(); } }}
     title={collapsed ? label : undefined}
     style={{
       width:'100%', padding:collapsed?'8px 0':'7px 10px',
@@ -19,7 +20,7 @@ const NavBtn = ({ label, active, onClick, collapsed }) => (
       alignItems:'center', justifyContent:collapsed?'center':'flex-start',
       gap:'9px', fontSize:F.base, color:active?T.accent:T.text1,
       borderRadius:'4px', borderRight:active?`2px solid ${T.accent}`:'2px solid transparent',
-      whiteSpace:'nowrap',
+      whiteSpace:'nowrap', textDecoration:'none',
     }}
     onMouseEnter={e=>{ if(!active) e.currentTarget.style.color=T.text0; }}
     onMouseLeave={e=>{ if(!active) e.currentTarget.style.color=T.text1; }}>
@@ -27,7 +28,7 @@ const NavBtn = ({ label, active, onClick, collapsed }) => (
       ? <span style={{fontSize:'16px',fontWeight:'600'}}>{label[0]}</span>
       : <span style={{flex:1}}>{label}</span>
     }
-  </button>
+  </a>
 );
 
 const SectionLabel = ({ label, collapsed }) => collapsed ? null : (
@@ -77,30 +78,30 @@ export default function AppShell({ children, activeView }) {
         </div>
         {/* Nav */}
         <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
-          <NavBtn label="Home" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={collapsed}/>
+          <NavBtn label="Home" href="/?view=morning-briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={collapsed}/>
           <SectionLabel label="Operations" collapsed={collapsed}/>
-          <NavBtn label="Properties"  active={is('properties')}  onClick={()=>go('/?view=properties')}  collapsed={collapsed}/>
-          <NavBtn label="Tenants"     active={is('tenants')}     onClick={()=>go('/tenants')}           collapsed={collapsed}/>
-          <NavBtn label="Suites"      active={is('suites')}      onClick={()=>go('/?view=suites')}      collapsed={collapsed}/>
-          <NavBtn label="Work Orders" active={is('work-orders')} onClick={()=>go('/work-orders')} collapsed={collapsed}/>
-          <NavBtn label="Issues"      active={is('issues')}      onClick={()=>go('/issues')}             collapsed={collapsed}/>
-          <NavBtn label="Contacts"    active={is('contacts')}    onClick={()=>go('/contacts')}           collapsed={collapsed}/>
-          <NavBtn label="Vendors"     active={is('vendors')}     onClick={()=>go('/vendors')}             collapsed={collapsed}/>
-          <NavBtn label="Owners"      active={is('owners')}      onClick={()=>go('/owners')}              collapsed={collapsed}/>
+          <NavBtn label="Properties"  href="/?view=properties"  active={is('properties')}  onClick={()=>go('/?view=properties')}  collapsed={collapsed}/>
+          <NavBtn label="Tenants"     href="/tenants"            active={is('tenants')}     onClick={()=>go('/tenants')}           collapsed={collapsed}/>
+          <NavBtn label="Suites"      href="/?view=suites"       active={is('suites')}      onClick={()=>go('/?view=suites')}      collapsed={collapsed}/>
+          <NavBtn label="Work Orders" href="/work-orders"        active={is('work-orders')} onClick={()=>go('/work-orders')}       collapsed={collapsed}/>
+          <NavBtn label="Issues"      href="/issues"             active={is('issues')}      onClick={()=>go('/issues')}            collapsed={collapsed}/>
+          <NavBtn label="Contacts"    href="/contacts"           active={is('contacts')}    onClick={()=>go('/contacts')}          collapsed={collapsed}/>
+          <NavBtn label="Vendors"     href="/vendors"            active={is('vendors')}     onClick={()=>go('/vendors')}           collapsed={collapsed}/>
+          <NavBtn label="Owners"      href="/owners"             active={is('owners')}      onClick={()=>go('/owners')}            collapsed={collapsed}/>
           <SectionLabel label="Leasing" collapsed={collapsed}/>
-          <NavBtn label="Pipeline"      active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={collapsed}/>
-          <NavBtn label="Leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={collapsed}/>
-          <NavBtn label="Rents"         active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={collapsed}/>
+          <NavBtn label="Pipeline"      href="/?view=leasing"       active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={collapsed}/>
+          <NavBtn label="Leases"        href="/?view=leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={collapsed}/>
+          <NavBtn label="Rents"         href="/rent-schedule"       active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={collapsed}/>
           <SectionLabel label="Compliance" collapsed={collapsed}/>
-          <NavBtn label="Insurance"   active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={collapsed}/>
-          <NavBtn label="Inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={collapsed}/>
+          <NavBtn label="Insurance"   href="/?view=tnt-cois"    active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={collapsed}/>
+          <NavBtn label="Inspections" href="/?view=inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={collapsed}/>
           <SectionLabel label="Finance" collapsed={collapsed}/>
-          <NavBtn label="QBO Dashboard" active={is('qbo')}      onClick={()=>go('/?view=qbo')}      collapsed={collapsed}/>
-          <NavBtn label="Invoices"      active={is('invoices')} onClick={()=>go('/?view=invoices')} collapsed={collapsed}/>
+          <NavBtn label="QBO Dashboard" href="/?view=qbo"      active={is('qbo')}      onClick={()=>go('/?view=qbo')}      collapsed={collapsed}/>
+          <NavBtn label="Invoices"      href="/?view=invoices" active={is('invoices')} onClick={()=>go('/?view=invoices')} collapsed={collapsed}/>
         </div>
         {/* Bottom */}
         <div style={{padding:'8px 6px',borderTop:`0.5px solid ${T.border}`,flexShrink:0}}>
-          <NavBtn label="Settings" active={is('settings')} onClick={()=>go('/?view=settings')} collapsed={collapsed}/>
+          <NavBtn label="Settings" href="/?view=settings" active={is('settings')} onClick={()=>go('/?view=settings')} collapsed={collapsed}/>
         </div>
       </div>
 

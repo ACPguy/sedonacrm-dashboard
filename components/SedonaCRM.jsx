@@ -49,7 +49,12 @@ const css = {
 };
 
 const today = new Date();
-const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+const fmtDate = d => {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
+};
 const fmtMoney = n => n != null && n !== '' ? '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
 const fmtNum = n => n != null && n !== '' ? Number(n).toLocaleString() : '—';
 
@@ -174,11 +179,14 @@ const WeatherCard = ({ city, lat, lon, url }) => {
 };
 
 // ── Nav Item ──────────────────────────────────────────────────────────────────
-const NavItem = ({ icon,label,active,onClick,collapsed,expandedMenu,setExpandedMenu,setCurrentView,submenu }) => {
+const NavItem = ({ icon,label,active,onClick,href,collapsed,expandedMenu,setExpandedMenu,setCurrentView,submenu }) => {
   const isExp = expandedMenu===label;
   return (
     <div>
-      <button onClick={()=>submenu?setExpandedMenu(isExp?null:label):onClick?.()}
+      <button onClick={e=>{
+          if((e.ctrlKey||e.metaKey)&&href){window.open(href,'_blank');return;}
+          submenu?setExpandedMenu(isExp?null:label):onClick?.();
+        }}
         title={collapsed?label:undefined}
         style={{width:'100%',padding:collapsed?'8px 0':'7px 10px',background:active?T.bg2:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',gap:'9px',fontSize:F.base,color:active?T.accent:T.text1,borderRadius:'4px',borderRight:active?`2px solid ${T.accent}`:'2px solid transparent',whiteSpace:'nowrap'}}
         onMouseEnter={e=>{if(!active)e.currentTarget.style.color=T.text0;}}
@@ -1156,30 +1164,30 @@ export default function SedonaCRM() {
         </div>
         {/* Nav */}
         <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
-          <NavItem icon="ti-layout-dashboard" label="Home" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
+          <NavItem icon="ti-layout-dashboard" label="Home" href="/?view=morning-briefing" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Operations</div>}
-          <NavItem icon="ti-building-store" label="Properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}  {...navProps}/>
-          <NavItem icon="ti-users"          label="Tenants"     active={currentView==='tenants'}     onClick={()=>router.push('/tenants')} {...navProps}/>
-          <NavItem icon="ti-door"           label="Suites"      active={currentView==='suites'}      onClick={()=>navTo('suites')}      {...navProps}/>
-          <NavItem icon="ti-tool"           label="Work Orders" active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
-          <NavItem icon="ti-alert-triangle" label="Issues"      active={currentView==='issues'}      onClick={()=>router.push('/issues')}   {...navProps}/>
-          <NavItem icon="ti-address-book"  label="Contacts"    active={currentView==='contacts'}    onClick={()=>router.push('/contacts')} {...navProps}/>
-          <NavItem icon="ti-building"      label="Vendors"     active={currentView==='vendors'}     onClick={()=>router.push('/vendors')}  {...navProps}/>
-          <NavItem icon="ti-home"          label="Owners"      active={currentView==='owners'}      onClick={()=>router.push('/owners')}   {...navProps}/>
+          <NavItem icon="ti-building-store" label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}  {...navProps}/>
+          <NavItem icon="ti-users"          label="Tenants"     href="/tenants"            active={currentView==='tenants'}     onClick={()=>router.push('/tenants')} {...navProps}/>
+          <NavItem icon="ti-door"           label="Suites"      href="/?view=suites"       active={currentView==='suites'}      onClick={()=>navTo('suites')}      {...navProps}/>
+          <NavItem icon="ti-tool"           label="Work Orders" href="/work-orders"        active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
+          <NavItem icon="ti-alert-triangle" label="Issues"      href="/issues"             active={currentView==='issues'}      onClick={()=>router.push('/issues')}   {...navProps}/>
+          <NavItem icon="ti-address-book"  label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>router.push('/contacts')} {...navProps}/>
+          <NavItem icon="ti-building"      label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>router.push('/vendors')}  {...navProps}/>
+          <NavItem icon="ti-home"          label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>router.push('/owners')}   {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
-          <NavItem icon="ti-pipeline"   label="Pipeline" active={currentView==='leasing'}   onClick={()=>navTo('leasing')}   {...navProps}/>
-          <NavItem icon="ti-file-text"  label="Leases"   active={currentView==='leases'}    onClick={()=>navTo('leases')}             {...navProps}/>
-          <NavItem icon="ti-cash"       label="Rents"    active={currentView==='rent-schedule'} onClick={()=>router.push('/rent-schedule')} {...navProps}/>
+          <NavItem icon="ti-pipeline"   label="Pipeline" href="/?view=leasing"       active={currentView==='leasing'}       onClick={()=>navTo('leasing')}   {...navProps}/>
+          <NavItem icon="ti-file-text"  label="Leases"   href="/?view=leases"        active={currentView==='leases'}        onClick={()=>navTo('leases')}             {...navProps}/>
+          <NavItem icon="ti-cash"       label="Rents"    href="/rent-schedule"       active={currentView==='rent-schedule'} onClick={()=>router.push('/rent-schedule')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Compliance</div>}
-          <NavItem icon="ti-shield-check"    label="Insurance"   active={currentView==='tnt-cois'}          onClick={()=>navTo('tnt-cois')}          {...navProps}/>
-          <NavItem icon="ti-clipboard-check" label="Inspections" active={currentView==='inspections'}       onClick={()=>navTo('inspections')}       {...navProps}/>
+          <NavItem icon="ti-shield-check"    label="Insurance"   href="/?view=tnt-cois"    active={currentView==='tnt-cois'}    onClick={()=>navTo('tnt-cois')}    {...navProps}/>
+          <NavItem icon="ti-clipboard-check" label="Inspections" href="/?view=inspections" active={currentView==='inspections'} onClick={()=>navTo('inspections')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Finance</div>}
-          <NavItem icon="ti-chart-bar" label="QBO Dashboard" active={currentView==='qbo'}      onClick={()=>navTo('qbo')}      {...navProps}/>
-          <NavItem icon="ti-receipt"   label="Invoices"      active={currentView==='invoices'} onClick={()=>navTo('invoices')} {...navProps}/>
+          <NavItem icon="ti-chart-bar" label="QBO Dashboard" href="/?view=qbo"      active={currentView==='qbo'}      onClick={()=>navTo('qbo')}      {...navProps}/>
+          <NavItem icon="ti-receipt"   label="Invoices"      href="/?view=invoices" active={currentView==='invoices'} onClick={()=>navTo('invoices')} {...navProps}/>
         </div>
         {/* Bottom */}
         <div style={{padding:'8px 6px',borderTop:`0.5px solid ${T.border}`,flexShrink:0}}>
-          <NavItem icon="ti-settings" label="Settings" active={currentView==='settings'} onClick={()=>navTo('settings')} {...navProps}/>
+          <NavItem icon="ti-settings" label="Settings" href="/?view=settings" active={currentView==='settings'} onClick={()=>navTo('settings')} {...navProps}/>
         </div>
       </div>
 

@@ -45,15 +45,16 @@ export const css = {
 
 const fmtDate = d => {
   if (!d) return '—';
-  const date = new Date(typeof d === 'string' && d.length === 10 ? d + 'T00:00:00' : d);
-  return isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
 };
 
 const fmtNumDate = d => {
   if (!d) return '';
-  const date = new Date(typeof d === 'string' && d.length === 10 ? d + 'T00:00:00' : d);
-  if (isNaN(date.getTime())) return '';
-  return `${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}-${date.getFullYear()}`;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
 };
 
 const fmtCurrency = n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
@@ -491,15 +492,18 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
 // Tenant Detail
 // ─────────────────────────────────────────────────────────────────────────────
 export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
-  const [tab,      setTab]      = useState('info');
+  const [tab,      setTab]      = useState('overview');
   const [data,     setData]     = useState(tenant);
   const [property, setProperty] = useState(null);
   const [suite,    setSuite]    = useState(null);
 
   // Lazy-loaded tab data
-  const [contacts,  setContacts]  = useState(null);   // { primary, accounting }
-  const [rent,      setRent]      = useState(null);   // array
-  const [cois,      setCois]      = useState(null);   // array
+  const [contacts,         setContacts]         = useState(null);
+  const [rent,             setRent]             = useState(null);
+  const [cois,             setCois]             = useState(null);
+  const [issues,           setIssues]           = useState(null);
+  const [workOrders,       setWorkOrders]       = useState(null);
+  const [rentStatusFilter, setRentStatusFilter] = useState(new Set(['Current', 'Future']));
   const loaded = useRef(new Set());
 
   // Load property + suite immediately (needed for Info tab)
@@ -528,21 +532,35 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
     }).catch(() => setContacts({ primary: null, accounting: null }));
   }, [tab, data.primary_contact_id, data.accounting_contact_id]);
 
-  // Lazy load Rent tab
+  // Lazy load Rent tab (also needed for Overview)
   useEffect(() => {
-    if (tab !== 'rent' || loaded.current.has('rent')) return;
+    if ((tab !== 'rent' && tab !== 'overview') || loaded.current.has('rent')) return;
     loaded.current.add('rent');
     sbFetch('rent_schedule', `select=*&tenant_id=eq.${data.id}&order=rent_starts.asc`)
       .then(r => setRent(r)).catch(() => setRent([]));
   }, [tab, data.id]);
 
-  // Lazy load COIs tab
+  // Lazy load COIs tab (also needed for Overview)
   useEffect(() => {
-    if (tab !== 'cois' || loaded.current.has('cois')) return;
+    if ((tab !== 'cois' && tab !== 'overview') || loaded.current.has('cois')) return;
     loaded.current.add('cois');
     sbFetch('tnt_cois', `select=*&tenant_id=eq.${data.id}&order=expiry_date.asc`)
       .then(r => setCois(r)).catch(() => setCois([]));
   }, [tab, data.id]);
+
+  // Lazy load Overview tab issues + work orders
+  useEffect(() => {
+    if (tab !== 'overview' || loaded.current.has('overview')) return;
+    loaded.current.add('overview');
+    if (data.prop_code) {
+      sbFetch('issues', `select=id,issue_name,priority,follow_up_date&prop_code=eq.${encodeURIComponent(data.prop_code)}&status=neq.Closed&order=follow_up_date.asc`)
+        .then(r => setIssues(r)).catch(() => setIssues([]));
+    } else {
+      setIssues([]);
+    }
+    sbFetch('work_orders', `select=id,wo_num,short_description,priority,stage,wo_status,follow_up_date&tenant_id=eq.${data.id}&wo_status=neq.Closed&wo_status=neq.Closed-Not Done&order=follow_up_date.asc`)
+      .then(r => setWorkOrders(r)).catch(() => setWorkOrders([]));
+  }, [tab, data.id, data.prop_code]);
 
   // Browser tab title
   useEffect(() => {
@@ -571,7 +589,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
     onUpdate?.(updated);
   };
 
-  const TABS = ['Info', 'Contacts', 'Rent', 'COIs', 'Activity', 'Communications'];
+  const TABS = ['Overview', 'Info', 'Contacts', 'Rent', 'COIs', 'Activity', 'Communications'];
   const tk   = t => t.toLowerCase();
 
   const hdrBtnStyle = (active) => ({
@@ -590,7 +608,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
       {/* ── Header ── */}
       <div style={{padding:'10px 16px 0', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0}}>
-        {/* Row 1: breadcrumb + action buttons + podio id */}
+        {/* Row 1: Back button + action buttons */}
         <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px'}}>
           <button onClick={onBack}
             style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0}}
@@ -598,15 +616,6 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
             onMouseLeave={e => e.currentTarget.style.color = T.text1}>
             ← Tenants
           </button>
-
-          {data.prop_code && (
-            <span style={{fontSize:F.sm, fontWeight:'600', color:T.accent, background:'#1a2e3a', padding:'2px 8px', borderRadius:'3px', flexShrink:0}}>
-              {data.prop_code}
-            </span>
-          )}
-          {data.suite_num && (
-            <span style={{fontSize:F.sm, color:T.text2, flexShrink:0}}>Suite {data.suite_num}</span>
-          )}
 
           {/* Action buttons — right-aligned */}
           <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'6px'}}>
@@ -632,31 +641,38 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
               style={{...hdrBtnStyle(false), cursor:'not-allowed'}}>
               eSign
             </span>
-
-            {data.podio_id && (
-              <span style={{marginLeft:'8px', borderLeft:`0.5px solid ${T.border}`, paddingLeft:'10px', display:'flex', alignItems:'center', gap:'4px', flexShrink:0}}>
-                <span style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em'}}>Podio</span>
-                <span style={{fontSize:F.xs, color:T.text2}}>{data.podio_id}</span>
-              </span>
-            )}
           </div>
         </div>
 
-        {/* Row 2: title + status badges */}
-        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'12px', marginBottom:'4px'}}>
-          <div>
-            <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
-              {data.tenant_dba || 'Untitled Tenant'}
-            </div>
-            {data.entity_name && (
-              <div style={{fontSize:F.sm, color:T.text2, marginTop:'2px'}}>{data.entity_name}</div>
-            )}
+        {/* Row 2: title + entity subtitle */}
+        <div style={{marginBottom:'5px'}}>
+          <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
+            {data.tenant_dba || 'Untitled Tenant'}
           </div>
-          <div style={{display:'flex', alignItems:'center', gap:'6px', flexShrink:0, paddingTop:'2px'}}>
-            {data.lease_type   && <span style={css.badge(T.text1, T.bg3)}>{data.lease_type}</span>}
-            {data.lease_status && <LeaseStatusBadge status={data.lease_status}/>}
-            <TenantStatusBadge status={data.tenant_status}/>
-          </div>
+          {data.entity_name && (
+            <div style={{fontSize:F.sm, color:T.text2, marginTop:'1px'}}>{data.entity_name}</div>
+          )}
+        </div>
+
+        {/* Row 3: chip row */}
+        <div style={{display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap', marginBottom:'5px'}}>
+          {data.prop_code && (
+            <span style={css.badge(T.accent, '#1a2e3a')}>{data.prop_code}</span>
+          )}
+          {data.suite_num && (
+            <span style={css.badge(T.text1, T.bg3)}>Suite {data.suite_num}</span>
+          )}
+          {data.lease_type && (
+            <span style={css.badge(T.text2, T.bg3)}>{data.lease_type}</span>
+          )}
+          {data.lease_status && <LeaseStatusBadge status={data.lease_status}/>}
+          <TenantStatusBadge status={data.tenant_status}/>
+          {data.podio_id && (
+            <span style={{display:'flex', alignItems:'center', gap:'3px'}}>
+              <span style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em'}}>Podio</span>
+              <span style={{...css.badge(T.text2, T.bg3)}}>{data.podio_id}</span>
+            </span>
+          )}
         </div>
 
         {/* Tab bar */}
@@ -675,6 +691,185 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
       {/* ── Tab content ── */}
       <div style={{flex:1, overflowY:'auto', padding:'16px'}}>
+
+        {/* ── OVERVIEW TAB ── */}
+        {tab === 'overview' && (() => {
+          // Find first Current or Future rent row for lease health
+          const activeRent = rent?.find(r => r.rent_status === 'Current' || r.rent_status === 'Future') ?? rent?.[0] ?? null;
+          const expDays    = daysUntil(activeRent?.rent_ends ?? data.lease_ends);
+          const expColor   = expDays === null ? T.text1
+            : expDays < 0   ? '#fff'
+            : expDays <= 30  ? T.danger
+            : expDays <= 60  ? '#d4924a'
+            : expDays <= 90  ? '#f0d060'
+            : expDays <= 120 ? T.success
+            : T.text1;
+          const expBg = expDays !== null && expDays < 0 ? '#7a0000' : 'transparent';
+          const sqft  = suite?.sqft || data.sqft;
+
+          return (
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+
+              {/* LEFT col */}
+              <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
+
+                {/* Lease Health */}
+                <div style={css.card}>
+                  <div style={css.secTitle}>Lease Health</div>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'12px', marginBottom:'10px'}}>
+                    <div>
+                      <div style={{fontSize:F.md, fontWeight:'600', color:T.text0}}>{data.tenant_dba}</div>
+                      <div style={{fontSize:F.xs, color:T.text2, marginTop:'2px'}}>{data.prop_code}{data.suite_num ? ` · Suite ${data.suite_num}` : ''}</div>
+                    </div>
+                    {data.lease_type && <span style={css.badge(T.text1, T.bg3)}>{data.lease_type}</span>}
+                  </div>
+                  <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px 16px', marginBottom:'10px'}}>
+                    <div>
+                      <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>Rent Start</div>
+                      <div style={{fontSize:F.sm, color:T.text1}}>{fmtDate(activeRent?.rent_starts ?? data.lease_starts) || '—'}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>Rent End</div>
+                      <div style={{fontSize:F.sm, fontWeight: expDays !== null && expDays <= 120 ? '700' : '400',
+                        color:expColor, background:expBg, padding: expBg !== 'transparent' ? '1px 5px' : '0',
+                        borderRadius:'3px', display:'inline-block'}}>
+                        {fmtDate(activeRent?.rent_ends ?? data.lease_ends) || '—'}
+                        {expDays !== null && (
+                          <span style={{fontSize:F.xs, fontWeight:'400', color: expBg !== 'transparent' ? '#fff' : T.text2, marginLeft:'6px'}}>
+                            {expDays < 0 ? `(${Math.abs(expDays)}d over)` : `(${expDays}d)`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                    <span style={{fontSize:F.xs, color:T.text3}}>Monthly Rent</span>
+                    <span style={{fontSize:F.md, fontWeight:'600', color:T.text0}}>{fmtCurrency(activeRent?.total ?? null)}</span>
+                  </div>
+                </div>
+
+                {/* COI Status */}
+                <div style={css.card}>
+                  <div style={css.secTitle}>COI Status</div>
+                  {cois === null ? (
+                    <div style={{fontSize:F.sm, color:T.text3}}>Loading…</div>
+                  ) : cois.length === 0 ? (
+                    <div style={{fontSize:F.sm, color:T.warn}}>⚠ No certificates of insurance on record</div>
+                  ) : (
+                    <table style={{width:'100%', borderCollapse:'collapse'}}>
+                      <tbody>
+                        {cois.map(c => {
+                          const cd = daysUntil(c.expiry_date);
+                          const cc = cd === null ? T.text1 : cd < 0 ? T.danger : cd <= 30 ? T.danger : cd <= 60 ? '#d4924a' : T.text1;
+                          const cbg = cd !== null && cd < 0 ? 'rgba(224,112,112,0.1)' : 'transparent';
+                          return (
+                            <tr key={c.id} style={{borderBottom:`0.5px solid ${T.border}`}}>
+                              <td style={{...css.td, padding:'4px 4px 4px 0', whiteSpace:'normal', wordBreak:'break-word'}}>{c.insured_company || '—'}</td>
+                              <td style={{...css.td, color:cc, background:cbg, borderRadius:'3px', textAlign:'right', paddingRight:'4px', flexShrink:0}}>{fmtDate(c.expiry_date) || '—'}</td>
+                              <td style={{css:{}, textAlign:'right', paddingLeft:'6px'}}>
+                                {c.coi_status && <span style={css.badge(c.coi_status==='Current'?T.success:T.danger, c.coi_status==='Current'?'#1e2a1e':'#3d1f1f')}>{c.coi_status}</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT col */}
+              <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
+
+                {/* Open Issues */}
+                <div style={css.card}>
+                  <div style={{...css.secTitle, display:'flex', alignItems:'center', gap:'6px', marginBottom:'8px'}}>
+                    Open Issues
+                    {issues !== null && (
+                      <span style={css.badge(issues.length ? T.warn : T.text2, issues.length ? 'rgba(212,146,74,0.15)' : T.bg3)}>{issues.length}</span>
+                    )}
+                  </div>
+                  {issues === null ? (
+                    <div style={{fontSize:F.sm, color:T.text3}}>Loading…</div>
+                  ) : issues.length === 0 ? (
+                    <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic'}}>No open issues</div>
+                  ) : (
+                    <table style={{width:'100%', borderCollapse:'collapse'}}>
+                      <tbody>
+                        {issues.map(iss => (
+                          <tr key={iss.id} style={{borderBottom:`0.5px solid ${T.border}`, cursor:'pointer'}}
+                            onClick={() => window.open(`/issues/${iss.id}`, '_blank')}
+                            onMouseEnter={e => e.currentTarget.style.background = T.bg3}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <td style={{...css.td, whiteSpace:'normal', wordBreak:'break-word', paddingLeft:'0'}}>{iss.issue_name || '—'}</td>
+                            <td style={{...css.td, flexShrink:0}}>
+                              {iss.priority && <span style={css.badge(iss.priority==='High'?T.danger:iss.priority==='Medium'?T.warn:T.text2, 'transparent')}>{iss.priority}</span>}
+                            </td>
+                            <td style={{...css.td, color:T.text2, fontSize:F.xs, textAlign:'right', paddingRight:0}}>{fmtDate(iss.follow_up_date)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Open Work Orders */}
+                <div style={css.card}>
+                  <div style={{...css.secTitle, display:'flex', alignItems:'center', gap:'6px', marginBottom:'8px'}}>
+                    Open Work Orders
+                    {workOrders !== null && (
+                      <span style={css.badge(workOrders.length ? T.accent : T.text2, workOrders.length ? '#1a2e3a' : T.bg3)}>{workOrders.length}</span>
+                    )}
+                  </div>
+                  {workOrders === null ? (
+                    <div style={{fontSize:F.sm, color:T.text3}}>Loading…</div>
+                  ) : workOrders.length === 0 ? (
+                    <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic'}}>No open work orders</div>
+                  ) : (
+                    <table style={{width:'100%', borderCollapse:'collapse'}}>
+                      <tbody>
+                        {workOrders.map(wo => (
+                          <tr key={wo.id} style={{borderBottom:`0.5px solid ${T.border}`, cursor:'pointer'}}
+                            onClick={() => window.open(`/work-orders/${wo.id}`, '_blank')}
+                            onMouseEnter={e => e.currentTarget.style.background = T.bg3}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <td style={{...css.td, color:T.text2, fontSize:F.xs, paddingLeft:'0', flexShrink:0}}>{wo.wo_num || ''}</td>
+                            <td style={{...css.td, whiteSpace:'normal', wordBreak:'break-word'}}>{wo.short_description || '—'}</td>
+                            <td style={{...css.td, color:T.text2, fontSize:F.xs, flexShrink:0}}>{wo.stage || ''}</td>
+                            <td style={{...css.td, color:T.text2, fontSize:F.xs, textAlign:'right', paddingRight:0}}>{fmtDate(wo.follow_up_date)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Quick Links */}
+                <div style={css.card}>
+                  <div style={css.secTitle}>Quick Links</div>
+                  <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+                    {data.gdrive_folder_url ? (
+                      <a href={data.gdrive_folder_url} target="_blank" rel="noreferrer"
+                        style={{fontSize:F.sm, color:T.accent, textDecoration:'none'}}>Drive Folder ↗</a>
+                    ) : (
+                      <span style={{fontSize:F.sm, color:T.text3}}>Drive Folder — not linked</span>
+                    )}
+                    {data.gdrive_lease_url ? (
+                      <a href={data.gdrive_lease_url} target="_blank" rel="noreferrer"
+                        style={{fontSize:F.sm, color:T.accent, textDecoration:'none'}}>PDF Lease ↗</a>
+                    ) : (
+                      <span style={{fontSize:F.sm, color:T.text3}}>PDF Lease — not linked</span>
+                    )}
+                    {property?.id && (
+                      <a href={`/properties/${property.id}`} target="_blank" rel="noreferrer"
+                        style={{fontSize:F.sm, color:T.accent, textDecoration:'none'}}>Property Page ↗</a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── INFO TAB ── */}
         {tab === 'info' && (
@@ -695,12 +890,6 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
             <div>
               <div style={{...css.card, marginBottom:'12px'}}>
                 <div style={css.secTitle}>Property</div>
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'4px'}}>Prop Code</div>
-                  <span style={{fontSize:F.md, fontWeight:'600', color:T.accent, background:'#1a2e3a', padding:'2px 8px', borderRadius:'3px'}}>
-                    {data.prop_code || '—'}
-                  </span>
-                </div>
                 {property ? (
                   <>
                     <ReadonlyField label="Property Name" value={property.property_name}/>
@@ -717,13 +906,12 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
               <div style={css.card}>
                 <div style={css.secTitle}>Suite</div>
-                <ReadonlyField label="Suite #"       value={data.suite_num}/>
-                <ReadonlyField label="Sq Ft"         value={fmtSqft(data.sqft)}/>
-                <ReadonlyField label="NNN Prorata %" value={data.nnn_prorata_share_pct != null ? fmtPct(data.nnn_prorata_share_pct) : null}/>
+                <ReadonlyField label="Suite #"     value={data.suite_num}/>
+                <ReadonlyField label="Sq Ft"       value={fmtSqft(data.sqft)}/>
                 {suite && (
                   <>
-                    {suite.space_type && <ReadonlyField label="Space Type" value={suite.space_type}/>}
-                    {suite.location_desc && <ReadonlyField label="Location" value={suite.location_desc}/>}
+                    {suite.space_type    && <ReadonlyField label="Space Type" value={suite.space_type}/>}
+                    {suite.location_desc && <ReadonlyField label="Location"   value={suite.location_desc}/>}
                   </>
                 )}
               </div>
@@ -828,54 +1016,125 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
         )}
 
         {/* ── RENT TAB ── */}
-        {tab === 'rent' && (
-          rent === null ? (
+        {tab === 'rent' && (() => {
+          if (rent === null) return (
             <div style={{padding:'32px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading rent schedule…</div>
-          ) : rent.length === 0 ? (
-            <div style={{...css.card}}>
+          );
+          if (rent.length === 0) return (
+            <div style={css.card}>
               <div style={{padding:'16px 0', textAlign:'center', color:T.text3, fontSize:F.sm}}>No rent schedule records found for this tenant.</div>
             </div>
-          ) : (
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'700px'}}>
-                <colgroup>
-                  <col style={{width:'90px'}}/>
-                  <col style={{width:'90px'}}/>
-                  <col style={{width:'90px'}}/>
-                  <col style={{width:'90px'}}/>
-                  <col style={{width:'90px'}}/>
-                  <col style={{width:'90px'}}/>
-                  <col style={{width:'90px'}}/>
-                  <col style={{width:'auto'}}/>
-                </colgroup>
-                <thead style={{position:'sticky', top:0, zIndex:2}}>
-                  <tr>
-                    {['Status','Rent Start','Rent End','Base Rent','NNN','Total','Base/SF','Notes'].map(h => (
-                      <th key={h} style={{...css.th, cursor:'default'}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rent.map((r, i) => (
-                    <tr key={r.id}
-                      style={{borderBottom:`0.5px solid ${T.border}`, background: i % 2 === 0 ? 'transparent' : T.bg0}}>
-                      <td style={css.td}><RentStatusBadge status={r.rent_status}/></td>
-                      <td style={{...css.td, color:T.text1}}>{fmtNumDate(r.rent_starts) || '—'}</td>
-                      <td style={{...css.td, color: r.rent_ends && daysUntil(r.rent_ends) != null && daysUntil(r.rent_ends) < 60 ? T.warn : T.text1}}>
-                        {fmtNumDate(r.rent_ends) || '—'}
-                      </td>
-                      <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(r.base_rent)}</td>
-                      <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(r.nnn)}</td>
-                      <td style={{...css.td, textAlign:'right', fontWeight:'500'}}>{fmtCurrency(r.total)}</td>
-                      <td style={{...css.td, textAlign:'right', color:T.text2}}>{r.base_per_sf != null ? '$' + Number(r.base_per_sf).toFixed(2) : '—'}</td>
-                      <td style={{...css.td, color:T.text2, fontSize:F.xs}} title={r.notes}>{r.notes || ''}</td>
+          );
+
+          const sqft = suite?.sqft || data.sqft;
+          const toggleRentFilter = status => {
+            setRentStatusFilter(prev => {
+              const next = new Set(prev);
+              if (status === 'All') return new Set(['All']);
+              next.delete('All');
+              if (next.has(status)) next.delete(status); else next.add(status);
+              return next.size === 0 ? new Set(['All']) : next;
+            });
+          };
+          const visibleRent = rent.filter(r =>
+            rentStatusFilter.has('All') || rentStatusFilter.size === 0 || rentStatusFilter.has(r.rent_status)
+          );
+          const rentEndStyle = d => {
+            const days = daysUntil(d);
+            if (days === null) return {};
+            if (days < 0)      return { color:'#fff', fontWeight:'700', background:'#7a0000', padding:'1px 5px', borderRadius:'3px', display:'inline-block' };
+            if (days <= 30)    return { color:T.danger,  fontWeight:'700' };
+            if (days <= 60)    return { color:'#d4924a', fontWeight:'700' };
+            if (days <= 90)    return { color:'#f0d060', fontWeight:'700' };
+            if (days <= 120)   return { color:T.success, fontWeight:'700' };
+            return {};
+          };
+          const sum = col => visibleRent.reduce((acc, r) => acc + (Number(r[col]) || 0), 0);
+
+          return (
+            <div>
+              <div style={{display:'flex', gap:'4px', marginBottom:'10px', flexWrap:'wrap'}}>
+                {['Current','Future','Past','All'].map(s => {
+                  const active = rentStatusFilter.has(s);
+                  return (
+                    <button key={s} onClick={() => toggleRentFilter(s)}
+                      style={{padding:'3px 9px', borderRadius:'4px', cursor:'pointer', fontSize:F.xs,
+                        border:`0.5px solid ${active ? T.accent : T.border}`,
+                        background: active ? '#1a2e3a' : 'transparent',
+                        color: active ? T.accent : T.text2, fontWeight: active ? '600' : '400'}}>
+                      {s} <span style={{color:active ? T.accent : T.text3, fontSize:'10px'}}>·{s === 'All' ? rent.length : rent.filter(r => r.rent_status === s).length}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'900px'}}>
+                  <colgroup>
+                    <col style={{width:'7%'}}/>
+                    <col style={{width:'8%'}}/>
+                    <col style={{width:'8%'}}/>
+                    <col style={{width:'8%'}}/>
+                    <col style={{width:'7%'}}/>
+                    <col style={{width:'7%'}}/>
+                    <col style={{width:'7%'}}/>
+                    <col style={{width:'7%'}}/>
+                    <col style={{width:'8%'}}/>
+                    <col style={{width:'7%'}}/>
+                    <col style={{width:'7%'}}/>
+                    <col style={{width:'auto'}}/>
+                  </colgroup>
+                  <thead style={{position:'sticky', top:0, zIndex:2}}>
+                    <tr>
+                      {['Status','Rent Start','Rent End','Base Rent','NNN','Other','CAMi','TPT Tax','Total','Base/SF','NNN/SF','Notes'].map(h => (
+                        <th key={h} style={{...css.th, cursor:'default', textAlign: h==='Status'||h==='Notes' ? 'left' : 'right'}}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {visibleRent.length === 0 && (
+                      <tr><td colSpan={12} style={{...css.td, textAlign:'center', padding:'24px', color:T.text3}}>No rows match filter</td></tr>
+                    )}
+                    {visibleRent.map((r, i) => {
+                      const endStyle = rentEndStyle(r.rent_ends);
+                      const bpsf = sqft && r.base_rent != null ? (Number(r.base_rent) / Number(sqft)).toFixed(2) : null;
+                      const npsf = sqft && r.nnn != null        ? (Number(r.nnn)       / Number(sqft)).toFixed(2) : null;
+                      return (
+                        <tr key={r.id} style={{borderBottom:`0.5px solid ${T.border}`, background: i%2===0 ? 'transparent' : T.bg0}}>
+                          <td style={css.td}><RentStatusBadge status={r.rent_status}/></td>
+                          <td style={{...css.td, textAlign:'right', color:T.text1}}>{fmtNumDate(r.rent_starts) || '—'}</td>
+                          <td style={{...css.td, textAlign:'right'}}><span style={endStyle}>{fmtNumDate(r.rent_ends) || '—'}</span></td>
+                          <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(r.base_rent)}</td>
+                          <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(r.nnn)}</td>
+                          <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(r.other_amt)}</td>
+                          <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(r.cam_impound)}</td>
+                          <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(r.tpt_tax)}</td>
+                          <td style={{...css.td, textAlign:'right', fontWeight:'500'}}>{fmtCurrency(r.total)}</td>
+                          <td style={{...css.td, textAlign:'right', color:T.text2}}>{bpsf ? '$'+bpsf : '—'}</td>
+                          <td style={{...css.td, textAlign:'right', color:T.text2}}>{npsf ? '$'+npsf : '—'}</td>
+                          <td style={{...css.td, color:T.text2, fontSize:F.xs, whiteSpace:'normal', wordBreak:'break-word', maxWidth:'200px'}}>{r.notes || ''}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {visibleRent.length > 0 && (
+                    <tfoot>
+                      <tr style={{borderTop:`1px solid ${T.border}`, background:T.bg2, fontWeight:'600'}}>
+                        <td style={{...css.td, color:T.text1}} colSpan={3}>Totals</td>
+                        <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(sum('base_rent'))}</td>
+                        <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(sum('nnn'))}</td>
+                        <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(sum('other_amt'))}</td>
+                        <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(sum('cam_impound'))}</td>
+                        <td style={{...css.td, textAlign:'right'}}>{fmtCurrency(sum('tpt_tax'))}</td>
+                        <td style={{...css.td, textAlign:'right', fontWeight:'700'}}>{fmtCurrency(sum('total'))}</td>
+                        <td style={css.td}/><td style={css.td}/><td style={css.td}/>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
             </div>
-          )
-        )}
+          );
+        })()}
 
         {/* ── COIS TAB ── */}
         {tab === 'cois' && (
@@ -886,18 +1145,18 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
               <div style={{padding:'16px 0', textAlign:'center', color:T.text3, fontSize:F.sm}}>No COI records found for this tenant.</div>
             </div>
           ) : (
-            <div style={{overflowX:'auto'}}>
+            <div>
               <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
                 <colgroup>
+                  <col style={{width:'25%'}}/>
+                  <col style={{width:'10%'}}/>
+                  <col style={{width:'10%'}}/>
+                  <col style={{width:'12%'}}/>
                   <col style={{width:'auto'}}/>
-                  <col style={{width:'90px'}}/>
-                  <col style={{width:'90px'}}/>
-                  <col style={{width:'110px'}}/>
-                  <col style={{width:'90px'}}/>
                 </colgroup>
                 <thead style={{position:'sticky', top:0, zIndex:2}}>
                   <tr>
-                    {['Insured Company','Expiry','COI Status','Add\'l Insured','Notes'].map(h => (
+                    {['Insured Company','Expiry','COI Status',"Add'l Insured",'Notes'].map(h => (
                       <th key={h} style={{...css.th, cursor:'default'}}>{h}</th>
                     ))}
                   </tr>
@@ -913,8 +1172,8 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                     return (
                       <tr key={c.id}
                         style={{borderBottom:`0.5px solid ${T.border}`, background: i % 2 === 0 ? 'transparent' : T.bg0}}>
-                        <td style={{...css.td}} title={c.insured_company}>{c.insured_company || ''}</td>
-                        <td style={{...css.td, color:expiredColor}}>{fmtNumDate(c.expiry_date) || '—'}</td>
+                        <td style={{...css.td, whiteSpace:'normal', wordBreak:'break-word'}}>{c.insured_company || ''}</td>
+                        <td style={{...css.td, color:expiredColor, whiteSpace:'normal', wordBreak:'break-word'}}>{fmtNumDate(c.expiry_date) || '—'}</td>
                         <td style={css.td}>
                           {c.coi_status && <span style={css.badge(coiStatusColor, coiStatusBg)}>{c.coi_status}</span>}
                         </td>
@@ -923,7 +1182,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                             <span style={css.badge(addlColor, addlBg)}>{c.additional_insured_status}</span>
                           )}
                         </td>
-                        <td style={{...css.td, color:T.text2, fontSize:F.xs}} title={c.internal_notes}>{c.internal_notes || ''}</td>
+                        <td style={{...css.td, color:T.text2, fontSize:F.xs, whiteSpace:'normal', wordBreak:'break-word'}}>{c.internal_notes || ''}</td>
                       </tr>
                     );
                   })}
