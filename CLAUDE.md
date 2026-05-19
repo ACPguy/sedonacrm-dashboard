@@ -166,8 +166,8 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - X-prefix fallback (e.g. `X32f3fc`) = null podio_id row; cold URL load will return not-found (acceptable until podio_ids are populated)
 - Production domain: crm.andersoncp.com
 - Never construct detail URLs using UUID directly
-- Tables with full podio_id coverage: tenants (312/312), suites (177/177), rent_schedule (1406/1406), issues (1233/1234), properties (47/48)
-- Tables with ZERO podio_id coverage (all X-fallback): work_orders (0/2914), contacts (0/2539), vendors (0/622), property_owners (0/43)
+- Tables with full podio_id coverage: tenants (312/312), suites (177/177), rent_schedule (1406/1406), work_orders (2914/2914), issues (1233/1234), properties (47/48)
+- Tables with ZERO podio_id coverage (all X-fallback): contacts (0/2539), vendors (0/622), property_owners (0/43) — no source files available to backfill
 
 ## Routing Pattern (Issues as template for all modules)
 
@@ -217,7 +217,9 @@ components/IssuesView.jsx     — exports: sbFetch, sbPatch, T, F, css, fmtDate,
 - Routing: all 7 detail pages switched to podio_id URL routing; UUID fallback retained for old bookmarks
 - Domain: production domain updated to crm.andersoncp.com in CLAUDE.md and Project section
 - URL Routing Rules section added to CLAUDE.md (permanent reference)
-- Note: work_orders, contacts, vendors, property_owners have zero podio_id coverage — all use X-fallback until data is populated
+- SedonaCRM.jsx NavItem changed from button to real anchor tag — all nav items now support Ctrl+click, middle-click, and right-click → open in new tab
+- work_orders podio_id backfilled (2914/2914) from podio_wo_number column
+- contacts/vendors/property_owners podio_id still null — no source files available to backfill
 
 **Next:**
 1. Property detail form — hub of the entire system

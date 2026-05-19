@@ -183,18 +183,20 @@ const NavItem = ({ icon,label,active,onClick,href,collapsed,expandedMenu,setExpa
   const isExp = expandedMenu===label;
   return (
     <div>
-      <button onClick={e=>{
-          if((e.ctrlKey||e.metaKey)&&href){window.open(href,'_blank');return;}
+      <a href={href}
+        onClick={e=>{
+          if(e.ctrlKey||e.metaKey) return;
+          e.preventDefault();
           submenu?setExpandedMenu(isExp?null:label):onClick?.();
         }}
         title={collapsed?label:undefined}
-        style={{width:'100%',padding:collapsed?'8px 0':'7px 10px',background:active?T.bg2:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',gap:'9px',fontSize:F.base,color:active?T.accent:T.text1,borderRadius:'4px',borderRight:active?`2px solid ${T.accent}`:'2px solid transparent',whiteSpace:'nowrap'}}
+        style={{width:'100%',padding:collapsed?'8px 0':'7px 10px',background:active?T.bg2:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',gap:'9px',fontSize:F.base,color:active?T.accent:T.text1,borderRadius:'4px',borderRight:active?`2px solid ${T.accent}`:'2px solid transparent',whiteSpace:'nowrap',textDecoration:'none'}}
         onMouseEnter={e=>{if(!active)e.currentTarget.style.color=T.text0;}}
         onMouseLeave={e=>{if(!active)e.currentTarget.style.color=T.text1;}}>
         <i className={`ti ${icon}`} style={{fontSize:'17px',flexShrink:0}} aria-hidden="true"></i>
         {!collapsed&&<span style={{flex:1}}>{label}</span>}
         {!collapsed&&submenu&&<i className="ti ti-chevron-down" style={{fontSize:'13px',transform:isExp?'rotate(180deg)':'none',transition:'transform 200ms'}} aria-hidden="true"></i>}
-      </button>
+      </a>
       {!collapsed&&submenu&&isExp&&(
         <div style={{paddingLeft:'24px'}}>
           {submenu.map(item=>(
