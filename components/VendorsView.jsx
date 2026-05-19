@@ -320,8 +320,14 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
         style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
         onMouseEnter={e => e.currentTarget.style.background = T.bg2}
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
-        onClick={openDetail}>
-        <td style={{...css.td}} title={v.company_dba}>{v.company_dba||''}</td>
+        onClick={e=>{if(e.target.closest('a'))return;openDetail(e);}}>
+        <td style={{...css.td}} title={v.company_dba}>
+          <a href={`/vendors/${v.podio_id ?? 'X'+v.id.slice(-6)}`}
+            onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();onSelect(v);}}}
+            style={{color:'inherit',textDecoration:'none'}}>
+            {v.company_dba||''}
+          </a>
+        </td>
         <td style={{...css.td,color:T.text1,fontSize:F.xs}} title={v.vendor_category}>{v.vendor_category||''}</td>
         <td style={{...css.td,color:T.text1}}>{v.main_phone||''}</td>
         <td style={{...css.td,color:T.text2}}>{cityState}</td>

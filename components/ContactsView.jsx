@@ -262,8 +262,14 @@ const ContactsList = ({ contacts, loading, error, onSelect }) => {
         style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
         onMouseEnter={e => e.currentTarget.style.background = T.bg2}
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
-        onClick={openDetail}>
-        <td style={{...css.td,fontWeight:'500'}} title={contact.full_name}>{contact.full_name||''}</td>
+        onClick={e=>{if(e.target.closest('a'))return;openDetail(e);}}>
+        <td style={{...css.td,fontWeight:'500'}} title={contact.full_name}>
+          <a href={`/contacts/${contact.podio_id ?? 'X'+contact.id.slice(-6)}`}
+            onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();onSelect(contact);}}}
+            style={{color:'inherit',textDecoration:'none'}}>
+            {contact.full_name||''}
+          </a>
+        </td>
         <td style={{...css.td,color:T.accent,fontWeight:'600',fontSize:F.xs}}>{contact.prop_code||''}</td>
         <td style={{...css.td,color:T.text1}} title={contact.company_dba}>{contact.company_dba||''}</td>
         <td style={{...css.td,fontSize:F.xs}}>

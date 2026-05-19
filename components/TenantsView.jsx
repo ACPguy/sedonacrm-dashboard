@@ -381,8 +381,14 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
         style={{borderBottom:`0.5px solid ${T.border}`, background:rowBg, cursor:'pointer'}}
         onMouseEnter={e => e.currentTarget.style.background = T.bg2}
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
-        onClick={openDetail}>
-        <td style={{...css.td}} title={t.tenant_dba}>{t.tenant_dba || ''}</td>
+        onClick={e=>{if(e.target.closest('a'))return;openDetail(e);}}>
+        <td style={{...css.td}} title={t.tenant_dba}>
+          <a href={`/tenants/${t.podio_id ?? 'X'+t.id.slice(-6)}`}
+            onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();onSelect(t);}}}
+            style={{color:'inherit',textDecoration:'none'}}>
+            {t.tenant_dba || ''}
+          </a>
+        </td>
         <td style={{...css.td, color:T.accent, fontWeight:'500', fontSize:F.xs}}>{t.prop_code || ''}</td>
         <td style={{...css.td, color:T.text1}}>{t.suite_num || '—'}</td>
         <td style={{...css.td, color:T.text2, textAlign:'right'}}>{t.sqft ? Number(t.sqft).toLocaleString() : '—'}</td>

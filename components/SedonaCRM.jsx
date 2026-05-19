@@ -813,10 +813,22 @@ const PropertiesView = () => {
               {filtered.map((p,i)=>{
                 const expStyle=expiryStyle(p._expires);
                 return (
-                  <tr key={p.id} onClick={()=>setSelected(p)} style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
+                  <tr key={p.id}
+                    onClick={e=>{
+                      if(e.target.closest('a'))return;
+                      if(e.ctrlKey||e.metaKey){window.open(`/properties/${p.podio_id??'X'+p.id.slice(-6)}`, '_blank');}
+                      else setSelected(p);
+                    }}
+                    style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
                     onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                     onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
-                    <td style={{...css.td,color:T.accent,fontWeight:'600'}}>{p.prop_code}</td>
+                    <td style={{...css.td,color:T.accent,fontWeight:'600'}}>
+                      <a href={`/properties/${p.podio_id??'X'+p.id.slice(-6)}`}
+                        onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();setSelected(p);}}}
+                        style={{color:'inherit',textDecoration:'none'}}>
+                        {p.prop_code}
+                      </a>
+                    </td>
                     <td style={css.td}>{p.property_name||'—'}</td>
                     <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{p.address||'—'}</td>
                     <td style={{...css.td,color:T.text2}}>{p.city||'—'}</td>

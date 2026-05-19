@@ -219,8 +219,14 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
         style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
         onMouseEnter={e => e.currentTarget.style.background = T.bg2}
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
-        onClick={openDetail}>
-        <td style={{...css.td}} title={o.company_dba}>{o.company_dba||''}</td>
+        onClick={e=>{if(e.target.closest('a'))return;openDetail(e);}}>
+        <td style={{...css.td}} title={o.company_dba}>
+          <a href={`/owners/${o.podio_id ?? 'X'+o.id.slice(-6)}`}
+            onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();onSelect(o);}}}
+            style={{color:'inherit',textDecoration:'none'}}>
+            {o.company_dba||''}
+          </a>
+        </td>
         <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{o.prop_code||''}</td>
         <td style={{...css.td}}>
           {o.category ? <span style={catBadgeStyle(o.category)}>{o.category}</span> : ''}

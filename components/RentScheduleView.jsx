@@ -328,9 +328,15 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
         style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
         onMouseEnter={e => e.currentTarget.style.background = T.bg2}
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
-        onClick={openDetail}>
+        onClick={e=>{if(e.target.closest('a'))return;openDetail(e);}}>
         <td style={{...css.td,color:T.accent,fontWeight:'600',fontSize:F.xs}}>{row.prop_code||''}</td>
-        <td style={{...css.td,color:T.text1}} title={row.tenants?.tenant_dba}>{row.tenants?.tenant_dba||''}</td>
+        <td style={{...css.td,color:T.text1}} title={row.tenants?.tenant_dba}>
+          <a href={`/rent-schedule/${row.podio_id ?? 'X'+row.id.slice(-6)}`}
+            onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();onSelect(row);}}}
+            style={{color:'inherit',textDecoration:'none'}}>
+            {row.tenants?.tenant_dba||''}
+          </a>
+        </td>
         <td style={{...css.td, whiteSpace:'normal', wordBreak:'break-word'}}>{row.suite_num||''}</td>
         <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{row.tenants?.lease_type||''}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(row.rent_starts)}</td>

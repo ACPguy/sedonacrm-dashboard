@@ -339,11 +339,21 @@ const SuitesList = ({ onSelect }) => {
     const tenantName = s.current_tenant_id ? tenantMap[s.current_tenant_id] : null;
     return (
       <tr key={s.id}
-        onClick={()=>onSelect(s)}
+        onClick={e=>{
+          if(e.target.closest('a'))return;
+          if(e.ctrlKey||e.metaKey){const tab=window.open(`${window.location.origin}/suites/${s.podio_id??'X'+s.id.slice(-6)}`, '_blank');if(tab)tab.focus();}
+          else onSelect(s);
+        }}
         style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
         onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
         onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
-        <td style={{...css.td,color:T.accent,fontWeight:'500'}}>{s.prop_code}</td>
+        <td style={{...css.td,color:T.accent,fontWeight:'500'}}>
+          <a href={`/suites/${s.podio_id??'X'+s.id.slice(-6)}`}
+            onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();onSelect(s);}}}
+            style={{color:'inherit',textDecoration:'none'}}>
+            {s.prop_code}
+          </a>
+        </td>
         <td style={{...css.td,fontWeight:'500'}}>{s.suite_num||'—'}</td>
         <td style={{...css.td,color:T.text2}}>{s.space_type||'—'}</td>
         <td style={css.td}><StatusBadge status={s.status}/></td>

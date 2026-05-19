@@ -608,11 +608,15 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
         style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
         onMouseEnter={e => e.currentTarget.style.background = T.bg2}
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
-        onClick={openDetail}>
+        onClick={e=>{if(e.target.closest('a'))return;openDetail(e);}}>
 
-        {/* Issue Title — read-only, click opens detail */}
+        {/* Issue Title — real anchor enables ctrl+click, middle-click, right-click → open in new tab */}
         <td style={{...css.td}} title={iss.issue_name}>
-          {iss.issue_name||''}
+          <a href={`/issues/${iss.podio_id ?? 'X'+iss.id.slice(-6)}`}
+            onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();onSelect(iss);}}}
+            style={{color:'inherit',textDecoration:'none'}}>
+            {iss.issue_name||''}
+          </a>
         </td>
 
         {/* FU Date — read-only */}
