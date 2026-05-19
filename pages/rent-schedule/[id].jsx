@@ -14,8 +14,9 @@ export default function RentScheduleDetailPage() {
     const { id } = router.query;
     if (!id) return;
     setLoading(true);
+    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
     sbFetch('rent_schedule',
-      `id=eq.${id}&select=*,tenants!rent_schedule_tenant_id_fkey(tenant_dba,lease_type)`
+      `${filter}&select=*,tenants!rent_schedule_tenant_id_fkey(tenant_dba,lease_type)`
     )
       .then(data => {
         if (data.length === 0) { setError('Record not found'); setLoading(false); return; }

@@ -251,7 +251,7 @@ const ContactsList = ({ contacts, loading, error, onSelect }) => {
     const rowBg = i % 2 === 0 ? 'transparent' : T.bg0;
     const openDetail = e => {
       if (e.ctrlKey || e.metaKey) {
-        const tab = window.open(`${window.location.origin}/contacts/${contact.id}`, '_blank');
+        const tab = window.open(`${window.location.origin}/contacts/${contact.podio_id ?? 'X'+contact.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
         onSelect(contact);

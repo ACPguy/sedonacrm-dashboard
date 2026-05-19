@@ -594,7 +594,7 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
 
     const openDetail = e => {
       if (e.ctrlKey || e.metaKey) {
-        const tab = window.open(`${window.location.origin}/issues/${iss.id}`, '_blank');
+        const tab = window.open(`${window.location.origin}/issues/${iss.podio_id ?? 'X'+iss.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
         onSelect(iss);

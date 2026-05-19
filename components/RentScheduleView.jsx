@@ -316,7 +316,7 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
 
     const openDetail = e => {
       if (e.ctrlKey || e.metaKey) {
-        const tab = window.open(`${window.location.origin}/rent-schedule/${row.id}`, '_blank');
+        const tab = window.open(`${window.location.origin}/rent-schedule/${row.podio_id ?? 'X'+row.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
         onSelect(row);

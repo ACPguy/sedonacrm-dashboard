@@ -14,7 +14,8 @@ export default function WorkOrderDetailPage() {
     const { id } = router.query;
     if (!id) return;
     setLoading(true);
-    sbFetch('work_orders', `id=eq.${id}&select=*`)
+    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
+    sbFetch('work_orders', `${filter}&select=*`)
       .then(data => {
         if (data.length === 0) { setError('Work order not found'); setLoading(false); return; }
         setWo(data[0]);

@@ -15,7 +15,8 @@ export default function OwnerDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    sbFetch('property_owners', `select=*&id=eq.${id}`)
+    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
+    sbFetch('property_owners', `select=*&${filter}`)
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Owner not found');

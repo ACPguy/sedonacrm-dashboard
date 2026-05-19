@@ -14,7 +14,8 @@ export default function IssueDetailPage() {
     const { id } = router.query;
     if (!id) return;
     setLoading(true);
-    sbFetch('issues', `id=eq.${id}&select=*`)
+    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
+    sbFetch('issues', `${filter}&select=*`)
       .then(data => {
         if (data.length === 0) { setError('Issue not found'); setLoading(false); return; }
         setIssue(data[0]);

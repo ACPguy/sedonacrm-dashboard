@@ -308,7 +308,7 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
 
     const openDetail = e => {
       if (e.ctrlKey || e.metaKey) {
-        const tab = window.open(`${window.location.origin}/vendors/${v.id}`, '_blank');
+        const tab = window.open(`${window.location.origin}/vendors/${v.podio_id ?? 'X'+v.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
         onSelect(v);

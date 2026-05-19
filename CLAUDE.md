@@ -8,7 +8,7 @@ SedonaCRM — custom AI-powered commercial property management platform replacin
 Owner: Scott Anderson, CCIM — Anderson Commercial Properties, Sedona AZ
 Portfolio: 14 active NNN commercial properties, each a separate LLC (48 prop_codes total)
 GitHub: https://github.com/ACPguy/sedonacrm-dashboard
-Vercel: https://sedonacrm-dashboard.vercel.app/
+Production domain: crm.andersoncp.com
 
 ## Working Directory
 
@@ -157,6 +157,18 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
    This rule applies even when --dangerously-skip-permissions is active.
    For all other operations (file reads, file writes, git, npm, SELECT queries), proceed without asking.
 
+## URL Routing Rules (permanent)
+
+- All detail page routes use `podio_id`, NOT UUID
+- Pattern: `/[module]/[podio_id]` — e.g. `/work-orders/3737`, `/tenants/2556`
+- Detail page lookup: if param contains hyphens → `WHERE id = param` (UUID fallback for old bookmarks); otherwise → `WHERE podio_id = param`
+- List view link generation: always use `record.podio_id ?? 'X'+record.id.slice(-6)`
+- X-prefix fallback (e.g. `X32f3fc`) = null podio_id row; cold URL load will return not-found (acceptable until podio_ids are populated)
+- Production domain: crm.andersoncp.com
+- Never construct detail URLs using UUID directly
+- Tables with full podio_id coverage: tenants (312/312), suites (177/177), rent_schedule (1406/1406), issues (1233/1234), properties (47/48)
+- Tables with ZERO podio_id coverage (all X-fallback): work_orders (0/2914), contacts (0/2539), vendors (0/622), property_owners (0/43)
+
 ## Routing Pattern (Issues as template for all modules)
 
 Modules get proper Next.js pages. Issues is the template — replicate this for Work Orders, Suites, Tenants, etc.
@@ -202,6 +214,11 @@ components/IssuesView.jsx     — exports: sbFetch, sbPatch, T, F, css, fmtDate,
 - Work Orders list: no truncation, Closed/Updated columns toggle by filter
 - Rent Schedule list: Suite column word-wrap, Tenant column truncates
 
+- Routing: all 7 detail pages switched to podio_id URL routing; UUID fallback retained for old bookmarks
+- Domain: production domain updated to crm.andersoncp.com in CLAUDE.md and Project section
+- URL Routing Rules section added to CLAUDE.md (permanent reference)
+- Note: work_orders, contacts, vendors, property_owners have zero podio_id coverage — all use X-fallback until data is populated
+
 **Next:**
 1. Property detail form — hub of the entire system
    - 5 tab groups: Overview, Leasing, Financial, Operations, Ownership
@@ -211,3 +228,5 @@ components/IssuesView.jsx     — exports: sbFetch, sbPatch, T, F, css, fmtDate,
 2. Tenant detail form — continue refinements as needed after Property detail template is established
 
 3. All other detail forms follow — Vendors, Owners, Contacts, Work Orders
+
+4. Populate podio_id for work_orders, contacts, vendors, property_owners tables (currently all null)

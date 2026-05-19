@@ -15,7 +15,8 @@ export default function TenantDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    sbFetch('tenants', `select=*&id=eq.${id}`)
+    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
+    sbFetch('tenants', `select=*&${filter}`)
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Tenant not found');

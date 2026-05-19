@@ -15,7 +15,8 @@ export default function VendorDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    sbFetch('vendors', `select=*&id=eq.${id}`)
+    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
+    sbFetch('vendors', `select=*&${filter}`)
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Vendor not found');

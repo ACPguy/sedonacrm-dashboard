@@ -543,7 +543,7 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
     const tenantName = tenant?.tenant_dba || '';
     const fuOverdue  = isFuOverdue(wo.follow_up_date, wo);
     const fuDisplay  = wo.follow_up_date ? fmtNumDate(wo.follow_up_date) : '';
-    const woUrl      = `/work-orders/${wo.id}`;
+    const woUrl      = `/work-orders/${wo.podio_id ?? 'X'+wo.id.slice(-6)}`;
     const rowBg      = i % 2 === 0 ? 'transparent' : T.bg0;
 
     return (
@@ -554,7 +554,7 @@ const WorkOrdersList = ({ wos, setWos, loading, error, onSelect }) => {
         onClick={e => {
           if (e.target.closest('a')) return;
           if (e.ctrlKey || e.metaKey) {
-            const tab = window.open(`${window.location.origin}/work-orders/${wo.id}`, '_blank');
+            const tab = window.open(`${window.location.origin}/work-orders/${wo.podio_id ?? 'X'+wo.id.slice(-6)}`, '_blank');
             if (tab) tab.focus();
           } else {
             onSelect(wo);

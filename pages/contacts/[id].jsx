@@ -15,7 +15,8 @@ export default function ContactDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    sbFetch('contacts', `select=*&id=eq.${id}`)
+    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
+    sbFetch('contacts', `select=*&${filter}`)
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Contact not found');

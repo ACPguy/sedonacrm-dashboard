@@ -368,7 +368,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
 
     const openDetail = e => {
       if (e.ctrlKey || e.metaKey) {
-        const tab = window.open(`${window.location.origin}/tenants/${t.id}`, '_blank');
+        const tab = window.open(`${window.location.origin}/tenants/${t.podio_id ?? 'X'+t.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
         try { sessionStorage.setItem('tenantsBackUrl', window.location.href); } catch {}
@@ -848,7 +848,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                       <tbody>
                         {issues.map(iss => (
                           <tr key={iss.id} style={{borderBottom:`0.5px solid ${T.border}`, cursor:'pointer'}}
-                            onClick={() => window.open(`/issues/${iss.id}`, '_blank')}
+                            onClick={() => window.open(`/issues/${iss.podio_id ?? 'X'+iss.id.slice(-6)}`, '_blank')}
                             onMouseEnter={e => e.currentTarget.style.background = T.bg3}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                             <td style={{...css.td, whiteSpace:'normal', wordBreak:'break-word', paddingLeft:'0'}}>{iss.issue_name || '—'}</td>
@@ -880,7 +880,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                       <tbody>
                         {workOrders.map(wo => (
                           <tr key={wo.id} style={{borderBottom:`0.5px solid ${T.border}`, cursor:'pointer'}}
-                            onClick={() => window.open(`/work-orders/${wo.id}`, '_blank')}
+                            onClick={() => window.open(`/work-orders/${wo.podio_id ?? 'X'+wo.id.slice(-6)}`, '_blank')}
                             onMouseEnter={e => e.currentTarget.style.background = T.bg3}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                             <td style={{...css.td, color:T.text2, fontSize:F.xs, paddingLeft:'0', flexShrink:0}}>{wo.wo_num || ''}</td>
@@ -911,7 +911,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                       <span style={{fontSize:F.sm, color:T.text3}}>PDF Lease — not linked</span>
                     )}
                     {property?.id && (
-                      <a href={`/properties/${property.id}`} target="_blank" rel="noreferrer"
+                      <a href={`/properties/${property.podio_id ?? 'X'+property.id.slice(-6)}`} target="_blank" rel="noreferrer"
                         style={{fontSize:F.sm, color:T.accent, textDecoration:'none'}}>Property Page ↗</a>
                     )}
                   </div>
@@ -944,7 +944,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                   <>
                     <ReadonlyField label="Property Name" value={property.property_name}/>
                     {propAddr && <ReadonlyField label="Address" value={propAddr}/>}
-                    <a href={`/properties/${property.id}`} target="_blank" rel="noreferrer"
+                    <a href={`/properties/${property.podio_id ?? 'X'+property.id.slice(-6)}`} target="_blank" rel="noreferrer"
                       style={{fontSize:F.xs, color:T.accent, textDecoration:'none', display:'inline-flex', alignItems:'center', gap:'3px', padding:'3px 5px', borderRadius:'3px', border:`0.5px solid ${T.border}`}}>
                       Open Property ↗
                     </a>

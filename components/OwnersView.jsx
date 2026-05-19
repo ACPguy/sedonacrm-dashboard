@@ -207,7 +207,7 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
 
     const openDetail = e => {
       if (e.ctrlKey || e.metaKey) {
-        const tab = window.open(`${window.location.origin}/owners/${o.id}`, '_blank');
+        const tab = window.open(`${window.location.origin}/owners/${o.podio_id ?? 'X'+o.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
         onSelect(o);
