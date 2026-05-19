@@ -166,10 +166,9 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - X-prefix fallback (e.g. `X32f3fc`) = null podio_id row; cold URL load will return not-found (acceptable until podio_ids are populated)
 - Production domain: crm.andersoncp.com
 - Never construct detail URLs using UUID directly
-- Tables with full podio_id coverage: tenants (312/312), suites (177/177), rent_schedule (1406/1406), work_orders (2914/2914), issues (1233/1234), properties (47/48)
-- Tables with ZERO podio_id coverage (all X-fallback): contacts (0/2539), vendors (0/622), property_owners (0/43)
-- Vendors podio_id: not available in xlsx export. Will be populated at go-live via Podio API sync. Currently uses X-fallback URLs.
-- Contacts podio_id: xlsx not yet on this machine (05-04-2026_-_Contacts_-_Last_view_used.xlsx); copy to /home/scott/ and re-run backfill when available
+- Tables with full podio_id coverage: tenants (312/312), suites (177/177), rent_schedule (1406/1406), work_orders (2914/2914), contacts (2539/2539), issues (1233/1234), properties (47/48)
+- Tables with ZERO podio_id coverage (all X-fallback): vendors (0/622), property_owners (0/43)
+- Vendors podio_id: not available in xlsx export — will be populated at go-live via Podio API sync; currently uses X-fallback URLs
 
 ## Routing Pattern (Issues as template for all modules)
 
@@ -221,7 +220,7 @@ components/IssuesView.jsx     — exports: sbFetch, sbPatch, T, F, css, fmtDate,
 - URL Routing Rules section added to CLAUDE.md (permanent reference)
 - SedonaCRM.jsx NavItem changed from button to real anchor tag — all nav items now support Ctrl+click, middle-click, and right-click → open in new tab
 - work_orders podio_id backfilled (2914/2914) from podio_wo_number column
-- contacts/vendors/property_owners podio_id still null — vendors deferred to Podio API sync at go-live; contacts needs xlsx copied to /home/scott/
+- contacts podio_id backfilled (2539/2539) from xlsx — email-first matching, name fallback; "None" string in email cells handled
 - All list views (IssuesView, TenantsView, ContactsView, VendorsView, OwnersView, RentScheduleView, SuitesView, PropertiesView) now have real anchor tags in row cells — ctrl+click, middle-click, right-click→open all work natively
 
 **Next:**
@@ -234,4 +233,4 @@ components/IssuesView.jsx     — exports: sbFetch, sbPatch, T, F, css, fmtDate,
 
 3. All other detail forms follow — Vendors, Owners, Contacts, Work Orders
 
-4. Populate podio_id for work_orders, contacts, vendors, property_owners tables (currently all null)
+4. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
