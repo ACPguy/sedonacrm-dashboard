@@ -223,34 +223,29 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 ## Next Priorities
 
 **Completed last session:**
-- Ctrl+click nav opens new tab (AppShell NavBtn → `<a>`, SedonaCRM NavItem → Ctrl+click handler)
-- Date format MM-DD-YYYY UTC everywhere (getUTC* methods in 9 files)
-- Tenant Detail: Overview tab as default, 4-card layout, 3-row header with chip row
-- Rent tab: multi-select filter pills, 12 cols, 5-level expiry color coding, footer totals
-- COIs tab: full-width, no truncation, word-wrap
-- Properties list: 7 cols, Expires col fixed (RLS policy added for anon SELECT on property_agreements), color-coded
-- Tenants list: property strip, grouped view (A→Z), % colwidths
-- Suites list: defaults to current/active, property strip, grouped (A→Z), Tenant column, Location removed, Clear Filters
-- Issues list: Opened/Closed column toggle by status filter (same as Work Orders)
-- Work Orders list: no truncation, Closed/Updated columns toggle by filter
-- Rent Schedule list: Suite column word-wrap, Tenant column truncates
-
-- Routing: all 7 detail pages switched to podio_id URL routing; UUID fallback retained for old bookmarks
-- Domain: production domain updated to crm.andersoncp.com in CLAUDE.md and Project section
-- URL Routing Rules section added to CLAUDE.md (permanent reference)
-- SedonaCRM.jsx NavItem changed from button to real anchor tag — all nav items now support Ctrl+click, middle-click, and right-click → open in new tab
-- work_orders podio_id backfilled (2914/2914) from podio_wo_number column
-- contacts podio_id backfilled (2539/2539) from xlsx — email-first matching, name fallback; "None" string in email cells handled
-- All list views (IssuesView, TenantsView, ContactsView, VendorsView, OwnersView, RentScheduleView, SuitesView, PropertiesView) now have real anchor tags in row cells — ctrl+click, middle-click, right-click→open all work natively
+- Property detail form — hub of the entire system, fully built
+  - components/PropertiesDetail.jsx — 7-tab form (Overview, Info, Suites, Tenants, Work Orders, Issues, Insurance)
+  - Overview: listing agreement card (expiry color coding), insurance card, open WOs card, open issues card, quick links
+  - Info: editable property fields + readonly ownership/agreement panel
+  - Suites: table with status badges, tenant name lookup via current_tenant_id, sq ft totals footer
+  - Tenants: status filter pills, lease expiry color coding (5-level)
+  - Work Orders: open/closed/all filter, sortable columns, toggle closed/updated date col
+  - Issues: open/closed/all filter, toggle closed/updated col
+  - Insurance: expiry color coding, premium, status badge
+  - pages/properties/index.jsx + [id].jsx — fully routed
+  - AppShell Properties nav → /properties (was /?view=properties)
+- CLAUDE.md documentation sync — component structure and routing pattern updated to reflect all 8 routed modules
 
 **Next:**
-1. Property detail form — hub of the entire system
-   - 5 tab groups: Overview, Leasing, Financial, Operations, Ownership
-   - Each tab embeds filtered views (Issues, Work Orders, Tenants, Rent Schedule, etc.)
-   - Map embed on Overview tab
+1. Property detail refinements (if needed after first use):
+   - Suites tab: filter pills (Occupied / Vacant / All)
+   - Tenants tab: add Base Rent / Total columns if rent_schedule join is added
+   - Work Orders tab: vendor name (requires vendor lookup or denormalized field)
 
-2. Tenant detail form — continue refinements as needed after Property detail template is established
+2. Tenant detail form — continue refinements as needed
 
-3. All other detail forms follow — Vendors, Owners, Contacts, Work Orders
+3. Remaining detail forms — Vendors, Owners, Contacts, Work Orders (standalone detail views)
 
-4. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
+4. Suites — add routed pages (pages/suites/index.jsx + [id].jsx) — currently SPA-only
+
+5. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
