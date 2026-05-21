@@ -25,12 +25,16 @@ export default function IssueDetailPage() {
   }, [router.isReady, router.query.id]);
 
   const handleBack = () => {
-    const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('issuesBackUrl')) || '/issues';
-    router.push(backUrl);
+    if (router.query.from === 'properties') {
+      const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('issuesBackUrl')) || '/properties';
+      router.push(backUrl);
+    } else {
+      router.push('/issues');
+    }
   };
 
   return (
-    <AppShell activeView="issues">
+    <AppShell activeView={router.query.from === 'properties' ? 'properties' : 'issues'}>
       <div style={{height:'100%',overflow:'hidden',background:T.bg1}}>
         {loading && (
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:T.text3,fontSize:F.sm}}>

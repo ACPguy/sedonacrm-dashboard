@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import MarkdownField from './MarkdownField';
 
 const SUPABASE_URL     = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -144,15 +145,14 @@ export const EditableField = ({ label, value, onSave, type = 'text', options = [
 
   const inputStyle = { flex:1, background:T.bg3, border:`1px solid ${T.accent}`, borderRadius:'4px', padding:'5px 8px', color:T.text0, fontSize:F.base, outline:'none' };
 
+  if (type === 'textarea') return <MarkdownField label={label} value={value} onSave={onSave}/>;
+
   return (
     <div style={{marginBottom:'10px'}}>
       {label && <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>{label}</div>}
       {editing ? (
         <div style={{display:'flex', alignItems:'flex-start', gap:'6px'}}>
-          {type === 'textarea' ? (
-            <textarea ref={inputRef} value={val} onChange={e => setVal(e.target.value)}
-              style={{...inputStyle, resize:'vertical', minHeight:'80px'}}/>
-          ) : type === 'select' ? (
+          {type === 'select' ? (
             <select ref={inputRef} value={val} onChange={e => setVal(e.target.value)} style={inputStyle}>
               <option value="">—</option>
               {options.map(o => <option key={o} value={o}>{o}</option>)}

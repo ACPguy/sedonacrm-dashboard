@@ -44,7 +44,7 @@ export const css = {
   secTitle: { fontSize:F.xs, fontWeight:'600', color:T.text2, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' },
   badge: (color,bg) => ({ fontSize:F.xs, padding:'2px 7px', borderRadius:'3px', fontWeight:'500', whiteSpace:'nowrap', color, background:bg }),
   th: { fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', padding:'5px 8px', fontWeight:'600', whiteSpace:'nowrap', textAlign:'left', cursor:'pointer', userSelect:'none', background:T.bg2 },
-  td: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'normal', wordBreak:'break-word' },
+  td: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
 };
 
 const fmtNumDate = d => {
@@ -577,11 +577,11 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
 
         {/* WO Title */}
         <td style={{...css.td}} title={wo.short_description}>
-          {wo.short_description || ''}
+          {wo.short_description ? (wo.short_description.length > 25 ? wo.short_description.slice(0,25)+'…' : wo.short_description) : ''}
         </td>
 
         {/* FU Date */}
-        <td style={{...css.td, color: fuOverdue ? T.warn : T.text2}}>
+        <td style={{...css.td, overflow:'visible', color: fuOverdue ? T.warn : T.text2}}>
           {fuDisplay
             ? <span style={{fontWeight:fuOverdue?'600':'400'}}>{fuOverdue && '⚠ '}{fuDisplay}</span>
             : ''}
@@ -775,7 +775,7 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
             <colgroup>
               {/* WO # */}    <col style={{width:'54px',  minWidth:'54px'}}/>
               {/* Title */}   <col style={{width:'auto'}}/>
-              {/* FU Date */} <col style={{width:'82px',  minWidth:'76px'}}/>
+              {/* FU Date */} <col style={{width:'100px', minWidth:'100px'}}/>
               {/* Prop */}    <col style={{width:'58px',  minWidth:'58px'}}/>
               {/* Priority */}<col style={{width:'88px',  minWidth:'80px'}}/>
               {/* Stage */}   <col style={{width:'136px', minWidth:'136px'}}/>

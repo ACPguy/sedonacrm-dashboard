@@ -25,12 +25,16 @@ export default function WorkOrderDetailPage() {
   }, [router.isReady, router.query.id]);
 
   const handleBack = () => {
-    const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('workOrdersBackUrl')) || '/work-orders';
-    router.push(backUrl);
+    if (router.query.from === 'properties') {
+      const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('workOrdersBackUrl')) || '/properties';
+      router.push(backUrl);
+    } else {
+      router.push('/work-orders');
+    }
   };
 
   return (
-    <AppShell activeView="work-orders">
+    <AppShell activeView={router.query.from === 'properties' ? 'properties' : 'work-orders'}>
       <div style={{height:'100%',overflow:'hidden',background:T.bg1}}>
         {loading && (
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:T.text3,fontSize:F.sm}}>

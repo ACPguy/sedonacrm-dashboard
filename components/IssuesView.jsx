@@ -7,6 +7,7 @@ import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable,
 } from '@dnd-kit/core';
+import MarkdownField from './MarkdownField';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -118,19 +119,17 @@ export const EditableField = ({ label, value, onSave, type='text' }) => {
     finally { setSaving(false); }
   };
   const cancel = () => { setVal(value||''); setEditing(false); };
+
+  if (type === 'textarea') return <MarkdownField label={label} value={value} onSave={onSave}/>;
+
   return (
     <div style={{marginBottom:'10px'}}>
       <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
       {editing ? (
         <div style={{display:'flex',alignItems:'flex-start',gap:'6px'}}>
-          {type==='textarea'?(
-            <textarea ref={inputRef} value={val} onChange={e=>setVal(e.target.value)}
-              style={{flex:1,background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,resize:'vertical',minHeight:'60px',outline:'none'}}/>
-          ):(
-            <input ref={inputRef} type={type} value={val} onChange={e=>setVal(e.target.value)}
-              onKeyDown={e=>{if(e.key==='Enter')save();if(e.key==='Escape')cancel();}}
-              style={{flex:1,background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}/>
-          )}
+          <input ref={inputRef} type={type} value={val} onChange={e=>setVal(e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter')save();if(e.key==='Escape')cancel();}}
+            style={{flex:1,background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}/>
           <button onClick={save} disabled={saving} style={{background:T.accent,border:'none',borderRadius:'4px',padding:'5px 10px',color:'#fff',fontSize:F.sm,cursor:'pointer',whiteSpace:'nowrap'}}>
             {saving?'…':'Save'}
           </button>
