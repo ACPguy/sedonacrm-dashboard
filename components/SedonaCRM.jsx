@@ -70,44 +70,55 @@ const StatusBadge = ({ status }) => {
   return <span style={css.badge(color,bg)}>{status||'—'}</span>;
 };
 
-const EditableField = ({ label, value, onSave, type='text' }) => {
+const EditableField = ({ label, value, onSave, type='text', display }) => {
   const [editing,setEditing] = useState(false);
   const [val,setVal] = useState(value||'');
-  const [saving,setSaving] = useState(false);
+  const [saved,setSaved] = useState(false);
   const inputRef = useRef(null);
+  const timerRef = useRef(null);
   useEffect(()=>{ if(editing) inputRef.current?.focus(); },[editing]);
   useEffect(()=>{ setVal(value||''); },[value]);
-  const save = async () => {
-    setSaving(true);
-    try { await onSave(val); setEditing(false); }
-    catch { alert('Save failed'); }
-    finally { setSaving(false); }
+  useEffect(()=>()=>{ if(timerRef.current) clearTimeout(timerRef.current); },[]);
+
+  const doSave = async (v) => {
+    if(String(v) === String(value||'')) return;
+    try {
+      await onSave(v);
+      setSaved(true);
+      if(timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(()=>setSaved(false), 1500);
+    } catch { alert('Save failed'); }
   };
+  const handleBlur = () => { setEditing(false); doSave(val); };
   const cancel = () => { setVal(value||''); setEditing(false); };
+  const displayVal = display !== undefined ? display : val;
+
   return (
     <div style={{marginBottom:'10px'}}>
-      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
+      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',display:'flex',alignItems:'center',gap:'6px'}}>
+        {label}
+        {saved&&<span style={{color:T.success,fontSize:'11px',fontWeight:'500'}}>✓ Saved</span>}
+      </div>
       {editing ? (
-        <div style={{display:'flex',alignItems:'flex-start',gap:'6px'}}>
+        <div>
           {type==='textarea'?(
             <textarea ref={inputRef} value={val} onChange={e=>setVal(e.target.value)}
-              style={{flex:1,background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,resize:'vertical',minHeight:'60px',outline:'none'}}/>
+              onBlur={handleBlur}
+              onKeyDown={e=>{if(e.key==='Escape')cancel();}}
+              style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,resize:'vertical',minHeight:'60px',outline:'none'}}/>
           ):(
             <input ref={inputRef} type={type} value={val} onChange={e=>setVal(e.target.value)}
-              onKeyDown={e=>{if(e.key==='Enter')save();if(e.key==='Escape')cancel();}}
-              style={{flex:1,background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}/>
+              onBlur={handleBlur}
+              onKeyDown={e=>{if(e.key==='Enter'){inputRef.current?.blur();}if(e.key==='Escape')cancel();}}
+              style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}/>
           )}
-          <button onClick={save} disabled={saving} style={{background:T.accent,border:'none',borderRadius:'4px',padding:'5px 10px',color:'#fff',fontSize:F.sm,cursor:'pointer',whiteSpace:'nowrap'}}>
-            {saving?'…':'Save'}
-          </button>
-          <button onClick={cancel} style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text1,fontSize:F.sm,cursor:'pointer'}}>✕</button>
         </div>
       ):(
         <div onClick={()=>setEditing(true)} title="Click to edit"
-          style={{fontSize:F.base,color:val?T.text0:T.text3,cursor:'text',padding:'3px 5px',borderRadius:'4px',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4'}}
+          style={{fontSize:F.base,color:displayVal?T.text0:T.text3,cursor:'text',padding:'3px 5px',borderRadius:'4px',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4'}}
           onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
           onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
-          {val||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>click to edit</span>}
+          {displayVal||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>click to edit</span>}
         </div>
       )}
     </div>
@@ -340,7 +351,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
   const [propTaxes,setPropTaxes] = useState([]);
   const [agreement,setAgreement] = useState(null);
   const [suites,setSuites] = useState([]);
-  const [rightCollapsed,setRightCollapsed] = useState(false);
+  const [rightCollapsed,setRightCollapsed] = useState(true);
   const [rightWidth,setRightWidth] = useState(280);
   const resizingRight = useRef(false);
 
@@ -375,6 +386,12 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
     await sbPatch('properties', data.id, { [field]: val||null });
     const updated = {...data,[field]:val};
     setData(updated); onUpdate?.(updated);
+  };
+
+  const saveAgreement = async (field, val) => {
+    if(!agreement) return;
+    await sbPatch('property_agreements', agreement.id, { [field]: val||null });
+    setAgreement(prev=>({...prev,[field]:val}));
   };
 
   const calcMoLeft = endDate => {
@@ -519,22 +536,6 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
                     );
                   })()}
                 </div>
-                <div style={css.card}>
-                  <div style={css.secTitle}>Quick Links</div>
-                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                    {[['Tenants','tenants'],['Work Orders','work-orders'],['Issues','issues'],
-                      ['Insurance','insurance'],['Monthly Reports','monthly-reports'],
-                      ['Property Taxes','property-taxes'],['Listing Info','listing-info'],['Documents','documents'],
-                    ].map(([label,t])=>(
-                      <button key={t} onClick={()=>setTab(t)}
-                        style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 12px',color:T.text1,fontSize:F.xs,cursor:'pointer'}}
-                        onMouseEnter={e=>{e.currentTarget.style.color=T.text0;e.currentTarget.style.borderColor=T.accent;}}
-                        onMouseLeave={e=>{e.currentTarget.style.color=T.text1;e.currentTarget.style.borderColor=T.border;}}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
@@ -639,29 +640,52 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
             )}
 
             {/* INSURANCE */}
-            {tab==='insurance'&&(
-              <table style={{width:'100%',borderCollapse:'collapse'}}>
-                <thead><tr>
-                  <th style={css.th}>Insurance Co</th>
-                  <th style={css.th}>Status</th>
-                  <th style={css.th}>Expiry</th>
-                  <th style={css.th}>Annual Premium</th>
-                  <th style={css.th}>ACP Named</th>
-                </tr></thead>
-                <tbody>
-                  {insurance.length===0&&<tr><td colSpan={5} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No insurance records</td></tr>}
-                  {insurance.map((ins,i)=>(
-                    <tr key={ins.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                      <td style={css.td}>{ins.insurance_co||'—'}</td>
-                      <td style={css.td}><StatusBadge status={ins.status}/></td>
-                      <td style={{...css.td,color:ins.expiry_date&&new Date(ins.expiry_date)<today?T.danger:T.text0}}>{fmtDate(ins.expiry_date)}</td>
-                      <td style={css.tdNum}>{fmtMoney(ins.annual_premium)}</td>
-                      <td style={{...css.td,color:ins.acp_named_additional_insured?T.success:T.danger}}>{ins.acp_named_additional_insured?'Yes':'No'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            {tab==='insurance'&&(()=>{
+              const activeIns   = insurance.filter(i=>i.status!=='ARCHIVED');
+              const archivedIns = insurance.filter(i=>i.status==='ARCHIVED');
+              const daysLeft = ins => {
+                if(!ins.expiry_date) return null;
+                return Math.round((new Date(ins.expiry_date)-today)/(1000*60*60*24));
+              };
+              const insRow = (ins,i,isArchived) => (
+                <tr key={ins.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
+                  <td style={css.td}>{ins.insurance_co||'—'}</td>
+                  <td style={css.td}><StatusBadge status={ins.status}/></td>
+                  <td style={{...css.td,color:ins.expiry_date&&new Date(ins.expiry_date)<today?T.danger:T.text0}}>{fmtDate(ins.expiry_date)}</td>
+                  <td style={css.td}>
+                    {!isArchived&&ins.status==='Policy Is Current'&&daysLeft(ins)!==null
+                      ? <span style={{color:daysLeft(ins)<=30?T.danger:daysLeft(ins)<=90?T.warn:T.text1}}>{daysLeft(ins)} days</span>
+                      : null}
+                  </td>
+                  <td style={css.tdNum}>{fmtMoney(ins.annual_premium)}</td>
+                  <td style={{...css.td,color:ins.acp_named_additional_insured?T.success:T.danger}}>{ins.acp_named_additional_insured?'Yes':'No'}</td>
+                </tr>
+              );
+              return (
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr>
+                    <th style={css.th}>Insurance Co</th>
+                    <th style={css.th}>Status</th>
+                    <th style={css.th}>Expiry</th>
+                    <th style={css.th}>Remaining</th>
+                    <th style={{...css.th,textAlign:'right'}}>Annual Premium</th>
+                    <th style={css.th}>ACP Named</th>
+                  </tr></thead>
+                  <tbody>
+                    {insurance.length===0&&<tr><td colSpan={6} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No insurance records</td></tr>}
+                    {activeIns.map((ins,i)=>insRow(ins,i,false))}
+                    {archivedIns.length>0&&(
+                      <tr>
+                        <td colSpan={6} style={{padding:'6px 8px',background:T.accent,borderTop:`0.5px solid ${T.border}`}}>
+                          <span style={{fontSize:F.xs,fontWeight:'700',color:T.bg0,textTransform:'uppercase',letterSpacing:'0.06em'}}>Archived</span>
+                        </td>
+                      </tr>
+                    )}
+                    {archivedIns.map((ins,i)=>insRow(ins,i,true))}
+                  </tbody>
+                </table>
+              );
+            })()}
 
             {/* COIs — placeholder */}
             {tab==='cois'&&(
@@ -682,12 +706,12 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
                     const fullYr=rows.reduce((s,t)=>s+(Number(t.annual_amt)||0),0);
                     return (
                       <div key={year} style={{marginBottom:'24px'}}>
-                        <div style={{display:'flex',gap:'20px',alignItems:'baseline',marginBottom:'6px',padding:'5px 0',borderBottom:`0.5px solid ${T.border}`}}>
-                          <span style={{fontSize:F.md,fontWeight:'700',color:T.text0}}>{year}</span>
-                          <span style={{fontSize:F.xs,color:T.text2}}>{rows.length} parcel{rows.length!==1?'s':''}</span>
-                          <span style={{fontSize:F.xs,color:T.text1}}>Full Year <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr)}</span></span>
-                          <span style={{fontSize:F.xs,color:T.text1}}>Half Yr <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr/2)}</span></span>
-                          <span style={{fontSize:F.xs,color:T.text1}}>Mo. <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr/12)}</span></span>
+                        <div style={{display:'flex',gap:'20px',alignItems:'baseline',marginBottom:'6px',padding:'5px 8px',borderRadius:'4px',background:T.accent}}>
+                          <span style={{fontSize:F.md,fontWeight:'700',color:T.bg0}}>{year}</span>
+                          <span style={{fontSize:F.xs,color:T.bg1}}>{rows.length} parcel{rows.length!==1?'s':''}</span>
+                          <span style={{fontSize:F.xs,color:T.bg1}}>Full Year <span style={{color:T.bg0,fontWeight:'600'}}>{fmtMoney(fullYr)}</span></span>
+                          <span style={{fontSize:F.xs,color:T.bg1}}>Half Yr <span style={{color:T.bg0,fontWeight:'600'}}>{fmtMoney(fullYr/2)}</span></span>
+                          <span style={{fontSize:F.xs,color:T.bg1}}>Mo. <span style={{color:T.bg0,fontWeight:'600'}}>{fmtMoney(fullYr/12)}</span></span>
                         </div>
                         <table style={{width:'100%',borderCollapse:'collapse'}}>
                           <thead><tr>
@@ -732,7 +756,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
                 </div>
                 <div style={css.card}>
                   <div style={css.secTitle}>Building Details</div>
-                  <EditableField label="Gross Sq Ft" value={data.gross_sqft} onSave={v=>save('gross_sqft',v)} type="number"/>
+                  <EditableField label="Gross Sq Ft" value={data.gross_sqft} display={fmtNum(data.gross_sqft)||undefined} onSave={v=>save('gross_sqft',v)} type="number"/>
                   <EditableField label="Year Built" value={data.year_built} onSave={v=>save('year_built',v)} type="number"/>
                   <EditableField label="Zoning" value={data.zoning} onSave={v=>save('zoning',v)}/>
                   <EditableField label="Construction Type" value={data.construction_type} onSave={v=>save('construction_type',v)}/>
@@ -764,87 +788,52 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
                 {agreement&&(<>
                   <div style={css.card}>
                     <div style={css.secTitle}>Listing Agreement</div>
-                    {[
-                      ['Type',agreement.listing_agreement_type],
-                      ['Start',fmtDate(agreement.listing_start_date)],
-                      ['Expiry',fmtDate(agreement.listing_expiry_date)],
-                      ['Closed',fmtDate(agreement.listing_closed_date)],
-                      ['Status',agreement.acp_listing_status],
-                      ['Notes',agreement.general_listing_notes],
-                    ].map(([label,val])=>(
-                      <div key={label} style={{marginBottom:'8px'}}>
-                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
-                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
-                      </div>
-                    ))}
+                    <EditableField label="Type" value={agreement.listing_agreement_type} onSave={v=>saveAgreement('listing_agreement_type',v)}/>
+                    <EditableField label="Start" value={agreement.listing_start_date} display={fmtDate(agreement.listing_start_date)||undefined} onSave={v=>saveAgreement('listing_start_date',v)} type="date"/>
+                    <EditableField label="Expiry" value={agreement.listing_expiry_date} display={fmtDate(agreement.listing_expiry_date)||undefined} onSave={v=>saveAgreement('listing_expiry_date',v)} type="date"/>
+                    <EditableField label="Closed" value={agreement.listing_closed_date} display={fmtDate(agreement.listing_closed_date)||undefined} onSave={v=>saveAgreement('listing_closed_date',v)} type="date"/>
+                    <EditableField label="Status" value={agreement.acp_listing_status} onSave={v=>saveAgreement('acp_listing_status',v)}/>
+                    <EditableField label="Notes" value={agreement.general_listing_notes} onSave={v=>saveAgreement('general_listing_notes',v)} type="textarea"/>
                   </div>
                   <div style={css.card}>
                     <div style={css.secTitle}>PM Fee</div>
-                    {[
-                      ['Fee Type',agreement.pm_fee_type],
-                      ['Fee %',agreement.pm_fee_pct?(Number(agreement.pm_fee_pct)*100).toFixed(2)+'%':null],
-                      ['No Less Than',fmtMoney(agreement.pm_fee_no_less_than)],
-                      ['Fixed Amt',fmtMoney(agreement.pm_fee_fixed_amt)],
-                      ['How Paid',agreement.pm_fee_how_paid],
-                      ['Current EFT',fmtMoney(agreement.pm_fee_current_eft_amt)],
-                      ['Current QBO',fmtMoney(agreement.pm_fee_current_qbo_amt)],
-                      ['Notes',agreement.pm_fee_notes],
-                    ].map(([label,val])=>(
-                      <div key={label} style={{marginBottom:'8px'}}>
-                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
-                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
-                      </div>
-                    ))}
+                    <EditableField label="Fee Type" value={agreement.pm_fee_type} onSave={v=>saveAgreement('pm_fee_type',v)}/>
+                    <EditableField label="Fee % (as decimal, e.g. 0.05 = 5%)" value={agreement.pm_fee_pct} display={agreement.pm_fee_pct?(Number(agreement.pm_fee_pct)*100).toFixed(2)+'%':undefined} onSave={v=>saveAgreement('pm_fee_pct',v)} type="number"/>
+                    <EditableField label="No Less Than" value={agreement.pm_fee_no_less_than} display={fmtMoney(agreement.pm_fee_no_less_than)||undefined} onSave={v=>saveAgreement('pm_fee_no_less_than',v)} type="number"/>
+                    <EditableField label="Fixed Amt" value={agreement.pm_fee_fixed_amt} display={fmtMoney(agreement.pm_fee_fixed_amt)||undefined} onSave={v=>saveAgreement('pm_fee_fixed_amt',v)} type="number"/>
+                    <EditableField label="How Paid" value={agreement.pm_fee_how_paid} onSave={v=>saveAgreement('pm_fee_how_paid',v)}/>
+                    <EditableField label="Current EFT" value={agreement.pm_fee_current_eft_amt} display={fmtMoney(agreement.pm_fee_current_eft_amt)||undefined} onSave={v=>saveAgreement('pm_fee_current_eft_amt',v)} type="number"/>
+                    <EditableField label="Current QBO" value={agreement.pm_fee_current_qbo_amt} display={fmtMoney(agreement.pm_fee_current_qbo_amt)||undefined} onSave={v=>saveAgreement('pm_fee_current_qbo_amt',v)} type="number"/>
+                    <EditableField label="Notes" value={agreement.pm_fee_notes} onSave={v=>saveAgreement('pm_fee_notes',v)} type="textarea"/>
                   </div>
                   <div style={css.card}>
                     <div style={css.secTitle}>Distributions</div>
-                    {[
-                      ['Type',agreement.distribution_type],
-                      ['Fixed Amt',fmtMoney(agreement.distribution_fixed_amt)],
-                      ['Paid Via',agreement.distribution_paid_via],
-                      ['Notes',agreement.distribution_notes],
-                      ['Min Bank Balance',fmtMoney(agreement.min_bank_balance)],
-                      ['Reserve Op Funds',fmtMoney(agreement.reserve_op_funds)],
-                      ['Bank Acct Type',agreement.bank_acct_type],
-                      ['LL Approval Over',fmtMoney(agreement.ll_approval_over_amt)],
-                    ].map(([label,val])=>(
-                      <div key={label} style={{marginBottom:'8px'}}>
-                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
-                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
-                      </div>
-                    ))}
+                    <EditableField label="Type" value={agreement.distribution_type} onSave={v=>saveAgreement('distribution_type',v)}/>
+                    <EditableField label="Fixed Amt" value={agreement.distribution_fixed_amt} display={fmtMoney(agreement.distribution_fixed_amt)||undefined} onSave={v=>saveAgreement('distribution_fixed_amt',v)} type="number"/>
+                    <EditableField label="Paid Via" value={agreement.distribution_paid_via} onSave={v=>saveAgreement('distribution_paid_via',v)}/>
+                    <EditableField label="Notes" value={agreement.distribution_notes} onSave={v=>saveAgreement('distribution_notes',v)} type="textarea"/>
+                    <EditableField label="Min Bank Balance" value={agreement.min_bank_balance} display={fmtMoney(agreement.min_bank_balance)||undefined} onSave={v=>saveAgreement('min_bank_balance',v)} type="number"/>
+                    <EditableField label="Reserve Op Funds" value={agreement.reserve_op_funds} display={fmtMoney(agreement.reserve_op_funds)||undefined} onSave={v=>saveAgreement('reserve_op_funds',v)} type="number"/>
+                    <EditableField label="Bank Acct Type" value={agreement.bank_acct_type} onSave={v=>saveAgreement('bank_acct_type',v)}/>
+                    <EditableField label="LL Approval Over" value={agreement.ll_approval_over_amt} display={fmtMoney(agreement.ll_approval_over_amt)||undefined} onSave={v=>saveAgreement('ll_approval_over_amt',v)} type="number"/>
                   </div>
                   <div style={css.card}>
                     <div style={css.secTitle}>Leasing Fees</div>
-                    {[
-                      ['Leasing Fee Type',agreement.leasing_fee_type],
-                      ['Leasing Fee %',agreement.leasing_fee_pct?(Number(agreement.leasing_fee_pct)*100).toFixed(2)+'%':null],
-                      ['Leasing Notes',agreement.leasing_fee_notes],
-                      ['Renewal Type',agreement.lease_renewal_type],
-                      ['Renewal Fee %',agreement.lease_renewal_fee_pct?(Number(agreement.lease_renewal_fee_pct)*100).toFixed(2)+'%':null],
-                      ['Renewal Notes',agreement.lease_renewal_fee_notes],
-                      ['Hourly Rate',fmtMoney(agreement.other_fees_hourly_rate)],
-                      ['Project Mgmt Hourly',fmtMoney(agreement.project_mgmt_hourly_rate)],
-                      ['Asset Improv Fee %',agreement.asset_improv_fee_pct?(Number(agreement.asset_improv_fee_pct)*100).toFixed(2)+'%':null],
-                      ['Asset Improv Term',agreement.asset_improv_term_months?agreement.asset_improv_term_months+' mo':null],
-                    ].map(([label,val])=>(
-                      <div key={label} style={{marginBottom:'8px'}}>
-                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
-                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
-                      </div>
-                    ))}
+                    <EditableField label="Leasing Fee Type" value={agreement.leasing_fee_type} onSave={v=>saveAgreement('leasing_fee_type',v)}/>
+                    <EditableField label="Leasing Fee % (decimal)" value={agreement.leasing_fee_pct} display={agreement.leasing_fee_pct?(Number(agreement.leasing_fee_pct)*100).toFixed(2)+'%':undefined} onSave={v=>saveAgreement('leasing_fee_pct',v)} type="number"/>
+                    <EditableField label="Leasing Notes" value={agreement.leasing_fee_notes} onSave={v=>saveAgreement('leasing_fee_notes',v)} type="textarea"/>
+                    <EditableField label="Renewal Type" value={agreement.lease_renewal_type} onSave={v=>saveAgreement('lease_renewal_type',v)}/>
+                    <EditableField label="Renewal Fee % (decimal)" value={agreement.lease_renewal_fee_pct} display={agreement.lease_renewal_fee_pct?(Number(agreement.lease_renewal_fee_pct)*100).toFixed(2)+'%':undefined} onSave={v=>saveAgreement('lease_renewal_fee_pct',v)} type="number"/>
+                    <EditableField label="Renewal Notes" value={agreement.lease_renewal_fee_notes} onSave={v=>saveAgreement('lease_renewal_fee_notes',v)} type="textarea"/>
+                    <EditableField label="Hourly Rate" value={agreement.other_fees_hourly_rate} display={fmtMoney(agreement.other_fees_hourly_rate)||undefined} onSave={v=>saveAgreement('other_fees_hourly_rate',v)} type="number"/>
+                    <EditableField label="Project Mgmt Hourly" value={agreement.project_mgmt_hourly_rate} display={fmtMoney(agreement.project_mgmt_hourly_rate)||undefined} onSave={v=>saveAgreement('project_mgmt_hourly_rate',v)} type="number"/>
+                    <EditableField label="Asset Improv Fee % (decimal)" value={agreement.asset_improv_fee_pct} display={agreement.asset_improv_fee_pct?(Number(agreement.asset_improv_fee_pct)*100).toFixed(2)+'%':undefined} onSave={v=>saveAgreement('asset_improv_fee_pct',v)} type="number"/>
+                    <EditableField label="Asset Improv Term (months)" value={agreement.asset_improv_term_months} onSave={v=>saveAgreement('asset_improv_term_months',v)} type="number"/>
                   </div>
                   <div style={css.card}>
                     <div style={css.secTitle}>PM Reports</div>
-                    {[
-                      ['Email To',agreement.pm_reports_email_to],
-                      ['Notes',agreement.pm_reports_notes],
-                    ].map(([label,val])=>(
-                      <div key={label} style={{marginBottom:'8px'}}>
-                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
-                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
-                      </div>
-                    ))}
+                    <EditableField label="Email To" value={agreement.pm_reports_email_to} onSave={v=>saveAgreement('pm_reports_email_to',v)}/>
+                    <EditableField label="Notes" value={agreement.pm_reports_notes} onSave={v=>saveAgreement('pm_reports_notes',v)} type="textarea"/>
                   </div>
                 </>)}
               </div>
@@ -981,13 +970,13 @@ export const PropertiesView = () => {
         {!loading&&(
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'6%'}}/>  {/* Prop */}
-              <col style={{width:'auto'}}/> {/* Property Name */}
-              <col style={{width:'14%'}}/> {/* Address */}
-              <col style={{width:'9%'}}/>  {/* City */}
-              <col style={{width:'10%'}}/> {/* Status */}
-              <col style={{width:'9%'}}/>  {/* Expires */}
-              <col style={{width:'8%'}}/>  {/* Sq Ftg */}
+              <col style={{width:'7%'}}/>
+              <col style={{width:'26%'}}/>
+              <col style={{width:'23%'}}/>
+              <col style={{width:'13%'}}/>
+              <col style={{width:'10%'}}/>
+              <col style={{width:'12%'}}/>
+              <col style={{width:'9%'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:1}}>
               <tr>
@@ -1046,7 +1035,7 @@ export const PropertiesView = () => {
 const TenantDetail = ({ tenant, onBack, onUpdate }) => {
   const [tab,setTab] = useState('info');
   const [data,setData] = useState(tenant);
-  const [rightCollapsed,setRightCollapsed] = useState(false);
+  const [rightCollapsed,setRightCollapsed] = useState(true);
   const [rightWidth,setRightWidth] = useState(280);
   const resizingRight = useRef(false);
 

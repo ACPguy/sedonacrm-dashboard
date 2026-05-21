@@ -838,7 +838,7 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
 export const WorkOrderDetail = ({ wo, onBack }) => {
   const [tab, setTab]                       = useState('info');
   const [data]                              = useState(wo);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(true);
   const [rightWidth, setRightWidth]         = useState(280);
   const resizingRight = useRef(false);
 

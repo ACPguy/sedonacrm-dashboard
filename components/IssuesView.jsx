@@ -856,7 +856,7 @@ export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePr
 export const IssueDetail = ({ issue, onBack, onUpdate }) => {
   const [tab, setTab] = useState('info');
   const [data, setData] = useState(issue);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(true);
   const [rightWidth, setRightWidth] = useState(280);
   const resizingRight = useRef(false);
 
