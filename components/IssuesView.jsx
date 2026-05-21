@@ -444,7 +444,7 @@ const MorePopover = ({ open, onClose, anchorRef, assignedFilter, setAssignedFilt
 // ─────────────────────────────────────────────────────────────────────────────
 // Issues List
 // ─────────────────────────────────────────────────────────────────────────────
-const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
+export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePropStrip = false }) => {
   const [users, setUsers]         = useState([]);
   const [statusFilter, setStatusFilter]     = useState('Open');
   const [priorityFilter, setPriorityFilter] = useState('All');
@@ -690,12 +690,14 @@ const IssuesList = ({ issues, setIssues, loading, error, onSelect }) => {
         </div>
 
         {/* Row 1: Property buttons — scrollable single line */}
-        <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
-          <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
-          {activeProps.map(pc => (
-            <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
-          ))}
-        </div>
+        {!hidePropStrip && (
+          <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
+            <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
+            {activeProps.map(pc => (
+              <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
+            ))}
+          </div>
+        )}
 
         {/* Row 2: Priority | Status | More... | Clear | Search */}
         <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0}}>

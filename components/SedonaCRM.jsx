@@ -1,6 +1,6 @@
-import WorkOrdersView from './WorkOrdersView';
+import WorkOrdersView, { WorkOrdersList } from './WorkOrdersView';
 import SuitesView from './SuitesView';
-import IssuesView from './IssuesView';
+import IssuesView, { IssuesList } from './IssuesView';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 
@@ -329,7 +329,8 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
 
 // ── Property Detail ───────────────────────────────────────────────────────────
 export const PropertyDetail = ({ property, onBack, onUpdate }) => {
-  const [tab,setTab] = useState('info');
+  const router = useRouter();
+  const [tab,setTab] = useState('dashboard');
   const [data,setData] = useState(property);
   const [rentRows,setRentRows] = useState([]);
   const [workOrders,setWorkOrders] = useState([]);
@@ -337,7 +338,8 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
   const [insurance,setInsurance] = useState([]);
   const [monthlyReports,setMonthlyReports] = useState([]);
   const [propTaxes,setPropTaxes] = useState([]);
-  const [pipeline,setPipeline] = useState([]);
+  const [agreement,setAgreement] = useState(null);
+  const [suites,setSuites] = useState([]);
   const [rightCollapsed,setRightCollapsed] = useState(false);
   const [rightWidth,setRightWidth] = useState(280);
   const resizingRight = useRef(false);
@@ -351,21 +353,42 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
   },[rightWidth]);
 
   useEffect(()=>{
+    const onKey = e => { if(e.key==='Escape') onBack?.(); };
+    window.addEventListener('keydown',onKey);
+    return ()=>window.removeEventListener('keydown',onKey);
+  },[onBack]);
+
+  useEffect(()=>{
     const pc = data.prop_code;
     const todayStr = new Date().toISOString().slice(0,10);
     sbFetch('rent_schedule',`prop_code=eq.${pc}&rent_status=eq.Current&rent_starts=lte.${todayStr}&rent_ends=gte.${todayStr}&select=*&order=suite_num.asc`).then(setRentRows).catch(()=>{});
-    sbFetch('work_orders',`prop_code=eq.${pc}&select=*&order=created_at.desc&limit=50`).then(setWorkOrders).catch(()=>{});
+    sbFetch('work_orders',`prop_code=eq.${pc}&select=*&order=created_at.desc`).then(setWorkOrders).catch(()=>{});
     sbFetch('issues',`prop_code=eq.${pc}&select=*&order=created_at.desc`).then(setIssues).catch(()=>{});
     sbFetch('property_insurance',`prop_code=eq.${pc}&select=*&order=expiry_date.desc`).then(setInsurance).catch(()=>{});
     sbFetch('monthly_reports',`prop_code=eq.${pc}&select=*&order=report_date.desc&limit=24`).then(setMonthlyReports).catch(()=>{});
     sbFetch('property_taxes',`prop_code=eq.${pc}&select=*&order=year.desc`).then(setPropTaxes).catch(()=>{});
-    sbFetch('leasing_pipeline',`prop_code=eq.${pc}&select=*&order=created_at.desc&limit=20`).then(setPipeline).catch(()=>{});
+    sbFetch('property_agreements',`prop_code=eq.${pc}&select=*&limit=1`).then(rows=>setAgreement(rows[0]||null)).catch(()=>{});
+    sbFetch('suites',`prop_code=eq.${pc}&select=*&order=suite_num.asc`).then(setSuites).catch(()=>{});
   },[data.prop_code]);
 
   const save = async (field, val) => {
     await sbPatch('properties', data.id, { [field]: val||null });
     const updated = {...data,[field]:val};
     setData(updated); onUpdate?.(updated);
+  };
+
+  const calcMoLeft = endDate => {
+    if(!endDate) return null;
+    const end = new Date(endDate);
+    if(isNaN(end.getTime())) return null;
+    return (end - new Date()) / (1000*60*60*24*30.44);
+  };
+
+  const moLeftColor = mo => {
+    if(mo===null||mo<0) return T.text3;
+    if(mo<=3)  return T.danger;
+    if(mo<=12) return T.warn;
+    return T.success;
   };
 
   const occupancy = (() => {
@@ -377,10 +400,14 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
     return { occupied_sf, vacant_sf, gross_sf, occ_pct, monthly_total };
   })();
 
-  const TABS = ['Info','Tenants','Work Orders','Issues','Insurance','Monthly Reports','Property Taxes','Listing Info','Documents'];
+  const openWOs    = workOrders.filter(w=>(w.status||'').toLowerCase()!=='closed').length;
+  const openIssues = issues.filter(i=>(i.status||'').toLowerCase()!=='closed').length;
+
+  const TABS = ['Dashboard','Tenants','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Info','Listing Info','CAMs','Inspections','Documents'];
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      {/* Header */}
       <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'4px'}}>
           <button onClick={onBack}
@@ -394,6 +421,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
         <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{data.property_name||data.prop_code}</div>
         <div style={{fontSize:F.sm,color:T.text2}}>{data.prop_code} · {data.address||''}{data.city?`, ${data.city}`:''}</div>
       </div>
+      {/* Tab bar */}
       <div style={{display:'flex',gap:'2px',padding:'6px 16px 0',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,flexShrink:0,overflowX:'auto'}}>
         {TABS.map(t=>(
           <button key={t} onClick={()=>setTab(t.toLowerCase().replace(/ /g,'-'))}
@@ -405,303 +433,467 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
           </button>
         ))}
       </div>
+      {/* Content */}
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
-        <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
 
-          {/* INFO */}
-          {tab==='info'&&(
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-              <div style={css.card}>
-                <div style={css.secTitle}>Property Info</div>
-                <EditableField label="Property Name" value={data.property_name} onSave={v=>save('property_name',v)}/>
-                <EditableField label="Marketing Name" value={data.property_marketing_name} onSave={v=>save('property_marketing_name',v)}/>
-                <EditableField label="Ownership Company" value={data.ownership_company} onSave={v=>save('ownership_company',v)}/>
-                <EditableField label="Address" value={data.address} onSave={v=>save('address',v)}/>
-                <EditableField label="City" value={data.city} onSave={v=>save('city',v)}/>
-                <EditableField label="Zip" value={data.zip} onSave={v=>save('zip',v)}/>
-              </div>
-              <div style={css.card}>
-                <div style={css.secTitle}>Building Details</div>
-                <EditableField label="Gross Sq Ft" value={data.gross_sqft} onSave={v=>save('gross_sqft',v)} type="number"/>
-                <EditableField label="Year Built" value={data.year_built} onSave={v=>save('year_built',v)} type="number"/>
-                <EditableField label="Zoning" value={data.zoning} onSave={v=>save('zoning',v)}/>
-                <EditableField label="Construction Type" value={data.construction_type} onSave={v=>save('construction_type',v)}/>
-                <EditableField label="Roof Type" value={data.roof_type} onSave={v=>save('roof_type',v)}/>
-                <EditableField label="TPT Tax %" value={data.tpt_tax_pct} onSave={v=>save('tpt_tax_pct',v)} type="number"/>
-              </div>
-              <div style={css.card}>
-                <div style={css.secTitle}>Parking & Access</div>
-                <EditableField label="Standard Stalls" value={data.parking_stalls_standard} onSave={v=>save('parking_stalls_standard',v)} type="number"/>
-                <EditableField label="HC Stalls" value={data.parking_stalls_hc} onSave={v=>save('parking_stalls_hc',v)} type="number"/>
-                <EditableField label="ADOR License #" value={data.ador_license_num} onSave={v=>save('ador_license_num',v)}/>
-                <EditableField label="Bank Account Name" value={data.bank_account_name} onSave={v=>save('bank_account_name',v)}/>
-              </div>
-              <div style={css.card}>
-                <div style={css.secTitle}>Notes</div>
-                <EditableField label="Other Notes" value={data.other_notes} onSave={v=>save('other_notes',v)} type="textarea"/>
-                <EditableField label="Rent Roll Notes" value={data.rent_roll_notes} onSave={v=>save('rent_roll_notes',v)} type="textarea"/>
-                <EditableField label="Snow / Ice Instructions" value={data.snow_ice_instructions} onSave={v=>save('snow_ice_instructions',v)} type="textarea"/>
-              </div>
-            </div>
-          )}
+        {/* Work Orders tab — full component, needs overflow:hidden wrapper */}
+        {tab==='work-orders'&&(
+          <div style={{flex:1,overflow:'hidden'}}>
+            <WorkOrdersList
+              wos={workOrders} setWos={setWorkOrders}
+              loading={false} error={null}
+              onSelect={wo=>router.push(`/work-orders/${wo.podio_id??'X'+wo.id.slice(-6)}`)}
+              hidePropStrip={true}
+            />
+          </div>
+        )}
 
-          {/* TENANTS / RENT ROLL */}
-          {tab==='tenants'&&(
-            <div>
-              <div style={{display:'flex',gap:'12px',marginBottom:'12px',flexWrap:'wrap'}}>
+        {/* Issues tab — full component, needs overflow:hidden wrapper */}
+        {tab==='issues'&&(
+          <div style={{flex:1,overflow:'hidden'}}>
+            <IssuesList
+              issues={issues} setIssues={setIssues}
+              loading={false} error={null}
+              onSelect={iss=>router.push(`/issues/${iss.podio_id??'X'+iss.id.slice(-6)}`)}
+              hidePropStrip={true}
+            />
+          </div>
+        )}
+
+        {/* All other tabs — scrollable padded container */}
+        {tab!=='work-orders'&&tab!=='issues'&&(
+          <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
+
+            {/* DASHBOARD */}
+            {tab==='dashboard'&&(
+              <div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:'12px',marginBottom:'20px'}}>
+                  <div style={css.card}>
+                    <div style={css.secTitle}>Occupancy</div>
+                    <div style={{fontSize:F.xl,fontWeight:'700',color:occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger}}>{occupancy.occ_pct}%</div>
+                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{fmtNum(occupancy.occupied_sf)} / {fmtNum(occupancy.gross_sf)} sf</div>
+                    <div style={{fontSize:F.xs,color:T.text3}}>{rentRows.length} tenant{rentRows.length!==1?'s':''} · {suites.length} suite{suites.length!==1?'s':''}</div>
+                  </div>
+                  <div style={css.card}>
+                    <div style={css.secTitle}>Monthly Rent</div>
+                    <div style={{fontSize:F.xl,fontWeight:'700',color:T.accent}}>{fmtMoney(occupancy.monthly_total)}</div>
+                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>Current rent roll total</div>
+                  </div>
+                  <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('work-orders')}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                    <div style={css.secTitle}>Open Work Orders</div>
+                    <div style={{fontSize:F.xl,fontWeight:'700',color:openWOs>0?T.warn:T.text3}}>{openWOs}</div>
+                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{workOrders.length} total</div>
+                  </div>
+                  <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('issues')}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                    <div style={css.secTitle}>Open Issues</div>
+                    <div style={{fontSize:F.xl,fontWeight:'700',color:openIssues>0?T.danger:T.text3}}>{openIssues}</div>
+                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{issues.length} total</div>
+                  </div>
+                  {insurance.length>0&&(()=>{
+                    const ins=insurance[0];
+                    const mo=calcMoLeft(ins.expiry_date);
+                    return (
+                      <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('insurance')}
+                        onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                        onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                        <div style={css.secTitle}>Insurance Expiry</div>
+                        <div style={{fontSize:F.md,fontWeight:'600',color:moLeftColor(mo)}}>{fmtDate(ins.expiry_date)}</div>
+                        <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{ins.insurance_co||'—'}</div>
+                      </div>
+                    );
+                  })()}
+                  {agreement&&(()=>{
+                    const mo=calcMoLeft(agreement.listing_expiry_date);
+                    return (
+                      <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('listing-info')}
+                        onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                        onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                        <div style={css.secTitle}>Agreement Expiry</div>
+                        <div style={{fontSize:F.md,fontWeight:'600',color:moLeftColor(mo)}}>{fmtDate(agreement.listing_expiry_date)}</div>
+                        <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{agreement.listing_agreement_type||'—'}</div>
+                      </div>
+                    );
+                  })()}
+                </div>
+                <div style={css.card}>
+                  <div style={css.secTitle}>Quick Links</div>
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                    {[['Tenants','tenants'],['Work Orders','work-orders'],['Issues','issues'],
+                      ['Insurance','insurance'],['Monthly Reports','monthly-reports'],
+                      ['Property Taxes','property-taxes'],['Listing Info','listing-info'],['Documents','documents'],
+                    ].map(([label,t])=>(
+                      <button key={t} onClick={()=>setTab(t)}
+                        style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 12px',color:T.text1,fontSize:F.xs,cursor:'pointer'}}
+                        onMouseEnter={e=>{e.currentTarget.style.color=T.text0;e.currentTarget.style.borderColor=T.accent;}}
+                        onMouseLeave={e=>{e.currentTarget.style.color=T.text1;e.currentTarget.style.borderColor=T.border;}}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TENANTS / RENT ROLL */}
+            {tab==='tenants'&&(
+              <div>
+                <div style={{display:'flex',gap:'12px',marginBottom:'12px',flexWrap:'wrap'}}>
+                  {[
+                    ['Occupied',`${fmtNum(occupancy.occupied_sf)} sf`,T.success],
+                    ['Vacant',`${fmtNum(occupancy.vacant_sf)} sf`,T.text2],
+                    ['Gross',`${fmtNum(occupancy.gross_sf)} sf`,T.text1],
+                    ['Occupancy',`${occupancy.occ_pct}%`,occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger],
+                    ['Monthly Total',fmtMoney(occupancy.monthly_total),T.accent],
+                  ].map(([label,val,color])=>(
+                    <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 14px',minWidth:'100px'}}>
+                      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
+                      <div style={{fontSize:F.md,fontWeight:'600',color,marginTop:'2px'}}>{val}</div>
+                    </div>
+                  ))}
+                  <button onClick={()=>generateRentRollPDF(data,rentRows,occupancy)}
+                    style={{marginLeft:'auto',background:T.accent,border:'none',borderRadius:'5px',padding:'6px 14px',color:'#fff',fontSize:F.sm,cursor:'pointer',alignSelf:'center'}}>
+                    Generate Rent Roll PDF
+                  </button>
+                </div>
+                <div style={{overflowX:'auto'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse'}}>
+                    <thead>
+                      <tr>
+                        {['Tenant DBA','Suite','Sq Ft','Security','Lease Ends','Base Rent','NNN','Other','TPT Tax','Total','Base/sf','NNN/sf'].map(h=>(
+                          <th key={h} style={{...css.th,textAlign:h==='Sq Ft'||h==='Base Rent'||h==='NNN'||h==='Other'||h==='TPT Tax'||h==='Total'||h==='Base/sf'||h==='NNN/sf'||h==='Security'?'right':'left'}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rentRows.length===0&&<tr><td colSpan={12} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No current rent schedule rows</td></tr>}
+                      {rentRows.map((r,i)=>{
+                        const mo=calcMoLeft(r.lease_ends);
+                        return (
+                          <tr key={r.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
+                            <td style={css.td}>{r.tenant_dba||'—'}</td>
+                            <td style={css.td}>{r.suite_num||'—'}</td>
+                            <td style={css.tdNum}>{fmtNum(r.sqft)}</td>
+                            <td style={css.tdNum}>{fmtMoney(r.security_deposit)}</td>
+                            <td style={{...css.td,color:moLeftColor(mo),fontWeight:mo!==null&&mo<=12?'600':'400'}}>{fmtDate(r.lease_ends)}</td>
+                            <td style={css.tdNum}>{fmtMoney(r.base_rent)}</td>
+                            <td style={css.tdNum}>{fmtMoney(r.nnn)}</td>
+                            <td style={css.tdNum}>{fmtMoney(r.other_amt)}</td>
+                            <td style={css.tdNum}>{fmtMoney(r.tpt_tax)}</td>
+                            <td style={{...css.tdNum,fontWeight:'600',color:T.text0}}>{fmtMoney(r.total)}</td>
+                            <td style={css.tdNum}>{r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
+                            <td style={css.tdNum}>{r.nnn_per_sf?Number(r.nnn_per_sf).toFixed(2):'—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {rentRows.length>0&&(
+                      <tfoot>
+                        <tr>
+                          <td colSpan={2} style={css.tfoot}>TOTALS</td>
+                          <td style={css.tfoot}>{fmtNum(rentRows.reduce((s,r)=>s+(Number(r.sqft)||0),0))}</td>
+                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.security_deposit)||0),0))}</td>
+                          <td style={css.tfoot}></td>
+                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
+                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
+                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
+                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.tpt_tax)||0),0))}</td>
+                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
+                          <td colSpan={2} style={css.tfoot}></td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* MONTHLY REPORTS */}
+            {tab==='monthly-reports'&&(
+              <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <thead><tr>
+                  <th style={css.th}>Month</th>
+                  <th style={css.th}>Status</th>
+                  <th style={{...css.th,textAlign:'right'}}>QBO Balance</th>
+                  <th style={{...css.th,textAlign:'right'}}>Distribution</th>
+                  <th style={css.th}>Email Sent</th>
+                  <th style={css.th}>PDFs Filed</th>
+                </tr></thead>
+                <tbody>
+                  {monthlyReports.length===0&&<tr><td colSpan={6} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No monthly reports</td></tr>}
+                  {monthlyReports.map((r,i)=>(
+                    <tr key={r.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
+                      <td style={css.td}>{fmtDate(r.report_date)}</td>
+                      <td style={css.td}><StatusBadge status={r.status}/></td>
+                      <td style={css.tdNum}>{fmtMoney(r.qbo_balance)}</td>
+                      <td style={css.tdNum}>{fmtMoney(r.actual_distribution_made)}</td>
+                      <td style={{...css.td,color:r.email_sent?T.success:T.text3}}>{r.email_sent?'✓':'—'}</td>
+                      <td style={{...css.td,color:r.pdfs_filed?T.success:T.text3}}>{r.pdfs_filed?'✓':'—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {/* INSURANCE */}
+            {tab==='insurance'&&(
+              <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <thead><tr>
+                  <th style={css.th}>Insurance Co</th>
+                  <th style={css.th}>Status</th>
+                  <th style={css.th}>Expiry</th>
+                  <th style={css.th}>Annual Premium</th>
+                  <th style={css.th}>ACP Named</th>
+                </tr></thead>
+                <tbody>
+                  {insurance.length===0&&<tr><td colSpan={5} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No insurance records</td></tr>}
+                  {insurance.map((ins,i)=>(
+                    <tr key={ins.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
+                      <td style={css.td}>{ins.insurance_co||'—'}</td>
+                      <td style={css.td}><StatusBadge status={ins.status}/></td>
+                      <td style={{...css.td,color:ins.expiry_date&&new Date(ins.expiry_date)<today?T.danger:T.text0}}>{fmtDate(ins.expiry_date)}</td>
+                      <td style={css.tdNum}>{fmtMoney(ins.annual_premium)}</td>
+                      <td style={{...css.td,color:ins.acp_named_additional_insured?T.success:T.danger}}>{ins.acp_named_additional_insured?'Yes':'No'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {/* COIs — placeholder */}
+            {tab==='cois'&&(
+              <div style={{...css.card,textAlign:'center',padding:'32px'}}>
+                <i className="ti ti-certificate" style={{fontSize:'32px',color:T.bg3,display:'block',marginBottom:'8px'}} aria-hidden="true"></i>
+                <div style={{fontSize:F.sm,color:T.text3}}>Certificate of Insurance tracking — coming soon</div>
+              </div>
+            )}
+
+            {/* PROPERTY TAXES */}
+            {tab==='property-taxes'&&(
+              <div>
+                {propTaxes.length===0&&<div style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No property tax records</div>}
+                {(()=>{
+                  const years=[...new Set(propTaxes.map(t=>t.year))].sort((a,b)=>b-a);
+                  return years.map(year=>{
+                    const rows=propTaxes.filter(t=>t.year===year);
+                    const fullYr=rows.reduce((s,t)=>s+(Number(t.annual_amt)||0),0);
+                    return (
+                      <div key={year} style={{marginBottom:'24px'}}>
+                        <div style={{display:'flex',gap:'20px',alignItems:'baseline',marginBottom:'6px',padding:'5px 0',borderBottom:`0.5px solid ${T.border}`}}>
+                          <span style={{fontSize:F.md,fontWeight:'700',color:T.text0}}>{year}</span>
+                          <span style={{fontSize:F.xs,color:T.text2}}>{rows.length} parcel{rows.length!==1?'s':''}</span>
+                          <span style={{fontSize:F.xs,color:T.text1}}>Full Year <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr)}</span></span>
+                          <span style={{fontSize:F.xs,color:T.text1}}>Half Yr <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr/2)}</span></span>
+                          <span style={{fontSize:F.xs,color:T.text1}}>Mo. <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr/12)}</span></span>
+                        </div>
+                        <table style={{width:'100%',borderCollapse:'collapse'}}>
+                          <thead><tr>
+                            <th style={css.th}>Parcel #</th>
+                            <th style={css.th}>Who Pays</th>
+                            <th style={{...css.th,textAlign:'right'}}>Annual</th>
+                            <th style={css.th}>1st Half</th>
+                            <th style={css.th}>2nd Half</th>
+                            <th style={css.th}>Overall</th>
+                          </tr></thead>
+                          <tbody>
+                            {rows.map((t,i)=>(
+                              <tr key={t.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
+                                <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{t.parcel_num||'—'}</td>
+                                <td style={{...css.td,color:T.text2}}>{t.who_pays||'—'}</td>
+                                <td style={css.tdNum}>{fmtMoney(t.annual_amt)}</td>
+                                <td style={{...css.td,fontSize:F.xs}}>{t.first_half_status||'—'}</td>
+                                <td style={{...css.td,fontSize:F.xs}}>{t.second_half_status||'—'}</td>
+                                <td style={css.td}><StatusBadge status={t.paid_overall_status}/></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+
+            {/* INFO */}
+            {tab==='info'&&(
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
+                <div style={css.card}>
+                  <div style={css.secTitle}>Property Info</div>
+                  <EditableField label="Property Name" value={data.property_name} onSave={v=>save('property_name',v)}/>
+                  <EditableField label="Marketing Name" value={data.property_marketing_name} onSave={v=>save('property_marketing_name',v)}/>
+                  <EditableField label="Ownership Company" value={data.ownership_company} onSave={v=>save('ownership_company',v)}/>
+                  <EditableField label="Address" value={data.address} onSave={v=>save('address',v)}/>
+                  <EditableField label="City" value={data.city} onSave={v=>save('city',v)}/>
+                  <EditableField label="Zip" value={data.zip} onSave={v=>save('zip',v)}/>
+                </div>
+                <div style={css.card}>
+                  <div style={css.secTitle}>Building Details</div>
+                  <EditableField label="Gross Sq Ft" value={data.gross_sqft} onSave={v=>save('gross_sqft',v)} type="number"/>
+                  <EditableField label="Year Built" value={data.year_built} onSave={v=>save('year_built',v)} type="number"/>
+                  <EditableField label="Zoning" value={data.zoning} onSave={v=>save('zoning',v)}/>
+                  <EditableField label="Construction Type" value={data.construction_type} onSave={v=>save('construction_type',v)}/>
+                  <EditableField label="Roof Type" value={data.roof_type} onSave={v=>save('roof_type',v)}/>
+                  <EditableField label="TPT Tax %" value={data.tpt_tax_pct} onSave={v=>save('tpt_tax_pct',v)} type="number"/>
+                </div>
+                <div style={css.card}>
+                  <div style={css.secTitle}>Parking & Access</div>
+                  <EditableField label="Standard Stalls" value={data.parking_stalls_standard} onSave={v=>save('parking_stalls_standard',v)} type="number"/>
+                  <EditableField label="HC Stalls" value={data.parking_stalls_hc} onSave={v=>save('parking_stalls_hc',v)} type="number"/>
+                  <EditableField label="ADOR License #" value={data.ador_license_num} onSave={v=>save('ador_license_num',v)}/>
+                  <EditableField label="Bank Account Name" value={data.bank_account_name} onSave={v=>save('bank_account_name',v)}/>
+                </div>
+                <div style={css.card}>
+                  <div style={css.secTitle}>Notes</div>
+                  <EditableField label="Other Notes" value={data.other_notes} onSave={v=>save('other_notes',v)} type="textarea"/>
+                  <EditableField label="Rent Roll Notes" value={data.rent_roll_notes} onSave={v=>save('rent_roll_notes',v)} type="textarea"/>
+                  <EditableField label="Snow / Ice Instructions" value={data.snow_ice_instructions} onSave={v=>save('snow_ice_instructions',v)} type="textarea"/>
+                </div>
+              </div>
+            )}
+
+            {/* LISTING INFO — management agreement from property_agreements */}
+            {tab==='listing-info'&&(
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
+                {!agreement&&(
+                  <div style={{gridColumn:'1/-1',textAlign:'center',padding:'32px',color:T.text3,fontSize:F.sm}}>No management agreement on file</div>
+                )}
+                {agreement&&(<>
+                  <div style={css.card}>
+                    <div style={css.secTitle}>Listing Agreement</div>
+                    {[
+                      ['Type',agreement.listing_agreement_type],
+                      ['Start',fmtDate(agreement.listing_start_date)],
+                      ['Expiry',fmtDate(agreement.listing_expiry_date)],
+                      ['Closed',fmtDate(agreement.listing_closed_date)],
+                      ['Status',agreement.acp_listing_status],
+                      ['Notes',agreement.general_listing_notes],
+                    ].map(([label,val])=>(
+                      <div key={label} style={{marginBottom:'8px'}}>
+                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
+                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={css.card}>
+                    <div style={css.secTitle}>PM Fee</div>
+                    {[
+                      ['Fee Type',agreement.pm_fee_type],
+                      ['Fee %',agreement.pm_fee_pct?(Number(agreement.pm_fee_pct)*100).toFixed(2)+'%':null],
+                      ['No Less Than',fmtMoney(agreement.pm_fee_no_less_than)],
+                      ['Fixed Amt',fmtMoney(agreement.pm_fee_fixed_amt)],
+                      ['How Paid',agreement.pm_fee_how_paid],
+                      ['Current EFT',fmtMoney(agreement.pm_fee_current_eft_amt)],
+                      ['Current QBO',fmtMoney(agreement.pm_fee_current_qbo_amt)],
+                      ['Notes',agreement.pm_fee_notes],
+                    ].map(([label,val])=>(
+                      <div key={label} style={{marginBottom:'8px'}}>
+                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
+                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={css.card}>
+                    <div style={css.secTitle}>Distributions</div>
+                    {[
+                      ['Type',agreement.distribution_type],
+                      ['Fixed Amt',fmtMoney(agreement.distribution_fixed_amt)],
+                      ['Paid Via',agreement.distribution_paid_via],
+                      ['Notes',agreement.distribution_notes],
+                      ['Min Bank Balance',fmtMoney(agreement.min_bank_balance)],
+                      ['Reserve Op Funds',fmtMoney(agreement.reserve_op_funds)],
+                      ['Bank Acct Type',agreement.bank_acct_type],
+                      ['LL Approval Over',fmtMoney(agreement.ll_approval_over_amt)],
+                    ].map(([label,val])=>(
+                      <div key={label} style={{marginBottom:'8px'}}>
+                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
+                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={css.card}>
+                    <div style={css.secTitle}>Leasing Fees</div>
+                    {[
+                      ['Leasing Fee Type',agreement.leasing_fee_type],
+                      ['Leasing Fee %',agreement.leasing_fee_pct?(Number(agreement.leasing_fee_pct)*100).toFixed(2)+'%':null],
+                      ['Leasing Notes',agreement.leasing_fee_notes],
+                      ['Renewal Type',agreement.lease_renewal_type],
+                      ['Renewal Fee %',agreement.lease_renewal_fee_pct?(Number(agreement.lease_renewal_fee_pct)*100).toFixed(2)+'%':null],
+                      ['Renewal Notes',agreement.lease_renewal_fee_notes],
+                      ['Hourly Rate',fmtMoney(agreement.other_fees_hourly_rate)],
+                      ['Project Mgmt Hourly',fmtMoney(agreement.project_mgmt_hourly_rate)],
+                      ['Asset Improv Fee %',agreement.asset_improv_fee_pct?(Number(agreement.asset_improv_fee_pct)*100).toFixed(2)+'%':null],
+                      ['Asset Improv Term',agreement.asset_improv_term_months?agreement.asset_improv_term_months+' mo':null],
+                    ].map(([label,val])=>(
+                      <div key={label} style={{marginBottom:'8px'}}>
+                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
+                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={css.card}>
+                    <div style={css.secTitle}>PM Reports</div>
+                    {[
+                      ['Email To',agreement.pm_reports_email_to],
+                      ['Notes',agreement.pm_reports_notes],
+                    ].map(([label,val])=>(
+                      <div key={label} style={{marginBottom:'8px'}}>
+                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em'}}>{label}</div>
+                        <div style={{fontSize:F.sm,color:val?T.text0:T.text3}}>{val||'—'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>)}
+              </div>
+            )}
+
+            {/* CAMs — placeholder */}
+            {tab==='cams'&&(
+              <div style={{...css.card,textAlign:'center',padding:'32px'}}>
+                <i className="ti ti-calculator" style={{fontSize:'32px',color:T.bg3,display:'block',marginBottom:'8px'}} aria-hidden="true"></i>
+                <div style={{fontSize:F.sm,color:T.text3}}>CAM reconciliation — coming soon</div>
+              </div>
+            )}
+
+            {/* INSPECTIONS — placeholder */}
+            {tab==='inspections'&&(
+              <div style={{...css.card,textAlign:'center',padding:'32px'}}>
+                <i className="ti ti-clipboard-check" style={{fontSize:'32px',color:T.bg3,display:'block',marginBottom:'8px'}} aria-hidden="true"></i>
+                <div style={{fontSize:F.sm,color:T.text3}}>Property inspections — coming soon</div>
+              </div>
+            )}
+
+            {/* DOCUMENTS */}
+            {tab==='documents'&&(
+              <div style={css.card}>
+                <div style={css.secTitle}>Google Drive Folders</div>
                 {[
-                  ['Occupied',`${fmtNum(occupancy.occupied_sf)} sf`,T.success],
-                  ['Vacant',`${fmtNum(occupancy.vacant_sf)} sf`,T.text2],
-                  ['Gross',`${fmtNum(occupancy.gross_sf)} sf`,T.text1],
-                  ['Occupancy',`${occupancy.occ_pct}%`,occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger],
-                  ['Monthly Total',fmtMoney(occupancy.monthly_total),T.accent],
-                ].map(([label,val,color])=>(
-                  <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 14px',minWidth:'100px'}}>
-                    <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
-                    <div style={{fontSize:F.md,fontWeight:'600',color,marginTop:'2px'}}>{val}</div>
+                  ['Root Folder','gdrive_root_folder_id'],
+                  ['Tenants Folder','gdrive_tenants_folder_id'],
+                  ['Photos Folder','gdrive_photos_folder_id'],
+                  ['Work Orders Folder','gdrive_work_orders_folder_id'],
+                  ['Reports Folder','gdrive_reports_folder_id'],
+                  ['Issues Folder','gdrive_issues_folder_id'],
+                  ['Insurance Folder','gdrive_insurance_folder_id'],
+                  ['Archives Folder','gdrive_archives_folder_id'],
+                ].map(([label,field])=>(
+                  <div key={field} style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}>
+                    <span style={{fontSize:F.sm,color:T.text2,width:'160px',flexShrink:0}}>{label}</span>
+                    {data[field]
+                      ? <a href={`https://drive.google.com/drive/folders/${data[field]}`} target="_blank" rel="noreferrer"
+                          style={{fontSize:F.sm,color:T.accent,textDecoration:'none'}}>Open in Drive ↗</a>
+                      : <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>not linked</span>
+                    }
                   </div>
                 ))}
-                <button onClick={()=>generateRentRollPDF(data,rentRows,occupancy)}
-                  style={{marginLeft:'auto',background:T.accent,border:'none',borderRadius:'5px',padding:'6px 14px',color:'#fff',fontSize:F.sm,cursor:'pointer',alignSelf:'center'}}>
-                  Generate Rent Roll PDF
-                </button>
               </div>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead>
-                    <tr>
-                      {['Tenant DBA','Suite','Sq Ft','Security','Lease Ends','Base Rent','NNN','Other','TPT Tax','Total','Base/sf','NNN/sf'].map(h=>(
-                        <th key={h} style={{...css.th,textAlign:h==='Sq Ft'||h==='Base Rent'||h==='NNN'||h==='Other'||h==='TPT Tax'||h==='Total'||h==='Base/sf'||h==='NNN/sf'||h==='Security'?'right':'left'}}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rentRows.length===0&&<tr><td colSpan={12} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No current rent schedule rows</td></tr>}
-                    {rentRows.map((r,i)=>(
-                      <tr key={r.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                        <td style={css.td}>{r.tenant_dba||'—'}</td>
-                        <td style={css.td}>{r.suite_num||'—'}</td>
-                        <td style={css.tdNum}>{fmtNum(r.sqft)}</td>
-                        <td style={css.tdNum}>{fmtMoney(r.security_deposit)}</td>
-                        <td style={css.td}>{fmtDate(r.lease_ends)}</td>
-                        <td style={css.tdNum}>{fmtMoney(r.base_rent)}</td>
-                        <td style={css.tdNum}>{fmtMoney(r.nnn)}</td>
-                        <td style={css.tdNum}>{fmtMoney(r.other_amt)}</td>
-                        <td style={css.tdNum}>{fmtMoney(r.tpt_tax)}</td>
-                        <td style={{...css.tdNum,fontWeight:'600',color:T.text0}}>{fmtMoney(r.total)}</td>
-                        <td style={css.tdNum}>{r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
-                        <td style={css.tdNum}>{r.nnn_per_sf?Number(r.nnn_per_sf).toFixed(2):'—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  {rentRows.length>0&&(
-                    <tfoot>
-                      <tr>
-                        <td colSpan={2} style={css.tfoot}>TOTALS</td>
-                        <td style={css.tfoot}>{fmtNum(rentRows.reduce((s,r)=>s+(Number(r.sqft)||0),0))}</td>
-                        <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.security_deposit)||0),0))}</td>
-                        <td style={css.tfoot}></td>
-                        <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
-                        <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
-                        <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
-                        <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.tpt_tax)||0),0))}</td>
-                        <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
-                        <td colSpan={2} style={css.tfoot}></td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* WORK ORDERS */}
-          {tab==='work-orders'&&(
-            <table style={{width:'100%',borderCollapse:'collapse'}}>
-              <thead><tr>
-                <th style={css.th}>Description</th>
-                <th style={css.th}>Category</th>
-                <th style={css.th}>Priority</th>
-                <th style={css.th}>Stage</th>
-                <th style={css.th}>Status</th>
-                <th style={css.th}>Follow-Up</th>
-              </tr></thead>
-              <tbody>
-                {workOrders.length===0&&<tr><td colSpan={6} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No work orders</td></tr>}
-                {workOrders.map((w,i)=>(
-                  <tr key={w.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                    <td style={css.td}>{w.short_description}</td>
-                    <td style={{...css.td,color:T.text2}}>{w.category||'—'}</td>
-                    <td style={css.td}><StatusBadge status={w.priority}/></td>
-                    <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{w.stage||'—'}</td>
-                    <td style={css.td}><StatusBadge status={w.status}/></td>
-                    <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtDate(w.follow_up_date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* ISSUES */}
-          {tab==='issues'&&(
-            <table style={{width:'100%',borderCollapse:'collapse'}}>
-              <thead><tr>
-                <th style={css.th}>Issue</th>
-                <th style={css.th}>Category</th>
-                <th style={css.th}>Priority</th>
-                <th style={css.th}>Status</th>
-                <th style={css.th}>Follow-Up</th>
-              </tr></thead>
-              <tbody>
-                {issues.length===0&&<tr><td colSpan={5} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No issues</td></tr>}
-                {issues.map((iss,i)=>(
-                  <tr key={iss.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                    <td style={css.td}>{iss.issue_name}</td>
-                    <td style={{...css.td,color:T.text2}}>{iss.category||'—'}</td>
-                    <td style={css.td}><StatusBadge status={iss.priority}/></td>
-                    <td style={css.td}><StatusBadge status={iss.status}/></td>
-                    <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtDate(iss.follow_up_date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* INSURANCE */}
-          {tab==='insurance'&&(
-            <table style={{width:'100%',borderCollapse:'collapse'}}>
-              <thead><tr>
-                <th style={css.th}>Insurance Co</th>
-                <th style={css.th}>Status</th>
-                <th style={css.th}>Expiry</th>
-                <th style={css.th}>Annual Premium</th>
-                <th style={css.th}>ACP Named</th>
-              </tr></thead>
-              <tbody>
-                {insurance.length===0&&<tr><td colSpan={5} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No insurance records</td></tr>}
-                {insurance.map((ins,i)=>(
-                  <tr key={ins.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                    <td style={css.td}>{ins.insurance_co||'—'}</td>
-                    <td style={css.td}><StatusBadge status={ins.status}/></td>
-                    <td style={{...css.td,color:ins.expiry_date&&new Date(ins.expiry_date)<today?T.danger:T.text0}}>{fmtDate(ins.expiry_date)}</td>
-                    <td style={css.tdNum}>{fmtMoney(ins.annual_premium)}</td>
-                    <td style={{...css.td,color:ins.acp_named_additional_insured?T.success:T.danger}}>{ins.acp_named_additional_insured?'Yes':'No'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* MONTHLY REPORTS */}
-          {tab==='monthly-reports'&&(
-            <table style={{width:'100%',borderCollapse:'collapse'}}>
-              <thead><tr>
-                <th style={css.th}>Month</th>
-                <th style={css.th}>Status</th>
-                <th style={{...css.th,textAlign:'right'}}>QBO Balance</th>
-                <th style={{...css.th,textAlign:'right'}}>Distribution</th>
-                <th style={css.th}>Email Sent</th>
-                <th style={css.th}>PDFs Filed</th>
-              </tr></thead>
-              <tbody>
-                {monthlyReports.length===0&&<tr><td colSpan={6} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No monthly reports</td></tr>}
-                {monthlyReports.map((r,i)=>(
-                  <tr key={r.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                    <td style={css.td}>{fmtDate(r.report_date)}</td>
-                    <td style={css.td}><StatusBadge status={r.status}/></td>
-                    <td style={css.tdNum}>{fmtMoney(r.qbo_balance)}</td>
-                    <td style={css.tdNum}>{fmtMoney(r.actual_distribution_made)}</td>
-                    <td style={{...css.td,color:r.email_sent?T.success:T.text3}}>{r.email_sent?'✓':'—'}</td>
-                    <td style={{...css.td,color:r.pdfs_filed?T.success:T.text3}}>{r.pdfs_filed?'✓':'—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* PROPERTY TAXES */}
-          {tab==='property-taxes'&&(
-            <table style={{width:'100%',borderCollapse:'collapse'}}>
-              <thead><tr>
-                <th style={css.th}>Year</th>
-                <th style={css.th}>Parcel #</th>
-                <th style={css.th}>Who Pays</th>
-                <th style={{...css.th,textAlign:'right'}}>Annual</th>
-                <th style={css.th}>1st Half</th>
-                <th style={css.th}>2nd Half</th>
-                <th style={css.th}>Overall</th>
-              </tr></thead>
-              <tbody>
-                {propTaxes.length===0&&<tr><td colSpan={7} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No property tax records</td></tr>}
-                {propTaxes.map((t,i)=>(
-                  <tr key={t.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                    <td style={{...css.td,fontWeight:'600'}}>{t.year}</td>
-                    <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{t.parcel_num||'—'}</td>
-                    <td style={{...css.td,color:T.text2}}>{t.who_pays||'—'}</td>
-                    <td style={css.tdNum}>{fmtMoney(t.annual_amt)}</td>
-                    <td style={{...css.td,fontSize:F.xs}}>{t.first_half_status||'—'}</td>
-                    <td style={{...css.td,fontSize:F.xs}}>{t.second_half_status||'—'}</td>
-                    <td style={css.td}><StatusBadge status={t.paid_overall_status}/></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* LISTING INFO */}
-          {tab==='listing-info'&&(
-            <table style={{width:'100%',borderCollapse:'collapse'}}>
-              <thead><tr>
-                <th style={css.th}>Prospect</th>
-                <th style={css.th}>Stage</th>
-                <th style={css.th}>Source</th>
-                <th style={css.th}>Suite</th>
-                <th style={css.th}>Status</th>
-                <th style={css.th}>Follow-Up</th>
-              </tr></thead>
-              <tbody>
-                {pipeline.length===0&&<tr><td colSpan={6} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No leasing pipeline records</td></tr>}
-                {pipeline.map((p,i)=>(
-                  <tr key={p.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                    <td style={css.td}>{p.prospect_name||'—'}</td>
-                    <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{p.stage||'—'}</td>
-                    <td style={{...css.td,color:T.text2}}>{p.source||'—'}</td>
-                    <td style={css.td}>{p.suite_num||'—'}</td>
-                    <td style={css.td}><StatusBadge status={p.status}/></td>
-                    <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{fmtDate(p.follow_up_date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* DOCUMENTS */}
-          {tab==='documents'&&(
-            <div style={css.card}>
-              <div style={css.secTitle}>Google Drive Folders</div>
-              {[
-                ['Root Folder','gdrive_root_folder_id'],
-                ['Tenants Folder','gdrive_tenants_folder_id'],
-                ['Photos Folder','gdrive_photos_folder_id'],
-                ['Work Orders Folder','gdrive_work_orders_folder_id'],
-                ['Reports Folder','gdrive_reports_folder_id'],
-                ['Issues Folder','gdrive_issues_folder_id'],
-                ['Insurance Folder','gdrive_insurance_folder_id'],
-                ['Archives Folder','gdrive_archives_folder_id'],
-              ].map(([label,field])=>(
-                <div key={field} style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px'}}>
-                  <span style={{fontSize:F.sm,color:T.text2,width:'160px',flexShrink:0}}>{label}</span>
-                  {data[field]
-                    ? <a href={`https://drive.google.com/drive/folders/${data[field]}`} target="_blank" rel="noreferrer"
-                        style={{fontSize:F.sm,color:T.accent,textDecoration:'none'}}>Open in Drive ↗</a>
-                    : <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>not linked</span>
-                  }
-                </div>
-              ))}
-            </div>
-          )}
-
-        </div>
+          </div>
+        )}
         <ActivityPanel collapsed={rightCollapsed} onCollapse={()=>setRightCollapsed(c=>!c)} width={rightWidth} onMouseDown={startRightResize}/>
       </div>
     </div>
