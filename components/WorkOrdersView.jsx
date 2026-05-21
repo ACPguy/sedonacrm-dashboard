@@ -553,12 +553,7 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
         onClick={e => {
           if (e.target.closest('a')) return;
-          if (e.ctrlKey || e.metaKey) {
-            const tab = window.open(`${window.location.origin}/work-orders/${wo.podio_id ?? 'X'+wo.id.slice(-6)}`, '_blank');
-            if (tab) tab.focus();
-          } else {
-            onSelect(wo);
-          }
+          if (!e.ctrlKey && !e.metaKey) onSelect(wo);
         }}>
 
         {/* WO # — real anchor enables ctrl+click, middle-click, right-click → open in new tab */}
@@ -577,7 +572,11 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
 
         {/* WO Title */}
         <td style={{...css.td}} title={wo.short_description}>
-          {wo.short_description ? (wo.short_description.length > 25 ? wo.short_description.slice(0,25)+'…' : wo.short_description) : ''}
+          <a href={woUrl}
+            onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();onSelect(wo);}}}
+            style={{color:'inherit',textDecoration:'none'}}>
+            {wo.short_description ? (wo.short_description.length > 25 ? wo.short_description.slice(0,25)+'…' : wo.short_description) : ''}
+          </a>
         </td>
 
         {/* FU Date */}

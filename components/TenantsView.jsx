@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import MarkdownField from './MarkdownField';
+import RichTextEditor from './RichTextEditor';
 
 const SUPABASE_URL     = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -145,7 +145,7 @@ export const EditableField = ({ label, value, onSave, type = 'text', options = [
 
   const inputStyle = { flex:1, background:T.bg3, border:`1px solid ${T.accent}`, borderRadius:'4px', padding:'5px 8px', color:T.text0, fontSize:F.base, outline:'none' };
 
-  if (type === 'textarea') return <MarkdownField label={label} value={value} onSave={onSave}/>;
+  if (type === 'textarea') return <RichTextEditor label={label} value={value} onSave={onSave}/>;
 
   return (
     <div style={{marginBottom:'10px'}}>

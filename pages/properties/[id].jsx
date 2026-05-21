@@ -57,6 +57,7 @@ export default function PropertyDetailPage() {
             property={property}
             onBack={handleBack}
             onUpdate={updated => setProperty(updated)}
+            initialTab={router.query.tab}
           />
         )}
       </div>

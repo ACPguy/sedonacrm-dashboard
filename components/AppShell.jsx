@@ -40,7 +40,7 @@ const SectionLabel = ({ label, collapsed }) => collapsed ? null : (
 export default function AppShell({ children, activeView }) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
-  const [width, setWidth] = useState(168);
+  const [width, setWidth] = useState(148);
   const resizing = useRef(false);
 
   const startResize = useCallback((e) => {
@@ -48,7 +48,7 @@ export default function AppShell({ children, activeView }) {
     const startX = e.clientX, startW = width;
     const onMove = me => {
       if (!resizing.current) return;
-      setWidth(Math.max(155, Math.min(280, startW + (me.clientX - startX))));
+      setWidth(Math.max(132, Math.min(280, startW + (me.clientX - startX))));
     };
     const onUp = () => {
       resizing.current = false;

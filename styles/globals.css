@@ -17,3 +17,19 @@ html {
 body { font-family: var(--font-sans); background: var(--color-background-tertiary); color: var(--color-text-primary); line-height: 1.6; }
 button { font-family: inherit; }
 a { color: inherit; text-decoration: none; }
+
+/* Tiptap rich-text editor */
+.ProseMirror { outline: none; min-height: 24px; font-size: 13px; line-height: 1.5; color: #c9cdd6; }
+.ProseMirror p { margin: 0 0 4px; }
+.ProseMirror h1 { font-size: 18px; font-weight: 700; margin: 8px 0 4px; color: #c9cdd6; }
+.ProseMirror h2 { font-size: 16px; font-weight: 700; margin: 8px 0 4px; color: #c9cdd6; }
+.ProseMirror h3 { font-size: 14px; font-weight: 700; margin: 8px 0 4px; color: #c9cdd6; }
+.ProseMirror ul { padding-left: 20px; margin: 4px 0; }
+.ProseMirror ol { padding-left: 20px; margin: 4px 0; }
+.ProseMirror li { margin: 2px 0; }
+.ProseMirror a { color: #6e9fd8; text-decoration: underline; }
+.ProseMirror ul[data-type="taskList"] { list-style: none; padding-left: 4px; }
+.ProseMirror ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 6px; margin: 3px 0; }
+.ProseMirror ul[data-type="taskList"] li > label { flex-shrink: 0; margin-top: 2px; }
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] { cursor: pointer; }
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; color: #5a6272; }

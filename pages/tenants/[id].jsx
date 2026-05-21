@@ -30,12 +30,16 @@ export default function TenantDetailPage() {
   }, [router.isReady, router.query.id]);
 
   const handleBack = () => {
-    const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('tenantsBackUrl')) || '/tenants';
-    router.push(backUrl);
+    if (router.query.from === 'properties') {
+      const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('tenantsBackUrl')) || '/properties';
+      router.push(backUrl);
+    } else {
+      router.push('/tenants');
+    }
   };
 
   return (
-    <AppShell activeView="tenants">
+    <AppShell activeView={router.query.from === 'properties' ? 'properties' : 'tenants'}>
       <div style={{height:'100%', overflow:'hidden', background:T.bg1}}>
         {loading && (
           <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:T.text3, fontSize:F.sm}}>

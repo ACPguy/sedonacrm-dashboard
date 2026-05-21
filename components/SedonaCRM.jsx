@@ -1,6 +1,7 @@
 import WorkOrdersView, { WorkOrdersList } from './WorkOrdersView';
 import SuitesView from './SuitesView';
 import IssuesView, { IssuesList } from './IssuesView';
+import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 
@@ -80,6 +81,8 @@ const EditableField = ({ label, value, onSave, type='text', display }) => {
   useEffect(()=>{ setVal(value||''); },[value]);
   useEffect(()=>()=>{ if(timerRef.current) clearTimeout(timerRef.current); },[]);
 
+  if (type === 'textarea') return <RichTextEditor label={label} value={value} onSave={onSave}/>;
+
   const doSave = async (v) => {
     if(String(v) === String(value||'')) return;
     try {
@@ -100,19 +103,10 @@ const EditableField = ({ label, value, onSave, type='text', display }) => {
         {saved&&<span style={{color:T.success,fontSize:'11px',fontWeight:'500'}}>✓ Saved</span>}
       </div>
       {editing ? (
-        <div>
-          {type==='textarea'?(
-            <textarea ref={inputRef} value={val} onChange={e=>setVal(e.target.value)}
-              onBlur={handleBlur}
-              onKeyDown={e=>{if(e.key==='Escape')cancel();}}
-              style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,resize:'vertical',minHeight:'60px',outline:'none'}}/>
-          ):(
-            <input ref={inputRef} type={type} value={val} onChange={e=>setVal(e.target.value)}
-              onBlur={handleBlur}
-              onKeyDown={e=>{if(e.key==='Enter'){inputRef.current?.blur();}if(e.key==='Escape')cancel();}}
-              style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}/>
-          )}
-        </div>
+        <input ref={inputRef} type={type} value={val} onChange={e=>setVal(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={e=>{if(e.key==='Enter'){inputRef.current?.blur();}if(e.key==='Escape')cancel();}}
+          style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}/>
       ):(
         <div onClick={()=>setEditing(true)} title="Click to edit"
           style={{fontSize:F.base,color:displayVal?T.text0:T.text3,cursor:'text',padding:'3px 5px',borderRadius:'4px',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4'}}
@@ -339,9 +333,9 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
 };
 
 // ── Property Detail ───────────────────────────────────────────────────────────
-export const PropertyDetail = ({ property, onBack, onUpdate }) => {
+export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   const router = useRouter();
-  const [tab,setTab] = useState('dashboard');
+  const [tab,setTab] = useState(initialTab || 'dashboard');
   const [data,setData] = useState(property);
   const [rentRows,setRentRows] = useState([]);
   const [workOrders,setWorkOrders] = useState([]);
@@ -372,7 +366,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
   useEffect(()=>{
     const pc = data.prop_code;
     const todayStr = new Date().toISOString().slice(0,10);
-    sbFetch('rent_schedule',`prop_code=eq.${pc}&rent_status=eq.Current&rent_starts=lte.${todayStr}&rent_ends=gte.${todayStr}&select=*&order=suite_num.asc`).then(setRentRows).catch(()=>{});
+    sbFetch('rent_schedule',`prop_code=eq.${pc}&rent_status=eq.Current&rent_starts=lte.${todayStr}&rent_ends=gte.${todayStr}&select=*,tenants!rent_schedule_tenant_id_fkey(id,podio_id)&order=suite_num.asc`).then(setRentRows).catch(()=>{});
     sbFetch('work_orders',`prop_code=eq.${pc}&select=*&order=created_at.desc`).then(setWorkOrders).catch(()=>{});
     sbFetch('issues',`prop_code=eq.${pc}&select=*&order=created_at.desc`).then(setIssues).catch(()=>{});
     sbFetch('property_insurance',`prop_code=eq.${pc}&select=*&order=expiry_date.desc`).then(setInsurance).catch(()=>{});
@@ -459,7 +453,13 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
             <WorkOrdersList
               wos={workOrders} setWos={setWorkOrders}
               loading={false} error={null}
-              onSelect={wo=>router.push(`/work-orders/${wo.podio_id??'X'+wo.id.slice(-6)}`)}
+              onSelect={wo=>{
+                if(typeof window!=='undefined'){
+                  const base = window.location.href.split('?')[0];
+                  sessionStorage.setItem('workOrdersBackUrl', `${base}?tab=work-orders`);
+                }
+                router.push(`/work-orders/${wo.podio_id??'X'+wo.id.slice(-6)}?from=properties`);
+              }}
               hidePropStrip={true}
             />
           </div>
@@ -471,7 +471,13 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
             <IssuesList
               issues={issues} setIssues={setIssues}
               loading={false} error={null}
-              onSelect={iss=>router.push(`/issues/${iss.podio_id??'X'+iss.id.slice(-6)}`)}
+              onSelect={iss=>{
+                if(typeof window!=='undefined'){
+                  const base = window.location.href.split('?')[0];
+                  sessionStorage.setItem('issuesBackUrl', `${base}?tab=issues`);
+                }
+                router.push(`/issues/${iss.podio_id??'X'+iss.id.slice(-6)}?from=properties`);
+              }}
               hidePropStrip={true}
             />
           </div>
@@ -499,14 +505,14 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
                   <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('work-orders')}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                    <div style={css.secTitle}>Open Work Orders</div>
+                    <div style={css.secTitle}>Work Orders</div>
                     <div style={{fontSize:F.xl,fontWeight:'700',color:openWOs>0?T.warn:T.text3}}>{openWOs}</div>
                     <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{workOrders.length} total</div>
                   </div>
                   <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('issues')}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                    <div style={css.secTitle}>Open Issues</div>
+                    <div style={css.secTitle}>Issues</div>
                     <div style={{fontSize:F.xl,fontWeight:'700',color:openIssues>0?T.danger:T.text3}}>{openIssues}</div>
                     <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{issues.length} total</div>
                   </div>
@@ -529,7 +535,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
                       <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('listing-info')}
                         onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                         onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                        <div style={css.secTitle}>Agreement Expiry</div>
+                        <div style={css.secTitle}>Listing Expiry</div>
                         <div style={{fontSize:F.md,fontWeight:'600',color:moLeftColor(mo)}}>{fmtDate(agreement.listing_expiry_date)}</div>
                         <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{agreement.listing_agreement_type||'—'}</div>
                       </div>
@@ -575,7 +581,15 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
                         const mo=calcMoLeft(r.lease_ends);
                         return (
                           <tr key={r.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                            <td style={css.td}>{r.tenant_dba||'—'}</td>
+                            <td style={css.td}>
+                              {r.tenants?.podio_id?(
+                                <a href={`/tenants/${r.tenants.podio_id}`}
+                                  onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();const base=window.location.href.split('?')[0];sessionStorage.setItem('tenantsBackUrl',`${base}?tab=tenants`);router.push(`/tenants/${r.tenants.podio_id}?from=properties`);}}}
+                                  style={{color:T.accent,textDecoration:'none',fontWeight:'500'}}>
+                                  {r.tenant_dba||'—'}
+                                </a>
+                              ):(r.tenant_dba||'—')}
+                            </td>
                             <td style={css.td}>{r.suite_num||'—'}</td>
                             <td style={css.tdNum}>{fmtNum(r.sqft)}</td>
                             <td style={css.tdNum}>{fmtMoney(r.security_deposit)}</td>
@@ -676,8 +690,8 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
                     {activeIns.map((ins,i)=>insRow(ins,i,false))}
                     {archivedIns.length>0&&(
                       <tr>
-                        <td colSpan={6} style={{padding:'6px 8px',background:T.accent,borderTop:`0.5px solid ${T.border}`}}>
-                          <span style={{fontSize:F.xs,fontWeight:'700',color:T.bg0,textTransform:'uppercase',letterSpacing:'0.06em'}}>Archived</span>
+                        <td colSpan={6} style={{padding:'7px 10px 7px 12px',background:'#3a3f4b',borderLeft:`4px solid ${T.accent}`,borderTop:`8px solid ${T.bg1}`}}>
+                          <span style={{fontSize:F.sm,fontWeight:'700',color:T.text0,textTransform:'uppercase',letterSpacing:'0.06em'}}>Archived</span>
                         </td>
                       </tr>
                     )}
@@ -706,12 +720,12 @@ export const PropertyDetail = ({ property, onBack, onUpdate }) => {
                     const fullYr=rows.reduce((s,t)=>s+(Number(t.annual_amt)||0),0);
                     return (
                       <div key={year} style={{marginBottom:'24px'}}>
-                        <div style={{display:'flex',gap:'20px',alignItems:'baseline',marginBottom:'6px',padding:'5px 8px',borderRadius:'4px',background:T.accent}}>
-                          <span style={{fontSize:F.md,fontWeight:'700',color:T.bg0}}>{year}</span>
-                          <span style={{fontSize:F.xs,color:T.bg1}}>{rows.length} parcel{rows.length!==1?'s':''}</span>
-                          <span style={{fontSize:F.xs,color:T.bg1}}>Full Year <span style={{color:T.bg0,fontWeight:'600'}}>{fmtMoney(fullYr)}</span></span>
-                          <span style={{fontSize:F.xs,color:T.bg1}}>Half Yr <span style={{color:T.bg0,fontWeight:'600'}}>{fmtMoney(fullYr/2)}</span></span>
-                          <span style={{fontSize:F.xs,color:T.bg1}}>Mo. <span style={{color:T.bg0,fontWeight:'600'}}>{fmtMoney(fullYr/12)}</span></span>
+                        <div style={{display:'flex',gap:'20px',alignItems:'baseline',marginTop:'16px',marginBottom:'6px',padding:'7px 10px 7px 12px',background:'#3a3f4b',borderLeft:`4px solid ${T.accent}`,borderRadius:'0 4px 4px 0'}}>
+                          <span style={{fontSize:F.sm,fontWeight:'700',color:T.text0}}>{year}</span>
+                          <span style={{fontSize:F.xs,color:T.text1}}>{rows.length} parcel{rows.length!==1?'s':''}</span>
+                          <span style={{fontSize:F.xs,color:T.text1}}>Full Year <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr)}</span></span>
+                          <span style={{fontSize:F.xs,color:T.text1}}>Half Yr <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr/2)}</span></span>
+                          <span style={{fontSize:F.xs,color:T.text1}}>Mo. <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr/12)}</span></span>
                         </div>
                         <table style={{width:'100%',borderCollapse:'collapse'}}>
                           <thead><tr>
@@ -1343,7 +1357,7 @@ export default function SedonaCRM() {
   const router = useRouter();
   const [currentView,setCurrentView] = useState('morning-briefing');
   const [sidebarCollapsed,setSidebarCollapsed] = useState(false);
-  const [sidebarWidth,setSidebarWidth] = useState(190);
+  const [sidebarWidth,setSidebarWidth] = useState(168);
   const [expandedMenu,setExpandedMenu] = useState(null);
   const [resetKey,setResetKey] = useState(0);
   const resizingSidebar = useRef(false);
@@ -1355,7 +1369,7 @@ export default function SedonaCRM() {
   const startSidebarResize = useCallback((e)=>{
     resizingSidebar.current=true;
     const startX=e.clientX,startW=sidebarWidth;
-    const onMove=me=>{if(!resizingSidebar.current)return;setSidebarWidth(Math.max(150,Math.min(300,startW+(me.clientX-startX))));};
+    const onMove=me=>{if(!resizingSidebar.current)return;setSidebarWidth(Math.max(155,Math.min(280,startW+(me.clientX-startX))));};
     const onUp=()=>{resizingSidebar.current=false;window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);};
     window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
   },[sidebarWidth]);
