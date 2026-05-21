@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
 
-const sbFetch = async (table, params = '') => {
+export const sbFetch = async (table, params = '') => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
   });
@@ -29,13 +29,13 @@ const sbPatch = async (table, id, updates) => {
 };
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
-const T = {
+export const T = {
   bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
   text0:'#c9cdd6', text1:'#8a95a8', text2:'#5a6272', text3:'#4a5264',
   accent:'#6e9fd8', border:'#2e3240',
   danger:'#e07070', warn:'#d4924a', success:'#6ab06a', purple:'#9a7ad4',
 };
-const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
+export const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
 const css = {
   shell: { display:'flex', height:'100vh', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden' },
   topbar: { padding:'8px 16px', background:T.bg0, borderBottom:`0.5px solid ${T.border}`, display:'flex', alignItems:'center', gap:'12px', flexShrink:0 },
@@ -328,7 +328,7 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
 };
 
 // ── Property Detail ───────────────────────────────────────────────────────────
-const PropertyDetail = ({ property, onBack, onUpdate }) => {
+export const PropertyDetail = ({ property, onBack, onUpdate }) => {
   const [tab,setTab] = useState('info');
   const [data,setData] = useState(property);
   const [rentRows,setRentRows] = useState([]);
@@ -709,7 +709,7 @@ const PropertyDetail = ({ property, onBack, onUpdate }) => {
 };
 
 // ── Properties List ───────────────────────────────────────────────────────────
-const PropertiesView = () => {
+export const PropertiesView = () => {
   const [properties,setProperties] = useState([]);
   const [agreementMap,setAgreementMap] = useState({});
   const [loading,setLoading] = useState(true);

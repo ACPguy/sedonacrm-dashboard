@@ -1,6 +1,6 @@
 import React from 'react';
 import AppShell from '../../components/AppShell';
-import PropertiesView from '../../components/PropertiesDetail';
+import { PropertiesView } from '../../components/SedonaCRM';
 
 export default function PropertiesPage() {
   return (
