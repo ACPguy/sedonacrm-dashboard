@@ -1051,7 +1051,7 @@ export default function IssuesView() {
 
   useEffect(() => {
     setLoading(true); setError(null);
-    sbFetch('issues', 'select=*')
+    sbFetch('issues', 'select=*&limit=10000')
       .then(data => { setIssues(data); setLoading(false); })
       .catch(e   => { setError(e.message); setLoading(false); });
   }, []); // fetch once — local state carries all subsequent updates

@@ -1002,7 +1002,7 @@ export default function WorkOrdersView() {
 
   useEffect(() => {
     setLoading(true); setError(null);
-    sbFetch('work_orders', 'select=*')
+    sbFetch('work_orders', 'select=*&limit=10000')
       .then(data => { setWos(data); setLoading(false); })
       .catch(e   => { setError(e.message); setLoading(false); });
   }, []);

@@ -539,7 +539,7 @@ export default function ContactsView() {
 
   useEffect(() => {
     setLoading(true); setError(null);
-    sbFetch('contacts', 'select=*&order=full_name.asc')
+    sbFetch('contacts', 'select=*&order=full_name.asc&limit=10000')
       .then(data => { setContacts(data); setLoading(false); })
       .catch(e   => { setError(e.message); setLoading(false); });
   }, []);
