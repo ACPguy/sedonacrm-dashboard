@@ -852,24 +852,103 @@ export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePr
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Issue Detail
+// Issue Detail — blur-save inline editing, activity panel default open
 // ─────────────────────────────────────────────────────────────────────────────
+
+const IssueBlurField = ({ label, value, onSave, type = 'text', readOnly = false }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value ?? '');
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { setVal(value ?? ''); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  const commit = async () => {
+    setEditing(false);
+    const trimmed = typeof val === 'string' ? val.trim() : String(val ?? '');
+    if (trimmed === String(value ?? '')) return;
+    setSaving(true);
+    try { await onSave(trimmed || null); }
+    catch { setVal(value ?? ''); }
+    finally { setSaving(false); }
+  };
+  const labelEl = (
+    <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>{label}</div>
+  );
+  if (readOnly) return (
+    <div style={{marginBottom:'10px'}}>
+      {labelEl}
+      <div style={{fontSize:F.base,color:T.text1,padding:'3px 5px'}}>{value || '—'}</div>
+    </div>
+  );
+  return (
+    <div style={{marginBottom:'10px'}}>
+      {labelEl}
+      {editing ? (
+        <input ref={inputRef} type={type} value={val} onChange={e => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => {
+            if (e.key === 'Escape') { setVal(value ?? ''); setEditing(false); }
+            if (e.key === 'Enter') commit();
+          }}
+          style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}
+        />
+      ) : (
+        <div onClick={() => setEditing(true)} title="Click to edit"
+          style={{fontSize:F.base,color:val?T.text0:T.text3,cursor:'text',padding:'3px 5px',borderRadius:'4px',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4'}}
+          onMouseEnter={e => e.currentTarget.style.border = `1px solid ${T.border}`}
+          onMouseLeave={e => e.currentTarget.style.border = '1px solid transparent'}>
+          {val || <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+          {saving && <span style={{color:T.text3,fontSize:F.xs,marginLeft:'6px'}}>saving…</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const IssueSelectField = ({ label, value, options, onSave }) => (
+  <div style={{marginBottom:'10px'}}>
+    <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>{label}</div>
+    <select value={value||''} onChange={async e => { await onSave(e.target.value||null); }}
+      style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+      <option value="">—</option>
+      {options.map(o => typeof o === 'object'
+        ? <option key={o.value} value={o.value}>{o.label}</option>
+        : <option key={o} value={o}>{o}</option>
+      )}
+    </select>
+  </div>
+);
+
+const CATEGORY_OPTIONS = [
+  '- PROJECT -','???','$ Issue','ACP Training','Adjust Rent','C-19','DONE','GOAL',
+  'Incident','Insurance','LATE RENT','Legal','Lender','LS Violation','LS Violation ?',
+  'Move In','Move Out','Note','Other','Taxes','TNT Estoppels',
+];
+
 export const IssueDetail = ({ issue, onBack, onUpdate }) => {
-  const [tab, setTab] = useState('info');
   const [data, setData] = useState(issue);
-  const [rightCollapsed, setRightCollapsed] = useState(true);
-  const [rightWidth, setRightWidth] = useState(280);
+  const [users, setUsers] = useState([]);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightWidth, setRightWidth] = useState(300);
+  const [copied, setCopied] = useState(false);
   const resizingRight = useRef(false);
+
+  useEffect(() => {
+    sbFetch('users', 'select=id,full_name&order=full_name.asc').then(setUsers).catch(() => {});
+  }, []);
 
   const startRightResize = useCallback((e) => {
     resizingRight.current = true;
-    const startX = e.clientX;
-    const startW = rightWidth;
+    const startX = e.clientX, startW = rightWidth;
     const onMove = me => {
       if (!resizingRight.current) return;
       setRightWidth(Math.max(180, Math.min(500, startW - (me.clientX - startX))));
     };
-    const onUp = () => { resizingRight.current = false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    const onUp = () => {
+      resizingRight.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }, [rightWidth]);
@@ -893,142 +972,130 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
   }, [data.prop_code, data.issue_name]);
 
   const save = async (field, val) => {
-    await sbPatch('issues', data.id, { [field]: val || null });
+    await sbPatch('issues', data.id, { [field]: val ?? null });
     const updated = { ...data, [field]: val };
     setData(updated);
     onUpdate?.(updated);
   };
 
-  const TABS  = ['Info', 'Timeline', 'Notes'];
-  const tabKey = t => t.toLowerCase();
+  const copyLink = () => {
+    const url = `${window.location.origin}/issues/${data.podio_id ?? 'X'+data.id.slice(-6)}`;
+    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  };
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      {/* Header */}
       <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={onBack}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer'}}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',flexShrink:0}}
             onMouseEnter={e=>e.currentTarget.style.color=T.text0}
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             ← Issues
           </button>
-          <span style={{color:T.text3,fontSize:F.sm}}>{data.prop_code||'—'}</span>
-          <span style={{marginLeft:'auto',display:'flex',gap:'8px',alignItems:'center'}}>
-            <StatusBadge status={data.status}/>
-            <StatusBadge status={data.priority}/>
+          <span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'2px 8px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>
+            {data.prop_code||'—'}
           </span>
-        </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3'}}>{data.issue_name||'Untitled Issue'}</div>
-        <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>{data.prop_code} · {data.category||'Uncategorized'}</div>
-      </div>
-
-      <div style={{display:'flex',gap:'2px',padding:'6px 16px 0',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,flexShrink:0}}>
-        {TABS.map(t=>(
-          <button key={t} onClick={()=>setTab(tabKey(t))}
-            style={{background:'transparent',border:'none',padding:'6px 12px',fontSize:F.sm,cursor:'pointer',borderRadius:'4px 4px 0 0',
-              color:tab===tabKey(t)?T.accent:T.text1,
-              borderBottom:tab===tabKey(t)?`2px solid ${T.accent}`:'2px solid transparent',
-              fontWeight:tab===tabKey(t)?'600':'400'}}>
-            {t}
+          {data.podio_id && <span style={{fontSize:F.xs,color:T.text3}}>#{data.podio_id}</span>}
+          <button onClick={copyLink}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',flexShrink:0,transition:'color 0.2s'}}
+            onMouseEnter={e=>{ if(!copied) e.currentTarget.style.color=T.text0; }}
+            onMouseLeave={e=>{ if(!copied) e.currentTarget.style.color=T.text2; }}>
+            {copied ? '✓ Copied' : '⧉ Copy Link'}
           </button>
-        ))}
+          <div style={{marginLeft:'auto',display:'flex',gap:'6px',alignItems:'center',flexShrink:0}}>
+            <StatusBadge status={data.priority}/>
+            <StatusBadge status={data.status}/>
+          </div>
+        </div>
+        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3',marginTop:'6px'}}>
+          {data.issue_name||'Untitled Issue'}
+        </div>
+        {data.category && (
+          <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>{data.category}</div>
+        )}
       </div>
 
+      {/* Body */}
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
-        <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
-          {tab==='info' && (
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-              <div style={css.card}>
-                <div style={css.secTitle}>Issue Info</div>
-                <EditableField label="Issue Title" value={data.issue_name} onSave={v=>save('issue_name',v)}/>
-                <EditableField label="Issue Type" value={data.category} onSave={v=>save('category',v)}/>
-                <div style={{marginBottom:'10px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Priority</div>
-                  <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                    {PRIORITY_OPTIONS.map(p=>(
-                      <button key={p} onClick={()=>save('priority',p)}
-                        style={{padding:'3px 10px',borderRadius:'4px',cursor:'pointer',fontSize:F.sm,
-                          border:data.priority===p?`1px solid ${T.accent}`:`1px solid ${T.border}`,
-                          background:data.priority===p?T.bg3:'transparent',
-                          color:data.priority===p?T.text0:T.text2}}>
-                        <PriorityDot priority={p}/>{p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div style={{marginBottom:'10px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'4px'}}>Status</div>
-                  <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                    {STATUS_OPTIONS.map(s=>(
-                      <button key={s} onClick={()=>save('status',s)}
-                        style={{padding:'3px 10px',borderRadius:'4px',cursor:'pointer',fontSize:F.sm,
-                          border:data.status===s?`1px solid ${T.accent}`:`1px solid ${T.border}`,
-                          background:data.status===s?T.bg3:'transparent',
-                          color:data.status===s?T.text0:T.text2}}>
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div style={css.card}>
-                <div style={css.secTitle}>Property</div>
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>Prop Code</div>
-                  <div style={{fontSize:F.md,color:T.accent,fontWeight:'600',padding:'3px 5px'}}>{data.prop_code||'—'}</div>
-                </div>
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>Follow-Up Date</div>
-                  <div style={{fontSize:F.base,color:isFuOverdue(data.follow_up_date,data.status)?T.warn:T.text0,padding:'3px 5px'}}>
-                    {data.follow_up_date ? fmtNumDate(data.follow_up_date) : '—'}
-                  </div>
-                </div>
-              </div>
-              <div style={{...css.card,gridColumn:'1 / -1'}}>
-                <div style={css.secTitle}>Description</div>
-                <EditableField label="" value={data.issue_details} onSave={v=>save('issue_details',v)} type="textarea"/>
+        {/* Left: form */}
+        <div style={{flex:1,overflowY:'auto',padding:'16px 18px'}}>
+          <div style={css.card}>
+            {/* 1. Calc → progress_pct */}
+            <IssueBlurField label="Calc (Progress %)"
+              value={data.progress_pct != null ? String(data.progress_pct) : ''}
+              type="number"
+              onSave={v => save('progress_pct', v ? parseInt(v, 10) : null)}
+            />
+            {/* 2. Issue Name */}
+            <IssueBlurField label="Issue Name" value={data.issue_name} onSave={v => save('issue_name', v)}/>
+            {/* 3. Prop Code */}
+            <IssueBlurField label="Prop Code" value={data.prop_code} onSave={v => save('prop_code', v)}/>
+            {/* 4. FU Date */}
+            <IssueBlurField label="FU Date" value={data.follow_up_date||''} type="date" onSave={v => save('follow_up_date', v)}/>
+            {/* 5. FU Notes */}
+            <IssueBlurField label="FU Notes" value={data.follow_up_notes} onSave={v => save('follow_up_notes', v)}/>
+            {/* 6. Priority */}
+            <IssueSelectField label="Priority" value={data.priority} options={['???','Urgent','High','Medium','Low']} onSave={v => save('priority', v)}/>
+            {/* 7. Assigned To */}
+            <div style={{marginBottom:'10px'}}>
+              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>Assigned To</div>
+              <select value={data.assigned_to_id||''} onChange={e => save('assigned_to_id', e.target.value||null)}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.assigned_to_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+              </select>
+            </div>
+            {/* 8. Category */}
+            <IssueSelectField label="Category" value={data.category} options={CATEGORY_OPTIONS} onSave={v => save('category', v)}/>
+            {/* 9. Properties (linked display) */}
+            <div style={{marginBottom:'10px'}}>
+              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>Properties</div>
+              <div style={{fontSize:F.base,padding:'3px 5px'}}>
+                {data.prop_code
+                  ? <a href={`/?view=properties&prop=${data.prop_code}`} style={{color:T.accent,textDecoration:'none',fontWeight:'500'}}
+                      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                      {data.prop_code}
+                    </a>
+                  : <span style={{color:T.text3}}>—</span>}
               </div>
             </div>
-          )}
-          {tab==='timeline' && (
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-              <div style={css.card}>
-                <div style={css.secTitle}>Dates</div>
-                <EditableField label="Reported Date"  value={data.create_date}      onSave={v=>save('create_date',v)}      type="date"/>
-                <EditableField label="Follow-Up Date" value={data.follow_up_date}   onSave={v=>save('follow_up_date',v)}   type="date"/>
-                <EditableField label="Resolved Date"  value={data.close_date}       onSave={v=>save('close_date',v)}       type="date"/>
-                <div style={{marginBottom:'8px'}}>
-                  <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>Created</div>
-                  <div style={{fontSize:F.base,color:T.text1,padding:'3px 5px'}}>{fmtDate(data.created_at)}</div>
-                </div>
-              </div>
-              <div style={css.card}>
-                <div style={css.secTitle}>Status Overview</div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
-                  {[
-                    ['Status',   <StatusBadge status={data.status}/>],
-                    ['Priority', <StatusBadge status={data.priority}/>],
-                    ['Reported', data.create_date ? fmtDate(data.create_date) : 'Not set'],
-                    ['Resolved', data.close_date  ? fmtDate(data.close_date)  : 'Open'],
-                  ].map(([label,val])=>(
-                    <div key={label} style={{background:T.bg3,borderRadius:'6px',padding:'10px 12px'}}>
-                      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'4px'}}>{label}</div>
-                      <div style={{fontSize:F.sm,color:T.text0}}>{val}</div>
-                    </div>
-                  ))}
-                </div>
+            {/* 10. Issue Details (textarea) */}
+            <RichTextEditor label="Issue Details" value={data.issue_details} onSave={v => save('issue_details', v)}/>
+            {/* 11. Contacts (placeholder) */}
+            <div style={{marginBottom:'10px'}}>
+              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>Contacts</div>
+              <div style={{fontSize:F.sm,color:T.text3,fontStyle:'italic',padding:'3px 5px'}}>Contacts relationship — available after Podio sync</div>
+            </div>
+            {/* 12. APP Links (podio_url) */}
+            <div style={{marginBottom:'10px'}}>
+              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>APP Links</div>
+              <div style={{fontSize:F.sm,padding:'3px 5px'}}>
+                {data.podio_url
+                  ? <a href={data.podio_url} target="_blank" rel="noopener noreferrer" style={{color:T.accent,textDecoration:'none'}}
+                      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                      Podio Record ↗
+                    </a>
+                  : <span style={{color:T.text3,fontStyle:'italic'}}>—</span>}
               </div>
             </div>
-          )}
-          {tab==='notes' && (
-            <div style={{display:'grid',gridTemplateColumns:'1fr',gap:'16px'}}>
-              <div style={css.card}>
-                <div style={css.secTitle}>Notes</div>
-                <EditableField label="" value={data.strategy_notes} onSave={v=>save('strategy_notes',v)} type="textarea"/>
-              </div>
-            </div>
-          )}
+            {/* 13. Status */}
+            <IssueSelectField label="Status" value={data.status} options={['Open','Closed']} onSave={v => save('status', v)}/>
+            {/* 14. Last Updated (read-only) */}
+            <IssueBlurField label="Last Updated"
+              value={data.last_updated ? fmtDate(data.last_updated) : (data.updated_at ? fmtDate(data.updated_at) : '')}
+              readOnly
+            />
+            {/* 15. Create Date (read-only) */}
+            <IssueBlurField label="Create Date" value={data.create_date ? fmtDate(data.create_date) : ''} readOnly/>
+            {/* 16. Date Closed */}
+            <IssueBlurField label="Date Closed" value={data.close_date||''} type="date" onSave={v => save('close_date', v)}/>
+          </div>
         </div>
+
         <ActivityPanel
           collapsed={rightCollapsed}
           onCollapse={() => setRightCollapsed(c => !c)}
