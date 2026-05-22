@@ -362,7 +362,7 @@ export const SuitesList = ({ suites, loading, error, onSelect, hidePropertyFilte
         onClick={e=>{
           if(e.target.closest('a'))return;
           if(e.ctrlKey||e.metaKey){const tab=window.open(`${window.location.origin}/suites/${s.podio_id??'X'+s.id.slice(-6)}`, '_blank');if(tab)tab.focus();}
-          else onSelect(s);
+          else { try{sessionStorage.setItem('suitesBackUrl', window.location.href);}catch{} onSelect(s); }
         }}
         style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
         onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
