@@ -1,6 +1,7 @@
 import WorkOrdersView from './WorkOrdersView';
 import WorkOrdersTable from './shared/WorkOrdersTable';
 import SuitesView from './SuitesView';
+import SuitesTable from './shared/SuitesTable';
 import IssuesView, { IssuesList } from './IssuesView';
 import ContactsTable from './shared/ContactsTable';
 import RichTextEditor from './RichTextEditor';
@@ -416,7 +417,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   const openWOs    = workOrders.filter(w=>w.wo_status!=='Closed'&&w.wo_status!=='Closed - Not Done').length;
   const openIssues = issues.filter(i=>(i.status||'').toLowerCase()!=='closed').length;
 
-  const TABS = ['Dashboard','Tenants','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Info','Listing Info','CAMs','Inspections','Contacts','Documents'];
+  const TABS = ['Dashboard','Tenants','Suites','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Info','Listing Info','CAMs','Inspections','Contacts','Documents'];
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -491,8 +492,15 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
           </div>
         )}
 
+        {/* Suites tab — self-fetching shared component */}
+        {tab==='suites'&&(
+          <div style={{flex:1,overflow:'hidden'}}>
+            <SuitesTable filterPropCode={data.prop_code} hidePropertyFilter={true}/>
+          </div>
+        )}
+
         {/* All other tabs — scrollable padded container */}
-        {tab!=='work-orders'&&tab!=='issues'&&tab!=='contacts'&&(
+        {tab!=='work-orders'&&tab!=='issues'&&tab!=='contacts'&&tab!=='suites'&&(
           <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
 
             {/* DASHBOARD */}

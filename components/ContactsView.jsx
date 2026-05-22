@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import RichTextEditor from './RichTextEditor';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -10,6 +11,19 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 export const sbFetch = async (table, params = '') => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+};
+
+export const sbPatch = async (table, id, updates) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(updates),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
@@ -63,6 +77,64 @@ const ContactStatusBadge = ({ status }) => {
   const [color, bg] = s === 'active' ? [T.success, '#1e2a1e'] : [T.text2, T.bg3];
   const label = s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
   return <span style={css.badge(color, bg)}>{label}</span>;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EditableField — inline edit with select support
+// ─────────────────────────────────────────────────────────────────────────────
+export const EditableField = ({ label, value, onSave, type = 'text', options = [] }) => {
+  const [editing, setEditing] = useState(false);
+  const [val,     setVal]     = useState(value != null ? String(value) : '');
+  const [saving,  setSaving]  = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  useEffect(() => { setVal(value != null ? String(value) : ''); }, [value]);
+
+  const save = async () => {
+    setSaving(true);
+    try { await onSave(val || null); setEditing(false); }
+    catch { alert('Save failed'); }
+    finally { setSaving(false); }
+  };
+  const cancel = () => { setVal(value != null ? String(value) : ''); setEditing(false); };
+
+  const inputStyle = { flex:1, background:T.bg3, border:`1px solid ${T.accent}`, borderRadius:'4px', padding:'5px 8px', color:T.text0, fontSize:F.base, outline:'none' };
+
+  if (type === 'textarea') return <RichTextEditor label={label} value={value} onSave={onSave}/>;
+
+  return (
+    <div style={{marginBottom:'10px'}}>
+      {label && <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>{label}</div>}
+      {editing ? (
+        <div style={{display:'flex', alignItems:'flex-start', gap:'6px'}}>
+          {type === 'select' ? (
+            <select ref={inputRef} value={val} onChange={e => setVal(e.target.value)} style={inputStyle}>
+              <option value="">—</option>
+              {options.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            <input ref={inputRef} type={type} value={val} onChange={e => setVal(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
+              style={inputStyle}/>
+          )}
+          <button onClick={save} disabled={saving}
+            style={{background:T.accent, border:'none', borderRadius:'4px', padding:'5px 10px', color:'#fff', fontSize:F.sm, cursor:'pointer', whiteSpace:'nowrap'}}>
+            {saving ? '…' : 'Save'}
+          </button>
+          <button onClick={cancel}
+            style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'5px 8px', color:T.text1, fontSize:F.sm, cursor:'pointer'}}>✕</button>
+        </div>
+      ) : (
+        <div onClick={() => setEditing(true)} title="Click to edit"
+          style={{fontSize:F.base, color:val ? T.text0 : T.text3, cursor:'text', padding:'3px 5px', borderRadius:'4px', minHeight:'24px', border:'1px solid transparent', lineHeight:'1.4'}}
+          onMouseEnter={e => e.currentTarget.style.border = `1px solid ${T.border}`}
+          onMouseLeave={e => e.currentTarget.style.border = '1px solid transparent'}>
+          {val || <span style={{color:T.text3, fontStyle:'italic', fontSize:F.sm}}>click to edit</span>}
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -442,91 +514,288 @@ export const ContactsList = ({ contacts, loading, error, onSelect, hidePropertyF
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ContactDetail — placeholder detail view
+// ContactDetail — full tabbed detail form
 // ─────────────────────────────────────────────────────────────────────────────
-export const ContactDetail = ({ contact, onBack }) => {
-  useEffect(() => {
-    const name = contact.full_name || 'Contact';
-    document.title = `${name} | SedonaCRM`;
-    return () => { document.title = 'SedonaCRM'; };
-  }, [contact.full_name]);
+export const ContactDetail = ({ contact, onBack, onUpdate }) => {
+  const [tab,  setTab]  = useState('dashboard');
+  const [data, setData] = useState(contact);
+  const [copied, setCopied] = useState(false);
 
+  // Document title
+  useEffect(() => {
+    document.title = `${data.full_name || 'Contact'} | SedonaCRM`;
+    return () => { document.title = 'SedonaCRM'; };
+  }, [data.full_name]);
+
+  // Escape key
   useEffect(() => {
     const onKey = e => {
       if (e.key !== 'Escape') return;
       const tag = e.target?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea') return;
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       onBack();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack]);
 
-  const field = (label, value) => (
-    <div style={{marginBottom:'10px'}}>
-      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
-      <div style={{fontSize:F.base,color:value?T.text0:T.text3,padding:'3px 5px'}}>{value||'—'}</div>
+  const save = async (field, val) => {
+    await sbPatch('contacts', data.id, { [field]: val });
+    const updated = { ...data, [field]: val };
+    setData(updated);
+    onUpdate?.(updated);
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  };
+
+  const TABS = ['Dashboard', 'Contact Info', 'Work Orders', 'Issues', 'Tenant', 'Communications'];
+  const tk = t => t.toLowerCase().replace(/ /g, '-');
+
+  const tabBtnStyle = active => ({
+    background:'transparent', border:'none', padding:'6px 12px', fontSize:F.sm, cursor:'pointer',
+    borderRadius:'4px 4px 0 0',
+    color: active ? T.accent : T.text1,
+    borderBottom: active ? `2px solid ${T.accent}` : '2px solid transparent',
+    fontWeight: active ? '600' : '400',
+    whiteSpace:'nowrap',
+  });
+
+  const placeholderPanel = (icon, msg, sub) => (
+    <div style={css.card}>
+      <div style={{padding:'32px 0', textAlign:'center'}}>
+        <div style={{fontSize:'32px', color:T.bg3, marginBottom:'8px'}}>{icon}</div>
+        <div style={{fontSize:F.base, color:T.text2, marginBottom:'4px'}}>{msg}</div>
+        {sub && <div style={{fontSize:F.sm, color:T.text3}}>{sub}</div>}
+      </div>
     </div>
   );
 
   return (
-    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
-      <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
+    <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
+
+      {/* ── Header ── */}
+      <div style={{padding:'10px 16px 0', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0}}>
+
+        {/* Row 1: Back + Copy Link */}
+        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px'}}>
           <button onClick={onBack}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer'}}
-            onMouseEnter={e=>e.currentTarget.style.color=T.text0}
-            onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
+            style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0}}
+            onMouseEnter={e => e.currentTarget.style.color = T.text0}
+            onMouseLeave={e => e.currentTarget.style.color = T.text1}>
             ← Contacts
           </button>
-          <span style={{color:T.text3,fontSize:F.sm}}>{contact.category||'—'}</span>
-          <span style={{marginLeft:'auto'}}>
-            <ContactStatusBadge status={contact.status}/>
-          </span>
+          <div style={{marginLeft:'auto', display:'flex', gap:'6px'}}>
+            <button onClick={copyLink}
+              style={{padding:'3px 10px', borderRadius:'4px', fontSize:F.xs, cursor:'pointer',
+                border:`0.5px solid ${copied ? T.success : T.border}`,
+                background:'transparent',
+                color: copied ? T.success : T.text2}}>
+              {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+          </div>
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{contact.full_name||'Unnamed Contact'}</div>
-        {contact.company_dba && (
-          <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>{contact.company_dba}</div>
-        )}
-      </div>
 
-      <div style={{flex:1,overflowY:'auto',padding:'16px',background:T.bg1}}>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px',maxWidth:'900px'}}>
-          <div style={css.card}>
-            <div style={css.secTitle}>Contact Info</div>
-            {field('Full Name', contact.full_name)}
-            {field('Category', contact.category)}
-            {field('Company', contact.company_dba)}
-            {field('Title', contact.title)}
-            {field('Property', contact.prop_code)}
+        {/* Row 2: Name + company */}
+        <div style={{marginBottom:'5px'}}>
+          <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
+            {data.full_name || 'Unnamed Contact'}
           </div>
-          <div style={css.card}>
-            <div style={css.secTitle}>Communication</div>
-            {field('Email', contact.email)}
-            {field('Phone', contact.primary_phone)}
-            {field('Alt Phone', contact.alt_phone)}
-            {field('Website', contact.website)}
-          </div>
-          <div style={css.card}>
-            <div style={css.secTitle}>Address</div>
-            {field('Street', contact.address)}
-            {field('City', contact.city)}
-            {field('State', contact.state)}
-            {field('ZIP', contact.zip)}
-          </div>
-          <div style={css.card}>
-            <div style={css.secTitle}>Record</div>
-            {field('Status', contact.status ? contact.status.charAt(0).toUpperCase()+contact.status.slice(1) : null)}
-            {field('Added',   fmtDate(contact.created_at))}
-            {field('Updated', fmtDate(contact.updated_at))}
-          </div>
-          {contact.notes && (
-            <div style={{...css.card,gridColumn:'1 / -1'}}>
-              <div style={css.secTitle}>Notes</div>
-              <div style={{fontSize:F.base,color:T.text1,lineHeight:'1.5',whiteSpace:'pre-wrap'}}>{contact.notes}</div>
-            </div>
+          {data.company_dba && (
+            <div style={{fontSize:F.sm, color:T.text2, marginTop:'1px'}}>{data.company_dba}</div>
           )}
         </div>
+
+        {/* Row 3: Badges */}
+        <div style={{display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap', marginBottom:'5px'}}>
+          {data.category && <span style={css.badge(T.text1, T.bg3)}>{data.category}</span>}
+          <ContactStatusBadge status={data.status}/>
+          {data.prop_code && <span style={css.badge(T.accent, '#1a2e3a')}>{data.prop_code}</span>}
+          {data.podio_id && (
+            <span style={{display:'flex', alignItems:'center', gap:'3px'}}>
+              <span style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em'}}>Podio</span>
+              <span style={css.badge(T.text2, T.bg3)}>{data.podio_id}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Tab bar */}
+        <div style={{display:'flex', gap:'2px', marginTop:'4px', overflowX:'auto', scrollbarWidth:'none'}}>
+          {TABS.map(t => (
+            <button key={t} onClick={() => setTab(tk(t))} style={tabBtnStyle(tab === tk(t))}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tab Content ── */}
+      <div style={{flex:1, overflowY:'auto', padding:'16px', background:T.bg1}}>
+
+        {/* ── DASHBOARD ── */}
+        {tab === 'dashboard' && (
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+
+            {/* Summary card */}
+            <div style={css.card}>
+              <div style={css.secTitle}>Contact Summary</div>
+              <div style={{marginBottom:'10px'}}>
+                <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>Full Name</div>
+                <div style={{fontSize:F.base, color:T.text0, padding:'3px 5px', fontWeight:'600'}}>{data.full_name || '—'}</div>
+              </div>
+              {data.company_dba && (
+                <div style={{marginBottom:'10px'}}>
+                  <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>Company</div>
+                  <div style={{fontSize:F.base, color:T.text1, padding:'3px 5px'}}>{data.company_dba}</div>
+                </div>
+              )}
+              <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'10px'}}>
+                {data.category && <span style={css.badge(T.text1, T.bg3)}>{data.category}</span>}
+                <ContactStatusBadge status={data.status}/>
+              </div>
+              {data.primary_phone && (
+                <div style={{marginBottom:'8px', display:'flex', alignItems:'center', gap:'8px'}}>
+                  <span style={{fontSize:F.xs, color:T.text3, minWidth:'50px'}}>Phone</span>
+                  <a href={`tel:${data.primary_phone}`} style={{fontSize:F.sm, color:T.accent, textDecoration:'none'}}>{data.primary_phone}</a>
+                </div>
+              )}
+              {data.email && (
+                <div style={{marginBottom:'8px', display:'flex', alignItems:'center', gap:'8px'}}>
+                  <span style={{fontSize:F.xs, color:T.text3, minWidth:'50px'}}>Email</span>
+                  <a href={`mailto:${data.email}`} style={{fontSize:F.sm, color:T.accent, textDecoration:'none', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{data.email}</a>
+                </div>
+              )}
+              {data.title && (
+                <div style={{marginBottom:'8px', display:'flex', alignItems:'center', gap:'8px'}}>
+                  <span style={{fontSize:F.xs, color:T.text3, minWidth:'50px'}}>Title</span>
+                  <span style={{fontSize:F.sm, color:T.text1}}>{data.title}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Recent Activity placeholder */}
+            <div style={css.card}>
+              <div style={css.secTitle}>Recent Activity</div>
+              <div style={{padding:'24px 0', textAlign:'center'}}>
+                <div style={{fontSize:'28px', color:T.bg3, marginBottom:'6px'}}>📋</div>
+                <div style={{fontSize:F.sm, color:T.text3}}>Activity feed — coming in Phase 3</div>
+              </div>
+              <div style={{marginTop:'12px', borderTop:`0.5px solid ${T.border}`, paddingTop:'10px'}}>
+                <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'6px'}}>Record</div>
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:F.xs, color:T.text3, marginBottom:'4px'}}>
+                  <span>Added</span><span style={{color:T.text2}}>{fmtDate(data.created_at)}</span>
+                </div>
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:F.xs, color:T.text3}}>
+                  <span>Updated</span><span style={{color:T.text2}}>{fmtDate(data.updated_at)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Links — deferred until FK columns added */}
+            <div style={{...css.card, gridColumn:'1 / -1'}}>
+              <div style={css.secTitle}>Linked Records</div>
+              <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic'}}>
+                Tenant, vendor, and owner links will appear here after Podio sync adds the FK columns.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── CONTACT INFO ── */}
+        {tab === 'contact-info' && (
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+
+            {/* Name / Company / Role */}
+            <div style={css.card}>
+              <div style={css.secTitle}>Name / Company / Role</div>
+              <EditableField label="Full Name"  value={data.full_name}   onSave={v => save('full_name', v)}/>
+              <EditableField label="First Name" value={data.first_name}  onSave={v => save('first_name', v)}/>
+              <EditableField label="Last Name"  value={data.last_name}   onSave={v => save('last_name', v)}/>
+              <EditableField label="Company"    value={data.company_dba} onSave={v => save('company_dba', v)}/>
+              <EditableField label="Title"      value={data.title}       onSave={v => save('title', v)}/>
+            </div>
+
+            {/* Contact Details */}
+            <div style={css.card}>
+              <div style={css.secTitle}>Contact Details</div>
+              <EditableField label="Email"             value={data.email}             onSave={v => save('email', v)}/>
+              <EditableField label="Primary Phone"     value={data.primary_phone}     onSave={v => save('primary_phone', v)}/>
+              <EditableField label="Main Office Phone" value={data.main_office_phone} onSave={v => save('main_office_phone', v)}/>
+              <EditableField label="Direct Phone"      value={data.direct_phone}      onSave={v => save('direct_phone', v)}/>
+              <EditableField label="Alt Phone"         value={data.alt_phone}         onSave={v => save('alt_phone', v)}/>
+              <EditableField label="Website"           value={data.website}           onSave={v => save('website', v)}/>
+            </div>
+
+            {/* Category / Status */}
+            <div style={css.card}>
+              <div style={css.secTitle}>Category / Status</div>
+              <EditableField label="Category" value={data.category}  onSave={v => save('category', v)}  type="select" options={CATEGORY_OPTIONS}/>
+              <EditableField label="Status"   value={data.status}    onSave={v => save('status', v)}    type="select" options={['active', 'archived']}/>
+              <EditableField label="Property" value={data.prop_code} onSave={v => save('prop_code', v)}/>
+            </div>
+
+            {/* Address */}
+            <div style={css.card}>
+              <div style={css.secTitle}>Address</div>
+              <EditableField label="Street" value={data.address} onSave={v => save('address', v)}/>
+              <EditableField label="City"   value={data.city}    onSave={v => save('city', v)}/>
+              <EditableField label="State"  value={data.state}   onSave={v => save('state', v)}/>
+              <EditableField label="ZIP"    value={data.zip}     onSave={v => save('zip', v)}/>
+            </div>
+
+            {/* Notes — full width */}
+            <div style={{...css.card, gridColumn:'1 / -1'}}>
+              <div style={css.secTitle}>Notes</div>
+              <EditableField label="" value={data.notes} onSave={v => save('notes', v)} type="textarea"/>
+            </div>
+          </div>
+        )}
+
+        {/* ── WORK ORDERS ── */}
+        {tab === 'work-orders' && (
+          placeholderPanel(
+            '🔧',
+            'Work order relationships will be available after Podio sync',
+            'When contact_id is added to work_orders schema, this tab will show the shared WorkOrdersTable.'
+          )
+        )}
+
+        {/* ── ISSUES ── */}
+        {tab === 'issues' && (
+          placeholderPanel(
+            '⚠',
+            'Issues relationships will be available after Podio sync',
+            'When contact_id is added to issues schema, this tab will show the shared IssuesTable.'
+          )
+        )}
+
+        {/* ── TENANT ── */}
+        {tab === 'tenant' && (
+          <div style={css.card}>
+            <div style={css.secTitle}>Linked Tenant</div>
+            <div style={{padding:'16px 0', textAlign:'center'}}>
+              <div style={{fontSize:'28px', color:T.bg3, marginBottom:'6px'}}>🏢</div>
+              <div style={{fontSize:F.sm, color:T.text3}}>No tenant record linked to this contact</div>
+              <div style={{fontSize:F.xs, color:T.text3, marginTop:'4px', fontStyle:'italic'}}>
+                Tenant links will be available after the tenant_id FK column is added to the contacts table.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── COMMUNICATIONS ── */}
+        {tab === 'communications' && (
+          placeholderPanel(
+            '✉',
+            'Email and SMS thread will appear here — coming in Phase 3',
+            'Gmail sync + Twilio SMS — Phase 3 & 6'
+          )
+        )}
+
       </div>
     </div>
   );
@@ -549,6 +818,7 @@ export default function ContactsView() {
   }, []);
 
   const handleSelect = useCallback((contact) => {
+    try { sessionStorage.setItem('contactsBackUrl', window.location.href); } catch {}
     history.pushState({ contactId: contact.id }, '');
     setSelected(contact);
   }, []);
@@ -565,8 +835,8 @@ export default function ContactsView() {
   }, []);
 
   return (
-    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>
-      <div style={{display:selected?'none':'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+    <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:T.bg1}}>
+      <div style={{display:selected?'none':'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
         <ContactsList
           contacts={contacts}
           loading={loading} error={error}
@@ -578,6 +848,7 @@ export default function ContactsView() {
           key={selected.id}
           contact={selected}
           onBack={handleBack}
+          onUpdate={updated => setSelected(updated)}
         />
       )}
     </div>

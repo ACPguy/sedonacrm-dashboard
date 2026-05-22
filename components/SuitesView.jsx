@@ -4,7 +4,7 @@ import RichTextEditor from './RichTextEditor';
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
 
-const sbFetch = async (table, params = '') => {
+export const sbFetch = async (table, params = '') => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
   });
@@ -12,7 +12,7 @@ const sbFetch = async (table, params = '') => {
   return res.json();
 };
 
-const sbPatch = async (table, id, updates) => {
+export const sbPatch = async (table, id, updates) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
     method: 'PATCH',
     headers: {
@@ -25,14 +25,14 @@ const sbPatch = async (table, id, updates) => {
   return res.json();
 };
 
-const T = {
+export const T = {
   bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
   text0:'#c9cdd6', text1:'#8a95a8', text2:'#5a6272', text3:'#4a5264',
   accent:'#6e9fd8', border:'#2e3240',
   danger:'#e07070', warn:'#d4924a', success:'#6ab06a', purple:'#9a7ad4',
 };
-const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
-const css = {
+export const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
+export const css = {
   card: { background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'6px', padding:'12px 14px' },
   secTitle: { fontSize:F.xs, fontWeight:'600', color:T.text2, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' },
   badge: (color,bg) => ({ fontSize:F.xs, padding:'2px 7px', borderRadius:'3px', fontWeight:'500', whiteSpace:'nowrap', color, background:bg }),
@@ -41,7 +41,7 @@ const css = {
   tdNum: { fontSize:F.sm, color:T.text0, padding:'4px 8px', whiteSpace:'nowrap', textAlign:'right' },
 };
 
-const fmtDate = d => {
+export const fmtDate = d => {
   if (!d) return '—';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '—';
@@ -50,13 +50,15 @@ const fmtDate = d => {
 const fmtMoney = n => n != null && n !== '' ? '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
 const fmtNum = n => n != null && n !== '' ? Number(n).toLocaleString() : '—';
 
-const StatusBadge = ({ status }) => {
+export const StatusBadge = ({ status }) => {
   const s = (status||'').toLowerCase();
   const map = {
     occupied:[T.success,'#1e2a1e'], vacant:[T.danger,'#3d1f1f'],
     'for lease':[T.accent,'#1a2e3a'], 'occupied / for lease':[T.warn,'#3d2e1a'],
+    'vacant / for lease':[T.accent,'#1a2e3a'],
     office:[T.purple,'#2a1e3a'], retail:[T.accent,'#1a2e3a'],
     restaurant:[T.warn,'#3d2e1a'], other:[T.text2,T.bg3],
+    archived:[T.text3,T.bg3],
   };
   const [color,bg] = map[s]||[T.text2,T.bg3];
   return <span style={css.badge(color,bg)}>{status||'—'}</span>;
@@ -122,7 +124,7 @@ const useSortable = (data, defaultCol, defaultDir='asc') => {
 };
 
 // ── Suite Detail ──────────────────────────────────────────────────────────────
-const SuiteDetail = ({ suite, onBack, onUpdate }) => {
+export const SuiteDetail = ({ suite, onBack, onUpdate }) => {
   const [data, setData] = useState(suite);
 
   useEffect(() => {
@@ -184,7 +186,7 @@ const SuiteDetail = ({ suite, onBack, onUpdate }) => {
               <select value={data.status||''} onChange={e=>save('status',e.target.value)}
                 style={{width:'100%',background:T.bg3,border:`1px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',cursor:'pointer'}}>
                 <option value="">— select —</option>
-                {['Occupied','Vacant','For Lease','Occupied / For Lease'].map(s=><option key={s} value={s}>{s}</option>)}
+                {['Occupied','Vacant / For Lease','Occupied / For Lease','Archived'].map(s=><option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <EditableField label="Sq Ft" value={data.sqft} onSave={v=>save('sqft',v)} type="number"/>
@@ -234,27 +236,21 @@ const SuiteDetail = ({ suite, onBack, onUpdate }) => {
 };
 
 // ── Suites List ───────────────────────────────────────────────────────────────
-const SuitesList = ({ onSelect }) => {
-  const [suites, setSuites] = useState([]);
+// Accepts external suites data. Fetches tenantMap and activeProps internally.
+// hidePropertyFilter=true: skips activeProps fetch and property strip.
+export const SuitesList = ({ suites, loading, error, onSelect, hidePropertyFilter = false }) => {
   const [tenantMap, setTenantMap] = useState({});
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('current');
   const [propFilter, setPropFilter] = useState([]);
   const [search, setSearch] = useState('');
   const [activeProps, setActiveProps] = useState([]);
 
   useEffect(() => {
-    setLoading(true);
-    sbFetch('suites', 'select=*&order=prop_code.asc,suite_num.asc')
-      .then(d => { setSuites(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
+    if (hidePropertyFilter) return;
     sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
       .then(d => setActiveProps(d.map(p => p.prop_code)))
       .catch(() => {});
-  }, []);
+  }, [hidePropertyFilter]);
 
   useEffect(() => {
     sbFetch('tenants', 'select=id,tenant_dba,tenant_status&tenant_status=neq.Archived')
@@ -266,7 +262,8 @@ const SuitesList = ({ onSelect }) => {
   }, []);
 
   const activePropSet = new Set(activeProps);
-  const suitesWithTenant = suites.map(s => ({
+
+  const suitesWithTenant = (suites || []).map(s => ({
     ...s,
     _tenant: s.current_tenant_id ? (tenantMap[s.current_tenant_id] || '') : '',
   }));
@@ -285,19 +282,29 @@ const SuitesList = ({ onSelect }) => {
     fontWeight: active ? '600' : '400',
   });
 
+  // Filter pills:
+  //   Current    = non-Archived + (if not hidePropertyFilter) in active properties
+  //   Occupied   = status === 'Occupied'
+  //   For Lease  = status is 'Occupied / For Lease' OR 'Vacant / For Lease'
+  //   Archived   = status === 'Archived'
+  //   All        = everything
   const statuses = [
-    { key:'current', label:'Current' },
-    { key:'Occupied', label:'Occupied' },
-    { key:'Occupied / For Lease', label:'Occ/For Lease' },
-    { key:'Vacant / For Lease', label:'Vacant/For Lease' },
-    { key:'Archived', label:'Archived' },
-    { key:'All', label:'All' },
+    { key:'current',   label:'Current'   },
+    { key:'Occupied',  label:'Occupied'  },
+    { key:'for-lease', label:'For Lease' },
+    { key:'Archived',  label:'Archived'  },
+    { key:'All',       label:'All'       },
   ];
 
   const filtered = sorted.filter(s => {
-    if (statusFilter === 'current' && s.status === 'Archived') return false;
-    if (statusFilter === 'current' && !activePropSet.has(s.prop_code)) return false;
-    if (statusFilter !== 'current' && statusFilter !== 'All' && s.status !== statusFilter) return false;
+    if (statusFilter === 'current') {
+      if (s.status === 'Archived') return false;
+      if (!hidePropertyFilter && !activePropSet.has(s.prop_code)) return false;
+    } else if (statusFilter === 'for-lease') {
+      if (s.status !== 'Occupied / For Lease' && s.status !== 'Vacant / For Lease') return false;
+    } else if (statusFilter !== 'All') {
+      if (s.status !== statusFilter) return false;
+    }
     if (propFilter.length > 0 && !propFilter.includes(s.prop_code)) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -305,13 +312,14 @@ const SuitesList = ({ onSelect }) => {
         (s.suite_num||'').toLowerCase().includes(q) ||
         (s.prop_code||'').toLowerCase().includes(q) ||
         (s.space_type||'').toLowerCase().includes(q) ||
-        (s.location_desc||'').toLowerCase().includes(q)
+        (s.location_desc||'').toLowerCase().includes(q) ||
+        (s._tenant||'').toLowerCase().includes(q)
       );
     }
     return true;
   });
 
-  // Grouped view when props selected — always A→Z by prop_code
+  // Groups when props selected
   const groups = propFilter.length > 0
     ? [...propFilter].sort().map(pc => ({
         prop_code: pc,
@@ -321,13 +329,15 @@ const SuitesList = ({ onSelect }) => {
 
   const hasActiveFilters = propFilter.length > 0 || statusFilter !== 'current' || search !== '';
 
-  // Summary counts (from non-archived active suites)
-  const activeSuites = suites.filter(s => s.status !== 'Archived' && activePropSet.has(s.prop_code));
+  // Summary counts (active non-archived suites)
+  const activeSuites = hidePropertyFilter
+    ? (suites || []).filter(s => s.status !== 'Archived')
+    : (suites || []).filter(s => s.status !== 'Archived' && activePropSet.has(s.prop_code));
   const counts = {
-    occupied: activeSuites.filter(s=>s.status==='Occupied').length,
-    vacant: activeSuites.filter(s=>s.status!=='Occupied').length,
-    totalSf: activeSuites.reduce((sum,s)=>sum+(Number(s.sqft)||0),0),
-    occupiedSf: activeSuites.filter(s=>s.status==='Occupied').reduce((sum,s)=>sum+(Number(s.sqft)||0),0),
+    occupied:   activeSuites.filter(s => s.status === 'Occupied').length,
+    forLease:   activeSuites.filter(s => s.status === 'Occupied / For Lease' || s.status === 'Vacant / For Lease').length,
+    totalSf:    activeSuites.reduce((sum,s) => sum+(Number(s.sqft)||0), 0),
+    occupiedSf: activeSuites.filter(s => s.status === 'Occupied').reduce((sum,s) => sum+(Number(s.sqft)||0), 0),
   };
   const occPct = counts.totalSf > 0 ? Math.round(counts.occupiedSf/counts.totalSf*100) : 0;
 
@@ -390,10 +400,10 @@ const SuitesList = ({ onSelect }) => {
         {/* Summary cards */}
         <div style={{display:'flex',gap:'8px',marginBottom:'6px'}}>
           {[
-            ['Occupied', counts.occupied, T.success],
-            ['Vacant / For Lease', counts.vacant, T.danger],
-            ['Occupancy', `${occPct}%`, occPct>=90?T.success:occPct>=70?T.warn:T.danger],
-            ['Total Sq Ft', fmtNum(counts.totalSf), T.text1],
+            ['Occupied',   counts.occupied,  T.success],
+            ['For Lease',  counts.forLease,  T.warn],
+            ['Occupancy',  `${occPct}%`,     occPct>=90?T.success:occPct>=70?T.warn:T.danger],
+            ['Total Sq Ft',fmtNum(counts.totalSf), T.text1],
           ].map(([label,val,color])=>(
             <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 12px',minWidth:'90px'}}>
               <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
@@ -402,13 +412,15 @@ const SuitesList = ({ onSelect }) => {
           ))}
         </div>
 
-        {/* Row 1: Property strip */}
-        <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
-          <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
-          {activeProps.map(pc => (
-            <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
-          ))}
-        </div>
+        {/* Row 1: Property strip (hidden when in property detail) */}
+        {!hidePropertyFilter && (
+          <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
+            <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
+            {activeProps.map(pc => (
+              <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
+            ))}
+          </div>
+        )}
 
         {/* Row 2: Status pills + clear + search */}
         <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
@@ -450,18 +462,19 @@ const SuitesList = ({ onSelect }) => {
       {/* Table */}
       <div style={{flex:1,overflowY:'auto'}}>
         {loading && <div style={{padding:'32px',textAlign:'center',color:T.text3}}>Loading suites…</div>}
-        {!loading && (
+        {error   && <div style={{padding:'32px',textAlign:'center',color:T.danger}}>Error: {error}</div>}
+        {!loading && !error && (
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'7%'}}/>   {/* Prop */}
-              <col style={{width:'8%'}}/>   {/* Suite # */}
-              <col style={{width:'9%'}}/>   {/* Type */}
-              <col style={{width:'11%'}}/>  {/* Status */}
-              <col style={{width:'28%'}}/>  {/* Tenant */}
-              <col style={{width:'8%'}}/>   {/* Sq Ft */}
-              <col style={{width:'10%'}}/>  {/* Base Rent */}
-              <col style={{width:'9%'}}/>   {/* NNN */}
-              <col style={{width:'10%'}}/>  {/* Total */}
+              <col style={{width:'7%'}}/>
+              <col style={{width:'8%'}}/>
+              <col style={{width:'9%'}}/>
+              <col style={{width:'14%'}}/>
+              <col style={{width:'25%'}}/>
+              <col style={{width:'8%'}}/>
+              <col style={{width:'10%'}}/>
+              <col style={{width:'9%'}}/>
+              <col style={{width:'10%'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:1}}>
               {tableHeaders}
@@ -493,7 +506,16 @@ const SuitesList = ({ onSelect }) => {
 
 // ── Main Export ───────────────────────────────────────────────────────────────
 export default function SuitesView() {
+  const [suites,   setSuites]   = useState([]);
+  const [loading,  setLoading]  = useState(true);
   const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    sbFetch('suites', 'select=*&order=prop_code.asc,suite_num.asc')
+      .then(d => { setSuites(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
 
   const handleSelect = useCallback((s) => {
     history.pushState({ suiteId: s.id }, '');
@@ -515,7 +537,7 @@ export default function SuitesView() {
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:'#1e2128'}}>
       {selected
         ? <SuiteDetail suite={selected} onBack={handleBack} onUpdate={u=>setSelected(u)}/>
-        : <SuitesList onSelect={handleSelect}/>
+        : <SuitesList suites={suites} loading={loading} onSelect={handleSelect}/>
       }
     </div>
   );

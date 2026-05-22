@@ -31,6 +31,10 @@ export default function ContactDetailPage() {
   }, [router.isReady, router.query.id]);
 
   const handleBack = () => {
+    try {
+      const back = sessionStorage.getItem('contactsBackUrl');
+      if (back) { router.push(back); return; }
+    } catch {}
     router.push('/contacts');
   };
 
