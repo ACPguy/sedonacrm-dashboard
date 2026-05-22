@@ -948,6 +948,141 @@ const IssuePriorityField = ({ value, onSave }) => {
   );
 };
 
+const FieldRow = ({ label, children, topAlign = false }) => (
+  <div style={{
+    display:'grid', gridTemplateColumns:'160px 1fr',
+    borderBottom:`0.5px solid ${T.border}`,
+    padding:'10px 0', minHeight:'48px',
+  }}>
+    <div style={{
+      fontSize:F.sm, fontWeight:'600', color:'#6B7280',
+      textAlign:'right', paddingRight:'16px',
+      alignSelf: topAlign ? 'start' : 'center',
+      paddingTop: topAlign ? '4px' : '0',
+      lineHeight:'1.4', userSelect:'none',
+    }}>
+      {label}
+    </div>
+    <div style={{alignSelf: topAlign ? 'start' : 'center', paddingRight:'4px'}}>
+      {children}
+    </div>
+  </div>
+);
+
+const InlineBlurField = ({ value, onSave, type = 'text', highlight = false, readOnly = false }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value ?? '');
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { setVal(value ?? ''); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  const commit = async () => {
+    setEditing(false);
+    const trimmed = typeof val === 'string' ? val.trim() : String(val ?? '');
+    if (trimmed === String(value ?? '')) return;
+    setSaving(true);
+    try { await onSave(trimmed || null); }
+    catch { setVal(value ?? ''); }
+    finally { setSaving(false); }
+  };
+  const displayVal = type === 'date' && val ? fmtDate(val) : val;
+  if (readOnly) return (
+    <div style={{fontSize:F.base, color:T.text1, lineHeight:'1.4'}}>{displayVal || '—'}</div>
+  );
+  return editing ? (
+    <input ref={inputRef} type={type} value={val} onChange={e => setVal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === 'Escape') { setVal(value ?? ''); setEditing(false); }
+        if (e.key === 'Enter') commit();
+      }}
+      style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}
+    />
+  ) : (
+    <div onClick={() => setEditing(true)} title="Click to edit"
+      style={{
+        fontSize:F.base, color: highlight?'#E8630A':(displayVal?T.text0:T.text3),
+        fontWeight: highlight?'700':'normal', cursor:'text', padding:'4px 0',
+        minHeight:'24px', border:'1px solid transparent', lineHeight:'1.4', borderRadius:'4px',
+      }}
+      onMouseEnter={e => e.currentTarget.style.border = `1px solid ${T.border}`}
+      onMouseLeave={e => e.currentTarget.style.border = '1px solid transparent'}>
+      {displayVal || <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+      {saving && <span style={{color:T.text3,fontSize:F.xs,marginLeft:'6px'}}>saving…</span>}
+    </div>
+  );
+};
+
+const InlineSelect = ({ value, options, onSave }) => (
+  <select value={value||''} onChange={async e => { await onSave(e.target.value||null); }}
+    style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+    <option value="">—</option>
+    {options.map(o => typeof o === 'object'
+      ? <option key={o.value} value={o.value}>{o.label}</option>
+      : <option key={o} value={o}>{o}</option>
+    )}
+  </select>
+);
+
+const PriorityPills = ({ value, onSave }) => {
+  const styles = {
+    '???':  { activeBg: T.bg3,     activeColor: T.text0, border: T.text2 },
+    Urgent: { activeBg: T.danger,  activeColor: '#fff',  border: T.danger },
+    High:   { activeBg: T.warn,    activeColor: '#fff',  border: T.warn },
+    Medium: { activeBg: T.success, activeColor: '#fff',  border: T.success },
+    Low:    { activeBg: T.accent,  activeColor: '#fff',  border: T.accent },
+  };
+  return (
+    <div style={{display:'flex', gap:'5px', flexWrap:'wrap'}}>
+      {PRIORITY_OPTIONS.map(opt => {
+        const active = (value || '???') === opt;
+        const s = styles[opt] || styles['???'];
+        return (
+          <button key={opt} onClick={() => !active && onSave(opt)}
+            style={{
+              padding:'3px 10px', borderRadius:'4px', fontSize:F.xs, fontWeight:'600',
+              cursor: active ? 'default' : 'pointer',
+              border: `1px solid ${s.border}`,
+              background: active ? s.activeBg : 'transparent',
+              color: active ? s.activeColor : s.border,
+              transition: 'all 0.1s',
+            }}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const StatusPills = ({ value, onSave }) => {
+  const styles = {
+    Open:   { activeBg: T.danger, activeColor: '#fff', border: T.danger },
+    Closed: { activeBg: T.warn,   activeColor: T.bg0,  border: T.warn },
+  };
+  return (
+    <div style={{display:'flex', gap:'5px', flexWrap:'wrap'}}>
+      {['Open', 'Closed'].map(opt => {
+        const active = (value || 'Open') === opt;
+        const s = styles[opt];
+        return (
+          <button key={opt} onClick={() => !active && onSave(opt)}
+            style={{
+              padding:'3px 10px', borderRadius:'4px', fontSize:F.xs, fontWeight:'600',
+              cursor: active ? 'default' : 'pointer',
+              border: `1px solid ${s.border}`,
+              background: active ? s.activeBg : 'transparent',
+              color: active ? s.activeColor : s.border,
+              transition: 'all 0.1s',
+            }}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 const CATEGORY_OPTIONS = [
   '- PROJECT -','???','$ Issue','ACP Training','Adjust Rent','C-19','DONE','GOAL',
   'Incident','Insurance','LATE RENT','Legal','Lender','LS Violation','LS Violation ?',
@@ -1065,88 +1200,73 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
 
       {/* Body */}
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
-        {/* Left: form */}
-        <div style={{flex:1,overflowY:'auto',padding:'16px 18px'}}>
-          <div style={css.card}>
-            {/* 1. Issue Name */}
-            <IssueBlurField label="Issue Name" value={data.issue_name} onSave={v => save('issue_name', v)} highlight/>
-            {/* 3. Prop Code — dropdown + property info box */}
-            <div style={{marginBottom:'10px'}}>
-              <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>Prop Code</div>
-              <select value={data.prop_code||''} onChange={async e => { await save('prop_code', e.target.value||null); }}
+        <div style={{flex:1,overflowY:'auto'}}>
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
+            <FieldRow label="Issue Name">
+              <InlineBlurField value={data.issue_name} onSave={v=>save('issue_name',v)} highlight/>
+            </FieldRow>
+            <FieldRow label="Prop Code" topAlign>
+              <select value={data.prop_code||''} onChange={async e=>{await save('prop_code',e.target.value||null);}}
                 style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.prop_code?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
                 <option value="">—</option>
-                {activeProps.map(p => (
-                  <option key={p.prop_code} value={p.prop_code}>{p.prop_code} — {p.property_name}</option>
-                ))}
+                {activeProps.map(p=>(<option key={p.prop_code} value={p.prop_code}>{p.prop_code} — {p.property_name}</option>))}
               </select>
-              {/* Fix 2: property info box */}
               {(() => {
                 const prop = activeProps.find(p => p.prop_code === data.prop_code);
-                if (!prop) return (
-                  <div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'7px 10px',color:T.text3,fontSize:F.sm,fontStyle:'italic',minHeight:'36px',display:'flex',alignItems:'center'}}>
-                    {data.prop_code ? data.prop_code : 'No property selected'}
-                  </div>
-                );
+                if (!prop) return null;
                 const addr2 = [prop.city, prop.state, prop.zip].filter(Boolean).join(' ');
                 const line2 = prop.address ? (addr2 ? `${prop.address}, ${addr2}` : prop.address) : addr2;
                 return (
-                  <div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'7px 10px'}}>
+                  <div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px 10px'}}>
                     <div style={{fontSize:F.sm,fontWeight:'500',color:T.text0}}>{prop.property_name}</div>
                     {line2 && <div style={{fontSize:F.xs,color:T.text2,marginTop:'2px'}}>{line2}</div>}
                   </div>
                 );
               })()}
-            </div>
-            {/* 4. FU Date */}
-            <IssueBlurField label="FU Date" value={data.follow_up_date||''} type="date" onSave={v => save('follow_up_date', v)}/>
-            {/* 5. FU Notes */}
-            <RichTextEditor label="FU Notes" value={data.follow_up_notes} onSave={v => save('follow_up_notes', v)}/>
-            {/* 6. Priority */}
-            <IssuePriorityField value={data.priority} onSave={v => save('priority', v)}/>
-            {/* 7. Assigned To */}
-            <div style={{marginBottom:'10px'}}>
-              <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>Assigned To</div>
-              <select value={data.assigned_to_id||''} onChange={e => save('assigned_to_id', e.target.value||null)}
-                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.assigned_to_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
-                <option value="">—</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-              </select>
-            </div>
-            {/* 8. Category */}
-            <IssueSelectField label="Category" value={data.category} options={CATEGORY_OPTIONS} onSave={v => save('category', v)}/>
-            {/* 10. Issue Details */}
-            <RichTextEditor label="Issue Details" value={data.issue_details} onSave={v => save('issue_details', v)} minRows={5}/>
-            {/* 11. Contacts (placeholder) */}
-            <div style={{marginBottom:'10px'}}>
-              <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>Contacts</div>
-              <div style={{fontSize:F.sm,color:T.text3,fontStyle:'italic',padding:'3px 5px'}}>Contacts relationship — available after Podio sync</div>
-            </div>
-            {/* 12. APP Links (podio_url) */}
-            <div style={{marginBottom:'10px'}}>
-              <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>APP Links</div>
-              <div style={{fontSize:F.sm,padding:'3px 5px'}}>
-                {data.podio_url
-                  ? <a href={data.podio_url} target="_blank" rel="noopener noreferrer" style={{color:T.accent,textDecoration:'none'}}
-                      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-                      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-                      Podio Record ↗
-                    </a>
-                  : <span style={{color:T.text3,fontStyle:'italic'}}>—</span>}
-              </div>
-            </div>
-            {/* 13. Status */}
-            <IssueSelectField label="Status" value={data.status} options={STATUS_OPTIONS} onSave={handleStatusChange}/>
-            {/* 14. Last Updated (read-only) */}
-            <IssueBlurField label="Last Updated"
-              value={data.last_updated ? fmtDate(data.last_updated) : (data.updated_at ? fmtDate(data.updated_at) : '')}
-              readOnly
-            />
-            {/* 15. Create Date (read-only) */}
-            <IssueBlurField label="Create Date" value={data.create_date ? fmtDate(data.create_date) : ''} readOnly/>
-            {/* 16. Date Closed — only shown when Status = Closed */}
+            </FieldRow>
+            <FieldRow label="FU Date">
+              <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
+            </FieldRow>
+            <FieldRow label="FU Notes" topAlign>
+              <RichTextEditor value={data.follow_up_notes} onSave={v=>save('follow_up_notes',v)}/>
+            </FieldRow>
+            <FieldRow label="Priority">
+              <PriorityPills value={data.priority} onSave={v=>save('priority',v)}/>
+            </FieldRow>
+            <FieldRow label="Status">
+              <StatusPills value={data.status} onSave={handleStatusChange}/>
+            </FieldRow>
+            <FieldRow label="Assigned To">
+              <InlineSelect value={data.assigned_to_id} options={users.map(u=>({value:u.id,label:u.full_name}))} onSave={v=>save('assigned_to_id',v)}/>
+            </FieldRow>
+            <FieldRow label="Category">
+              <InlineSelect value={data.category} options={CATEGORY_OPTIONS} onSave={v=>save('category',v)}/>
+            </FieldRow>
+            <FieldRow label="Issue Details" topAlign>
+              <RichTextEditor value={data.issue_details} onSave={v=>save('issue_details',v)} minRows={5}/>
+            </FieldRow>
+            <FieldRow label="Contacts">
+              <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Available after Podio sync</span>
+            </FieldRow>
+            <FieldRow label="Podio Link">
+              {data.podio_url
+                ? <a href={data.podio_url} target="_blank" rel="noopener noreferrer" style={{color:T.accent,textDecoration:'none',fontSize:F.sm}}
+                    onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                    onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                    Podio Record ↗
+                  </a>
+                : <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+            </FieldRow>
+            <FieldRow label="Last Updated">
+              <InlineBlurField readOnly value={data.last_updated?fmtDate(data.last_updated):(data.updated_at?fmtDate(data.updated_at):'')}/>
+            </FieldRow>
+            <FieldRow label="Create Date">
+              <InlineBlurField readOnly value={data.create_date?fmtDate(data.create_date):''}/>
+            </FieldRow>
             {data.status === 'Closed' && (
-              <IssueBlurField label="Date Closed" value={data.close_date||''} type="date" onSave={v => save('close_date', v)}/>
+              <FieldRow label="Date Closed">
+                <InlineBlurField type="date" value={data.close_date||''} onSave={v=>save('close_date',v)}/>
+              </FieldRow>
             )}
           </div>
         </div>

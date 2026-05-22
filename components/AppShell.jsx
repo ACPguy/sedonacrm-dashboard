@@ -60,8 +60,11 @@ export default function AppShell({ children, activeView }) {
   }, [width]);
 
   const go = path => {
-    const sep = path.includes('?') ? '&' : '?';
-    router.push(path + sep + 't=' + Date.now());
+    if (router.asPath === path || router.asPath.startsWith(path + '/') || router.asPath.startsWith(path + '?')) {
+      router.replace(path).then(() => router.reload());
+    } else {
+      router.push(path);
+    }
   };
   const is = view => activeView === view;
 

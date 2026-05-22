@@ -126,14 +126,16 @@ export default function RichTextEditor({ label, value, onSave, minRows = 1 }) {
 
   return (
     <div style={{ marginBottom: '10px' }}>
-      <div style={{
-        fontSize: F.xs, color: T.text3, textTransform: 'uppercase',
-        letterSpacing: '0.04em', marginBottom: '4px',
-        display: 'flex', alignItems: 'center', gap: '6px',
-      }}>
-        {label}
-        {saved && <span style={{ color: T.success, fontSize: '11px', fontWeight: '500' }}>✓ Saved</span>}
-      </div>
+      {label && (
+        <div style={{
+          fontSize: F.xs, color: T.text3, textTransform: 'uppercase',
+          letterSpacing: '0.04em', marginBottom: '4px',
+          display: 'flex', alignItems: 'center', gap: '6px',
+        }}>
+          {label}
+          {saved && <span style={{ color: T.success, fontSize: '11px', fontWeight: '500' }}>✓ Saved</span>}
+        </div>
+      )}
 
       <div
         ref={wrapperRef}

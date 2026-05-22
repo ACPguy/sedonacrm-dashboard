@@ -195,7 +195,7 @@ echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
 
 2. **npm run dev before every commit** — After every set of changes, run `npm run dev` (or `npm run build`) and confirm no build errors before committing or pushing. Fix errors first, then push. Never push broken code to GitHub (it deploys broken to Vercel).
 
-3. **Left nav always-navigate on click** — Nav items must always navigate on click, even when the user is already on that module or inside a detail record. Use `router.push('/module?t=' + Date.now())` on all nav onClick handlers to force navigation. Never use a conditional that skips navigation if the current route matches. This applies to all routed modules in AppShell.jsx and SedonaCRM.jsx.
+3. **Left nav always-navigate on click** — Nav items must always navigate on click, even when the user is already on that module or inside a detail record. Use the `handleNav`/`go` pattern: if `router.asPath` already matches the target path (exact, or starts with `path + '/'`, or `path + '?'`), call `router.replace(path).then(() => router.reload())`; otherwise call `router.push(path)`. Never use `?t=Date.now()` — Next.js does not re-mount components for same-path navigations with different query params. This pattern is in `go()` in AppShell.jsx and `handleNav()` in SedonaCRM.jsx; apply the same logic in any new nav code.
 
 4. **Destructive Database Operations — ALWAYS STOP AND CONFIRM** — Before executing ANY of the following, stop and tell me exactly what you are about to run and why, then wait for my explicit confirmation before proceeding:
    - TRUNCATE (any table)
