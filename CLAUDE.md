@@ -250,29 +250,31 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 ## Next Priorities
 
 **Completed last session:**
-- Property detail form — hub of the entire system, fully built
-  - components/PropertiesDetail.jsx — 7-tab form (Overview, Info, Suites, Tenants, Work Orders, Issues, Insurance)
-  - Overview: listing agreement card (expiry color coding), insurance card, open WOs card, open issues card, quick links
-  - Info: editable property fields + readonly ownership/agreement panel
-  - Suites: table with status badges, tenant name lookup via current_tenant_id, sq ft totals footer
-  - Tenants: status filter pills, lease expiry color coding (5-level)
-  - Work Orders: open/closed/all filter, sortable columns, toggle closed/updated date col
-  - Issues: open/closed/all filter, toggle closed/updated col
-  - Insurance: expiry color coding, premium, status badge
-  - pages/properties/index.jsx + [id].jsx — fully routed
-  - AppShell Properties nav → /properties (was /?view=properties)
-- CLAUDE.md documentation sync — component structure and routing pattern updated to reflect all 8 routed modules
+- Fixed Supabase 1000-row cap on standalone fetches (was silently truncating at 1000):
+  - WorkOrdersView — 2914 rows → now limit=10000
+  - IssuesView — 1233 rows → now limit=10000
+  - ContactsView — 2539 rows → now limit=10000
+- Shared ContactsTable component — components/shared/ContactsTable.jsx
+  - Self-fetching; accepts filterPropCode / filterTenantId / filterVendorId / filterOwnerId + hidePropertyFilter
+  - Gracefully handles 400 (unknown FK column) as empty set rather than error state
+  - ContactsList in ContactsView.jsx exported as named export; hidePropertyFilter suppresses property strip + title side effect
+- Property detail — added Contacts tab (between Inspections and Documents); full-height layout, filterPropCode
+- Tenant detail — Contacts tab: added ContactsTable (filterTenantId) below Primary/Accounting boxes; Entity Info box moved from Contacts tab → Info tab (top, full-width)
+- Vendor detail — added Info / Contacts tab bar; Contacts tab uses ContactsTable filterVendorId
+- Owner detail — added Info / Contacts tab bar; Contacts tab uses ContactsTable filterOwnerId
 
 **Next:**
-1. Property detail refinements (if needed after first use):
+1. Property detail refinements:
    - Suites tab: filter pills (Occupied / Vacant / All)
-   - Tenants tab: add Base Rent / Total columns if rent_schedule join is added
-   - Work Orders tab: vendor name (requires vendor lookup or denormalized field)
+   - Tenants tab: add Base Rent / Total columns (requires rent_schedule join)
+   - Work Orders tab: vendor name (denormalized field or vendor lookup)
 
-2. Tenant detail form — continue refinements as needed
+2. Contacts detail form — full build (currently placeholder); should match Tenant detail pattern with editable fields, activity panel, tabs
 
-3. Remaining detail forms — Vendors, Owners, Contacts, Work Orders (standalone detail views)
+3. Work Orders detail form — full build (standalone /work-orders/[id] currently a placeholder)
 
 4. Suites — add routed pages (pages/suites/index.jsx + [id].jsx) — currently SPA-only
 
 5. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
+
+6. contacts table FK columns — tenant_id / vendor_id / owner_id not yet in schema; ContactsTable filterTenantId / filterVendorId / filterOwnerId will return empty until those columns are added
