@@ -1,4 +1,5 @@
-import WorkOrdersView, { WorkOrdersList } from './WorkOrdersView';
+import WorkOrdersView from './WorkOrdersView';
+import WorkOrdersTable from './shared/WorkOrdersTable';
 import SuitesView from './SuitesView';
 import IssuesView, { IssuesList } from './IssuesView';
 import ContactsTable from './shared/ContactsTable';
@@ -448,12 +449,12 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
       {/* Content */}
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
 
-        {/* Work Orders tab — full component, needs overflow:hidden wrapper */}
+        {/* Work Orders tab — self-fetching shared component */}
         {tab==='work-orders'&&(
           <div style={{flex:1,overflow:'hidden'}}>
-            <WorkOrdersList
-              wos={workOrders} setWos={setWorkOrders}
-              loading={false} error={null}
+            <WorkOrdersTable
+              filterPropCode={data.prop_code}
+              hidePropertyFilter={true}
               onSelect={wo=>{
                 if(typeof window!=='undefined'){
                   const base = window.location.href.split('?')[0];
@@ -461,7 +462,6 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                 }
                 router.push(`/work-orders/${wo.podio_id??'X'+wo.id.slice(-6)}?from=properties`);
               }}
-              hidePropertyFilter={true}
             />
           </div>
         )}
