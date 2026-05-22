@@ -250,18 +250,16 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 ## Next Priorities
 
 **Completed last session:**
-- Fixed Supabase 1000-row cap on standalone fetches (was silently truncating at 1000):
-  - WorkOrdersView — 2914 rows → now limit=10000
-  - IssuesView — 1233 rows → now limit=10000
-  - ContactsView — 2539 rows → now limit=10000
 - Shared ContactsTable component — components/shared/ContactsTable.jsx
   - Self-fetching; accepts filterPropCode / filterTenantId / filterVendorId / filterOwnerId + hidePropertyFilter
   - Gracefully handles 400 (unknown FK column) as empty set rather than error state
-  - ContactsList in ContactsView.jsx exported as named export; hidePropertyFilter suppresses property strip + title side effect
-- Property detail — added Contacts tab (between Inspections and Documents); full-height layout, filterPropCode
-- Tenant detail — Contacts tab: added ContactsTable (filterTenantId) below Primary/Accounting boxes; Entity Info box moved from Contacts tab → Info tab (top, full-width)
-- Vendor detail — added Info / Contacts tab bar; Contacts tab uses ContactsTable filterVendorId
-- Owner detail — added Info / Contacts tab bar; Contacts tab uses ContactsTable filterOwnerId
+- Property detail — added Contacts tab (filterPropCode); Vendor/Owner detail — added Info/Contacts tab bar
+- Tenant detail — ContactsTable (filterTenantId); Entity Info moved from Contacts tab → Info tab
+- WorkOrdersTable (shared) — converted from re-export stub to self-fetching component
+- Fixed Supabase anon max_rows=1000 cap: introduced sbFetchAll (limit+offset pagination loop)
+  - Standalone WorkOrdersView now loads all 2914 WOs (was silently capping at 1000)
+  - WorkOrdersTable unfiltered also uses sbFetchAll; prop-filtered stays single-fetch
+  - Console.log diagnostics in WorkOrdersTable and WorkOrdersList (query, row count, statusFilter)
 
 **Next:**
 1. Property detail refinements:
