@@ -19,6 +19,23 @@ export const sbFetch = async (table, params = '') => {
   return res.json();
 };
 
+// Paginates through all rows 1000 at a time (bypasses Supabase anon max_rows=1000 cap).
+// Use for unfiltered full-table loads; prop-filtered fetches are always <1000.
+export const sbFetchAll = async (table, baseParams = '') => {
+  const PAGE = 1000;
+  let offset = 0;
+  let all = [];
+  while (true) {
+    const sep = baseParams ? '&' : '';
+    const page = await sbFetch(table, `${baseParams}${sep}limit=${PAGE}&offset=${offset}`);
+    all = all.concat(page);
+    if (page.length < PAGE) break;
+    offset += PAGE;
+  }
+  console.log(`[sbFetchAll] ${table} — fetched ${all.length} total rows (${Math.ceil(all.length/PAGE)} pages)`);
+  return all;
+};
+
 export const sbPatch = async (table, id, updates) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
     method: 'PATCH',
@@ -483,6 +500,11 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
 
   const filtered           = useMemo(() => applyFilters(sorted),       [sorted, applyFilters]);
   const filteredNoPriority = useMemo(() => applyFilters(sorted, true), [sorted, applyFilters]);
+
+  // Diagnostic log — shows loaded total, status filter, and visible count after filters
+  useEffect(() => {
+    console.log(`[WorkOrdersList] loaded=${wos.length} statusFilter=${statusFilter} visible=${filtered.length}`);
+  }, [wos.length, statusFilter, filtered.length]);
 
   const priorityCounts = useMemo(() => {
     const c = { '???': 0, Urgent: 0, High: 0, Medium: 0, Low: 0 };
@@ -1002,7 +1024,7 @@ export default function WorkOrdersView() {
 
   useEffect(() => {
     setLoading(true); setError(null);
-    sbFetch('work_orders', 'select=*&limit=10000')
+    sbFetchAll('work_orders', 'select=*&order=created_at.desc')
       .then(data => { setWos(data); setLoading(false); })
       .catch(e   => { setError(e.message); setLoading(false); });
   }, []);

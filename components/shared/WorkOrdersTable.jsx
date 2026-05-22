@@ -9,7 +9,7 @@
 //   onSelect           (fn, optional)     — override row click handler
 
 import React, { useState, useEffect } from 'react';
-import { WorkOrdersList, sbFetch } from '../WorkOrdersView';
+import { WorkOrdersList, sbFetch, sbFetchAll } from '../WorkOrdersView';
 
 export function WorkOrdersTable({
   filterPropCode,
@@ -23,12 +23,23 @@ export function WorkOrdersTable({
 
   useEffect(() => {
     setLoading(true); setError(null);
-    const params = filterPropCode
-      ? `select=*&prop_code=eq.${encodeURIComponent(filterPropCode)}&order=created_at.desc&limit=10000`
-      : 'select=*&limit=10000';
-    sbFetch('work_orders', params)
-      .then(data => { setWos(data); setLoading(false); })
-      .catch(e => { setError(e.message); setLoading(false); });
+    if (filterPropCode) {
+      // Prop-filtered: always <1000 rows, single fetch is fine
+      const params = `select=*&prop_code=eq.${encodeURIComponent(filterPropCode)}&order=created_at.desc`;
+      console.log(`[WorkOrdersTable] prop-filtered query: work_orders?${params}`);
+      sbFetch('work_orders', params)
+        .then(data => {
+          console.log(`[WorkOrdersTable] prop=${filterPropCode} returned ${data.length} rows`);
+          setWos(data); setLoading(false);
+        })
+        .catch(e => { setError(e.message); setLoading(false); });
+    } else {
+      // Full table: paginate to bypass the Supabase anon max_rows=1000 cap
+      console.log('[WorkOrdersTable] unfiltered — using sbFetchAll (paginated)');
+      sbFetchAll('work_orders', 'select=*&order=created_at.desc')
+        .then(data => { setWos(data); setLoading(false); })
+        .catch(e => { setError(e.message); setLoading(false); });
+    }
   }, [filterPropCode]);
 
   const defaultSelect = wo => {
