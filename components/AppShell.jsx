@@ -59,7 +59,10 @@ export default function AppShell({ children, activeView }) {
     window.addEventListener('mouseup', onUp);
   }, [width]);
 
-  const go = path => router.push(path);
+  const go = path => {
+    const sep = path.includes('?') ? '&' : '?';
+    router.push(path + sep + 't=' + Date.now());
+  };
   const is = view => activeView === view;
 
   return (

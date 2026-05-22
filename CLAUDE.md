@@ -195,7 +195,9 @@ echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
 
 2. **npm run dev before every commit** — After every set of changes, run `npm run dev` (or `npm run build`) and confirm no build errors before committing or pushing. Fix errors first, then push. Never push broken code to GitHub (it deploys broken to Vercel).
 
-3. **Destructive Database Operations — ALWAYS STOP AND CONFIRM** — Before executing ANY of the following, stop and tell me exactly what you are about to run and why, then wait for my explicit confirmation before proceeding:
+3. **Left nav always-navigate on click** — Nav items must always navigate on click, even when the user is already on that module or inside a detail record. Use `router.push('/module?t=' + Date.now())` on all nav onClick handlers to force navigation. Never use a conditional that skips navigation if the current route matches. This applies to all routed modules in AppShell.jsx and SedonaCRM.jsx.
+
+4. **Destructive Database Operations — ALWAYS STOP AND CONFIRM** — Before executing ANY of the following, stop and tell me exactly what you are about to run and why, then wait for my explicit confirmation before proceeding:
    - TRUNCATE (any table)
    - DROP TABLE or DROP COLUMN
    - DELETE FROM (any table)

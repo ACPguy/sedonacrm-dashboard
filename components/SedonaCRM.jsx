@@ -1451,17 +1451,17 @@ export default function SedonaCRM() {
           <NavItem icon="ti-layout-dashboard" label="Home" href="/?view=morning-briefing" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Operations</div>}
           <NavItem icon="ti-building-store" label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}  {...navProps}/>
-          <NavItem icon="ti-users"          label="Tenants"     href="/tenants"            active={currentView==='tenants'}     onClick={()=>router.push('/tenants')} {...navProps}/>
-          <NavItem icon="ti-door"           label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>router.push('/suites')} {...navProps}/>
+          <NavItem icon="ti-users"          label="Tenants"     href="/tenants"            active={currentView==='tenants'}     onClick={()=>router.push('/tenants?t='+Date.now())} {...navProps}/>
+          <NavItem icon="ti-door"           label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>router.push('/suites?t='+Date.now())} {...navProps}/>
           <NavItem icon="ti-tool"           label="Work Orders" href="/work-orders"        active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
-          <NavItem icon="ti-alert-triangle" label="Issues"      href="/issues"             active={currentView==='issues'}      onClick={()=>router.push('/issues')}   {...navProps}/>
-          <NavItem icon="ti-address-book"  label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>router.push('/contacts')} {...navProps}/>
-          <NavItem icon="ti-building"      label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>router.push('/vendors')}  {...navProps}/>
-          <NavItem icon="ti-home"          label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>router.push('/owners')}   {...navProps}/>
+          <NavItem icon="ti-alert-triangle" label="Issues"      href="/issues"             active={currentView==='issues'}      onClick={()=>router.push('/issues?t='+Date.now())}   {...navProps}/>
+          <NavItem icon="ti-address-book"  label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>router.push('/contacts?t='+Date.now())} {...navProps}/>
+          <NavItem icon="ti-building"      label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>router.push('/vendors?t='+Date.now())}  {...navProps}/>
+          <NavItem icon="ti-home"          label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>router.push('/owners?t='+Date.now())}   {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
           <NavItem icon="ti-pipeline"   label="Pipeline" href="/?view=leasing"       active={currentView==='leasing'}       onClick={()=>navTo('leasing')}   {...navProps}/>
           <NavItem icon="ti-file-text"  label="Leases"   href="/?view=leases"        active={currentView==='leases'}        onClick={()=>navTo('leases')}             {...navProps}/>
-          <NavItem icon="ti-cash"       label="Rents"    href="/rent-schedule"       active={currentView==='rent-schedule'} onClick={()=>router.push('/rent-schedule')} {...navProps}/>
+          <NavItem icon="ti-cash"       label="Rents"    href="/rent-schedule"       active={currentView==='rent-schedule'} onClick={()=>router.push('/rent-schedule?t='+Date.now())} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Compliance</div>}
           <NavItem icon="ti-shield-check"    label="Insurance"   href="/?view=tnt-cois"    active={currentView==='tnt-cois'}    onClick={()=>navTo('tnt-cois')}    {...navProps}/>
           <NavItem icon="ti-clipboard-check" label="Inspections" href="/?view=inspections" active={currentView==='inspections'} onClick={()=>navTo('inspections')} {...navProps}/>

@@ -855,7 +855,7 @@ export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePr
 // Issue Detail — blur-save inline editing, activity panel default open
 // ─────────────────────────────────────────────────────────────────────────────
 
-const IssueBlurField = ({ label, value, onSave, type = 'text', readOnly = false }) => {
+const IssueBlurField = ({ label, value, onSave, type = 'text', readOnly = false, highlight = false }) => {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value ?? '');
   const [saving, setSaving] = useState(false);
@@ -872,7 +872,7 @@ const IssueBlurField = ({ label, value, onSave, type = 'text', readOnly = false 
     finally { setSaving(false); }
   };
   const labelEl = (
-    <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>{label}</div>
+    <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>{label}</div>
   );
   if (readOnly) return (
     <div style={{marginBottom:'10px'}}>
@@ -894,7 +894,7 @@ const IssueBlurField = ({ label, value, onSave, type = 'text', readOnly = false 
         />
       ) : (
         <div onClick={() => setEditing(true)} title="Click to edit"
-          style={{fontSize:F.base,color:val?T.text0:T.text3,cursor:'text',padding:'3px 5px',borderRadius:'4px',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4'}}
+          style={{fontSize:F.base,color:highlight?'#E8630A':(val?T.text0:T.text3),fontWeight:highlight?'700':'normal',cursor:'text',padding:'3px 5px',borderRadius:'4px',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4'}}
           onMouseEnter={e => e.currentTarget.style.border = `1px solid ${T.border}`}
           onMouseLeave={e => e.currentTarget.style.border = '1px solid transparent'}>
           {(type === 'date' && val ? fmtDate(val) : val) || <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
@@ -907,7 +907,7 @@ const IssueBlurField = ({ label, value, onSave, type = 'text', readOnly = false 
 
 const IssueSelectField = ({ label, value, options, onSave }) => (
   <div style={{marginBottom:'10px'}}>
-    <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>{label}</div>
+    <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>{label}</div>
     <select value={value||''} onChange={async e => { await onSave(e.target.value||null); }}
       style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
       <option value="">—</option>
@@ -918,6 +918,35 @@ const IssueSelectField = ({ label, value, options, onSave }) => (
     </select>
   </div>
 );
+
+const IssuePriorityField = ({ value, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const PRIORITY_COLORS = {
+    '???': [T.text2, T.bg3],
+    Urgent: [T.danger, '#3d1f1f'],
+    High: [T.warn, '#3d2e1a'],
+    Medium: [T.success, '#1e2a1e'],
+    Low: [T.accent, '#1a2e3a'],
+  };
+  const [color, bg] = PRIORITY_COLORS[value] || PRIORITY_COLORS['???'];
+  return (
+    <div style={{marginBottom:'10px'}}>
+      <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>Priority</div>
+      {editing ? (
+        <select value={value||'???'} autoFocus
+          onChange={async e => { await onSave(e.target.value); setEditing(false); }}
+          onBlur={() => setEditing(false)}
+          style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+          {PRIORITY_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : (
+        <div onClick={() => setEditing(true)} title="Click to change" style={{cursor:'pointer',display:'inline-block',padding:'3px 0'}}>
+          <span style={css.badge(color, bg)}>{value || '???'}</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const CATEGORY_OPTIONS = [
   '- PROJECT -','???','$ Issue','ACP Training','Adjust Rent','C-19','DONE','GOAL',
@@ -1026,7 +1055,7 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             <StatusBadge status={data.status}/>
           </div>
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3',marginTop:'6px'}}>
+        <div style={{fontSize:F.lg,fontWeight:'700',color:'#E8630A',lineHeight:'1.3',marginTop:'6px'}}>
           {data.issue_name||'Untitled Issue'}
         </div>
         {data.category && (
@@ -1039,17 +1068,11 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
         {/* Left: form */}
         <div style={{flex:1,overflowY:'auto',padding:'16px 18px'}}>
           <div style={css.card}>
-            {/* 1. Calc → progress_pct */}
-            <IssueBlurField label="Calc (Progress %)"
-              value={data.progress_pct != null ? String(data.progress_pct) : ''}
-              type="number"
-              onSave={v => save('progress_pct', v ? parseInt(v, 10) : null)}
-            />
-            {/* 2. Issue Name */}
-            <IssueBlurField label="Issue Name" value={data.issue_name} onSave={v => save('issue_name', v)}/>
+            {/* 1. Issue Name */}
+            <IssueBlurField label="Issue Name" value={data.issue_name} onSave={v => save('issue_name', v)} highlight/>
             {/* 3. Prop Code — dropdown + property info box */}
             <div style={{marginBottom:'10px'}}>
-              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>Prop Code</div>
+              <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>Prop Code</div>
               <select value={data.prop_code||''} onChange={async e => { await save('prop_code', e.target.value||null); }}
                 style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.prop_code?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
                 <option value="">—</option>
@@ -1080,10 +1103,10 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             {/* 5. FU Notes */}
             <RichTextEditor label="FU Notes" value={data.follow_up_notes} onSave={v => save('follow_up_notes', v)}/>
             {/* 6. Priority */}
-            <IssueSelectField label="Priority" value={data.priority} options={['???','Urgent','High','Medium','Low']} onSave={v => save('priority', v)}/>
+            <IssuePriorityField value={data.priority} onSave={v => save('priority', v)}/>
             {/* 7. Assigned To */}
             <div style={{marginBottom:'10px'}}>
-              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>Assigned To</div>
+              <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>Assigned To</div>
               <select value={data.assigned_to_id||''} onChange={e => save('assigned_to_id', e.target.value||null)}
                 style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.assigned_to_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
                 <option value="">—</option>
@@ -1092,16 +1115,16 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             </div>
             {/* 8. Category */}
             <IssueSelectField label="Category" value={data.category} options={CATEGORY_OPTIONS} onSave={v => save('category', v)}/>
-            {/* 10. Issue Details (textarea) */}
-            <RichTextEditor label="Issue Details" value={data.issue_details} onSave={v => save('issue_details', v)}/>
+            {/* 10. Issue Details */}
+            <RichTextEditor label="Issue Details" value={data.issue_details} onSave={v => save('issue_details', v)} minRows={5}/>
             {/* 11. Contacts (placeholder) */}
             <div style={{marginBottom:'10px'}}>
-              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>Contacts</div>
+              <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>Contacts</div>
               <div style={{fontSize:F.sm,color:T.text3,fontStyle:'italic',padding:'3px 5px'}}>Contacts relationship — available after Podio sync</div>
             </div>
             {/* 12. APP Links (podio_url) */}
             <div style={{marginBottom:'10px'}}>
-              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>APP Links</div>
+              <div style={{fontSize:F.xs,color:'#374151',fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'2px',userSelect:'none'}}>APP Links</div>
               <div style={{fontSize:F.sm,padding:'3px 5px'}}>
                 {data.podio_url
                   ? <a href={data.podio_url} target="_blank" rel="noopener noreferrer" style={{color:T.accent,textDecoration:'none'}}

@@ -36,7 +36,7 @@ const Sep = () => (
   <div style={{ width: '1px', height: '18px', background: T.border, margin: '0 2px', flexShrink: 0 }}/>
 );
 
-export default function RichTextEditor({ label, value, onSave }) {
+export default function RichTextEditor({ label, value, onSave, minRows = 1 }) {
   const [editing, setEditing] = useState(false);
   const [saved,   setSaved]   = useState(false);
   const [tick,    setTick]    = useState(0);   // force toolbar re-render on editor state change
@@ -229,7 +229,7 @@ export default function RichTextEditor({ label, value, onSave }) {
         {/* Editor content area */}
         <div
           onClick={!editing ? startEditing : undefined}
-          style={{ padding: '4px 6px', minHeight: '28px', cursor: 'text' }}
+          style={{ padding: '4px 6px', minHeight: editing && minRows > 1 ? `${minRows * 20}px` : '28px', cursor: 'text' }}
         >
           {isEmpty && !editing ? (
             <span style={{ color: T.text3, fontStyle: 'italic', fontSize: F.sm }}>click to edit</span>
