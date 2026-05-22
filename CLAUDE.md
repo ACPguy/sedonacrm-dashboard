@@ -250,29 +250,31 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 ## Next Priorities
 
 **Completed last session:**
-- Shared ContactsTable component — components/shared/ContactsTable.jsx
-  - Self-fetching; accepts filterPropCode / filterTenantId / filterVendorId / filterOwnerId + hidePropertyFilter
-  - Gracefully handles 400 (unknown FK column) as empty set rather than error state
-- Property detail — added Contacts tab (filterPropCode); Vendor/Owner detail — added Info/Contacts tab bar
-- Tenant detail — ContactsTable (filterTenantId); Entity Info moved from Contacts tab → Info tab
-- WorkOrdersTable (shared) — converted from re-export stub to self-fetching component
-- Fixed Supabase anon max_rows=1000 cap: introduced sbFetchAll (limit+offset pagination loop)
-  - Standalone WorkOrdersView now loads all 2914 WOs (was silently capping at 1000)
-  - WorkOrdersTable unfiltered also uses sbFetchAll; prop-filtered stays single-fetch
-  - Console.log diagnostics in WorkOrdersTable and WorkOrdersList (query, row count, statusFilter)
+- SuitesView: refactored SuitesList to accept external data (self-fetches tenantMap + activeProps internally)
+  - Filter pills updated: Current | Occupied | For Lease | Archived | All
+  - "For Lease" matches both 'Occupied / For Lease' AND 'Vacant / For Lease'
+  - "Current" = non-Archived + (standalone) in active properties
+  - hidePropertyFilter=true skips activeProps fetch and property strip
+- SuitesTable (shared) — new components/shared/SuitesTable.jsx (self-fetching wrapper around SuitesList)
+- Property detail — added Suites tab after Tenants tab, using SuitesTable (hidePropertyFilter=true)
+- ContactDetail — full tabbed form replacing placeholder:
+  - Tabs: Dashboard | Contact Info | Work Orders | Issues | Tenant | Communications
+  - Contact Info: all 25 columns editable (EditableField with select support)
+  - Work Orders + Issues + Tenant: placeholder panels (FK columns not yet in schema)
+  - Communications: Phase 3 placeholder
+  - Header: copy link button, category/status badges
+- ContactsView now exports: sbPatch, EditableField (new), sbFetch, T, F, css, fmtDate, ContactsList, ContactDetail
+- contacts/[id].jsx: back button uses sessionStorage contactsBackUrl
 
 **Next:**
-1. Property detail refinements:
-   - Suites tab: filter pills (Occupied / Vacant / All)
+1. Work Orders detail form — full build (standalone /work-orders/[id] currently a placeholder)
+
+2. Property detail refinements:
    - Tenants tab: add Base Rent / Total columns (requires rent_schedule join)
    - Work Orders tab: vendor name (denormalized field or vendor lookup)
 
-2. Contacts detail form — full build (currently placeholder); should match Tenant detail pattern with editable fields, activity panel, tabs
+3. Suites — add routed pages (pages/suites/index.jsx + [id].jsx) — currently SPA-only
 
-3. Work Orders detail form — full build (standalone /work-orders/[id] currently a placeholder)
+4. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
 
-4. Suites — add routed pages (pages/suites/index.jsx + [id].jsx) — currently SPA-only
-
-5. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
-
-6. contacts table FK columns — tenant_id / vendor_id / owner_id not yet in schema; ContactsTable filterTenantId / filterVendorId / filterOwnerId will return empty until those columns are added
+5. contacts table FK columns — tenant_id / vendor_id / owner_id not yet in schema; ContactsTable filterTenantId / filterVendorId / filterOwnerId will return empty until those columns are added
