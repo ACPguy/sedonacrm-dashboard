@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import ContactsTable from './shared/ContactsTable';
 
 const SUPABASE_URL    = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -363,6 +364,8 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
 // Owner Detail — placeholder
 // ─────────────────────────────────────────────────────────────────────────────
 export const OwnerDetail = ({ owner, onBack }) => {
+  const [tab, setTab] = useState('info');
+
   useEffect(() => {
     const name = owner?.company_dba || 'Owner';
     document.title = `${name} | SedonaCRM`;
@@ -382,9 +385,12 @@ export const OwnerDetail = ({ owner, onBack }) => {
 
   if (!owner) return null;
 
+  const TABS = ['Info', 'Contacts'];
+
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
-      <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+      {/* Header */}
+      <div style={{padding:'10px 16px 0',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
           <button onClick={onBack}
             style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer'}}
@@ -403,35 +409,52 @@ export const OwnerDetail = ({ owner, onBack }) => {
         {owner.entity_name && (
           <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>{owner.entity_name}</div>
         )}
+        {/* Tab bar */}
+        <div style={{display:'flex',gap:'2px',marginTop:'8px'}}>
+          {TABS.map(t => (
+            <button key={t} onClick={() => setTab(t.toLowerCase())}
+              style={{background:'transparent',border:'none',padding:'6px 12px',fontSize:F.sm,cursor:'pointer',borderRadius:'4px 4px 0 0',
+                color: tab === t.toLowerCase() ? T.accent : T.text1,
+                borderBottom: tab === t.toLowerCase() ? `2px solid ${T.accent}` : '2px solid transparent',
+                fontWeight: tab === t.toLowerCase() ? '600' : '400'}}>
+              {t}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div style={{flex:1,overflowY:'auto',padding:'20px'}}>
-        <div style={{...css.card,maxWidth:'600px'}}>
-          <div style={css.secTitle}>Owner Info</div>
-          {[
-            ['Company DBA',  owner.company_dba],
-            ['Prop Code',    owner.prop_code],
-            ['Category',     owner.category],
-            ['Entity Name',  owner.entity_name],
-            ['Entity Type',  owner.entity_type],
-            ['Entity State', owner.entity_state],
-            ['Tax ID (EIN)', owner.tax_id_ein],
-            ['Phone',        owner.main_phone],
-            ['Address',      [owner.address, owner.city, owner.state, owner.zip].filter(Boolean).join(', ')],
-            ['Notes',        owner.company_notes],
-          ].map(([label, val]) => val ? (
-            <div key={label} style={{marginBottom:'8px'}}>
-              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
-              <div style={{fontSize:F.base,color:T.text0,lineHeight:'1.4'}}>{val}</div>
-            </div>
-          ) : null)}
-        </div>
-        <div style={{marginTop:'16px',padding:'12px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',maxWidth:'600px'}}>
-          <div style={{fontSize:F.sm,color:T.text2,fontStyle:'italic'}}>
-            Full owner detail page — coming in a future build.
+      {/* Info tab */}
+      {tab === 'info' && (
+        <div style={{flex:1,overflowY:'auto',padding:'20px'}}>
+          <div style={{...css.card,maxWidth:'600px'}}>
+            <div style={css.secTitle}>Owner Info</div>
+            {[
+              ['Company DBA',  owner.company_dba],
+              ['Prop Code',    owner.prop_code],
+              ['Category',     owner.category],
+              ['Entity Name',  owner.entity_name],
+              ['Entity Type',  owner.entity_type],
+              ['Entity State', owner.entity_state],
+              ['Tax ID (EIN)', owner.tax_id_ein],
+              ['Phone',        owner.main_phone],
+              ['Address',      [owner.address, owner.city, owner.state, owner.zip].filter(Boolean).join(', ')],
+              ['Notes',        owner.company_notes],
+            ].map(([label, val]) => val ? (
+              <div key={label} style={{marginBottom:'8px'}}>
+                <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
+                <div style={{fontSize:F.base,color:T.text0,lineHeight:'1.4'}}>{val}</div>
+              </div>
+            ) : null)}
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Contacts tab */}
+      {tab === 'contacts' && (
+        <div style={{flex:1,overflow:'hidden'}}>
+          <ContactsTable filterOwnerId={owner.id} hidePropertyFilter={true}/>
+        </div>
+      )}
     </div>
   );
 };

@@ -137,7 +137,7 @@ const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) 
 // ─────────────────────────────────────────────────────────────────────────────
 const NCOLS = 7;
 
-const ContactsList = ({ contacts, loading, error, onSelect }) => {
+export const ContactsList = ({ contacts, loading, error, onSelect, hidePropertyFilter = false }) => {
   const [statusFilter, setStatusFilter]     = useState('Active');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [propFilter, setPropFilter]         = useState([]);
@@ -150,15 +150,17 @@ const ContactsList = ({ contacts, loading, error, onSelect }) => {
   const moreAnchorRef = useRef(null);
 
   useEffect(() => {
+    if (hidePropertyFilter) return;
     sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
       .then(data => setActiveProps(data.map(p => p.prop_code)))
       .catch(() => {});
-  }, []);
+  }, [hidePropertyFilter]);
 
   useEffect(() => {
+    if (hidePropertyFilter) return;
     document.title = 'Contacts | SedonaCRM';
     return () => { document.title = 'SedonaCRM'; };
-  }, []);
+  }, [hidePropertyFilter]);
 
   const toggleProp = code => {
     if (code === 'All') { setPropFilter([]); return; }
@@ -296,12 +298,14 @@ const ContactsList = ({ contacts, loading, error, onSelect }) => {
         </div>
 
         {/* Row 1: Property strip */}
-        <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
-          <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
-          {activeProps.map(pc => (
-            <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
-          ))}
-        </div>
+        {!hidePropertyFilter && (
+          <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
+            <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
+            {activeProps.map(pc => (
+              <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
+            ))}
+          </div>
+        )}
 
         {/* Row 2: Category | Status | More... | Clear | Search */}
         <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0,flexWrap:'wrap'}}>

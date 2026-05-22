@@ -1,6 +1,7 @@
 import WorkOrdersView, { WorkOrdersList } from './WorkOrdersView';
 import SuitesView from './SuitesView';
 import IssuesView, { IssuesList } from './IssuesView';
+import ContactsTable from './shared/ContactsTable';
 import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
@@ -414,7 +415,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   const openWOs    = workOrders.filter(w=>w.wo_status!=='Closed'&&w.wo_status!=='Closed - Not Done').length;
   const openIssues = issues.filter(i=>(i.status||'').toLowerCase()!=='closed').length;
 
-  const TABS = ['Dashboard','Tenants','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Info','Listing Info','CAMs','Inspections','Documents'];
+  const TABS = ['Dashboard','Tenants','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Info','Listing Info','CAMs','Inspections','Contacts','Documents'];
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -483,8 +484,15 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
           </div>
         )}
 
+        {/* Contacts tab — full component, needs overflow:hidden wrapper */}
+        {tab==='contacts'&&(
+          <div style={{flex:1,overflow:'hidden'}}>
+            <ContactsTable filterPropCode={data.prop_code} hidePropertyFilter={true}/>
+          </div>
+        )}
+
         {/* All other tabs — scrollable padded container */}
-        {tab!=='work-orders'&&tab!=='issues'&&(
+        {tab!=='work-orders'&&tab!=='issues'&&tab!=='contacts'&&(
           <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
 
             {/* DASHBOARD */}

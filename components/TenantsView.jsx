@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import RichTextEditor from './RichTextEditor';
+import ContactsTable from './shared/ContactsTable';
 
 const SUPABASE_URL     = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -931,6 +932,25 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
         {tab === 'info' && (
           <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
 
+            {/* Entity Info — full width at top */}
+            <div style={{...css.card, gridColumn:'1 / -1'}}>
+              <div style={css.secTitle}>Entity Info</div>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'16px'}}>
+                <ReadonlyField label="Entity Name"  value={data.entity_name}/>
+                <ReadonlyField label="Entity Type"  value={data.entity_type}/>
+                <ReadonlyField label="Entity State" value={data.entity_state}/>
+              </div>
+              {data.entity_sig_block && (
+                <div style={{marginTop:'8px', padding:'8px', background:T.bg3, borderRadius:'4px', fontSize:F.sm, color:T.text1, lineHeight:'1.5', whiteSpace:'pre-wrap'}}>
+                  {data.entity_sig_block}
+                </div>
+              )}
+              <div style={{marginTop:'12px'}}>
+                <div style={css.secTitle}>Mailing Address</div>
+                <ReadonlyField label="" value={[data.address, data.city, data.state, data.zip].filter(Boolean).join(', ')}/>
+              </div>
+            </div>
+
             {/* LEFT: Tenant Info */}
             <div style={css.card}>
               <div style={css.secTitle}>Tenant Info</div>
@@ -1013,62 +1033,51 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
         {/* ── CONTACTS TAB ── */}
         {tab === 'contacts' && (
-          contacts === null ? (
-            <div style={{padding:'32px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading contacts…</div>
-          ) : (
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
-              {/* Primary Contact */}
-              <div style={css.card}>
-                <div style={css.secTitle}>Primary Contact</div>
-                {contacts.primary ? (
-                  <>
-                    <ReadonlyField label="Name"   value={contacts.primary.full_name}/>
-                    <ReadonlyField label="Title"  value={contacts.primary.title}/>
-                    <ReadonlyField label="Phone"  value={contacts.primary.primary_phone || contacts.primary.main_office_phone}/>
-                    <ReadonlyField label="Email"  value={contacts.primary.email}/>
-                    {contacts.primary.company_dba && <ReadonlyField label="Company" value={contacts.primary.company_dba}/>}
-                  </>
-                ) : (
-                  <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic', padding:'8px 0'}}>No primary contact linked.</div>
-                )}
-              </div>
-
-              {/* Accounting Contact */}
-              <div style={css.card}>
-                <div style={css.secTitle}>Accounting Contact</div>
-                {contacts.accounting ? (
-                  <>
-                    <ReadonlyField label="Name"   value={contacts.accounting.full_name}/>
-                    <ReadonlyField label="Title"  value={contacts.accounting.title}/>
-                    <ReadonlyField label="Phone"  value={contacts.accounting.primary_phone || contacts.accounting.main_office_phone}/>
-                    <ReadonlyField label="Email"  value={contacts.accounting.email}/>
-                    {contacts.accounting.company_dba && <ReadonlyField label="Company" value={contacts.accounting.company_dba}/>}
-                  </>
-                ) : (
-                  <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic', padding:'8px 0'}}>No accounting contact linked.</div>
-                )}
-              </div>
-
-              {/* Entity info from tenant record */}
-              <div style={{...css.card, gridColumn:'1 / -1'}}>
-                <div style={css.secTitle}>Entity Info</div>
-                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'16px'}}>
-                  <ReadonlyField label="Entity Name"  value={data.entity_name}/>
-                  <ReadonlyField label="Entity Type"  value={data.entity_type}/>
-                  <ReadonlyField label="Entity State" value={data.entity_state}/>
+          <div>
+            {/* Primary + Accounting linked contacts */}
+            {contacts === null ? (
+              <div style={{padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading contacts…</div>
+            ) : (
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'16px'}}>
+                {/* Primary Contact */}
+                <div style={css.card}>
+                  <div style={css.secTitle}>Primary Contact</div>
+                  {contacts.primary ? (
+                    <>
+                      <ReadonlyField label="Name"   value={contacts.primary.full_name}/>
+                      <ReadonlyField label="Title"  value={contacts.primary.title}/>
+                      <ReadonlyField label="Phone"  value={contacts.primary.primary_phone || contacts.primary.main_office_phone}/>
+                      <ReadonlyField label="Email"  value={contacts.primary.email}/>
+                      {contacts.primary.company_dba && <ReadonlyField label="Company" value={contacts.primary.company_dba}/>}
+                    </>
+                  ) : (
+                    <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic', padding:'8px 0'}}>No primary contact linked.</div>
+                  )}
                 </div>
-                {data.entity_sig_block && (
-                  <div style={{marginTop:'8px', padding:'8px', background:T.bg3, borderRadius:'4px', fontSize:F.sm, color:T.text1, lineHeight:'1.5', whiteSpace:'pre-wrap'}}>
-                    {data.entity_sig_block}
-                  </div>
-                )}
-                <div style={{marginTop:'12px'}}>
-                  <div style={css.secTitle}>Mailing Address</div>
-                  <ReadonlyField label="" value={[data.address, data.city, data.state, data.zip].filter(Boolean).join(', ')}/>
+
+                {/* Accounting Contact */}
+                <div style={css.card}>
+                  <div style={css.secTitle}>Accounting Contact</div>
+                  {contacts.accounting ? (
+                    <>
+                      <ReadonlyField label="Name"   value={contacts.accounting.full_name}/>
+                      <ReadonlyField label="Title"  value={contacts.accounting.title}/>
+                      <ReadonlyField label="Phone"  value={contacts.accounting.primary_phone || contacts.accounting.main_office_phone}/>
+                      <ReadonlyField label="Email"  value={contacts.accounting.email}/>
+                      {contacts.accounting.company_dba && <ReadonlyField label="Company" value={contacts.accounting.company_dba}/>}
+                    </>
+                  ) : (
+                    <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic', padding:'8px 0'}}>No accounting contact linked.</div>
+                  )}
                 </div>
               </div>
+            )}
+
+            {/* All contacts for this tenant */}
+            <div style={{height:'400px', overflow:'hidden', border:`0.5px solid ${T.border}`, borderRadius:'6px'}}>
+              <ContactsTable filterTenantId={data.id} hidePropertyFilter={true}/>
             </div>
-          )
+          </div>
         )}
 
         {/* ── RENT TAB ── */}
