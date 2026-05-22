@@ -93,7 +93,7 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
 - Issues — fully routed (`/issues`, `/issues/[id]`)
 - Work Orders — fully routed (`/work-orders`, `/work-orders/[id]`)
 - Tenants — fully routed (`/tenants`, `/tenants/[id]`)
-- Suites — built (SPA only, not yet routed to own pages)
+- Suites — fully routed (`/suites`, `/suites/[id]`)
 - Rent Schedule — fully routed (`/rent-schedule`, `/rent-schedule/[id]`)
 - Contacts — fully routed (`/contacts`, `/contacts/[id]`)
 - Vendors — fully routed (`/vendors`, `/vendors/[id]`)
@@ -249,7 +249,13 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 ## Next Priorities
 
-**Completed last session:**
+**Completed this session:**
+- Suites fully routed: pages/suites/index.jsx + pages/suites/[id].jsx
+  - Cold-loadable detail loads by podio_id; back via sessionStorage suitesBackUrl
+  - AppShell + SedonaCRM nav updated to /suites (router.push)
+  - SuitesView row click stores suitesBackUrl
+
+**Completed previous session:**
 - SuitesView: refactored SuitesList to accept external data (self-fetches tenantMap + activeProps internally)
   - Filter pills updated: Current | Occupied | For Lease | Archived | All
   - "For Lease" matches both 'Occupied / For Lease' AND 'Vacant / For Lease'
@@ -273,8 +279,6 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
    - Tenants tab: add Base Rent / Total columns (requires rent_schedule join)
    - Work Orders tab: vendor name (denormalized field or vendor lookup)
 
-3. Suites — add routed pages (pages/suites/index.jsx + [id].jsx) — currently SPA-only
-
-4. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
+3. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
 
 5. contacts table FK columns — tenant_id / vendor_id / owner_id not yet in schema; ContactsTable filterTenantId / filterVendorId / filterOwnerId will return empty until those columns are added
