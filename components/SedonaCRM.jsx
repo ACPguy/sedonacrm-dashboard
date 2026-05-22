@@ -411,7 +411,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
     return { occupied_sf, vacant_sf, gross_sf, occ_pct, monthly_total };
   })();
 
-  const openWOs    = workOrders.filter(w=>(w.status||'').toLowerCase()!=='closed').length;
+  const openWOs    = workOrders.filter(w=>w.wo_status!=='Closed'&&w.wo_status!=='Closed - Not Done').length;
   const openIssues = issues.filter(i=>(i.status||'').toLowerCase()!=='closed').length;
 
   const TABS = ['Dashboard','Tenants','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Info','Listing Info','CAMs','Inspections','Documents'];
