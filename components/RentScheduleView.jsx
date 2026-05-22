@@ -266,15 +266,15 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
   const hasMoreActive       = statusFilters.includes('Past') || hasActiveDateFilter;
   const hasActiveFilters    = propFilter.length > 0 || !isDefaultStatus || search !== '' || hasActiveDateFilter;
 
-  const grouped = useMemo(() => propFilter.length >= 1
-    ? [...propFilter].sort()
-        .map(pc => ({
-          prop_code: pc,
-          rows: filtered.filter(r => r.prop_code === pc),
-        }))
-        .filter(g => g.rows.length > 0)
-    : null
-  , [filtered, propFilter]);
+  const grouped = useMemo(() => {
+    const map = {};
+    filtered.forEach(r => {
+      const pc = r.prop_code || '';
+      if (!map[pc]) map[pc] = [];
+      map[pc].push(r);
+    });
+    return Object.keys(map).sort().map(pc => ({ prop_code: pc, rows: map[pc] }));
+  }, [filtered]);
 
   const clearFilters = () => {
     setStatusFilters([...DEFAULT_STATUSES]);
@@ -337,7 +337,7 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
             {row.tenants?.tenant_dba||''}
           </a>
         </td>
-        <td style={{...css.td, whiteSpace:'normal', wordBreak:'break-word'}}>{row.suite_num||''}</td>
+        <td style={{...css.td}}>{row.suite_num||''}</td>
         <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{row.tenants?.lease_type||''}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(row.rent_starts)}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs,
@@ -488,23 +488,19 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
+              {grouped.length === 0 && (
                 <tr><td colSpan={NCOLS} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No records match filters</td></tr>
               )}
-              {grouped ? (
-                grouped.map(group => (
-                  <React.Fragment key={group.prop_code}>
-                    <tr style={{background:T.bg3,position:'sticky',top:'29px',zIndex:1}}>
-                      <td colSpan={NCOLS} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
-                        {group.prop_code} <span style={{color:T.text3,fontWeight:'400'}}>({group.rows.length})</span>
-                      </td>
-                    </tr>
-                    {group.rows.map((row, i) => renderRow(row, i))}
-                  </React.Fragment>
-                ))
-              ) : (
-                filtered.map((row, i) => renderRow(row, i))
-              )}
+              {grouped.map(group => (
+                <React.Fragment key={group.prop_code}>
+                  <tr style={{background:T.bg3,borderLeft:`3px solid ${T.accent}`,position:'sticky',top:'29px',zIndex:1}}>
+                    <td colSpan={NCOLS} style={{...css.td,fontWeight:'700',color:T.text0,padding:'5px 10px',fontSize:F.xs,letterSpacing:'0.04em'}}>
+                      {group.prop_code}&nbsp;&nbsp;<span style={{color:T.text3,fontWeight:'400'}}>({group.rows.length})</span>
+                    </td>
+                  </tr>
+                  {group.rows.map((row, i) => renderRow(row, i))}
+                </React.Fragment>
+              ))}
             </tbody>
           </table>
         </div>
