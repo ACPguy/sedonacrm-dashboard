@@ -252,30 +252,30 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 ## Next Priorities
 
 **Completed this session:**
-- Suites fully routed: pages/suites/index.jsx + pages/suites/[id].jsx
-  - Cold-loadable detail loads by podio_id; back via sessionStorage suitesBackUrl
-  - AppShell + SedonaCRM nav updated to /suites (router.push)
-  - SuitesView row click stores suitesBackUrl
+- Issues detail form — full overhaul across two sessions:
+  - Round 1: PropCode live dropdown (properties table), property info box, FU Date calendar picker,
+    FU Notes TipTap rich text editor, Date Closed conditional on Status=Closed, global MM-DD-YYYY dates
+  - Round 2: Remove Calc field, Issue Name orange+bold, label typography update, IssuePriorityField
+    (click-to-dropdown pill), Issue Details minRows=5
+  - Round 3 (this session): IssueDetail body rewritten as 160px-label / 1fr-field two-column grid;
+    new FieldRow, InlineBlurField, InlineSelect, PriorityPills (all options always visible),
+    StatusPills (Open/Closed inline toggles) components; RichTextEditor label made conditional
+- Nav always-navigate fix (real fix):
+  - AppShell go() + SedonaCRM handleNav(): router.replace(path).then(reload) when already on
+    that path or sub-path; otherwise router.push(path)
+  - Replaced all 7 router.push('?t=Date.now()') calls in SedonaCRM.jsx with handleNav()
+  - CLAUDE.md Development Rule #3 updated to document this pattern and warn against ?t= approach
 
-**Completed previous session:**
-- SuitesView: refactored SuitesList to accept external data (self-fetches tenantMap + activeProps internally)
-  - Filter pills updated: Current | Occupied | For Lease | Archived | All
-  - "For Lease" matches both 'Occupied / For Lease' AND 'Vacant / For Lease'
-  - "Current" = non-Archived + (standalone) in active properties
-  - hidePropertyFilter=true skips activeProps fetch and property strip
-- SuitesTable (shared) — new components/shared/SuitesTable.jsx (self-fetching wrapper around SuitesList)
-- Property detail — added Suites tab after Tenants tab, using SuitesTable (hidePropertyFilter=true)
-- ContactDetail — full tabbed form replacing placeholder:
-  - Tabs: Dashboard | Contact Info | Work Orders | Issues | Tenant | Communications
-  - Contact Info: all 25 columns editable (EditableField with select support)
-  - Work Orders + Issues + Tenant: placeholder panels (FK columns not yet in schema)
-  - Communications: Phase 3 placeholder
-  - Header: copy link button, category/status badges
-- ContactsView now exports: sbPatch, EditableField (new), sbFetch, T, F, css, fmtDate, ContactsList, ContactDetail
-- contacts/[id].jsx: back button uses sessionStorage contactsBackUrl
+**Completed previous sessions:**
+- Suites fully routed: /suites + /suites/[id], cold-loadable by podio_id
+- SuitesTable shared component; Property detail Suites tab
+- ContactDetail — full tabbed form (Dashboard | Contact Info | WOs | Issues | Tenant | Comms)
+- contacts/[id].jsx back button via sessionStorage
 
 **Next:**
 1. Work Orders detail form — full build (standalone /work-orders/[id] currently a placeholder)
+   - Same pattern as Issues detail: two-column FieldRow grid, InlineBlurField, inline pills
+   - Check columns first: SELECT DISTINCT for status values
 
 2. Property detail refinements:
    - Tenants tab: add Base Rent / Total columns (requires rent_schedule join)
@@ -283,4 +283,5 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 3. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
 
-5. contacts table FK columns — tenant_id / vendor_id / owner_id not yet in schema; ContactsTable filterTenantId / filterVendorId / filterOwnerId will return empty until those columns are added
+4. contacts table FK columns — tenant_id / vendor_id / owner_id not yet in schema; ContactsTable
+   filterTenantId / filterVendorId / filterOwnerId will return empty until those columns are added
