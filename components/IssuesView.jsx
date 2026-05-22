@@ -897,7 +897,7 @@ const IssueBlurField = ({ label, value, onSave, type = 'text', readOnly = false 
           style={{fontSize:F.base,color:val?T.text0:T.text3,cursor:'text',padding:'3px 5px',borderRadius:'4px',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4'}}
           onMouseEnter={e => e.currentTarget.style.border = `1px solid ${T.border}`}
           onMouseLeave={e => e.currentTarget.style.border = '1px solid transparent'}>
-          {val || <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+          {(type === 'date' && val ? fmtDate(val) : val) || <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
           {saving && <span style={{color:T.text3,fontSize:F.xs,marginLeft:'6px'}}>saving…</span>}
         </div>
       )}
@@ -928,6 +928,7 @@ const CATEGORY_OPTIONS = [
 export const IssueDetail = ({ issue, onBack, onUpdate }) => {
   const [data, setData] = useState(issue);
   const [users, setUsers] = useState([]);
+  const [activeProps, setActiveProps] = useState([]);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [rightWidth, setRightWidth] = useState(300);
   const [copied, setCopied] = useState(false);
@@ -935,6 +936,8 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
 
   useEffect(() => {
     sbFetch('users', 'select=id,full_name&order=full_name.asc').then(setUsers).catch(() => {});
+    sbFetch('properties', 'select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc')
+      .then(setActiveProps).catch(() => {});
   }, []);
 
   const startRightResize = useCallback((e) => {
@@ -974,6 +977,20 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
   const save = async (field, val) => {
     await sbPatch('issues', data.id, { [field]: val ?? null });
     const updated = { ...data, [field]: val };
+    setData(updated);
+    onUpdate?.(updated);
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    const updates = { status: newStatus };
+    if (newStatus === 'Closed' && !data.close_date) {
+      const d = new Date();
+      updates.close_date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    } else if (newStatus !== 'Closed') {
+      updates.close_date = null;
+    }
+    await sbPatch('issues', data.id, updates);
+    const updated = { ...data, ...updates };
     setData(updated);
     onUpdate?.(updated);
   };
@@ -1030,12 +1047,38 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             />
             {/* 2. Issue Name */}
             <IssueBlurField label="Issue Name" value={data.issue_name} onSave={v => save('issue_name', v)}/>
-            {/* 3. Prop Code */}
-            <IssueBlurField label="Prop Code" value={data.prop_code} onSave={v => save('prop_code', v)}/>
+            {/* 3. Prop Code — dropdown + property info box */}
+            <div style={{marginBottom:'10px'}}>
+              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>Prop Code</div>
+              <select value={data.prop_code||''} onChange={async e => { await save('prop_code', e.target.value||null); }}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.prop_code?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {activeProps.map(p => (
+                  <option key={p.prop_code} value={p.prop_code}>{p.prop_code} — {p.property_name}</option>
+                ))}
+              </select>
+              {/* Fix 2: property info box */}
+              {(() => {
+                const prop = activeProps.find(p => p.prop_code === data.prop_code);
+                if (!prop) return (
+                  <div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'7px 10px',color:T.text3,fontSize:F.sm,fontStyle:'italic',minHeight:'36px',display:'flex',alignItems:'center'}}>
+                    {data.prop_code ? data.prop_code : 'No property selected'}
+                  </div>
+                );
+                const addr2 = [prop.city, prop.state, prop.zip].filter(Boolean).join(' ');
+                const line2 = prop.address ? (addr2 ? `${prop.address}, ${addr2}` : prop.address) : addr2;
+                return (
+                  <div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'7px 10px'}}>
+                    <div style={{fontSize:F.sm,fontWeight:'500',color:T.text0}}>{prop.property_name}</div>
+                    {line2 && <div style={{fontSize:F.xs,color:T.text2,marginTop:'2px'}}>{line2}</div>}
+                  </div>
+                );
+              })()}
+            </div>
             {/* 4. FU Date */}
             <IssueBlurField label="FU Date" value={data.follow_up_date||''} type="date" onSave={v => save('follow_up_date', v)}/>
             {/* 5. FU Notes */}
-            <IssueBlurField label="FU Notes" value={data.follow_up_notes} onSave={v => save('follow_up_notes', v)}/>
+            <RichTextEditor label="FU Notes" value={data.follow_up_notes} onSave={v => save('follow_up_notes', v)}/>
             {/* 6. Priority */}
             <IssueSelectField label="Priority" value={data.priority} options={['???','Urgent','High','Medium','Low']} onSave={v => save('priority', v)}/>
             {/* 7. Assigned To */}
@@ -1049,19 +1092,6 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             </div>
             {/* 8. Category */}
             <IssueSelectField label="Category" value={data.category} options={CATEGORY_OPTIONS} onSave={v => save('category', v)}/>
-            {/* 9. Properties (linked display) */}
-            <div style={{marginBottom:'10px'}}>
-              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px',userSelect:'none'}}>Properties</div>
-              <div style={{fontSize:F.base,padding:'3px 5px'}}>
-                {data.prop_code
-                  ? <a href={`/?view=properties&prop=${data.prop_code}`} style={{color:T.accent,textDecoration:'none',fontWeight:'500'}}
-                      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-                      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-                      {data.prop_code}
-                    </a>
-                  : <span style={{color:T.text3}}>—</span>}
-              </div>
-            </div>
             {/* 10. Issue Details (textarea) */}
             <RichTextEditor label="Issue Details" value={data.issue_details} onSave={v => save('issue_details', v)}/>
             {/* 11. Contacts (placeholder) */}
@@ -1083,7 +1113,7 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
               </div>
             </div>
             {/* 13. Status */}
-            <IssueSelectField label="Status" value={data.status} options={['Open','Closed']} onSave={v => save('status', v)}/>
+            <IssueSelectField label="Status" value={data.status} options={STATUS_OPTIONS} onSave={handleStatusChange}/>
             {/* 14. Last Updated (read-only) */}
             <IssueBlurField label="Last Updated"
               value={data.last_updated ? fmtDate(data.last_updated) : (data.updated_at ? fmtDate(data.updated_at) : '')}
@@ -1091,8 +1121,10 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             />
             {/* 15. Create Date (read-only) */}
             <IssueBlurField label="Create Date" value={data.create_date ? fmtDate(data.create_date) : ''} readOnly/>
-            {/* 16. Date Closed */}
-            <IssueBlurField label="Date Closed" value={data.close_date||''} type="date" onSave={v => save('close_date', v)}/>
+            {/* 16. Date Closed — only shown when Status = Closed */}
+            {data.status === 'Closed' && (
+              <IssueBlurField label="Date Closed" value={data.close_date||''} type="date" onSave={v => save('close_date', v)}/>
+            )}
           </div>
         </div>
 

@@ -289,7 +289,7 @@ const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
 const generateRentRollPDF = (property, rentRows, occupancy) => {
   const win = window.open('','_blank');
   const fmt = n => n!=null?'$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
-  const fmtD = d => d?new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+  const fmtD = d => fmtDate(d);
   const rows = rentRows.map(r=>`
     <tr>
       <td>${r.tenant_dba||'—'}</td><td>${r.suite_num||'—'}</td>
@@ -310,7 +310,7 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
   td{border:1px solid #ddd;padding:4px 6px}tfoot td{background:#f0f0f0;font-weight:bold}
   .summary{margin-bottom:12px;font-size:11px}.summary span{margin-right:20px}</style></head><body>
   <h2>Rent Roll — ${property.property_name||property.prop_code}</h2>
-  <div style="font-size:11px;color:#666;margin-bottom:8px">${property.address||''} · As of ${new Date().toLocaleDateString()}</div>
+  <div style="font-size:11px;color:#666;margin-bottom:8px">${property.address||''} · As of ${(d => `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}-${d.getFullYear()}`)(new Date())}</div>
   <div class="summary">
     <span>Occupied: ${fmtNum(occupancy.occupied_sf)} sf</span>
     <span>Vacant: ${fmtNum(occupancy.vacant_sf)} sf</span>
