@@ -391,7 +391,10 @@ const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) 
 // ─────────────────────────────────────────────────────────────────────────────
 // WorkOrders List
 // ─────────────────────────────────────────────────────────────────────────────
-export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hidePropStrip = false }) => {
+export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hidePropStrip = false, hidePropertyFilter = false, hideSearch = false, filterPropCode }) => {
+  // filterPropCode: client-side filter when data is pre-fetched for all props
+  if (filterPropCode) wos = wos.filter(w => w.prop_code === filterPropCode);
+  const _hidePropStrip = hidePropStrip || hidePropertyFilter;
   const [vendors, setVendors]               = useState([]);
   const [tenants, setTenants]               = useState([]);
   const [statusFilter, setStatusFilter]     = useState('Open');
@@ -662,7 +665,7 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
         </div>
 
         {/* Row 1: Property buttons — scrollable */}
-        {!hidePropStrip && (
+        {!_hidePropStrip && (
           <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
             <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
             {activeProps.map(pc => (

@@ -443,7 +443,9 @@ const MorePopover = ({ open, onClose, anchorRef, assignedFilter, setAssignedFilt
 // ─────────────────────────────────────────────────────────────────────────────
 // Issues List
 // ─────────────────────────────────────────────────────────────────────────────
-export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePropStrip = false }) => {
+export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePropStrip = false, hidePropertyFilter = false, hideSearch = false, filterPropCode }) => {
+  if (filterPropCode) issues = issues.filter(i => i.prop_code === filterPropCode);
+  const _hidePropStrip = hidePropStrip || hidePropertyFilter;
   const [users, setUsers]         = useState([]);
   const [statusFilter, setStatusFilter]     = useState('Open');
   const [priorityFilter, setPriorityFilter] = useState('All');
@@ -689,7 +691,7 @@ export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePr
         </div>
 
         {/* Row 1: Property buttons — scrollable single line */}
-        {!hidePropStrip && (
+        {!_hidePropStrip && (
           <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
             <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
             {activeProps.map(pc => (

@@ -125,6 +125,17 @@ const useSortable = (data, defaultCol, defaultDir='asc') => {
 const SuiteDetail = ({ suite, onBack, onUpdate }) => {
   const [data, setData] = useState(suite);
 
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'Escape') return;
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      onBack();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onBack]);
+
   const save = async (field, val) => {
     await sbPatch('suites', data.id, { [field]: val||null });
     const updated = {...data, [field]: val};
@@ -442,15 +453,15 @@ const SuitesList = ({ onSelect }) => {
         {!loading && (
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'6%'}}/>   {/* Prop */}
-              <col style={{width:'7%'}}/>   {/* Suite # */}
-              <col style={{width:'8%'}}/>   {/* Type */}
+              <col style={{width:'7%'}}/>   {/* Prop */}
+              <col style={{width:'8%'}}/>   {/* Suite # */}
+              <col style={{width:'9%'}}/>   {/* Type */}
               <col style={{width:'11%'}}/>  {/* Status */}
-              <col style={{width:'auto'}}/> {/* Tenant */}
-              <col style={{width:'7%'}}/>   {/* Sq Ft */}
-              <col style={{width:'9%'}}/>   {/* Base Rent */}
-              <col style={{width:'8%'}}/>   {/* NNN */}
-              <col style={{width:'9%'}}/>   {/* Total */}
+              <col style={{width:'28%'}}/>  {/* Tenant */}
+              <col style={{width:'8%'}}/>   {/* Sq Ft */}
+              <col style={{width:'10%'}}/>  {/* Base Rent */}
+              <col style={{width:'9%'}}/>   {/* NNN */}
+              <col style={{width:'10%'}}/>  {/* Total */}
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:1}}>
               {tableHeaders}
@@ -483,11 +494,28 @@ const SuitesList = ({ onSelect }) => {
 // ── Main Export ───────────────────────────────────────────────────────────────
 export default function SuitesView() {
   const [selected, setSelected] = useState(null);
+
+  const handleSelect = useCallback((s) => {
+    history.pushState({ suiteId: s.id }, '');
+    setSelected(s);
+  }, []);
+
+  const handleBack = useCallback(() => {
+    if (window.history.state?.suiteId) history.replaceState({}, '');
+    setSelected(null);
+  }, []);
+
+  useEffect(() => {
+    const onPop = () => setSelected(null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:'#1e2128'}}>
       {selected
-        ? <SuiteDetail suite={selected} onBack={()=>setSelected(null)} onUpdate={u=>setSelected(u)}/>
-        : <SuitesList onSelect={setSelected}/>
+        ? <SuiteDetail suite={selected} onBack={handleBack} onUpdate={u=>setSelected(u)}/>
+        : <SuitesList onSelect={handleSelect}/>
       }
     </div>
   );

@@ -162,6 +162,33 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 
 - **`property_agreements` table** (14 rows) = ACP's management agreement with property owners. Contains: commission structures, management fees, agreement start/end/expiration dates, and terms of ACP's contract to manage and lease the property. This is **NOT** the leasing pipeline. Never confuse these.
 
+## Architecture Rule — Single Source of Truth for All Table Components
+
+Every table/list view in the app must have exactly **ONE** shared component that is used everywhere.
+The primary version is always the one in the left-hand navigation pane.
+That component is built once, lives in `components/shared/`, and is imported everywhere it is needed.
+**NEVER build a second version of a table for use in a sub-view, tab, or detail form.**
+Instead, pass props to the shared component to control filtering and hide features not needed in that context.
+
+**Standard props every shared table component must accept:**
+- `filterPropCode` (string, optional) — auto-filter to this property
+- `filterTenantId` (string, optional) — auto-filter to this tenant
+- `hidePropertyFilter` (boolean) — hides preset property sort buttons when used inside a property detail
+- `hideSearch` (boolean, optional) — hides search bar if not needed in context
+
+Any change made to a shared component automatically reflects everywhere it is used.
+**If CC finds itself creating a second version of an existing table — STOP and use the shared component instead.**
+
+## Workflow Rule — Preview Branch Only
+
+All code changes go to the `preview` branch — never directly to `main`.
+Never run `git push origin main` unless Scott explicitly says "approved, merge to main."
+Always run `npm run build` before pushing — zero errors required.
+When stopped and waiting for Scott, always run:
+```
+echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
+```
+
 ## Development Rules
 
 1. **SELECT DISTINCT before any UI field from Podio** — Before building any dropdown, filter, badge, or component that displays or filters a field sourced from Podio data, always run `SELECT DISTINCT col FROM table ORDER BY col;` to confirm the exact values in the database. Never hardcode options without checking first.

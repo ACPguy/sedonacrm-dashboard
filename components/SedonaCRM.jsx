@@ -460,7 +460,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                 }
                 router.push(`/work-orders/${wo.podio_id??'X'+wo.id.slice(-6)}?from=properties`);
               }}
-              hidePropStrip={true}
+              hidePropertyFilter={true}
             />
           </div>
         )}
@@ -478,7 +478,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                 }
                 router.push(`/issues/${iss.podio_id??'X'+iss.id.slice(-6)}?from=properties`);
               }}
-              hidePropStrip={true}
+              hidePropertyFilter={true}
             />
           </div>
         )}
@@ -912,6 +912,22 @@ export const PropertiesView = () => {
   const [filter,setFilter] = useState('active');
   const [search,setSearch] = useState('');
 
+  const handleSelectProp = useCallback((p) => {
+    history.pushState({ propId: p.id }, '');
+    setSelected(p);
+  }, []);
+
+  const handleBackProp = useCallback(() => {
+    if (window.history.state?.propId) history.replaceState({}, '');
+    setSelected(null);
+  }, []);
+
+  useEffect(() => {
+    const onPop = () => setSelected(null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   useEffect(()=>{
     setLoading(true);
     let params = 'select=*';
@@ -955,7 +971,7 @@ export const PropertiesView = () => {
     return (p.prop_code||'').toLowerCase().includes(q)||(p.property_name||'').toLowerCase().includes(q)||(p.city||'').toLowerCase().includes(q);
   });
 
-  if(selected) return <PropertyDetail property={selected} onBack={()=>setSelected(null)} onUpdate={u=>setSelected(u)}/>;
+  if(selected) return <PropertyDetail property={selected} onBack={handleBackProp} onUpdate={u=>setSelected(u)}/>;
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -1012,14 +1028,14 @@ export const PropertiesView = () => {
                     onClick={e=>{
                       if(e.target.closest('a'))return;
                       if(e.ctrlKey||e.metaKey){window.open(`/properties/${p.podio_id??'X'+p.id.slice(-6)}`, '_blank');}
-                      else setSelected(p);
+                      else handleSelectProp(p);
                     }}
                     style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
                     onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                     onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
                     <td style={{...css.td,color:T.accent,fontWeight:'600'}}>
                       <a href={`/properties/${p.podio_id??'X'+p.id.slice(-6)}`}
-                        onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();setSelected(p);}}}
+                        onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();handleSelectProp(p);}}}
                         style={{color:'inherit',textDecoration:'none'}}>
                         {p.prop_code}
                       </a>

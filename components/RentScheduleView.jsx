@@ -337,7 +337,7 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
             {row.tenants?.tenant_dba||''}
           </a>
         </td>
-        <td style={{...css.td}}>{row.suite_num||''}</td>
+        <td style={{...css.td, overflow:'visible', textOverflow:'unset'}}>{row.suite_num||''}</td>
         <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{row.tenants?.lease_type||''}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{fmtNumDate(row.rent_starts)}</td>
         <td style={{...css.td,color:T.text2,fontSize:F.xs,
@@ -455,8 +455,8 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
           <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               {/* Prop      */} <col style={{width:'5%'}}/>
-              {/* Tenant    */} <col style={{width:'15%'}}/>
-              {/* Suite     */} <col style={{width:'4%'}}/>
+              {/* Tenant    */} <col style={{width:'12%'}}/>
+              {/* Suite     */} <col style={{width:'8%'}}/>
               {/* Type      */} <col style={{width:'5%'}}/>
               {/* Start     */} <col style={{width:'6%'}}/>
               {/* End       */} <col style={{width:'6%'}}/>
