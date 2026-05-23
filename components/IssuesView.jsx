@@ -1193,9 +1193,6 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
         <div style={{fontSize:F.lg,fontWeight:'700',color:'#E8630A',lineHeight:'1.3',marginTop:'6px'}}>
           {data.issue_name||'Untitled Issue'}
         </div>
-        {data.category && (
-          <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>{data.category}</div>
-        )}
       </div>
 
       {/* Body */}
