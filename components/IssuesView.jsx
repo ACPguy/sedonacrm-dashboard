@@ -948,12 +948,12 @@ const IssuePriorityField = ({ value, onSave }) => {
   );
 };
 
-const FieldRow = ({ label, children, topAlign = false }) => (
-  <div style={{
-    display:'grid', gridTemplateColumns:'160px 1fr',
-    borderBottom:`0.5px solid ${T.border}`,
-    padding:'10px 0', minHeight:'48px',
-  }}>
+const FieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
+  <div
+    style={{display:'grid',gridTemplateColumns:'160px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
+    onMouseEnter={hoverable ? e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } : undefined}
+    onMouseLeave={hoverable ? e => { e.currentTarget.style.background = ''; } : undefined}
+  >
     <div style={{
       fontSize:F.sm, fontWeight:'600', color:'#6B7280',
       textAlign:'right', paddingRight:'16px',
@@ -1239,10 +1239,10 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             <FieldRow label="Issue Details" topAlign>
               <RichTextEditor value={data.issue_details} onSave={v=>save('issue_details',v)} minRows={5}/>
             </FieldRow>
-            <FieldRow label="Contacts">
+            <FieldRow label="Contacts" hoverable={false}>
               <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Available after Podio sync</span>
             </FieldRow>
-            <FieldRow label="Podio Link">
+            <FieldRow label="Podio Link" hoverable={false}>
               {data.podio_url
                 ? <a href={data.podio_url} target="_blank" rel="noopener noreferrer" style={{color:T.accent,textDecoration:'none',fontSize:F.sm}}
                     onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
@@ -1251,10 +1251,10 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
                   </a>
                 : <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
             </FieldRow>
-            <FieldRow label="Last Updated">
+            <FieldRow label="Last Updated" hoverable={false}>
               <InlineBlurField readOnly value={data.last_updated?fmtDate(data.last_updated):(data.updated_at?fmtDate(data.updated_at):'')}/>
             </FieldRow>
-            <FieldRow label="Create Date">
+            <FieldRow label="Create Date" hoverable={false}>
               <InlineBlurField readOnly value={data.create_date?fmtDate(data.create_date):''}/>
             </FieldRow>
             {data.status === 'Closed' && (

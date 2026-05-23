@@ -1339,43 +1339,16 @@ const TenantsView = () => {
 
 // ── Home / Morning Briefing ───────────────────────────────────────────────────
 const HomeView = () => {
-  const router = useRouter();
   const [stats,setStats] = useState({properties:0,suites:0,tenants:0,workOrders:0});
-  const [activeProps,setActiveProps] = useState([]);
   useEffect(()=>{
     sbFetch('properties','select=id&status=eq.active').then(d=>setStats(s=>({...s,properties:d.length}))).catch(()=>{});
     sbFetch('suites','select=id').then(d=>setStats(s=>({...s,suites:d.length}))).catch(()=>{});
     sbFetch('tenants','select=id&tenant_status=eq.Active').then(d=>setStats(s=>({...s,tenants:d.length}))).catch(()=>{});
     sbFetch('work_orders','select=id&status=eq.Open').then(d=>setStats(s=>({...s,workOrders:d.length}))).catch(()=>{});
-    sbFetch('properties','select=prop_code,property_name,podio_id,id&status=eq.active&order=prop_code.asc')
-      .then(d=>setActiveProps(Array.isArray(d)?d:[])).catch(()=>{});
   },[]);
-  const go = path => {
-    if (router.asPath===path||router.asPath.startsWith(path+'/')||router.asPath.startsWith(path+'?')) {
-      router.replace(path).then(()=>router.reload());
-    } else {
-      router.push(path);
-    }
-  };
   return (
     <div style={{padding:'20px',overflowY:'auto',height:'100%'}}>
       <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,marginBottom:'16px'}}>Good morning, Scott.</div>
-      {activeProps.length>0&&(
-        <div style={{marginBottom:'20px'}}>
-          <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:'600',marginBottom:'8px'}}>Properties</div>
-          <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-            {activeProps.map(p=>(
-              <button key={p.prop_code} title={p.property_name}
-                onClick={()=>go(`/properties/${p.podio_id??'X'+p.id.slice(-6)}`)}
-                style={{height:'30px',padding:'0 12px',borderRadius:'4px',background:T.bg3,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:F.xs,fontWeight:'500',cursor:'pointer',whiteSpace:'nowrap'}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color=T.text0;}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
-                {p.prop_code}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'12px',marginBottom:'20px'}}>
         {[
           ['Active Properties',stats.properties,T.accent,'ti-building-store'],

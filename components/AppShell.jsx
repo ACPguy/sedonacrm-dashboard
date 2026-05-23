@@ -136,16 +136,20 @@ export default function AppShell({ children, activeView }) {
           <span style={{fontSize:F.md,fontWeight:'600',color:'#d4924a',flexShrink:0}}>Anderson Commercial Properties</span>
           <div style={{flex:1,overflow:'hidden',minWidth:0}}>
             <div style={{display:'flex',gap:'5px',overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch',padding:'7px 0'}}>
-              {activeProps.map(p => (
-                <button key={p.prop_code}
-                  title={p.property_name}
-                  onClick={() => go(`/properties/${p.podio_id ?? 'X'+p.id.slice(-6)}`)}
-                  style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg3,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color=T.text0;}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
-                  {p.prop_code}
-                </button>
-              ))}
+              {activeProps.map(p => {
+                const href = `/properties/${p.podio_id ?? 'X'+p.id.slice(-6)}`;
+                return (
+                  <a key={p.prop_code}
+                    href={href}
+                    title={p.property_name}
+                    onClick={e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); go(href); } }}
+                    style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg3,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,display:'inline-flex',alignItems:'center',textDecoration:'none'}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color=T.text0;}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
+                    {p.prop_code}
+                  </a>
+                );
+              })}
             </div>
           </div>
           <div style={{width:'32px',height:'32px',borderRadius:'50%',background:T.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:F.sm,fontWeight:'700',color:'#fff',flexShrink:0}}>SA</div>
