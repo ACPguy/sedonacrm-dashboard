@@ -1190,9 +1190,6 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             <StatusBadge status={data.status}/>
           </div>
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'700',color:'#E8630A',lineHeight:'1.3',marginTop:'6px'}}>
-          {data.issue_name||'Untitled Issue'}
-        </div>
       </div>
 
       {/* Body */}
