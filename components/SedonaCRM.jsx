@@ -1392,11 +1392,18 @@ export default function SedonaCRM() {
   const [sidebarWidth,setSidebarWidth] = useState(168);
   const [expandedMenu,setExpandedMenu] = useState(null);
   const [resetKey,setResetKey] = useState(0);
+  const [activeProps,setActiveProps] = useState([]);
   const resizingSidebar = useRef(false);
 
   useEffect(() => {
     if (router.query.view) setCurrentView(router.query.view);
   }, [router.query.view]);
+
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/rest/v1/properties?select=prop_code,property_name,podio_id,id&status=eq.active&order=prop_code.asc`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+    }).then(r => r.json()).then(data => setActiveProps(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
 
   const startSidebarResize = useCallback((e)=>{
     resizingSidebar.current=true;
@@ -1494,8 +1501,26 @@ export default function SedonaCRM() {
       {/* Main content */}
       <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
         {/* Topbar */}
-        <div style={{...css.topbar,justifyContent:'space-between'}}>
-          <span style={{fontSize:F.md,fontWeight:'600',color:'#d4924a'}}>Anderson Commercial Properties</span>
+        <div style={{padding:'0 16px',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:'12px',flexShrink:0,minHeight:'42px'}}>
+          <span style={{fontSize:F.md,fontWeight:'600',color:'#d4924a',flexShrink:0}}>Anderson Commercial Properties</span>
+          <div style={{flex:1,overflow:'hidden',minWidth:0}}>
+            <div style={{display:'flex',gap:'5px',overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch',padding:'7px 0'}}>
+              {activeProps.map(p => {
+                const href = `/properties/${p.podio_id ?? 'X'+p.id.slice(-6)}`;
+                return (
+                  <a key={p.prop_code}
+                    href={href}
+                    title={p.property_name}
+                    onClick={e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); handleNav(href); } }}
+                    style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg3,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,display:'inline-flex',alignItems:'center',textDecoration:'none'}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color=T.text0;}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
+                    {p.prop_code}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
           <div style={{width:'32px',height:'32px',borderRadius:'50%',background:T.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:F.sm,fontWeight:'700',color:'#fff',flexShrink:0}}>SA</div>
         </div>
         {/* View */}
