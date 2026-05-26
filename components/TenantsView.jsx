@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Storefront } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
 
@@ -668,10 +669,10 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
         {/* Row 1: Back button + action buttons */}
         <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px'}}>
           <button onClick={onBack}
-            style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0}}
+            style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0, display:'inline-flex', alignItems:'center', gap:'5px'}}
             onMouseEnter={e => e.currentTarget.style.color = T.text0}
             onMouseLeave={e => e.currentTarget.style.color = T.text1}>
-            ← Tenants
+            <Storefront size={14} weight="bold"/>← Tenants
           </button>
 
           {/* Action buttons — right-aligned */}

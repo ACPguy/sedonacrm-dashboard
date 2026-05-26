@@ -7,6 +7,7 @@ import ContactsTable from './shared/ContactsTable';
 import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -187,7 +188,7 @@ const WeatherCard = ({ city, lat, lon, url }) => {
 };
 
 // ── Nav Item ──────────────────────────────────────────────────────────────────
-const NavItem = ({ icon,label,active,onClick,href,collapsed,expandedMenu,setExpandedMenu,setCurrentView,submenu }) => {
+const NavItem = ({ iconComp,label,active,onClick,href,collapsed,expandedMenu,setExpandedMenu,setCurrentView,submenu }) => {
   const isExp = expandedMenu===label;
   return (
     <div>
@@ -201,9 +202,16 @@ const NavItem = ({ icon,label,active,onClick,href,collapsed,expandedMenu,setExpa
         style={{width:'100%',padding:collapsed?'8px 0':'7px 10px',background:active?T.bg2:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:collapsed?'center':'flex-start',gap:'9px',fontSize:F.base,color:active?T.accent:T.text1,borderRadius:'4px',borderRight:active?`2px solid ${T.accent}`:'2px solid transparent',whiteSpace:'nowrap',textDecoration:'none'}}
         onMouseEnter={e=>{if(!active)e.currentTarget.style.color=T.text0;}}
         onMouseLeave={e=>{if(!active)e.currentTarget.style.color=T.text1;}}>
-        <i className={`ti ${icon}`} style={{fontSize:'17px',flexShrink:0}} aria-hidden="true"></i>
-        {!collapsed&&<span style={{flex:1}}>{label}</span>}
-        {!collapsed&&submenu&&<i className="ti ti-chevron-down" style={{fontSize:'13px',transform:isExp?'rotate(180deg)':'none',transition:'transform 200ms'}} aria-hidden="true"></i>}
+        {collapsed
+          ? (iconComp
+              ? <span style={{display:'flex',alignItems:'center'}}>{iconComp}</span>
+              : <span style={{fontSize:'16px',fontWeight:'600'}}>{label[0]}</span>)
+          : <>
+              {iconComp && <span style={{display:'flex',alignItems:'center',flexShrink:0}}>{iconComp}</span>}
+              <span style={{flex:1}}>{label}</span>
+              {submenu && <i className="ti ti-chevron-down" style={{fontSize:'13px',transform:isExp?'rotate(180deg)':'none',transition:'transform 200ms'}} aria-hidden="true"></i>}
+            </>
+        }
       </a>
       {!collapsed&&submenu&&isExp&&(
         <div style={{paddingLeft:'24px'}}>
@@ -1463,30 +1471,30 @@ export default function SedonaCRM() {
         </div>
         {/* Nav */}
         <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
-          <NavItem icon="ti-layout-dashboard" label="Home" href="/?view=morning-briefing" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
+          <NavItem iconComp={<HouseLine size={18} weight="bold"/>} label="Home" href="/?view=morning-briefing" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Operations</div>}
-          <NavItem icon="ti-building-store" label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}  {...navProps}/>
-          <NavItem icon="ti-users"          label="Tenants"     href="/tenants"            active={currentView==='tenants'}     onClick={()=>handleNav('/tenants')} {...navProps}/>
-          <NavItem icon="ti-door"           label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>handleNav('/suites')} {...navProps}/>
-          <NavItem icon="ti-tool"           label="Work Orders" href="/work-orders"        active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
-          <NavItem icon="ti-alert-triangle" label="Issues"      href="/issues"             active={currentView==='issues'}      onClick={()=>handleNav('/issues')}   {...navProps}/>
-          <NavItem icon="ti-address-book"  label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>handleNav('/contacts')} {...navProps}/>
-          <NavItem icon="ti-building"      label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>handleNav('/vendors')}  {...navProps}/>
-          <NavItem icon="ti-home"          label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>handleNav('/owners')}   {...navProps}/>
+          <NavItem iconComp={<BuildingOffice size={18} weight="bold"/>} label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}  {...navProps}/>
+          <NavItem iconComp={<Storefront size={18} weight="bold"/>} label="Tenants"     href="/tenants"            active={currentView==='tenants'}     onClick={()=>handleNav('/tenants')} {...navProps}/>
+          <NavItem iconComp={<Cube size={18} weight="bold"/>} label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>handleNav('/suites')} {...navProps}/>
+          <NavItem iconComp={<Wrench size={18} weight="bold"/>} label="Work Orders" href="/work-orders"        active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
+          <NavItem iconComp={<CheckFat size={18} weight="bold"/>} label="Issues"      href="/issues"             active={currentView==='issues'}      onClick={()=>handleNav('/issues')}   {...navProps}/>
+          <NavItem iconComp={<UserCircle size={18} weight="bold"/>} label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>handleNav('/contacts')} {...navProps}/>
+          <NavItem iconComp={<Truck size={18} weight="bold"/>} label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>handleNav('/vendors')}  {...navProps}/>
+          <NavItem iconComp={<Briefcase size={18} weight="bold"/>} label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>handleNav('/owners')}   {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
-          <NavItem icon="ti-pipeline"   label="Pipeline" href="/?view=leasing"       active={currentView==='leasing'}       onClick={()=>navTo('leasing')}   {...navProps}/>
-          <NavItem icon="ti-file-text"  label="Leases"   href="/?view=leases"        active={currentView==='leases'}        onClick={()=>navTo('leases')}             {...navProps}/>
-          <NavItem icon="ti-cash"       label="Rents"    href="/rent-schedule"       active={currentView==='rent-schedule'} onClick={()=>handleNav('/rent-schedule')} {...navProps}/>
+          <NavItem label="Pipeline" href="/?view=leasing"       active={currentView==='leasing'}       onClick={()=>navTo('leasing')}   {...navProps}/>
+          <NavItem label="Leases"   href="/?view=leases"        active={currentView==='leases'}        onClick={()=>navTo('leases')}             {...navProps}/>
+          <NavItem iconComp={<ChartBar size={18} weight="bold"/>} label="Rents"    href="/rent-schedule"       active={currentView==='rent-schedule'} onClick={()=>handleNav('/rent-schedule')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Compliance</div>}
-          <NavItem icon="ti-shield-check"    label="Insurance"   href="/?view=tnt-cois"    active={currentView==='tnt-cois'}    onClick={()=>navTo('tnt-cois')}    {...navProps}/>
-          <NavItem icon="ti-clipboard-check" label="Inspections" href="/?view=inspections" active={currentView==='inspections'} onClick={()=>navTo('inspections')} {...navProps}/>
+          <NavItem label="Insurance"   href="/?view=tnt-cois"    active={currentView==='tnt-cois'}    onClick={()=>navTo('tnt-cois')}    {...navProps}/>
+          <NavItem label="Inspections" href="/?view=inspections" active={currentView==='inspections'} onClick={()=>navTo('inspections')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Finance</div>}
-          <NavItem icon="ti-chart-bar" label="QBO Dashboard" href="/?view=qbo"      active={currentView==='qbo'}      onClick={()=>navTo('qbo')}      {...navProps}/>
-          <NavItem icon="ti-receipt"   label="Invoices"      href="/?view=invoices" active={currentView==='invoices'} onClick={()=>navTo('invoices')} {...navProps}/>
+          <NavItem label="QBO Dashboard" href="/?view=qbo"      active={currentView==='qbo'}      onClick={()=>navTo('qbo')}      {...navProps}/>
+          <NavItem label="Invoices"      href="/?view=invoices" active={currentView==='invoices'} onClick={()=>navTo('invoices')} {...navProps}/>
         </div>
         {/* Bottom */}
         <div style={{padding:'8px 6px',borderTop:`0.5px solid ${T.border}`,flexShrink:0}}>
-          <NavItem icon="ti-settings" label="Settings" href="/?view=settings" active={currentView==='settings'} onClick={()=>navTo('settings')} {...navProps}/>
+          <NavItem label="Settings" href="/?view=settings" active={currentView==='settings'} onClick={()=>navTo('settings')} {...navProps}/>
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ChartBar } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -544,10 +545,10 @@ export const RentScheduleDetail = ({ row, onBack }) => {
       <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
           <button onClick={onBack}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer'}}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'5px'}}
             onMouseEnter={e=>e.currentTarget.style.color=T.text0}
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
-            ← Rent Schedule
+            <ChartBar size={14} weight="bold"/>← Rent Schedule
           </button>
           <span style={{color:T.accent,fontWeight:'600',fontSize:F.sm}}>{row.prop_code||'—'}</span>
           {row.suite_num && <span style={{color:T.text2,fontSize:F.sm}}>Suite {row.suite_num}</span>}

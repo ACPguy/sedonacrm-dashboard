@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -12,7 +13,7 @@ const T = {
 };
 const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
 
-const NavBtn = ({ label, active, href, onClick, collapsed }) => (
+const NavBtn = ({ label, active, href, onClick, collapsed, icon }) => (
   <a href={href}
     onClick={e=>{ if(!e.ctrlKey && !e.metaKey){ e.preventDefault(); onClick?.(); } }}
     title={collapsed ? label : undefined}
@@ -28,8 +29,10 @@ const NavBtn = ({ label, active, href, onClick, collapsed }) => (
     onMouseEnter={e=>{ if(!active) e.currentTarget.style.color=T.text0; }}
     onMouseLeave={e=>{ if(!active) e.currentTarget.style.color=T.text1; }}>
     {collapsed
-      ? <span style={{fontSize:'16px',fontWeight:'600'}}>{label[0]}</span>
-      : <span style={{flex:1}}>{label}</span>
+      ? (icon
+          ? <span style={{display:'flex',alignItems:'center'}}>{icon}</span>
+          : <span style={{fontSize:'16px',fontWeight:'600'}}>{label[0]}</span>)
+      : <>{icon && <span style={{display:'flex',alignItems:'center',flexShrink:0}}>{icon}</span>}<span style={{flex:1}}>{label}</span></>
     }
   </a>
 );
@@ -94,20 +97,20 @@ export default function AppShell({ children, activeView }) {
         </div>
         {/* Nav */}
         <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
-          <NavBtn label="Home" href="/?view=morning-briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={collapsed}/>
+          <NavBtn label="Home" href="/?view=morning-briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={collapsed} icon={<HouseLine size={18} weight="bold"/>}/>
           <SectionLabel label="Operations" collapsed={collapsed}/>
-          <NavBtn label="Properties"  href="/properties"        active={is('properties')}  onClick={()=>go('/properties')}        collapsed={collapsed}/>
-          <NavBtn label="Tenants"     href="/tenants"            active={is('tenants')}     onClick={()=>go('/tenants')}           collapsed={collapsed}/>
-          <NavBtn label="Suites"      href="/suites"             active={is('suites')}      onClick={()=>go('/suites')}            collapsed={collapsed}/>
-          <NavBtn label="Work Orders" href="/work-orders"        active={is('work-orders')} onClick={()=>go('/work-orders')}       collapsed={collapsed}/>
-          <NavBtn label="Issues"      href="/issues"             active={is('issues')}      onClick={()=>go('/issues')}            collapsed={collapsed}/>
-          <NavBtn label="Contacts"    href="/contacts"           active={is('contacts')}    onClick={()=>go('/contacts')}          collapsed={collapsed}/>
-          <NavBtn label="Vendors"     href="/vendors"            active={is('vendors')}     onClick={()=>go('/vendors')}           collapsed={collapsed}/>
-          <NavBtn label="Owners"      href="/owners"             active={is('owners')}      onClick={()=>go('/owners')}            collapsed={collapsed}/>
+          <NavBtn label="Properties"  href="/properties"        active={is('properties')}  onClick={()=>go('/properties')}        collapsed={collapsed} icon={<BuildingOffice size={18} weight="bold"/>}/>
+          <NavBtn label="Tenants"     href="/tenants"            active={is('tenants')}     onClick={()=>go('/tenants')}           collapsed={collapsed} icon={<Storefront size={18} weight="bold"/>}/>
+          <NavBtn label="Suites"      href="/suites"             active={is('suites')}      onClick={()=>go('/suites')}            collapsed={collapsed} icon={<Cube size={18} weight="bold"/>}/>
+          <NavBtn label="Work Orders" href="/work-orders"        active={is('work-orders')} onClick={()=>go('/work-orders')}       collapsed={collapsed} icon={<Wrench size={18} weight="bold"/>}/>
+          <NavBtn label="Issues"      href="/issues"             active={is('issues')}      onClick={()=>go('/issues')}            collapsed={collapsed} icon={<CheckFat size={18} weight="bold"/>}/>
+          <NavBtn label="Contacts"    href="/contacts"           active={is('contacts')}    onClick={()=>go('/contacts')}          collapsed={collapsed} icon={<UserCircle size={18} weight="bold"/>}/>
+          <NavBtn label="Vendors"     href="/vendors"            active={is('vendors')}     onClick={()=>go('/vendors')}           collapsed={collapsed} icon={<Truck size={18} weight="bold"/>}/>
+          <NavBtn label="Owners"      href="/owners"             active={is('owners')}      onClick={()=>go('/owners')}            collapsed={collapsed} icon={<Briefcase size={18} weight="bold"/>}/>
           <SectionLabel label="Leasing" collapsed={collapsed}/>
           <NavBtn label="Pipeline"      href="/?view=leasing"       active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={collapsed}/>
           <NavBtn label="Leases"        href="/?view=leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={collapsed}/>
-          <NavBtn label="Rents"         href="/rent-schedule"       active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={collapsed}/>
+          <NavBtn label="Rents"         href="/rent-schedule"       active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={collapsed} icon={<ChartBar size={18} weight="bold"/>}/>
           <SectionLabel label="Compliance" collapsed={collapsed}/>
           <NavBtn label="Insurance"   href="/?view=tnt-cois"    active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={collapsed}/>
           <NavBtn label="Inspections" href="/?view=inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={collapsed}/>

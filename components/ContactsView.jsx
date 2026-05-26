@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { UserCircle } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -584,10 +585,10 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
         {/* Row 1: Back + Copy Link */}
         <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px'}}>
           <button onClick={onBack}
-            style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0}}
+            style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0, display:'inline-flex', alignItems:'center', gap:'5px'}}
             onMouseEnter={e => e.currentTarget.style.color = T.text0}
             onMouseLeave={e => e.currentTarget.style.color = T.text1}>
-            ← Contacts
+            <UserCircle size={14} weight="bold"/>← Contacts
           </button>
           <div style={{marginLeft:'auto', display:'flex', gap:'6px'}}>
             <button onClick={copyLink}

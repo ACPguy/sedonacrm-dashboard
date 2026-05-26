@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Truck } from '@phosphor-icons/react';
 import ContactsTable from './shared/ContactsTable';
 
 const SUPABASE_URL    = 'https://edxcvyleielzevpappui.supabase.co';
@@ -525,10 +526,10 @@ export const VendorDetail = ({ vendor, onBack }) => {
       <div style={{padding:'10px 16px 0',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
           <button onClick={onBack}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer'}}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'5px'}}
             onMouseEnter={e => e.currentTarget.style.color = T.text0}
             onMouseLeave={e => e.currentTarget.style.color = T.text1}>
-            ← Vendors
+            <Truck size={14} weight="bold"/>← Vendors
           </button>
           {vendor.prop_code && <span style={{color:T.text3,fontSize:F.sm}}>{vendor.prop_code}</span>}
           {vendor.vendor_status && (
