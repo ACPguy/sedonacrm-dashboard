@@ -454,7 +454,7 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
 
       {!loading && !error && (
         <div style={{flex:1,overflowY:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+          <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               {/* Prop      */} <col style={{width:'5%'}}/>
               {/* Tenant    */} <col style={{width:'12%'}}/>
@@ -505,6 +505,29 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
               ))}
             </tbody>
           </table>
+          {/* Mobile cards */}
+          <div className="crm-mobile-cards">
+            {grouped.length === 0 && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No records match filters</div>}
+            {grouped.flatMap(g => g.rows).map((row, i) => {
+              const rowBg = i%2===0?'transparent':T.bg0;
+              const endSoon = isEndingSoon(row);
+              return (
+                <div key={row.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
+                  onClick={()=>onSelect(row)}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+                  <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{row.tenants?.tenant_dba||'—'}</div>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
+                    {row.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{row.prop_code}</span>}
+                    {row.suite_num&&<span style={{fontSize:F.xs,color:T.text2}}>Suite {row.suite_num}</span>}
+                    <RentStatusBadge status={row.rent_status}/>
+                    {endSoon&&<span style={{fontSize:F.xs,color:T.warn}}>Ends {fmtNumDate(row.rent_ends)}</span>}
+                  </div>
+                  {row.total&&<div style={{fontSize:F.xs,color:T.text1,marginTop:'3px'}}>Total: ${Number(row.total).toLocaleString()}/mo</div>}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

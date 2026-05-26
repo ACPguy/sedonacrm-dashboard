@@ -348,12 +348,12 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
 
 // ── Property Detail micro-components ─────────────────────────────────────────
 const PropFieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
-  <div
+  <div className="crm-field-row"
     style={{display:'grid',gridTemplateColumns:'160px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
     onMouseEnter={hoverable ? e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';} : undefined}
     onMouseLeave={hoverable ? e=>{e.currentTarget.style.background='';} : undefined}
   >
-    <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
+    <div className="crm-field-label" style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
       {label}
     </div>
     <div style={{alignSelf:topAlign?'start':'center',paddingRight:'4px'}}>
@@ -538,14 +538,16 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   },[tab,data.prop_code]);
 
   const save = async (field, val) => {
-    await sbPatch('properties', data.id, { [field]: val||null });
+    const stored = (val === '' || val === undefined) ? null : val;
+    await sbPatch('properties', data.id, { [field]: stored });
     const updated = {...data,[field]:val};
     setData(updated); onUpdate?.(updated);
   };
 
   const saveAgreement = async (field, val) => {
     if(!agreement) return;
-    await sbPatch('property_agreements', agreement.id, { [field]: val||null });
+    const stored = (val === '' || val === undefined) ? null : val;
+    await sbPatch('property_agreements', agreement.id, { [field]: stored });
     setAgreement(prev=>({...prev,[field]:val}));
   };
 
@@ -973,7 +975,9 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                   <RichTextEditor value={data.aps_notes||''} onSave={v=>save('aps_notes',v)}/>
                 </PropFieldRow>
                 <PropFieldRow label="Gross Sq Ftg">
-                  <PropInlineBlur value={data.gross_sqft!=null?String(data.gross_sqft):''} type="number" onSave={v=>save('gross_sqft',v)}/>
+                  <PropInlineBlur value={data.gross_sqft!=null?String(data.gross_sqft):''} type="number"
+                    displayTransform={v=>v?Number(v).toLocaleString():''}
+                    onSave={v=>save('gross_sqft',v?parseInt(v,10):null)}/>
                 </PropFieldRow>
                 <PropFieldRow label="Snow & Ice" topAlign>
                   <RichTextEditor value={data.snow_ice_instructions||''} onSave={v=>save('snow_ice_instructions',v)}/>

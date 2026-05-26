@@ -499,7 +499,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
 
       {!loading && !error && (
         <div style={{flex:1, overflowY:'auto'}}>
-          <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
+          <table className="crm-list-table" style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
             <colgroup>
               <col style={{width:'22%'}}/>
               <col style={{width:'6%'}}/>
@@ -543,6 +543,29 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
               }
             </tbody>
           </table>
+          {/* Mobile cards */}
+          <div className="crm-mobile-cards">
+            {filtered.length === 0 && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No tenants match filters</div>}
+            {filtered.map((t, i) => {
+              const rowBg = i%2===0?'transparent':T.bg0;
+              const exp = daysUntil(t.lease_ends);
+              const expColor = exp===null?T.text3:exp<0?T.danger:exp<180?T.warn:T.text2;
+              return (
+                <div key={t.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
+                  onClick={()=>onSelect(t)}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+                  <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{t.tenant_dba||'—'}</div>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
+                    {t.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{t.prop_code}</span>}
+                    {t.suite_num&&<span style={{fontSize:F.xs,color:T.text2}}>Suite {t.suite_num}</span>}
+                    <TenantStatusBadge status={t.tenant_status}/>
+                    {t.lease_ends&&<span style={{fontSize:F.xs,color:expColor}}>{fmtNumDate(t.lease_ends)}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

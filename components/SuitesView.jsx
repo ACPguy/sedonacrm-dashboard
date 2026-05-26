@@ -467,7 +467,8 @@ export const SuitesList = ({ suites, loading, error, onSelect, hidePropertyFilte
         {loading && <div style={{padding:'32px',textAlign:'center',color:T.text3}}>Loading suites…</div>}
         {error   && <div style={{padding:'32px',textAlign:'center',color:T.danger}}>Error: {error}</div>}
         {!loading && !error && (
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+          <>
+          <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               <col style={{width:'7%'}}/>
               <col style={{width:'8%'}}/>
@@ -501,6 +502,32 @@ export const SuitesList = ({ suites, loading, error, onSelect, hidePropertyFilte
               }
             </tbody>
           </table>
+          {/* Mobile cards */}
+          <div className="crm-mobile-cards">
+            {filtered.length === 0 && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No suites match filters</div>}
+            {filtered.map((s, i) => {
+              const tenantName = s.current_tenant_id ? tenantMap[s.current_tenant_id] : null;
+              const rowBg = i%2===0?'transparent':T.bg0;
+              return (
+                <div key={s.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
+                  onClick={()=>onSelect(s)}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}}>
+                    <span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{s.prop_code}</span>
+                    <span style={{fontWeight:'600',fontSize:F.base,color:T.text0}}>Suite {s.suite_num||'—'}</span>
+                    <StatusBadge status={s.status}/>
+                  </div>
+                  <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+                    <span style={{fontSize:F.xs,color:tenantName?T.text1:T.text3,fontStyle:tenantName?'normal':'italic'}}>{tenantName||'Vacant'}</span>
+                    {s.sqft&&<span style={{fontSize:F.xs,color:T.text2}}>{fmtNum(s.sqft)} sf</span>}
+                    {s.current_total_rent&&<span style={{fontSize:F.xs,color:T.accent,fontWeight:'600'}}>{fmtMoney(s.current_total_rent)}/mo</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         )}
       </div>
     </div>

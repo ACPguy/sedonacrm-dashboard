@@ -344,7 +344,7 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
 
       {!loading && !error && (
         <div style={{flex:1,overflowY:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+          <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               <col style={{width:'auto'}}/>
               <col style={{width:'60px'}}/>
@@ -372,6 +372,27 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
               {filtered.map((o, i) => renderRow(o, i))}
             </tbody>
           </table>
+          {/* Mobile cards */}
+          <div className="crm-mobile-cards">
+            {filtered.length === 0 && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No owners match filters</div>}
+            {filtered.map((o, i) => {
+              const rowBg = i%2===0?'transparent':T.bg0;
+              return (
+                <div key={o.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
+                  onClick={()=>onSelect(o)}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+                  <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{o.company_dba||'—'}</div>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
+                    {o.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{o.prop_code}</span>}
+                    {o.category&&<span style={catBadgeStyle(o.category)}>{o.category}</span>}
+                    {o.entity_type&&<span style={{fontSize:F.xs,color:T.text2}}>{o.entity_type}</span>}
+                  </div>
+                  {o.entity_name&&<div style={{fontSize:F.xs,color:T.text2,marginTop:'3px'}}>{o.entity_name}</div>}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -385,12 +406,12 @@ const OW_CAT_OPTS    = ['Active', 'Inactive', '???'];
 const OW_ENTITY_OPTS = ['Limited Liability Company', 'Partnership', 'Sole Proprietor'];
 
 const OwFieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
-  <div
+  <div className="crm-field-row"
     style={{display:'grid',gridTemplateColumns:'160px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
     onMouseEnter={hoverable ? e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';} : undefined}
     onMouseLeave={hoverable ? e=>{e.currentTarget.style.background='';} : undefined}
   >
-    <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
+    <div className="crm-field-label" style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
       {label}
     </div>
     <div style={{alignSelf:topAlign?'start':'center',paddingRight:'4px'}}>

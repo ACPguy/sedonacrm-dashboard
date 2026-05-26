@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -49,6 +49,7 @@ export default function AppShell({ children, activeView }) {
   const [width, setWidth] = useState(148);
   const resizing = useRef(false);
   const [activeProps, setActiveProps] = useState([]);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     fetch(`${SUPABASE_URL}/rest/v1/properties?select=prop_code,property_name,podio_id,id&status=eq.active&order=prop_code.asc`, {
@@ -73,6 +74,7 @@ export default function AppShell({ children, activeView }) {
   }, [width]);
 
   const go = path => {
+    setMobileNavOpen(false);
     if (router.asPath === path || router.asPath.startsWith(path + '/') || router.asPath.startsWith(path + '?')) {
       router.replace(path).then(() => router.reload());
     } else {
@@ -81,11 +83,65 @@ export default function AppShell({ children, activeView }) {
   };
   const is = view => activeView === view;
 
+  const navItems = (
+    <>
+      <NavBtn label="Home" href="/?view=morning-briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={collapsed} icon={<HouseLine size={18} weight="bold"/>}/>
+      <SectionLabel label="Operations" collapsed={collapsed}/>
+      <NavBtn label="Properties"  href="/properties"        active={is('properties')}  onClick={()=>go('/properties')}        collapsed={collapsed} icon={<BuildingOffice size={18} weight="bold"/>}/>
+      <NavBtn label="Tenants"     href="/tenants"            active={is('tenants')}     onClick={()=>go('/tenants')}           collapsed={collapsed} icon={<Storefront size={18} weight="bold"/>}/>
+      <NavBtn label="Suites"      href="/suites"             active={is('suites')}      onClick={()=>go('/suites')}            collapsed={collapsed} icon={<Cube size={18} weight="bold"/>}/>
+      <NavBtn label="Work Orders" href="/work-orders"        active={is('work-orders')} onClick={()=>go('/work-orders')}       collapsed={collapsed} icon={<Wrench size={18} weight="bold"/>}/>
+      <NavBtn label="Issues"      href="/issues"             active={is('issues')}      onClick={()=>go('/issues')}            collapsed={collapsed} icon={<CheckFat size={18} weight="bold"/>}/>
+      <NavBtn label="Contacts"    href="/contacts"           active={is('contacts')}    onClick={()=>go('/contacts')}          collapsed={collapsed} icon={<UserCircle size={18} weight="bold"/>}/>
+      <NavBtn label="Vendors"     href="/vendors"            active={is('vendors')}     onClick={()=>go('/vendors')}           collapsed={collapsed} icon={<Truck size={18} weight="bold"/>}/>
+      <NavBtn label="Owners"      href="/owners"             active={is('owners')}      onClick={()=>go('/owners')}            collapsed={collapsed} icon={<Briefcase size={18} weight="bold"/>}/>
+      <SectionLabel label="Leasing" collapsed={collapsed}/>
+      <NavBtn label="Pipeline"      href="/?view=leasing"       active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={collapsed}/>
+      <NavBtn label="Leases"        href="/?view=leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={collapsed}/>
+      <NavBtn label="Rents"         href="/rent-schedule"       active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={collapsed} icon={<ChartBar size={18} weight="bold"/>}/>
+      <SectionLabel label="Compliance" collapsed={collapsed}/>
+      <NavBtn label="Insurance"   href="/?view=tnt-cois"    active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={collapsed} icon={<Umbrella size={18} weight="bold"/>}/>
+      <NavBtn label="Inspections" href="/?view=inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={collapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
+      <SectionLabel label="Finance" collapsed={collapsed}/>
+      <NavBtn label="QBO Dashboard" href="/?view=qbo"      active={is('qbo')}      onClick={()=>go('/?view=qbo')}      collapsed={collapsed}/>
+      <NavBtn label="Invoices"      href="/?view=invoices" active={is('invoices')} onClick={()=>go('/?view=invoices')} collapsed={collapsed}/>
+    </>
+  );
+
   return (
     <div style={{display:'flex',height:'100vh',background:T.bg1,fontFamily:'var(--font-sans)',color:T.text0,fontSize:F.base,overflow:'hidden'}}>
-      {/* Sidebar */}
-      <div style={{width:collapsed?'48px':`${width}px`,background:T.bg0,borderRight:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',flexShrink:0,overflow:'hidden',transition:'width 200ms ease'}}>
-        {/* Top bar */}
+
+      {/* Mobile nav overlay */}
+      {mobileNavOpen && (
+        <div className="crm-mobile-overlay" onClick={()=>setMobileNavOpen(false)}/>
+      )}
+
+      {/* Mobile nav drawer (fixed, slides in from left) */}
+      <div style={{
+        position:'fixed',top:0,left:0,height:'100vh',zIndex:50,
+        width:'220px',background:T.bg0,borderRight:`0.5px solid ${T.border}`,
+        display:'flex',flexDirection:'column',overflow:'hidden',
+        transform:mobileNavOpen?'translateX(0)':'translateX(-100%)',
+        transition:'transform 0.2s ease',
+      }}>
+        <div style={{padding:'8px 16px',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px',flexShrink:0,minHeight:'42px'}}>
+          <span style={{fontSize:F.sm,fontWeight:'700',color:'#d4924a',letterSpacing:'0.02em'}}>ACP</span>
+          <button onClick={()=>setMobileNavOpen(false)}
+            style={{background:T.bg3,border:`1px solid ${T.border}`,color:T.text0,cursor:'pointer',padding:'4px 7px',borderRadius:'4px',fontSize:'13px',lineHeight:1}}>
+            ✕
+          </button>
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
+          {navItems}
+        </div>
+        <div style={{padding:'8px 6px',borderTop:`0.5px solid ${T.border}`,flexShrink:0}}>
+          <NavBtn label="Settings" href="/?view=settings" active={is('settings')} onClick={()=>go('/?view=settings')} collapsed={false}/>
+        </div>
+      </div>
+
+      {/* Desktop Sidebar */}
+      <div style={{width:collapsed?'48px':`${width}px`,background:T.bg0,borderRight:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',flexShrink:0,overflow:'hidden',transition:'width 200ms ease'}}
+        className="crm-desktop-sidebar">
         <div style={{padding:'8px 16px',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px',flexShrink:0,minHeight:'42px'}}>
           {!collapsed && <span style={{fontSize:F.sm,fontWeight:'700',color:'#d4924a',letterSpacing:'0.02em'}}>ACP</span>}
           <button onClick={()=>setCollapsed(c=>!c)}
@@ -95,48 +151,36 @@ export default function AppShell({ children, activeView }) {
             {collapsed?'»':'«'}
           </button>
         </div>
-        {/* Nav */}
         <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
-          <NavBtn label="Home" href="/?view=morning-briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={collapsed} icon={<HouseLine size={18} weight="bold"/>}/>
-          <SectionLabel label="Operations" collapsed={collapsed}/>
-          <NavBtn label="Properties"  href="/properties"        active={is('properties')}  onClick={()=>go('/properties')}        collapsed={collapsed} icon={<BuildingOffice size={18} weight="bold"/>}/>
-          <NavBtn label="Tenants"     href="/tenants"            active={is('tenants')}     onClick={()=>go('/tenants')}           collapsed={collapsed} icon={<Storefront size={18} weight="bold"/>}/>
-          <NavBtn label="Suites"      href="/suites"             active={is('suites')}      onClick={()=>go('/suites')}            collapsed={collapsed} icon={<Cube size={18} weight="bold"/>}/>
-          <NavBtn label="Work Orders" href="/work-orders"        active={is('work-orders')} onClick={()=>go('/work-orders')}       collapsed={collapsed} icon={<Wrench size={18} weight="bold"/>}/>
-          <NavBtn label="Issues"      href="/issues"             active={is('issues')}      onClick={()=>go('/issues')}            collapsed={collapsed} icon={<CheckFat size={18} weight="bold"/>}/>
-          <NavBtn label="Contacts"    href="/contacts"           active={is('contacts')}    onClick={()=>go('/contacts')}          collapsed={collapsed} icon={<UserCircle size={18} weight="bold"/>}/>
-          <NavBtn label="Vendors"     href="/vendors"            active={is('vendors')}     onClick={()=>go('/vendors')}           collapsed={collapsed} icon={<Truck size={18} weight="bold"/>}/>
-          <NavBtn label="Owners"      href="/owners"             active={is('owners')}      onClick={()=>go('/owners')}            collapsed={collapsed} icon={<Briefcase size={18} weight="bold"/>}/>
-          <SectionLabel label="Leasing" collapsed={collapsed}/>
-          <NavBtn label="Pipeline"      href="/?view=leasing"       active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={collapsed}/>
-          <NavBtn label="Leases"        href="/?view=leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={collapsed}/>
-          <NavBtn label="Rents"         href="/rent-schedule"       active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={collapsed} icon={<ChartBar size={18} weight="bold"/>}/>
-          <SectionLabel label="Compliance" collapsed={collapsed}/>
-          <NavBtn label="Insurance"   href="/?view=tnt-cois"    active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={collapsed} icon={<Umbrella size={18} weight="bold"/>}/>
-          <NavBtn label="Inspections" href="/?view=inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={collapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
-          <SectionLabel label="Finance" collapsed={collapsed}/>
-          <NavBtn label="QBO Dashboard" href="/?view=qbo"      active={is('qbo')}      onClick={()=>go('/?view=qbo')}      collapsed={collapsed}/>
-          <NavBtn label="Invoices"      href="/?view=invoices" active={is('invoices')} onClick={()=>go('/?view=invoices')} collapsed={collapsed}/>
+          {navItems}
         </div>
-        {/* Bottom */}
         <div style={{padding:'8px 6px',borderTop:`0.5px solid ${T.border}`,flexShrink:0}}>
           <NavBtn label="Settings" href="/?view=settings" active={is('settings')} onClick={()=>go('/?view=settings')} collapsed={collapsed}/>
         </div>
       </div>
 
-      {/* Sidebar resize handle */}
+      {/* Sidebar resize handle (desktop only) */}
       {!collapsed && (
         <div onMouseDown={startResize}
           style={{width:'4px',cursor:'col-resize',background:T.border,flexShrink:0,transition:'background 0.15s'}}
           onMouseEnter={e=>e.currentTarget.style.background=T.accent}
-          onMouseLeave={e=>e.currentTarget.style.background=T.border}/>
+          onMouseLeave={e=>e.currentTarget.style.background=T.border}
+          className="crm-desktop-sidebar"/>
       )}
 
       {/* Main content */}
-      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
         {/* Topbar */}
-        <div style={{padding:'0 16px',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:'12px',flexShrink:0,minHeight:'42px'}}>
-          <span style={{fontSize:F.md,fontWeight:'600',color:'#d4924a',flexShrink:0}}>Anderson Commercial Properties</span>
+        <div style={{padding:'0 12px',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:'10px',flexShrink:0,minHeight:'42px'}}>
+          {/* Hamburger — mobile only */}
+          <button className="crm-hamburger"
+            onClick={()=>setMobileNavOpen(o=>!o)}
+            style={{background:'transparent',border:'none',color:T.text1,cursor:'pointer',padding:'4px',borderRadius:'4px',minWidth:'44px',minHeight:'44px',display:'none'}}
+            onMouseEnter={e=>e.currentTarget.style.color=T.text0}
+            onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
+            <List size={24} weight="bold"/>
+          </button>
+          <span className="crm-topbar-title" style={{fontSize:F.md,fontWeight:'600',color:'#d4924a',flexShrink:0,whiteSpace:'nowrap'}}>Anderson Commercial Properties</span>
           <div style={{flex:1,overflow:'hidden',minWidth:0}}>
             <div style={{display:'flex',gap:'5px',overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch',padding:'7px 0'}}>
               {activeProps.map(p => {

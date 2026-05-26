@@ -819,7 +819,7 @@ export const WorkOrdersList = ({ onSelect, hidePropStrip = false, hidePropertyFi
 
       {!loading && !error && viewMode === 'table' && (
         <div style={{flex:1,overflowY:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+          <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               {/* WO # */}    <col style={{width:'54px',  minWidth:'54px'}}/>
               {/* Title */}   <col style={{width:'auto'}}/>
@@ -874,6 +874,33 @@ export const WorkOrdersList = ({ onSelect, hidePropStrip = false, hidePropertyFi
               )}
             </tbody>
           </table>
+          {/* Mobile cards */}
+          <div className="crm-mobile-cards">
+            {filtered.length === 0 && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No work orders match filters</div>}
+            {filtered.map((wo, i) => {
+              const vendorName = vendors.find(v=>v.id===wo.vendor_id)?.company_dba||'';
+              const fuOverdue = isFuOverdue(wo.follow_up_date, wo);
+              const fuDisplay = wo.follow_up_date ? fmtNumDate(wo.follow_up_date) : null;
+              const rowBg = i%2===0?'transparent':T.bg0;
+              return (
+                <div key={wo.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
+                  onClick={()=>onSelect(wo)}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+                  <div style={{display:'flex',gap:'6px',alignItems:'baseline',marginBottom:'4px'}}>
+                    {wo.podio_wo_number&&<span style={{fontSize:F.xs,color:T.text2,fontWeight:'600'}}>#{wo.podio_wo_number}</span>}
+                    <span style={{fontWeight:'600',fontSize:F.base,color:T.text0,lineHeight:'1.3'}}>{wo.short_description||'—'}</span>
+                  </div>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
+                    {wo.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{wo.prop_code}</span>}
+                    <StatusBadge status={wo.wo_status||'New'}/>
+                    {fuDisplay&&<span style={{fontSize:F.xs,color:fuOverdue?T.warn:T.text2,fontWeight:fuOverdue?'600':'400'}}>{fuOverdue&&'⚠ '}{fuDisplay}</span>}
+                    {vendorName&&<span style={{fontSize:F.xs,color:T.text2}}>{vendorName}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -884,12 +911,12 @@ export const WorkOrdersList = ({ onSelect, hidePropStrip = false, hidePropertyFi
 // WorkOrder Detail — form micro-components
 // ─────────────────────────────────────────────────────────────────────────────
 const WoFieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
-  <div
+  <div className="crm-field-row"
     style={{display:'grid',gridTemplateColumns:'170px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
     onMouseEnter={hoverable ? e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } : undefined}
     onMouseLeave={hoverable ? e => { e.currentTarget.style.background = ''; } : undefined}
   >
-    <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
+    <div className="crm-field-label" style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
       {label}
     </div>
     <div style={{alignSelf:topAlign?'start':'center',paddingRight:'4px'}}>

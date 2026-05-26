@@ -821,7 +821,7 @@ export const IssuesList = ({ onSelect, hidePropStrip = false, hidePropertyFilter
 
       {!loading && !error && viewMode === 'table' && (
         <div style={{flex:1,overflowY:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+          <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               <col style={{width:'auto'}}/>
               <col style={{width:'82px'}}/>
@@ -866,6 +866,29 @@ export const IssuesList = ({ onSelect, hidePropStrip = false, hidePropertyFilter
               )}
             </tbody>
           </table>
+          {/* Mobile cards */}
+          <div className="crm-mobile-cards">
+            {filtered.length === 0 && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No issues match filters</div>}
+            {filtered.map((iss, i) => {
+              const fuOverdue = isFuOverdue(iss.follow_up_date, iss.status);
+              const fuDisplay = iss.follow_up_date ? fmtNumDate(iss.follow_up_date) : null;
+              const rowBg = i%2===0?'transparent':T.bg0;
+              return (
+                <div key={iss.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
+                  onClick={()=>onSelect(iss)}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+                  <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px',lineHeight:'1.3'}}>{iss.issue_name||'—'}</div>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
+                    {iss.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{iss.prop_code}</span>}
+                    <StatusBadge status={iss.status||'Open'}/>
+                    {iss.priority&&<span style={{display:'flex',alignItems:'center',gap:'3px',fontSize:F.xs,color:T.text2}}><PriorityDot priority={iss.priority}/>{iss.priority}</span>}
+                    {fuDisplay&&<span style={{fontSize:F.xs,color:fuOverdue?T.warn:T.text2,fontWeight:fuOverdue?'600':'400'}}>{fuOverdue&&'⚠ '}{fuDisplay}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -970,12 +993,12 @@ const IssuePriorityField = ({ value, onSave }) => {
 };
 
 const FieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
-  <div
+  <div className="crm-field-row"
     style={{display:'grid',gridTemplateColumns:'160px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
     onMouseEnter={hoverable ? e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } : undefined}
     onMouseLeave={hoverable ? e => { e.currentTarget.style.background = ''; } : undefined}
   >
-    <div style={{
+    <div className="crm-field-label" style={{
       fontSize:F.sm, fontWeight:'600', color:'#6B7280',
       textAlign:'right', paddingRight:'16px',
       alignSelf: topAlign ? 'start' : 'center',

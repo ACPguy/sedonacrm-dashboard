@@ -483,7 +483,7 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
 
       {!loading && !error && (
         <div style={{flex:1,overflowY:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+          <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               <col style={{width:'auto'}}/>
               <col style={{width:'160px'}}/>
@@ -513,6 +513,31 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
               {filtered.map((v, i) => renderRow(v, i))}
             </tbody>
           </table>
+          {/* Mobile cards */}
+          <div className="crm-mobile-cards">
+            {filtered.length === 0 && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No vendors match filters</div>}
+            {filtered.map((v, i) => {
+              const rowBg = i%2===0?'transparent':T.bg0;
+              const statusColor = v.vendor_status==='Active'?T.success:v.vendor_status==='Inactive'?T.text2:T.warn;
+              const statusBg = v.vendor_status==='Active'?'#1e2a1e':v.vendor_status==='Inactive'?T.bg3:'rgba(212,146,74,0.15)';
+              return (
+                <div key={v.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
+                  onClick={()=>onSelect(v)}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+                  <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{v.company_dba||'—'}</div>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
+                    {v.vendor_status&&<span style={css.badge(statusColor,statusBg)}>{v.vendor_status}</span>}
+                    {v.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{v.prop_code}</span>}
+                    {Array.isArray(v.vendor_category)&&v.vendor_category.slice(0,2).map((c,ci)=>(
+                      <span key={ci} style={css.badge(T.text2,T.bg3)}>{c}</span>
+                    ))}
+                  </div>
+                  {v.main_phone&&<div style={{fontSize:F.xs,color:T.text2,marginTop:'3px'}}>{v.main_phone}</div>}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -526,12 +551,12 @@ const VD_STATUS_OPTS = ['Active', 'Inactive', 'Unrated Currently'];
 const VD_TAX_ID_TYPE_OPTS = ['EIN', 'SSN'];
 
 const VdFieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
-  <div
+  <div className="crm-field-row"
     style={{display:'grid',gridTemplateColumns:'160px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
     onMouseEnter={hoverable ? e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';} : undefined}
     onMouseLeave={hoverable ? e=>{e.currentTarget.style.background='';} : undefined}
   >
-    <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
+    <div className="crm-field-label" style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
       {label}
     </div>
     <div style={{alignSelf:topAlign?'start':'center',paddingRight:'4px'}}>

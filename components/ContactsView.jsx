@@ -468,7 +468,7 @@ export const ContactsList = ({ contacts, loading, error, onSelect, hidePropertyF
 
       {!loading && !error && (
         <div style={{flex:1,overflowY:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+          <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               {/* Name     */} <col style={{width:'22%'}}/>
               {/* Prop     */} <col style={{width:'6%'}}/>
@@ -509,6 +509,31 @@ export const ContactsList = ({ contacts, loading, error, onSelect, hidePropertyF
               )}
             </tbody>
           </table>
+          {/* Mobile cards */}
+          <div className="crm-mobile-cards">
+            {filtered.length === 0 && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No contacts match filters</div>}
+            {filtered.map((c, i) => {
+              const rowBg = i%2===0?'transparent':T.bg0;
+              const sLow = (c.status||'').toLowerCase();
+              const statusColor = sLow==='active'?T.success:T.text2;
+              const statusBg = sLow==='active'?'#1e2a1e':T.bg3;
+              return (
+                <div key={c.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
+                  onClick={()=>onSelect(c)}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                  onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+                  <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{c.full_name||'—'}</div>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
+                    {c.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{c.prop_code}</span>}
+                    {c.category&&<span style={css.badge(T.text1,T.bg3)}>{c.category}</span>}
+                    {c.status&&<span style={css.badge(statusColor,statusBg)}>{c.status}</span>}
+                  </div>
+                  {c.company_dba&&<div style={{fontSize:F.xs,color:T.text2,marginTop:'3px'}}>{c.company_dba}</div>}
+                  {c.primary_phone&&<div style={{fontSize:F.xs,color:T.text2,marginTop:'2px'}}>{c.primary_phone}</div>}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -518,10 +543,25 @@ export const ContactsList = ({ contacts, loading, error, onSelect, hidePropertyF
 // ─────────────────────────────────────────────────────────────────────────────
 // ContactDetail — full tabbed detail form
 // ─────────────────────────────────────────────────────────────────────────────
+const leaseUrgStyle = d => {
+  if (!d) return {};
+  const days = Math.round((new Date(d+'T00:00:00') - new Date()) / (1000*60*60*24));
+  if (days < 0)    return { color:'#fff', fontWeight:'700', background:'#7a0000', borderRadius:'3px', padding:'1px 5px' };
+  if (days <= 30)  return { color:'#e07070', fontWeight:'700' };
+  if (days <= 90)  return { color:'#d4924a', fontWeight:'700' };
+  if (days <= 180) return { color:'#f0d060', fontWeight:'700' };
+  return {};
+};
+
 export const ContactDetail = ({ contact, onBack, onUpdate }) => {
   const [tab,  setTab]  = useState('dashboard');
   const [data, setData] = useState(contact);
   const [copied, setCopied] = useState(false);
+
+  // Lazy tab data
+  const [tenantTab, setTenantTab] = useState({ rows: null, loading: false });
+  const [ownerTab,  setOwnerTab]  = useState({ rows: null, loading: false });
+  const [vendorTab, setVendorTab] = useState({ rows: null, loading: false });
 
   // Document title
   useEffect(() => {
@@ -541,6 +581,33 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack]);
 
+  // Lazy fetch: tenant
+  useEffect(() => {
+    if (tab !== 'tenant' || tenantTab.rows !== null) return;
+    setTenantTab({ rows: null, loading: true });
+    sbFetch('tenants', `select=id,podio_id,tenant_dba,prop_code,tenant_status,lease_ends,suite_num&or=(primary_contact_id.eq.${data.id},accounting_contact_id.eq.${data.id})`)
+      .then(rows => setTenantTab({ rows: rows || [], loading: false }))
+      .catch(() => setTenantTab({ rows: [], loading: false }));
+  }, [tab, data.id]);
+
+  // Lazy fetch: owner
+  useEffect(() => {
+    if (tab !== 'owner' || ownerTab.rows !== null) return;
+    setOwnerTab({ rows: null, loading: true });
+    sbFetch('property_owners', `select=id,company_dba,prop_code,entity_type,category&primary_contact_id=eq.${data.id}`)
+      .then(rows => setOwnerTab({ rows: rows || [], loading: false }))
+      .catch(() => setOwnerTab({ rows: [], loading: false }));
+  }, [tab, data.id]);
+
+  // Lazy fetch: vendor
+  useEffect(() => {
+    if (tab !== 'vendor' || vendorTab.rows !== null) return;
+    setVendorTab({ rows: null, loading: true });
+    sbFetch('vendors', `select=id,company_dba,vendor_status,vendor_category&primary_contact_id=eq.${data.id}`)
+      .then(rows => setVendorTab({ rows: rows || [], loading: false }))
+      .catch(() => setVendorTab({ rows: [], loading: false }));
+  }, [tab, data.id]);
+
   const save = async (field, val) => {
     await sbPatch('contacts', data.id, { [field]: val });
     const updated = { ...data, [field]: val };
@@ -555,7 +622,7 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
     }).catch(() => {});
   };
 
-  const TABS = ['Dashboard', 'Contact Info', 'Work Orders', 'Issues', 'Tenant', 'Communications'];
+  const TABS = ['Dashboard', 'Contact Info', 'Tenant', 'Issues', 'Owner', 'Vendor', 'Work Orders', 'Communications'];
   const tk = t => t.toLowerCase().replace(/ /g, '-');
 
   const tabBtnStyle = active => ({
@@ -760,36 +827,114 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
           </div>
         )}
 
-        {/* ── WORK ORDERS ── */}
-        {tab === 'work-orders' && (
-          placeholderPanel(
-            '🔧',
-            'Work order relationships will be available after Podio sync',
-            'When contact_id is added to work_orders schema, this tab will show the shared WorkOrdersTable.'
-          )
+        {/* ── TENANT ── */}
+        {tab === 'tenant' && (
+          <div style={css.card}>
+            <div style={css.secTitle}>Linked Tenant Records</div>
+            <div style={{fontSize:F.xs,color:T.text3,marginBottom:'10px'}}>
+              Contacts linked as primary or accounting contact on a tenant record.
+            </div>
+            {tenantTab.loading && <div style={{color:T.text3,fontSize:F.sm,padding:'16px 0',textAlign:'center'}}>Loading…</div>}
+            {!tenantTab.loading && tenantTab.rows !== null && tenantTab.rows.length === 0 && (
+              <div style={{padding:'16px 0',textAlign:'center',color:T.text3,fontSize:F.sm}}>No tenant records linked to this contact</div>
+            )}
+            {(tenantTab.rows||[]).map(t => (
+              <a key={t.id} href={`/tenants/${t.podio_id??'X'+t.id.slice(-6)}`}
+                style={{display:'block',textDecoration:'none',padding:'10px 12px',borderRadius:'5px',border:`0.5px solid ${T.border}`,marginBottom:'8px',background:T.bg3,cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                  <span style={{fontSize:F.base,fontWeight:'600',color:T.text0}}>{t.tenant_dba||'—'}</span>
+                  {t.prop_code&&<span style={css.badge(T.accent,'#1a2e3a')}>{t.prop_code}</span>}
+                  {t.suite_num&&<span style={{fontSize:F.xs,color:T.text2}}>Suite {t.suite_num}</span>}
+                  {t.tenant_status&&<span style={css.badge(t.tenant_status==='active'?T.success:T.text2,t.tenant_status==='active'?'#1e2a1e':T.bg2)}>{t.tenant_status}</span>}
+                </div>
+                {t.lease_ends&&(
+                  <div style={{fontSize:F.xs,color:T.text3,marginTop:'4px'}}>
+                    Lease ends: <span style={leaseUrgStyle(t.lease_ends)}>{fmtDate(t.lease_ends)}</span>
+                  </div>
+                )}
+              </a>
+            ))}
+          </div>
         )}
 
         {/* ── ISSUES ── */}
         {tab === 'issues' && (
           placeholderPanel(
             '⚠',
-            'Issues relationships will be available after Podio sync',
-            'When contact_id is added to issues schema, this tab will show the shared IssuesTable.'
+            'Issue linking via junction table — confirm schema then wire up',
+            'issue_contacts(issue_id, contact_id) confirmed. Anon SELECT policy needed before data appears.'
           )
         )}
 
-        {/* ── TENANT ── */}
-        {tab === 'tenant' && (
+        {/* ── OWNER ── */}
+        {tab === 'owner' && (
           <div style={css.card}>
-            <div style={css.secTitle}>Linked Tenant</div>
-            <div style={{padding:'16px 0', textAlign:'center'}}>
-              <div style={{fontSize:'28px', color:T.bg3, marginBottom:'6px'}}>🏢</div>
-              <div style={{fontSize:F.sm, color:T.text3}}>No tenant record linked to this contact</div>
-              <div style={{fontSize:F.xs, color:T.text3, marginTop:'4px', fontStyle:'italic'}}>
-                Tenant links will be available after the tenant_id FK column is added to the contacts table.
-              </div>
+            <div style={css.secTitle}>Linked Owner Records</div>
+            <div style={{fontSize:F.xs,color:T.text3,marginBottom:'10px'}}>
+              Contacts linked as primary contact on a property owner record.
             </div>
+            {ownerTab.loading && <div style={{color:T.text3,fontSize:F.sm,padding:'16px 0',textAlign:'center'}}>Loading…</div>}
+            {!ownerTab.loading && ownerTab.rows !== null && ownerTab.rows.length === 0 && (
+              <div style={{padding:'16px 0',textAlign:'center',color:T.text3,fontSize:F.sm}}>No owner records linked to this contact</div>
+            )}
+            {(ownerTab.rows||[]).map(o => (
+              <a key={o.id} href={`/owners/X${o.id.slice(-6)}`}
+                style={{display:'block',textDecoration:'none',padding:'10px 12px',borderRadius:'5px',border:`0.5px solid ${T.border}`,marginBottom:'8px',background:T.bg3,cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                  <span style={{fontSize:F.base,fontWeight:'600',color:T.text0}}>{o.company_dba||'—'}</span>
+                  {o.prop_code&&<span style={css.badge(T.accent,'#1a2e3a')}>{o.prop_code}</span>}
+                  {o.entity_type&&<span style={{fontSize:F.xs,color:T.text2}}>{o.entity_type}</span>}
+                  {o.category&&<span style={css.badge(T.text1,T.bg2)}>{o.category}</span>}
+                </div>
+              </a>
+            ))}
           </div>
+        )}
+
+        {/* ── VENDOR ── */}
+        {tab === 'vendor' && (
+          <div style={css.card}>
+            <div style={css.secTitle}>Linked Vendor Records</div>
+            <div style={{fontSize:F.xs,color:T.text3,marginBottom:'10px'}}>
+              Contacts linked as primary contact on a vendor record.
+            </div>
+            {vendorTab.loading && <div style={{color:T.text3,fontSize:F.sm,padding:'16px 0',textAlign:'center'}}>Loading…</div>}
+            {!vendorTab.loading && vendorTab.rows !== null && vendorTab.rows.length === 0 && (
+              <div style={{padding:'16px 0',textAlign:'center',color:T.text3,fontSize:F.sm}}>No vendor records linked to this contact</div>
+            )}
+            {(vendorTab.rows||[]).map(v => (
+              <a key={v.id} href={`/vendors/X${v.id.slice(-6)}`}
+                style={{display:'block',textDecoration:'none',padding:'10px 12px',borderRadius:'5px',border:`0.5px solid ${T.border}`,marginBottom:'8px',background:T.bg3,cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                  <span style={{fontSize:F.base,fontWeight:'600',color:T.text0}}>{v.company_dba||'—'}</span>
+                  {v.vendor_status&&<span style={css.badge(v.vendor_status==='Active'?T.success:T.text2,v.vendor_status==='Active'?'#1e2a1e':T.bg2)}>{v.vendor_status}</span>}
+                </div>
+                {v.vendor_category&&v.vendor_category.length>0&&(
+                  <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginTop:'5px'}}>
+                    {v.vendor_category.slice(0,4).map((cat,i)=>(
+                      <span key={i} style={css.badge(T.text2,T.bg2)}>{cat}</span>
+                    ))}
+                    {v.vendor_category.length>4&&<span style={{fontSize:F.xs,color:T.text3}}>+{v.vendor_category.length-4} more</span>}
+                  </div>
+                )}
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* ── WORK ORDERS ── */}
+        {tab === 'work-orders' && (
+          placeholderPanel(
+            '🔧',
+            'Work order linking available after Podio sync',
+            'work_orders has no contact_id FK — will be linked via Podio API sync at go-live.'
+          )
         )}
 
         {/* ── COMMUNICATIONS ── */}

@@ -37,3 +37,57 @@ a { color: inherit; text-decoration: none; }
 /* Hide native calendar icon; showPicker() opens the picker on focus */
 input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
 input[type="date"]::-moz-calendar-picker-indicator    { display: none; }
+
+/* ── Mobile responsive — breakpoint 640px ─────────────────────────────── */
+
+/* Desktop sidebar: hidden on mobile */
+@media (max-width: 639px) {
+  .crm-desktop-sidebar { display: none !important; }
+}
+
+/* Hamburger: hidden on desktop, flex on mobile */
+.crm-hamburger { display: none !important; }
+@media (max-width: 639px) {
+  .crm-hamburger { display: flex !important; align-items: center; justify-content: center; }
+  .crm-topbar-title { display: none !important; }
+}
+
+/* Mobile sidebar drawer (AppShell mobile nav) */
+.crm-mobile-overlay {
+  display: none;
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 49;
+}
+@media (max-width: 639px) {
+  .crm-mobile-overlay { display: block; }
+}
+
+/* FieldRow two-col → stacked on mobile */
+@media (max-width: 639px) {
+  .crm-field-row {
+    grid-template-columns: 1fr !important;
+    padding: 8px 0 !important;
+    min-height: unset !important;
+  }
+  .crm-field-label {
+    text-align: left !important;
+    padding-right: 0 !important;
+    margin-bottom: 4px;
+    font-size: 11px !important;
+  }
+}
+
+/* Table → card layout on mobile */
+@media (max-width: 639px) {
+  .crm-list-table { display: none !important; }
+  .crm-mobile-cards { display: block !important; }
+  /* Filter strips: horizontal scroll */
+  .crm-filter-strip { flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Touch targets */
+  .crm-filter-btn { min-height: 40px !important; }
+  /* Detail panel stacks below */
+  .crm-detail-layout { flex-direction: column !important; }
+  .crm-detail-right  { width: 100% !important; max-width: 100% !important; position: static !important; }
+}
+@media (min-width: 640px) {
+  .crm-mobile-cards { display: none !important; }
+}
