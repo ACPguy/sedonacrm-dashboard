@@ -3,7 +3,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Truck } from '@phosphor-icons/react';
+import { Truck, Eye, EyeSlash } from '@phosphor-icons/react';
+import { useRouter } from 'next/router';
+import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
 
 const SUPABASE_URL    = 'https://edxcvyleielzevpappui.supabase.co';
@@ -12,6 +14,19 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 export const sbFetch = async (table, params = '') => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+};
+
+export const sbPatch = async (table, id, updates) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(updates),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
@@ -36,6 +51,13 @@ const fmtNumDate = d => {
   if (!d) return '';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '';
+  return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
+};
+
+export const fmtDate = d => {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
   return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
 };
 
@@ -495,17 +517,271 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Vendor Detail — placeholder
+// Vendor Detail — micro-components
 // ─────────────────────────────────────────────────────────────────────────────
-export const VendorDetail = ({ vendor, onBack }) => {
-  const [tab, setTab] = useState('info');
+const VD_STATUS_OPTS = ['Active', 'Inactive', 'Unrated Currently'];
+const VD_TAX_ID_TYPE_OPTS = ['EIN', 'SSN'];
 
+const VdFieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
+  <div
+    style={{display:'grid',gridTemplateColumns:'160px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
+    onMouseEnter={hoverable ? e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';} : undefined}
+    onMouseLeave={hoverable ? e=>{e.currentTarget.style.background='';} : undefined}
+  >
+    <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
+      {label}
+    </div>
+    <div style={{alignSelf:topAlign?'start':'center',paddingRight:'4px'}}>
+      {children}
+    </div>
+  </div>
+);
+
+const VdInlineBlur = ({ value, onSave, type='text', highlight=false, readOnly=false }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState(value ?? '');
+  const [saving, setSaving]   = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { setVal(value ?? ''); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  const commit = async () => {
+    setEditing(false);
+    const trimmed = typeof val === 'string' ? val.trim() : String(val ?? '');
+    if (trimmed === String(value ?? '')) return;
+    setSaving(true);
+    try { await onSave(trimmed || null); }
+    catch { setVal(value ?? ''); }
+    finally { setSaving(false); }
+  };
+  const displayVal = type === 'date' && val ? fmtDate(val) : (val != null ? String(val) : '');
+  if (readOnly) return <div style={{fontSize:F.base,color:T.text1,lineHeight:'1.4'}}>{displayVal||'—'}</div>;
+  return editing ? (
+    <input ref={inputRef} type={type} value={val} onChange={e=>setVal(e.target.value)}
+      onFocus={type==='date'?(e=>{try{e.target.showPicker();}catch(_){}}) : undefined}
+      onBlur={commit}
+      onKeyDown={e=>{if(e.key==='Escape'){setVal(value??'');setEditing(false);}if(e.key==='Enter')commit();}}
+      style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',
+        ...(type==='date'?{appearance:'none',WebkitAppearance:'none',MozAppearance:'none'}:{})}}
+    />
+  ) : (
+    <div onClick={()=>setEditing(true)} title="Click to edit"
+      style={{fontSize:F.base,color:highlight?'#E8630A':(displayVal?T.text0:T.text3),fontWeight:highlight?'700':'normal',cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
+      onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
+      onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
+      {displayVal || <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+      {saving && <span style={{color:T.text3,fontSize:F.xs,marginLeft:'6px'}}>saving…</span>}
+    </div>
+  );
+};
+
+const VdInlineSelect = ({ value, options, onSave }) => (
+  <select value={value||''} onChange={async e=>{await onSave(e.target.value||null);}}
+    style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+    <option value="">—</option>
+    {options.map(o=>typeof o==='object'
+      ?<option key={o.value} value={o.value}>{o.label}</option>
+      :<option key={o} value={o}>{o}</option>)}
+  </select>
+);
+
+const VdBoolPill = ({ value, onSave }) => {
+  const opts = [
+    {val:true,  label:'Yes', activeBg:T.success,  activeColor:'#fff',  border:T.success, hoverBg:'rgba(106,176,106,0.20)'},
+    {val:false, label:'No',  activeBg:T.bg3,      activeColor:T.text0, border:T.text2,   hoverBg:'rgba(107,114,128,0.20)'},
+  ];
+  return (
+    <div style={{display:'flex',gap:'5px'}}>
+      {opts.map(o=>{
+        const active = value === o.val;
+        return (
+          <button key={o.label} onClick={()=>!active&&onSave(o.val)}
+            style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',
+              border:`1px solid ${o.border}`,background:active?o.activeBg:'transparent',color:active?o.activeColor:o.border,
+              transition:'background 0.15s ease'}}
+            onMouseEnter={e=>{if(!active)e.currentTarget.style.background=o.hoverBg;}}
+            onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const TaxIdField = ({ value, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState(value ?? '');
+  const [show, setShow]       = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { setVal(value ?? ''); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  const commit = async () => {
+    setEditing(false);
+    const trimmed = val.trim();
+    if (trimmed === String(value ?? '')) return;
+    setSaving(true);
+    try { await onSave(trimmed || null); }
+    catch { setVal(value ?? ''); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+      {editing ? (
+        <input ref={inputRef} type={show?'text':'password'} value={val}
+          onChange={e=>setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e=>{if(e.key==='Escape'){setVal(value??'');setEditing(false);}if(e.key==='Enter')commit();}}
+          style={{flex:1,background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}
+        />
+      ) : (
+        <div onClick={()=>setEditing(true)} title="Click to edit"
+          style={{flex:1,fontSize:F.base,color:val?T.text0:T.text3,cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
+          onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
+          onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
+          {val
+            ? (show ? val : '•'.repeat(Math.min(val.length, 9)))
+            : <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>
+          }
+          {saving && <span style={{color:T.text3,fontSize:F.xs,marginLeft:'6px'}}>saving…</span>}
+        </div>
+      )}
+      <button onClick={()=>setShow(s=>!s)} title={show?'Hide':'Show'}
+        style={{background:'transparent',border:'none',cursor:'pointer',color:T.text2,padding:'2px',display:'flex',alignItems:'center',flexShrink:0}}
+        onMouseEnter={e=>e.currentTarget.style.color=T.text0}
+        onMouseLeave={e=>e.currentTarget.style.color=T.text2}>
+        {show ? <EyeSlash size={16}/> : <Eye size={16}/>}
+      </button>
+    </div>
+  );
+};
+
+const VdActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
+  const [tab, setTab] = useState('comments');
+  return (
+    <div style={{display:'flex',flexShrink:0,height:'100%'}}>
+      <div onMouseDown={onMouseDown}
+        style={{width:'4px',cursor:'col-resize',background:T.border,flexShrink:0,transition:'background 0.15s'}}
+        onMouseEnter={e=>e.currentTarget.style.background=T.accent}
+        onMouseLeave={e=>e.currentTarget.style.background=T.border}/>
+      <div style={{width:collapsed?'36px':`${width}px`,background:T.bg0,borderLeft:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',overflow:'hidden',transition:'width 200ms ease',flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:collapsed?'center':'space-between',padding:collapsed?'9px 0':'8px 12px',borderBottom:`0.5px solid ${T.border}`,minHeight:'42px',flexShrink:0}}>
+          {!collapsed&&(
+            <div style={{display:'flex',gap:'2px'}}>
+              {['Comments','Activity'].map(t=>(
+                <button key={t} onClick={()=>setTab(t.toLowerCase())}
+                  style={{background:tab===t.toLowerCase()?T.bg2:'transparent',border:'none',padding:'4px 10px',borderRadius:'4px',cursor:'pointer',fontSize:F.sm,color:tab===t.toLowerCase()?T.accent:T.text1,fontWeight:tab===t.toLowerCase()?'600':'400'}}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={onCollapse}
+            title={collapsed?'Expand panel':'Collapse panel'}
+            style={{background:T.bg3,border:`1px solid ${T.border}`,color:T.text0,cursor:'pointer',padding:'4px 7px',display:'flex',alignItems:'center',borderRadius:'4px',flexShrink:0,fontSize:'14px',lineHeight:1}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+            {collapsed ? '«' : '»'}
+          </button>
+        </div>
+        {!collapsed&&(
+          <div style={{flex:1,overflowY:'auto',padding:'12px'}}>
+            {tab==='comments'&&(
+              <div>
+                <div style={{...css.card,marginBottom:'10px'}}>
+                  <p style={{fontSize:F.sm,color:T.text2,fontStyle:'italic',lineHeight:'1.6',margin:0}}>Comments and attached files will sync from Podio via API at go-live.</p>
+                </div>
+                <div style={{textAlign:'center',marginTop:'32px'}}>
+                  <span style={{fontSize:'32px',color:T.bg3,display:'block',marginBottom:'8px'}}>💬</span>
+                  <span style={{fontSize:F.sm,color:T.text3}}>Comments sync at go-live</span>
+                </div>
+              </div>
+            )}
+            {tab==='activity'&&(
+              <div>
+                <div style={{...css.card,marginBottom:'10px'}}>
+                  <p style={{fontSize:F.sm,color:T.text2,fontStyle:'italic',lineHeight:'1.6',margin:0}}>Activity tracking begins at go-live.</p>
+                </div>
+                <div style={{textAlign:'center',marginTop:'32px'}}>
+                  <span style={{fontSize:'32px',color:T.bg3,display:'block',marginBottom:'8px'}}>🕐</span>
+                  <span style={{fontSize:F.sm,color:T.text3}}>No activity before go-live</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vendor Detail — full form
+// ─────────────────────────────────────────────────────────────────────────────
+export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
+  const router = useRouter();
+  const [data, setData]                       = useState(vendor);
+  const [primaryContact, setPrimaryContact]   = useState(null);
+  const [referredContact, setReferredContact] = useState(null);
+  const [vendorServices, setVendorServices]   = useState([]);
+  const [serviceProps, setServiceProps]       = useState({});
+  const [rightCollapsed, setRightCollapsed]   = useState(false);
+  const [rightWidth, setRightWidth]           = useState(300);
+  const [copied, setCopied]                   = useState(false);
+  const [referSearch, setReferSearch]         = useState('');
+  const [referResults, setReferResults]       = useState([]);
+  const [referLoading, setReferLoading]       = useState(false);
+  const [referOpen, setReferOpen]             = useState(false);
+  const resizingRight = useRef(false);
+  const referRef      = useRef(null);
+
+  // Fetch linked contacts + vendor services on mount
   useEffect(() => {
-    const name = vendor?.company_dba || 'Vendor';
-    document.title = `${name} | SedonaCRM`;
-    return () => { document.title = 'SedonaCRM'; };
-  }, [vendor]);
+    if (data.primary_contact_id) {
+      sbFetch('contacts', `id=eq.${data.primary_contact_id}&select=id,full_name,podio_id`)
+        .then(rows=>setPrimaryContact(rows[0]||null)).catch(()=>{});
+    }
+    if (data.referred_by_contact_id) {
+      sbFetch('contacts', `id=eq.${data.referred_by_contact_id}&select=id,full_name,podio_id`)
+        .then(rows=>setReferredContact(rows[0]||null)).catch(()=>{});
+    }
+    sbFetch('vendor_services', `vendor_id=eq.${data.id}&select=*&order=prop_code.asc`)
+      .then(async rows=>{
+        setVendorServices(rows||[]);
+        const pcs=[...new Set((rows||[]).map(r=>r.prop_code).filter(Boolean))];
+        if(pcs.length){
+          const props=await sbFetch('properties',`prop_code=in.(${pcs.join(',')})&select=prop_code,property_name,podio_id,id`);
+          const map={};
+          (props||[]).forEach(p=>{map[p.prop_code]=p;});
+          setServiceProps(map);
+        }
+      }).catch(()=>{});
+  }, []);
 
+  // Debounced contact search for referred_by
+  useEffect(() => {
+    if (!referSearch || referSearch.length < 2) { setReferResults([]); setReferOpen(false); return; }
+    const t = setTimeout(async () => {
+      setReferLoading(true);
+      try {
+        const q = referSearch.replace(/['"]/g,'');
+        const rows = await sbFetch('contacts', `full_name=ilike.*${q}*&select=id,full_name,podio_id&limit=5&order=full_name.asc`);
+        setReferResults(rows||[]);
+        setReferOpen(true);
+      } catch { }
+      finally { setReferLoading(false); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [referSearch]);
+
+  // Close refer dropdown on outside click
+  useEffect(() => {
+    const handle = e => { if (referRef.current && !referRef.current.contains(e.target)) setReferOpen(false); };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  // Escape key
   useEffect(() => {
     const onKey = e => {
       if (e.key !== 'Escape') return;
@@ -517,88 +793,304 @@ export const VendorDetail = ({ vendor, onBack }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack]);
 
-  if (!vendor) return null;
+  // Document title
+  useEffect(() => {
+    document.title = `${data.company_dba || 'Vendor'} | SedonaCRM`;
+    return () => { document.title = 'SedonaCRM'; };
+  }, [data.company_dba]);
 
-  const TABS = ['Info', 'Contacts'];
+  const startRightResize = useCallback(e => {
+    resizingRight.current = true;
+    const startX = e.clientX, startW = rightWidth;
+    const onMove = me => { if (!resizingRight.current) return; setRightWidth(Math.max(180, Math.min(500, startW - (me.clientX - startX)))); };
+    const onUp   = () => { resizingRight.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [rightWidth]);
+
+  const save = async (field, val) => {
+    await sbPatch('vendors', data.id, { [field]: val ?? null });
+    const updated = { ...data, [field]: val };
+    setData(updated);
+    onUpdate?.(updated);
+  };
+
+  const copyLink = () => {
+    const url = `${window.location.origin}/vendors/${data.podio_id ?? 'X'+data.id.slice(-6)}`;
+    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(()=>setCopied(false), 1500); });
+  };
+
+  const selectReferredBy = async contact => {
+    await sbPatch('vendors', data.id, { referred_by_contact_id: contact.id });
+    const updated = { ...data, referred_by_contact_id: contact.id };
+    setData(updated);
+    setReferredContact(contact);
+    setReferSearch(''); setReferResults([]); setReferOpen(false);
+    onUpdate?.(updated);
+  };
+
+  const clearReferredBy = async () => {
+    await sbPatch('vendors', data.id, { referred_by_contact_id: null });
+    const updated = { ...data, referred_by_contact_id: null };
+    setData(updated);
+    setReferredContact(null);
+    onUpdate?.(updated);
+  };
+
+  const statusBadgeStyle = s => css.badge(
+    s==='Active'?T.success:s==='Inactive'?T.text2:T.warn,
+    s==='Active'?'#1e2a1e':s==='Inactive'?T.bg3:'rgba(212,146,74,0.15)'
+  );
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
-      <div style={{padding:'10px 16px 0',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
+      <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={onBack}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'5px'}}
-            onMouseEnter={e => e.currentTarget.style.color = T.text0}
-            onMouseLeave={e => e.currentTarget.style.color = T.text1}>
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',flexShrink:0,display:'inline-flex',alignItems:'center',gap:'5px'}}
+            onMouseEnter={e=>e.currentTarget.style.color=T.text0}
+            onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             <Truck size={14} weight="bold"/>← Vendors
           </button>
-          {vendor.prop_code && <span style={{color:T.text3,fontSize:F.sm}}>{vendor.prop_code}</span>}
-          {vendor.vendor_status && (
-            <span style={{marginLeft:'auto'}}>
-              <span style={css.badge(
-                vendor.vendor_status==='Active' ? T.success :
-                vendor.vendor_status==='Inactive' ? T.text2 : T.warn,
-                vendor.vendor_status==='Active' ? '#1e2a1e' :
-                vendor.vendor_status==='Inactive' ? T.bg3 : 'rgba(212,146,74,0.15)'
-              )}>{vendor.vendor_status}</span>
-            </span>
+          {data.vendor_category && (
+            <span style={css.badge(T.text1, T.bg3)}>{data.vendor_category.split(';')[0].trim()}</span>
           )}
+          <button onClick={copyLink}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',flexShrink:0,transition:'color 0.2s'}}
+            onMouseEnter={e=>{if(!copied)e.currentTarget.style.color=T.text0;}}
+            onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
+            {copied ? '✓ Copied' : '⧉ Copy Link'}
+          </button>
+          <div style={{marginLeft:'auto',display:'flex',gap:'6px',alignItems:'center',flexShrink:0}}>
+            {data.vendor_status && <span style={statusBadgeStyle(data.vendor_status)}>{data.vendor_status}</span>}
+          </div>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:'6px'}}>
           <Truck size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
-          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{vendor.company_dba||'Untitled Vendor'}</div>
-        </div>
-        {vendor.vendor_category && (
-          <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>{vendor.vendor_category}</div>
-        )}
-        {/* Tab bar */}
-        <div style={{display:'flex',gap:'2px',marginTop:'8px'}}>
-          {TABS.map(t => (
-            <button key={t} onClick={() => setTab(t.toLowerCase())}
-              style={{background:'transparent',border:'none',padding:'6px 12px',fontSize:F.sm,cursor:'pointer',borderRadius:'4px 4px 0 0',
-                color: tab === t.toLowerCase() ? T.accent : T.text1,
-                borderBottom: tab === t.toLowerCase() ? `2px solid ${T.accent}` : '2px solid transparent',
-                fontWeight: tab === t.toLowerCase() ? '600' : '400'}}>
-              {t}
-            </button>
-          ))}
+          <div style={{fontSize:F.lg,fontWeight:'700',color:'#E8630A'}}>{data.company_dba||'Untitled Vendor'}</div>
         </div>
       </div>
 
-      {/* Info tab */}
-      {tab === 'info' && (
-        <div style={{flex:1,overflowY:'auto',padding:'20px'}}>
-          <div style={{...css.card,maxWidth:'600px'}}>
-            <div style={css.secTitle}>Vendor Info</div>
-            {[
-              ['Company DBA',  vendor.company_dba],
-              ['Category',     vendor.vendor_category],
-              ['Status',       vendor.vendor_status],
-              ['Phone',        vendor.main_phone],
-              ['Fax',          vendor.fax],
-              ['Address',      [vendor.address, vendor.city, vendor.state, vendor.zip].filter(Boolean).join(', ')],
-              ['Prop Code',    vendor.prop_code],
-              ['Gets 1099',    vendor.gets_1099 === true ? 'Yes' : vendor.gets_1099 === false ? 'No' : '—'],
-              ['Tax ID',       vendor.tax_id],
-              ['Tax ID Type',  vendor.tax_id_type],
-              ['W9 On File',   vendor.w9_on_file === true ? 'Yes' : vendor.w9_on_file === false ? 'No' : '—'],
-              ['Notes',        vendor.company_notes],
-            ].map(([label, val]) => val ? (
-              <div key={label} style={{marginBottom:'8px'}}>
-                <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
-                <div style={{fontSize:F.base,color:T.text0,lineHeight:'1.4'}}>{val}</div>
+      {/* Body */}
+      <div style={{display:'flex',flex:1,overflow:'hidden'}}>
+        {/* Left: fields */}
+        <div style={{flex:1,overflowY:'auto'}}>
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
+
+            {/* 1. Company DBA */}
+            <VdFieldRow label="Company DBA">
+              <VdInlineBlur value={data.company_dba||''} onSave={v=>save('company_dba',v)} highlight/>
+            </VdFieldRow>
+
+            {/* 2. Vendor Status */}
+            <VdFieldRow label="Vendor Status">
+              <VdInlineSelect value={data.vendor_status} options={VD_STATUS_OPTS} onSave={v=>save('vendor_status',v)}/>
+            </VdFieldRow>
+
+            {/* 3. Vendor Category — free-form (103 distinct compound values) */}
+            <VdFieldRow label="Vendor Category">
+              <VdInlineBlur value={data.vendor_category||''} onSave={v=>save('vendor_category',v)}/>
+            </VdFieldRow>
+
+            {/* 4. Primary Contact linker */}
+            <VdFieldRow label="Primary Contact" hoverable={false}>
+              {primaryContact
+                ? <span style={{fontSize:F.base,color:T.accent,cursor:'pointer',textDecoration:'underline'}}
+                    onClick={()=>router.push('/contacts/'+(primaryContact.podio_id??'X'+primaryContact.id.slice(-6)))}>
+                    {primaryContact.full_name}
+                  </span>
+                : <span style={{fontSize:F.base,color:T.text3,fontStyle:'italic'}}>—</span>
+              }
+            </VdFieldRow>
+
+            {/* 5. Main Phone */}
+            <VdFieldRow label="Main Phone">
+              <VdInlineBlur value={data.main_phone||''} onSave={v=>save('main_phone',v)}/>
+            </VdFieldRow>
+
+            {/* 6. Fax */}
+            <VdFieldRow label="Fax">
+              <VdInlineBlur value={data.fax||''} onSave={v=>save('fax',v)}/>
+            </VdFieldRow>
+
+            {/* 7. Company Notes */}
+            <VdFieldRow label="Company Notes" topAlign>
+              <RichTextEditor value={data.company_notes||''} onSave={v=>save('company_notes',v)} minRows={5}/>
+            </VdFieldRow>
+
+            {/* 8-11. Address */}
+            <VdFieldRow label="Address">
+              <VdInlineBlur value={data.address||''} onSave={v=>save('address',v)}/>
+            </VdFieldRow>
+            <VdFieldRow label="City">
+              <VdInlineBlur value={data.city||''} onSave={v=>save('city',v)}/>
+            </VdFieldRow>
+            <VdFieldRow label="State">
+              <VdInlineBlur value={data.state||''} onSave={v=>save('state',v)}/>
+            </VdFieldRow>
+            <VdFieldRow label="Zip">
+              <VdInlineBlur value={data.zip||''} onSave={v=>save('zip',v)}/>
+            </VdFieldRow>
+
+            {/* 12. Referred To Us By */}
+            <VdFieldRow label="Referred To Us By" hoverable={false}>
+              <div ref={referRef} style={{position:'relative'}}>
+                {data.referred_by_contact_id && referredContact
+                  ? <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                      <span style={{fontSize:F.base,color:T.accent,cursor:'pointer',textDecoration:'underline'}}
+                        onClick={()=>router.push('/contacts/'+(referredContact.podio_id??'X'+referredContact.id.slice(-6)))}>
+                        {referredContact.full_name}
+                      </span>
+                      <button onClick={clearReferredBy}
+                        style={{background:'transparent',border:`0.5px solid ${T.text3}`,borderRadius:'3px',padding:'1px 5px',color:T.text3,cursor:'pointer',fontSize:F.xs,lineHeight:1}}
+                        onMouseEnter={e=>e.currentTarget.style.color=T.danger}
+                        onMouseLeave={e=>e.currentTarget.style.color=T.text3}>
+                        ✕
+                      </button>
+                    </div>
+                  : <div>
+                      <input value={referSearch} onChange={e=>setReferSearch(e.target.value)}
+                        placeholder="Search contacts by name…"
+                        onFocus={()=>{ if(referResults.length) setReferOpen(true); }}
+                        style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.sm,outline:'none'}}
+                      />
+                      {referLoading && <span style={{fontSize:F.xs,color:T.text3,marginTop:'3px',display:'block'}}>Searching…</span>}
+                      {referOpen && referResults.length > 0 && (
+                        <div style={{position:'absolute',top:'100%',left:0,right:0,background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',zIndex:100,boxShadow:'0 4px 12px rgba(0,0,0,0.4)',marginTop:'2px'}}>
+                          {referResults.map(c=>(
+                            <div key={c.id}
+                              style={{padding:'6px 10px',cursor:'pointer',fontSize:F.sm,color:T.text0,borderBottom:`0.5px solid ${T.border}`}}
+                              onMouseEnter={e=>e.currentTarget.style.background=T.bg3}
+                              onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                              onMouseDown={e=>{e.preventDefault();selectReferredBy(c);}}>
+                              {c.full_name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                }
+                {data.referred_by && (
+                  <div style={{fontSize:F.xs,color:T.text3,marginTop:'4px',fontStyle:'italic'}}>
+                    Legacy Podio value: {data.referred_by}
+                  </div>
+                )}
               </div>
-            ) : null)}
+            </VdFieldRow>
+
+            {/* 13. Properties Serviced */}
+            <VdFieldRow label="Properties Serviced" topAlign hoverable={false}>
+              {vendorServices.length === 0
+                ? <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>No property services on record</span>
+                : <table style={{width:'100%',borderCollapse:'collapse',marginTop:'2px'}}>
+                    <thead>
+                      <tr>
+                        <th style={{...css.th,background:'transparent',padding:'4px 6px'}}>Prop Code</th>
+                        <th style={{...css.th,background:'transparent',padding:'4px 6px'}}>Property Name</th>
+                        <th style={{...css.th,background:'transparent',padding:'4px 6px'}}>Status</th>
+                        <th style={{...css.th,background:'transparent',padding:'4px 6px'}}>Frequency</th>
+                        <th style={{...css.th,background:'transparent',padding:'4px 6px'}}>Service Day</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vendorServices.map(svc=>{
+                        const prop = serviceProps[svc.prop_code];
+                        return (
+                          <tr key={svc.id} style={{borderBottom:`0.5px solid ${T.border}`}}>
+                            <td style={{...css.td,padding:'4px 6px'}}>
+                              {prop
+                                ? <span style={{color:T.accent,cursor:'pointer',textDecoration:'underline'}}
+                                    onClick={()=>router.push('/properties/'+(prop.podio_id??'X'+prop.id.slice(-6)))}>
+                                    {svc.prop_code}
+                                  </span>
+                                : <span>{svc.prop_code||'—'}</span>
+                              }
+                            </td>
+                            <td style={{...css.td,padding:'4px 6px'}}>{prop?.property_name||'—'}</td>
+                            <td style={{...css.td,padding:'4px 6px'}}>{svc.status||'—'}</td>
+                            <td style={{...css.td,padding:'4px 6px'}}>{svc.service_frequency||'—'}</td>
+                            <td style={{...css.td,padding:'4px 6px'}}>{svc.service_day||'—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+              }
+            </VdFieldRow>
+
+            {/* 14. Request W9 placeholder */}
+            <VdFieldRow label="W9 Request" hoverable={false}>
+              <button disabled
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 12px',color:T.text3,fontSize:F.sm,cursor:'not-allowed',opacity:0.5}}>
+                Request W9 — Coming in Phase 3
+              </button>
+            </VdFieldRow>
+
+            {/* 15. Gets 1099? */}
+            <VdFieldRow label="Gets 1099?">
+              <VdBoolPill value={data.gets_1099} onSave={v=>save('gets_1099',v)}/>
+            </VdFieldRow>
+
+            {/* Entity section divider */}
+            <div style={{padding:'7px 16px 5px',background:'rgba(255,255,255,0.015)',borderTop:`0.5px solid ${T.border}`,borderBottom:`0.5px solid ${T.border}`}}>
+              <span style={{fontSize:F.xs,fontWeight:'700',color:T.text3,textTransform:'uppercase',letterSpacing:'0.1em'}}>Entity</span>
+            </div>
+
+            {/* 16. Entity Name */}
+            <VdFieldRow label="Entity — Name">
+              <VdInlineBlur value={data.entity_name||''} onSave={v=>save('entity_name',v)}/>
+            </VdFieldRow>
+
+            {/* 17. Tax ID — sensitive/password */}
+            <VdFieldRow label="Entity — Tax ID" hoverable={false}>
+              <TaxIdField value={data.tax_id||''} onSave={v=>save('tax_id',v)}/>
+            </VdFieldRow>
+
+            {/* 18. Tax ID Type */}
+            <VdFieldRow label="Tax ID # is a">
+              <VdInlineSelect value={data.tax_id_type} options={VD_TAX_ID_TYPE_OPTS} onSave={v=>save('tax_id_type',v)}/>
+            </VdFieldRow>
+
+            {/* 19. 1099 Notes */}
+            <VdFieldRow label="1099 Notes" topAlign>
+              <RichTextEditor value={data.notes_1099||''} onSave={v=>save('notes_1099',v)} minRows={5}/>
+            </VdFieldRow>
+
+            {/* 20. QBO Vendor ID */}
+            <VdFieldRow label="QBO Vendor ID">
+              <VdInlineBlur value={data.qbo_vendor_id||''} onSave={v=>save('qbo_vendor_id',v)}/>
+            </VdFieldRow>
+
+            {/* 21. W9 Requested Date */}
+            <VdFieldRow label="W9 Requested Date">
+              <VdInlineBlur type="date" value={data.w9_requested_date||''} onSave={v=>save('w9_requested_date',v)}/>
+            </VdFieldRow>
+
+            {/* 22. W9 On File */}
+            <VdFieldRow label="W9 On File">
+              <VdBoolPill value={data.w9_on_file} onSave={v=>save('w9_on_file',v)}/>
+            </VdFieldRow>
+
+            {/* 23. Vendor Podio ID */}
+            <VdFieldRow label="Vendor Podio ID" hoverable={false}>
+              {data.podio_id
+                ? <span style={{fontSize:F.sm,color:T.text1,fontFamily:'monospace'}}>{data.podio_id}</span>
+                : <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Available after Podio sync</span>
+              }
+            </VdFieldRow>
+
           </div>
         </div>
-      )}
 
-      {/* Contacts tab */}
-      {tab === 'contacts' && (
-        <div style={{flex:1,overflow:'hidden'}}>
-          <ContactsTable filterVendorId={vendor.id} hidePropertyFilter={true}/>
-        </div>
-      )}
+        {/* Right: Activity panel (defaults OPEN) */}
+        <VdActivityPanel
+          collapsed={rightCollapsed}
+          onCollapse={()=>setRightCollapsed(c=>!c)}
+          width={rightWidth}
+          onMouseDown={startRightResize}
+        />
+      </div>
     </div>
   );
 };
@@ -641,7 +1133,7 @@ export default function VendorsView() {
         <VendorsList vendors={vendors} loading={loading} error={error} onSelect={handleSelect}/>
       </div>
       {selected && (
-        <VendorDetail key={selected.id} vendor={selected} onBack={handleBack}/>
+        <VendorDetail key={selected.id} vendor={selected} onBack={handleBack} onUpdate={updated=>setSelected(updated)}/>
       )}
     </div>
   );

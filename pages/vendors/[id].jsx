@@ -15,8 +15,22 @@ export default function VendorDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
-    sbFetch('vendors', `select=*&${filter}`)
+
+    let fetchPromise;
+    if (id.includes('-')) {
+      // UUID fallback
+      fetchPromise = sbFetch('vendors', `select=*&id=eq.${id}`);
+    } else if (id.startsWith('X')) {
+      // X-prefix: vendors have 0 podio_ids — match by last 6 chars of UUID
+      const suffix = id.slice(1);
+      fetchPromise = sbFetch('vendors', `select=*`).then(rows =>
+        (rows || []).filter(v => v.id && v.id.slice(-6) === suffix)
+      );
+    } else {
+      fetchPromise = sbFetch('vendors', `select=*&podio_id=eq.${id}`);
+    }
+
+    fetchPromise
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Vendor not found');
@@ -30,7 +44,10 @@ export default function VendorDetailPage() {
       .catch(e => { setError(e.message); setLoading(false); });
   }, [router.isReady, router.query.id]);
 
-  const handleBack = () => router.push('/vendors');
+  const handleBack = () => {
+    const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('vendorsBackUrl')) || '/vendors';
+    router.push(backUrl);
+  };
 
   return (
     <AppShell activeView="vendors">
@@ -49,7 +66,14 @@ export default function VendorDetailPage() {
             </button>
           </div>
         )}
-        {vendor && <VendorDetail key={vendor.id} vendor={vendor} onBack={handleBack}/>}
+        {vendor && (
+          <VendorDetail
+            key={vendor.id}
+            vendor={vendor}
+            onBack={handleBack}
+            onUpdate={updated => setVendor(updated)}
+          />
+        )}
       </div>
     </AppShell>
   );
