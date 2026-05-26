@@ -4,6 +4,7 @@ import SuitesView from './SuitesView';
 import SuitesTable from './shared/SuitesTable';
 import IssuesView, { IssuesList } from './IssuesView';
 import ContactsTable from './shared/ContactsTable';
+import TenantsTable from './shared/TenantsTable';
 import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
@@ -571,81 +572,15 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
 
             {/* TENANTS / RENT ROLL */}
             {tab==='tenants'&&(
-              <div>
-                <div style={{display:'flex',gap:'12px',marginBottom:'12px',flexWrap:'wrap'}}>
-                  {[
-                    ['Occupied',`${fmtNum(occupancy.occupied_sf)} sf`,T.success],
-                    ['Vacant',`${fmtNum(occupancy.vacant_sf)} sf`,T.text2],
-                    ['Gross',`${fmtNum(occupancy.gross_sf)} sf`,T.text1],
-                    ['Occupancy',`${occupancy.occ_pct}%`,occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger],
-                    ['Monthly Total',fmtMoney(occupancy.monthly_total),T.accent],
-                  ].map(([label,val,color])=>(
-                    <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 14px',minWidth:'100px'}}>
-                      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
-                      <div style={{fontSize:F.md,fontWeight:'600',color,marginTop:'2px'}}>{val}</div>
-                    </div>
-                  ))}
+              <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+                <div style={{padding:'8px 14px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0,display:'flex',alignItems:'center'}}>
                   <button onClick={()=>generateRentRollPDF(data,rentRows,occupancy)}
-                    style={{marginLeft:'auto',background:T.accent,border:'none',borderRadius:'5px',padding:'6px 14px',color:'#fff',fontSize:F.sm,cursor:'pointer',alignSelf:'center'}}>
+                    style={{background:T.accent,border:'none',borderRadius:'5px',padding:'6px 14px',color:'#fff',fontSize:F.sm,cursor:'pointer'}}>
                     Generate Rent Roll PDF
                   </button>
                 </div>
-                <div style={{overflowX:'auto'}}>
-                  <table style={{width:'100%',borderCollapse:'collapse'}}>
-                    <thead>
-                      <tr>
-                        {['Tenant DBA','Suite','Sq Ft','Security','Lease Ends','Base Rent','NNN','Other','TPT Tax','Total','Base/sf','NNN/sf'].map(h=>(
-                          <th key={h} style={{...css.th,textAlign:h==='Sq Ft'||h==='Base Rent'||h==='NNN'||h==='Other'||h==='TPT Tax'||h==='Total'||h==='Base/sf'||h==='NNN/sf'||h==='Security'?'right':'left'}}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rentRows.length===0&&<tr><td colSpan={12} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No current rent schedule rows</td></tr>}
-                      {rentRows.map((r,i)=>{
-                        const mo=calcMoLeft(r.lease_ends);
-                        return (
-                          <tr key={r.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
-                            <td style={css.td}>
-                              {r.tenants?.podio_id?(
-                                <a href={`/tenants/${r.tenants.podio_id}`}
-                                  onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();const base=window.location.href.split('?')[0];sessionStorage.setItem('tenantsBackUrl',`${base}?tab=tenants`);router.push(`/tenants/${r.tenants.podio_id}?from=properties`);}}}
-                                  style={{color:T.accent,textDecoration:'none',fontWeight:'500'}}>
-                                  {r.tenant_dba||'—'}
-                                </a>
-                              ):(r.tenant_dba||'—')}
-                            </td>
-                            <td style={css.td}>{r.suite_num||'—'}</td>
-                            <td style={css.tdNum}>{fmtNum(r.sqft)}</td>
-                            <td style={css.tdNum}>{fmtMoney(r.security_deposit)}</td>
-                            <td style={{...css.td,color:moLeftColor(mo),fontWeight:mo!==null&&mo<=12?'600':'400'}}>{fmtDate(r.lease_ends)}</td>
-                            <td style={css.tdNum}>{fmtMoney(r.base_rent)}</td>
-                            <td style={css.tdNum}>{fmtMoney(r.nnn)}</td>
-                            <td style={css.tdNum}>{fmtMoney(r.other_amt)}</td>
-                            <td style={css.tdNum}>{fmtMoney(r.tpt_tax)}</td>
-                            <td style={{...css.tdNum,fontWeight:'600',color:T.text0}}>{fmtMoney(r.total)}</td>
-                            <td style={css.tdNum}>{r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
-                            <td style={css.tdNum}>{r.nnn_per_sf?Number(r.nnn_per_sf).toFixed(2):'—'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    {rentRows.length>0&&(
-                      <tfoot>
-                        <tr>
-                          <td colSpan={2} style={css.tfoot}>TOTALS</td>
-                          <td style={css.tfoot}>{fmtNum(rentRows.reduce((s,r)=>s+(Number(r.sqft)||0),0))}</td>
-                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.security_deposit)||0),0))}</td>
-                          <td style={css.tfoot}></td>
-                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
-                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
-                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
-                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.tpt_tax)||0),0))}</td>
-                          <td style={css.tfoot}>{fmtMoney(rentRows.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
-                          <td colSpan={2} style={css.tfoot}></td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
+                <div style={{flex:1,overflow:'hidden'}}>
+                  <TenantsTable filterPropCode={data.prop_code} hidePropertyFilter={true} grossSqft={data.gross_sqft}/>
                 </div>
               </div>
             )}

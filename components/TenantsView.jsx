@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/router';
 import { Storefront } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
@@ -61,6 +62,7 @@ const fmtNumDate = d => {
 };
 
 const fmtCurrency = n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+const fmtNum      = n => n != null && n !== '' ? Number(n).toLocaleString() : '—';
 const fmtSqft     = n => n == null ? '—' : Number(n).toLocaleString() + ' sf';
 const fmtPct      = n => n == null ? '—' : Number(n).toFixed(4) + '%';
 
@@ -1299,45 +1301,306 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TenantRentList — shared rent-roll table (source of truth for all contexts)
+// Props: rows (rent_schedule+tenants join), loading, error, properties,
+//        hidePropertyFilter, grossSqft, onRowClick(row)
+// ─────────────────────────────────────────────────────────────────────────────
+export const TenantRentList = ({
+  rows = [], loading = false, error = null, properties = [],
+  hidePropertyFilter = false, grossSqft, onRowClick,
+}) => {
+  const [propFilter,   setPropFilter]   = useState([]);
+  const [statusFilter, setStatusFilter] = useState('Active');
+  const [search,       setSearch]       = useState('');
+  const [sortCol,      setSortCol]      = useState('suite_num');
+  const [sortDir,      setSortDir]      = useState('asc');
+
+  const calcMo = endDate => {
+    if (!endDate) return null;
+    const end = new Date(endDate);
+    if (isNaN(end.getTime())) return null;
+    return (end - new Date()) / (1000*60*60*24*30.44);
+  };
+  const moColor = mo => {
+    if (mo === null || mo < 0) return T.text3;
+    if (mo <= 3)  return T.danger;
+    if (mo <= 12) return T.warn;
+    return T.success;
+  };
+
+  const activePropCodes = useMemo(() => properties.map(p => p.prop_code), [properties]);
+
+  const toggleProp = code => {
+    if (code === 'All') { setPropFilter([]); return; }
+    setPropFilter(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]);
+  };
+
+  const sorted = useMemo(() => {
+    const numeric = ['sqft','security_deposit','base_rent','nnn','other_amt','tpt_tax','total','base_per_sf','nnn_per_sf'];
+    return [...rows].sort((a, b) => {
+      const av = numeric.includes(sortCol) ? (Number(a[sortCol])||0) : String(a[sortCol]??'');
+      const bv = numeric.includes(sortCol) ? (Number(b[sortCol])||0) : String(b[sortCol]??'');
+      const cmp = typeof av === 'number' ? av - bv : av.localeCompare(bv);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [rows, sortCol, sortDir]);
+
+  const matchesSearch = r => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (r.tenant_dba||'').toLowerCase().includes(q) ||
+           (r.suite_num  ||'').toLowerCase().includes(q) ||
+           (r.prop_code  ||'').toLowerCase().includes(q);
+  };
+
+  const filtered = useMemo(() => sorted.filter(r => {
+    if (propFilter.length > 0 && !propFilter.includes(r.prop_code)) return false;
+    const ts = r.tenants?.tenant_status || '';
+    if (statusFilter !== 'All' && ts !== statusFilter) return false;
+    return matchesSearch(r);
+  }), [sorted, propFilter, statusFilter, search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const statusCounts = useMemo(() => {
+    const base = sorted.filter(r => {
+      if (propFilter.length > 0 && !propFilter.includes(r.prop_code)) return false;
+      return matchesSearch(r);
+    });
+    const c = { All: base.length };
+    TENANT_STATUS_OPTIONS.forEach(s => { c[s] = base.filter(r => (r.tenants?.tenant_status||'') === s).length; });
+    return c;
+  }, [sorted, propFilter, search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const occupancy = useMemo(() => {
+    const occupied_sf   = filtered.reduce((s,r) => s+(Number(r.sqft)||0), 0);
+    const gross_sf      = grossSqft != null ? Number(grossSqft) : properties.reduce((s,p) => s+(Number(p.gross_sqft)||0), 0);
+    const vacant_sf     = Math.max(0, gross_sf - occupied_sf);
+    const occ_pct       = gross_sf > 0 ? Math.round(occupied_sf/gross_sf*100) : 0;
+    const monthly_total = filtered.reduce((s,r) => s+(Number(r.total)||0), 0);
+    return { occupied_sf, vacant_sf, gross_sf, occ_pct, vacancy_pct: 100-occ_pct, monthly_total };
+  }, [filtered, grossSqft, properties]);
+
+  const hasActiveFilters = propFilter.length > 0 || statusFilter !== 'Active' || search !== '';
+  const clearFilters = () => { setPropFilter([]); setStatusFilter('Active'); setSearch(''); };
+
+  const toggleSort = col => {
+    if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+  const Th = ({ col, label, align='left' }) => (
+    <th style={{...css.th, textAlign:align}} onClick={() => toggleSort(col)}>
+      {label}
+      {sortCol===col ? <span style={{marginLeft:'3px'}}>{sortDir==='asc'?'↑':'↓'}</span>
+                     : <span style={{marginLeft:'3px',color:T.bg3}}>↕</span>}
+    </th>
+  );
+
+  const propBtnStyle = active => ({
+    padding:'3px 7px', borderRadius:'4px', cursor:'pointer', fontSize:F.xs, whiteSpace:'nowrap', flexShrink:0,
+    border:`0.5px solid ${active ? T.accent : T.border}`,
+    background: active ? T.accent : 'transparent',
+    color: active ? '#fff' : T.text2, fontWeight: active ? '600' : '400',
+  });
+
+  const colSpan = hidePropertyFilter ? 12 : 13;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      {/* Header */}
+      <div style={{padding:'7px 14px 6px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
+          <Storefront size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Tenants</span>
+          <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
+        </div>
+        {!hidePropertyFilter && (
+          <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
+            <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length===0)}>All</button>
+            {activePropCodes.map(pc => (
+              <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
+            ))}
+          </div>
+        )}
+        <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0}}>
+          <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+            {['All',...TENANT_STATUS_OPTIONS].map(s => {
+              const cnt = statusCounts[s] ?? 0;
+              const active = statusFilter === s;
+              return (
+                <button key={s} onClick={() => setStatusFilter(s)}
+                  style={{padding:'3px 7px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
+                    background:active?T.bg3:'transparent',color:active?T.text0:T.text2,fontWeight:active?'600':'400',
+                    display:'flex',alignItems:'center',gap:'2px',whiteSpace:'nowrap'}}>
+                  {s}<span style={{color:active?T.text1:T.text3,fontSize:'10px'}}>·{cnt}</span>
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={clearFilters}
+            style={{padding:'3px 9px',borderRadius:'5px',cursor:'pointer',fontSize:F.xs,
+              border:`0.5px solid ${hasActiveFilters?T.warn:T.border}`,background:'transparent',
+              color:hasActiveFilters?T.warn:T.text3,display:'flex',alignItems:'center',gap:'3px',
+              transition:'all 0.15s',visibility:hasActiveFilters?'visible':'hidden'}}>
+            <span style={{fontSize:'12px'}}>×</span> Clear
+          </button>
+          <div style={{marginLeft:'auto',position:'relative',display:'flex',alignItems:'center',flexShrink:0}}>
+            {search && (
+              <button onClick={() => setSearch('')}
+                style={{position:'absolute',left:'7px',background:'transparent',border:'none',cursor:'pointer',color:T.text2,fontSize:'14px',lineHeight:1,padding:0,zIndex:1}}>×</button>
+            )}
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
+              style={{width:'220px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',
+                padding:`4px 10px 4px ${search?'26px':'10px'}`,color:T.text0,fontSize:F.xs,outline:'none'}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary bar */}
+      {!loading && !error && (
+        <div style={{display:'flex',gap:'8px',padding:'8px 14px',borderBottom:`0.5px solid ${T.border}`,background:T.bg1,flexShrink:0,flexWrap:'wrap'}}>
+          {[
+            ['Occupied',     `${fmtNum(occupancy.occupied_sf)} sf`,   T.success],
+            ['Vacant',       `${fmtNum(occupancy.vacant_sf)} sf`,     T.text2],
+            ['Gross',        `${fmtNum(occupancy.gross_sf)} sf`,      T.text1],
+            ['Occupancy',    `${occupancy.occ_pct}%`,                 occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger],
+            ['Vacancy',      `${occupancy.vacancy_pct}%`,             T.text2],
+            ['Monthly Total', fmtCurrency(occupancy.monthly_total),   T.accent],
+          ].map(([label,val,color]) => (
+            <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'6px 12px',minWidth:'90px'}}>
+              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
+              <div style={{fontSize:F.md,fontWeight:'600',color,marginTop:'2px'}}>{val}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Body */}
+      {loading && <div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>Loading tenants…</div>}
+      {error   && <div style={{padding:'32px',textAlign:'center',color:T.danger,fontSize:F.sm}}>Error: {error}</div>}
+
+      {!loading && !error && (
+        <div style={{flex:1,overflowY:'auto',overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead style={{position:'sticky',top:0,zIndex:2}}>
+              <tr>
+                <Th col="tenant_dba"      label="Tenant DBA"/>
+                {!hidePropertyFilter && <Th col="prop_code" label="Prop"/>}
+                <Th col="suite_num"       label="Suite"/>
+                <Th col="sqft"            label="Sq Ft"     align="right"/>
+                <Th col="security_deposit" label="Security" align="right"/>
+                <Th col="lease_ends"      label="Lease Ends"/>
+                <Th col="base_rent"       label="Base Rent" align="right"/>
+                <Th col="nnn"             label="NNN"       align="right"/>
+                <Th col="other_amt"       label="Other"     align="right"/>
+                <Th col="tpt_tax"         label="TPT Tax"   align="right"/>
+                <Th col="total"           label="Total"     align="right"/>
+                <Th col="base_per_sf"     label="Base/sf"   align="right"/>
+                <Th col="nnn_per_sf"      label="NNN/sf"    align="right"/>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={colSpan} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No current rent schedule rows match filters</td></tr>
+              )}
+              {filtered.map((r, i) => {
+                const mo     = calcMo(r.lease_ends);
+                const rowBg  = i % 2 === 0 ? 'transparent' : T.bg0;
+                const podioId = r.tenants?.podio_id;
+                const href   = podioId ? `/tenants/${podioId}` : undefined;
+                return (
+                  <tr key={r.id}
+                    style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+                    onMouseLeave={e => e.currentTarget.style.background = rowBg}
+                    onClick={e => {
+                      if (e.target.closest('a')) return;
+                      if ((e.ctrlKey||e.metaKey) && href) window.open(href,'_blank');
+                      else if (onRowClick) onRowClick(r);
+                    }}>
+                    <td style={css.td}>
+                      {href ? (
+                        <a href={href}
+                          onClick={e => { if (!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0) { e.preventDefault(); onRowClick?.(r); } }}
+                          style={{color:T.accent,textDecoration:'none',fontWeight:'500'}}>
+                          {r.tenant_dba||'—'}
+                        </a>
+                      ) : (r.tenant_dba||'—')}
+                    </td>
+                    {!hidePropertyFilter && <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{r.prop_code||'—'}</td>}
+                    <td style={css.td}>{r.suite_num||'—'}</td>
+                    <td style={{...css.td,textAlign:'right'}}>{fmtNum(r.sqft)}</td>
+                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.security_deposit)}</td>
+                    <td style={{...css.td,color:moColor(mo),fontWeight:mo!==null&&mo<=12?'600':'400'}}>{fmtDate(r.lease_ends)}</td>
+                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.base_rent)}</td>
+                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.nnn)}</td>
+                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.other_amt)}</td>
+                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.tpt_tax)}</td>
+                    <td style={{...css.td,textAlign:'right',fontWeight:'600',color:T.text0}}>{fmtCurrency(r.total)}</td>
+                    <td style={{...css.td,textAlign:'right'}}>{r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
+                    <td style={{...css.td,textAlign:'right'}}>{r.nnn_per_sf?Number(r.nnn_per_sf).toFixed(2):'—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {filtered.length > 0 && (
+              <tfoot>
+                <tr>
+                  <td colSpan={hidePropertyFilter?2:3} style={{...css.th,background:T.bg3,color:T.text2}}>TOTALS</td>
+                  <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtNum(filtered.reduce((s,r)=>s+(Number(r.sqft)||0),0))}</td>
+                  <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.security_deposit)||0),0))}</td>
+                  <td style={{...css.th,background:T.bg3}}></td>
+                  <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
+                  <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
+                  <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
+                  <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.tpt_tax)||0),0))}</td>
+                  <td style={{...css.th,textAlign:'right',background:T.bg3,color:T.text0,fontWeight:'700'}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
+                  <td colSpan={2} style={{...css.th,background:T.bg3}}></td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main export — SPA (list + detail)
 // ─────────────────────────────────────────────────────────────────────────────
 export default function TenantsView() {
-  const [tenants,  setTenants]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState(null);
-  const [selected, setSelected] = useState(null);
+  const router = useRouter();
+  const [rows,       setRows]       = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState(null);
+  const [properties, setProperties] = useState([]);
 
   useEffect(() => {
+    document.title = 'Tenants | SedonaCRM';
+    return () => { document.title = 'SedonaCRM'; };
+  }, []);
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
     setLoading(true); setError(null);
-    sbFetch('tenants', 'select=*&order=tenant_dba.asc')
-      .then(data => { setTenants(data); setLoading(false); })
-      .catch(e   => { setError(e.message); setLoading(false); });
-  }, []);
-
-  const handleSelect = useCallback(t => {
-    history.pushState({ tenantId: t.id }, '');
-    setSelected(t);
-  }, []);
-
-  const handleBack = useCallback(() => {
-    if (window.history.state?.tenantId) history.replaceState({}, '');
-    setSelected(null);
-  }, []);
-
-  useEffect(() => {
-    const onPop = () => setSelected(null);
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    Promise.all([
+      sbFetch('rent_schedule', `rent_status=eq.Current&rent_starts=lte.${today}&rent_ends=gte.${today}&select=*,tenants!rent_schedule_tenant_id_fkey(id,podio_id,tenant_status)&order=suite_num.asc`),
+      sbFetch('properties', 'select=prop_code,property_name,gross_sqft&status=eq.active&order=prop_code.asc'),
+    ]).then(([rentRows, props]) => {
+      setRows(rentRows); setProperties(props); setLoading(false);
+    }).catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
   return (
-    <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden', background:T.bg1}}>
-      <div style={{display:selected ? 'none' : 'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
-        <TenantsList tenants={tenants} loading={loading} error={error} onSelect={handleSelect}/>
-      </div>
-      {selected && (
-        <TenantDetail key={selected.id} tenant={selected} onBack={handleBack} onUpdate={updated => setSelected(updated)}/>
-      )}
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>
+      <TenantRentList
+        rows={rows} loading={loading} error={error} properties={properties}
+        onRowClick={r => {
+          const pid = r.tenants?.podio_id;
+          if (!pid) return;
+          try { sessionStorage.setItem('tenantsBackUrl', window.location.href); } catch {}
+          router.push('/tenants/' + pid);
+        }}
+      />
     </div>
   );
 }
