@@ -993,12 +993,14 @@ const InlineBlurField = ({ value, onSave, type = 'text', highlight = false, read
   );
   return editing ? (
     <input ref={inputRef} type={type} value={val} onChange={e => setVal(e.target.value)}
+      onFocus={type === 'date' ? (e => { try { e.target.showPicker(); } catch(_) {} }) : undefined}
       onBlur={commit}
       onKeyDown={e => {
         if (e.key === 'Escape') { setVal(value ?? ''); setEditing(false); }
         if (e.key === 'Enter') commit();
       }}
-      style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}
+      style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',
+        ...(type==='date'?{appearance:'none',WebkitAppearance:'none',MozAppearance:'none'}:{})}}
     />
   ) : (
     <div onClick={() => setEditing(true)} title="Click to edit"

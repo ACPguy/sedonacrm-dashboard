@@ -15,6 +15,7 @@ export function TenantsTable({
   filterPropCode,
   hidePropertyFilter = false,
   grossSqft,
+  onGeneratePDF,
 }) {
   const [rows,       setRows]       = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -51,6 +52,7 @@ export function TenantsTable({
       properties={properties}
       hidePropertyFilter={hidePropertyFilter}
       grossSqft={grossSqft}
+      onGeneratePDF={onGeneratePDF}
     />
   );
 }

@@ -1305,9 +1305,61 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 // Props: rows (rent_schedule+tenants join), loading, error, properties,
 //        hidePropertyFilter, grossSqft, onRowClick(row)
 // ─────────────────────────────────────────────────────────────────────────────
+const generatePortfolioPDF = (rows, occupancy) => {
+  const win = window.open('', '_blank');
+  const fmt = n => n != null ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }) : '—';
+  const fmtD = d => fmtDate(d);
+  const fmtN = n => n != null && n !== '' ? Number(n).toLocaleString() : '—';
+  const tableRows = rows.map(r => `
+    <tr>
+      <td>${r.tenant_dba||'—'}</td><td>${r.prop_code||'—'}</td><td>${r.suite_num||'—'}</td>
+      <td style="text-align:right">${fmtN(r.sqft)}</td>
+      <td style="text-align:right">${fmt(r.security_deposit)}</td>
+      <td>${fmtD(r.lease_ends)}</td>
+      <td style="text-align:right">${fmt(r.base_rent)}</td>
+      <td style="text-align:right">${fmt(r.nnn)}</td>
+      <td style="text-align:right">${fmt(r.other_amt)}</td>
+      <td style="text-align:right">${fmt(r.tpt_tax)}</td>
+      <td style="text-align:right">${fmt(r.total)}</td>
+      <td style="text-align:right">${r.base_per_sf ? Number(r.base_per_sf).toFixed(2) : '—'}</td>
+      <td style="text-align:right">${r.nnn_per_sf  ? Number(r.nnn_per_sf).toFixed(2)  : '—'}</td>
+    </tr>`).join('');
+  const today = new Date();
+  const todayStr = `${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}-${today.getFullYear()}`;
+  win.document.write(`<!DOCTYPE html><html><head><title>Portfolio Rent Roll</title>
+  <style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}h2{font-size:14px;margin-bottom:4px}
+  table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#f0f0f0;border:1px solid #ccc;padding:4px 6px;font-size:10px}
+  td{border:1px solid #ddd;padding:4px 6px}tfoot td{background:#f0f0f0;font-weight:bold}
+  .summary{margin-bottom:12px;font-size:11px}.summary span{margin-right:20px}</style></head><body>
+  <h2>Portfolio Rent Roll — All Properties</h2>
+  <div style="font-size:11px;color:#666;margin-bottom:8px">As of ${todayStr}</div>
+  <div class="summary">
+    <span>Occupied: ${fmtN(occupancy.occupied_sf)} sf</span>
+    <span>Vacant: ${fmtN(occupancy.vacant_sf)} sf</span>
+    <span>Gross: ${fmtN(occupancy.gross_sf)} sf</span>
+    <span>Occupancy: ${occupancy.occ_pct}%</span>
+    <span>Monthly Total: ${fmt(occupancy.monthly_total)}</span>
+  </div>
+  <table><thead><tr>
+    <th>Tenant DBA</th><th>Prop</th><th>Suite</th><th>Sq Ft</th><th>Security</th><th>Lease Ends</th>
+    <th>Base Rent</th><th>NNN</th><th>Other</th><th>TPT Tax</th><th>Total</th><th>Base/sf</th><th>NNN/sf</th>
+  </tr></thead><tbody>${tableRows}</tbody>
+  <tfoot><tr>
+    <td colspan="6">TOTALS</td>
+    <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
+    <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
+    <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
+    <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.tpt_tax)||0),0))}</td>
+    <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
+    <td colspan="2"></td>
+  </tr></tfoot></table>
+  <script>window.onload=()=>window.print();</script></body></html>`);
+  win.document.close();
+};
+
 export const TenantRentList = ({
   rows = [], loading = false, error = null, properties = [],
-  hidePropertyFilter = false, grossSqft, onRowClick,
+  hidePropertyFilter = false, grossSqft, onRowClick, onGeneratePDF,
 }) => {
   const [propFilter,   setPropFilter]   = useState([]);
   const [statusFilter, setStatusFilter] = useState('Active');
@@ -1456,7 +1508,7 @@ export const TenantRentList = ({
 
       {/* Summary bar */}
       {!loading && !error && (
-        <div style={{display:'flex',gap:'8px',padding:'8px 14px',borderBottom:`0.5px solid ${T.border}`,background:T.bg1,flexShrink:0,flexWrap:'wrap'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'8px 14px',borderBottom:`0.5px solid ${T.border}`,background:T.bg1,flexShrink:0,flexWrap:'wrap'}}>
           {[
             ['Occupied',     `${fmtNum(occupancy.occupied_sf)} sf`,   T.success],
             ['Vacant',       `${fmtNum(occupancy.vacant_sf)} sf`,     T.text2],
@@ -1470,6 +1522,15 @@ export const TenantRentList = ({
               <div style={{fontSize:F.md,fontWeight:'600',color,marginTop:'2px'}}>{val}</div>
             </div>
           ))}
+          <button
+            onClick={() => onGeneratePDF ? onGeneratePDF() : generatePortfolioPDF(filtered, occupancy)}
+            style={{marginLeft:'auto',background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'5px',
+              padding:'5px 12px',color:T.text1,fontSize:F.xs,cursor:'pointer',flexShrink:0,
+              transition:'border-color 0.15s,color 0.15s'}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=T.accent;e.currentTarget.style.color=T.accent;}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
+            Rent Roll PDF
+          </button>
         </div>
       )}
 

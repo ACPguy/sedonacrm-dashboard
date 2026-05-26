@@ -573,15 +573,12 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
             {/* TENANTS / RENT ROLL */}
             {tab==='tenants'&&(
               <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
-                <div style={{padding:'8px 14px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0,display:'flex',alignItems:'center'}}>
-                  <button onClick={()=>generateRentRollPDF(data,rentRows,occupancy)}
-                    style={{background:T.accent,border:'none',borderRadius:'5px',padding:'6px 14px',color:'#fff',fontSize:F.sm,cursor:'pointer'}}>
-                    Generate Rent Roll PDF
-                  </button>
-                </div>
-                <div style={{flex:1,overflow:'hidden'}}>
-                  <TenantsTable filterPropCode={data.prop_code} hidePropertyFilter={true} grossSqft={data.gross_sqft}/>
-                </div>
+                <TenantsTable
+                  filterPropCode={data.prop_code}
+                  hidePropertyFilter={true}
+                  grossSqft={data.gross_sqft}
+                  onGeneratePDF={()=>generateRentRollPDF(data,rentRows,occupancy)}
+                />
               </div>
             )}
 
