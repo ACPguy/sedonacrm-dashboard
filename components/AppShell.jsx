@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -112,8 +112,8 @@ export default function AppShell({ children, activeView }) {
           <NavBtn label="Leases"        href="/?view=leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={collapsed}/>
           <NavBtn label="Rents"         href="/rent-schedule"       active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={collapsed} icon={<ChartBar size={18} weight="bold"/>}/>
           <SectionLabel label="Compliance" collapsed={collapsed}/>
-          <NavBtn label="Insurance"   href="/?view=tnt-cois"    active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={collapsed}/>
-          <NavBtn label="Inspections" href="/?view=inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={collapsed}/>
+          <NavBtn label="Insurance"   href="/?view=tnt-cois"    active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={collapsed} icon={<Umbrella size={18} weight="bold"/>}/>
+          <NavBtn label="Inspections" href="/?view=inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={collapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
           <SectionLabel label="Finance" collapsed={collapsed}/>
           <NavBtn label="QBO Dashboard" href="/?view=qbo"      active={is('qbo')}      onClick={()=>go('/?view=qbo')}      collapsed={collapsed}/>
           <NavBtn label="Invoices"      href="/?view=invoices" active={is('invoices')} onClick={()=>go('/?view=invoices')} collapsed={collapsed}/>

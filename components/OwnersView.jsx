@@ -248,6 +248,7 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
 
         {/* Title + count */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
+          <Briefcase size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Owners</span>
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
         </div>
@@ -406,7 +407,10 @@ export const OwnerDetail = ({ owner, onBack }) => {
             </span>
           )}
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{owner.company_dba||'Untitled Owner'}</div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <Briefcase size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{owner.company_dba||'Untitled Owner'}</div>
+        </div>
         {owner.entity_name && (
           <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>{owner.entity_name}</div>
         )}

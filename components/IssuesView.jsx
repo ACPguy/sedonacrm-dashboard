@@ -677,6 +677,7 @@ export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePr
 
         {/* Title + count + view toggle */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
+          <CheckFat size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Issues</span>
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
           <div style={{marginLeft:'auto',display:'flex',gap:'2px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'2px'}}>
@@ -1190,6 +1191,10 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             <StatusBadge status={data.priority}/>
             <StatusBadge status={data.status}/>
           </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:'6px'}}>
+          <CheckFat size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+          <div style={{fontSize:F.lg,fontWeight:'600',color:'#E8630A'}}>{data.issue_name||'Untitled Issue'}</div>
         </div>
       </div>
 

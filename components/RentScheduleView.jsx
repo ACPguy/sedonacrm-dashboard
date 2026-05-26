@@ -368,6 +368,7 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
 
         {/* Title + count */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
+          <ChartBar size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Rent Schedule</span>
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
         </div>
@@ -556,7 +557,10 @@ export const RentScheduleDetail = ({ row, onBack }) => {
             <RentStatusBadge status={row.rent_status}/>
           </span>
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{row.tenants?.tenant_dba||'Unnamed Tenant'}</div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <ChartBar size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{row.tenants?.tenant_dba||'Unnamed Tenant'}</div>
+        </div>
         <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>
           {row.tenants?.lease_type || 'Lease'} · {row.prop_code}{row.suite_num ? ` · Suite ${row.suite_num}` : ''}
         </div>

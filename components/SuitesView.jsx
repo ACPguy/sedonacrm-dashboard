@@ -159,8 +159,9 @@ export const SuiteDetail = ({ suite, onBack, onUpdate }) => {
           <StatusBadge status={data.status}/>
           <StatusBadge status={data.space_type}/>
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>
-          Suite {data.suite_num||'—'}
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <Cube size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Suite {data.suite_num||'—'}</div>
         </div>
         <div style={{fontSize:F.sm,color:T.text2}}>
           {data.prop_code} · {fmtNum(data.sqft)} sf · {data.space_type||'—'}
@@ -394,6 +395,7 @@ export const SuitesList = ({ suites, loading, error, onSelect, hidePropertyFilte
       {/* Header */}
       <div style={{padding:'7px 14px 6px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'5px'}}>
+          <Cube size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Suites</span>
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length} shown</span>
         </div>

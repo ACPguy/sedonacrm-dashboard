@@ -366,6 +366,7 @@ export const ContactsList = ({ contacts, loading, error, onSelect, hidePropertyF
 
         {/* Title + count */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
+          <UserCircle size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Contacts</span>
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
         </div>
@@ -603,8 +604,11 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
 
         {/* Row 2: Name + company */}
         <div style={{marginBottom:'5px'}}>
-          <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
-            {data.full_name || 'Unnamed Contact'}
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <UserCircle size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+            <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
+              {data.full_name || 'Unnamed Contact'}
+            </div>
           </div>
           {data.company_dba && (
             <div style={{fontSize:F.sm, color:T.text2, marginTop:'1px'}}>{data.company_dba}</div>

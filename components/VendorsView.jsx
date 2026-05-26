@@ -357,6 +357,7 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
 
         {/* Title + count */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
+          <Truck size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Vendors</span>
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
         </div>
@@ -543,7 +544,10 @@ export const VendorDetail = ({ vendor, onBack }) => {
             </span>
           )}
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{vendor.company_dba||'Untitled Vendor'}</div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <Truck size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{vendor.company_dba||'Untitled Vendor'}</div>
+        </div>
         {vendor.vendor_category && (
           <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>{vendor.vendor_category}</div>
         )}

@@ -412,6 +412,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
       {/* Header */}
       <div style={{padding:'7px 14px 6px', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0}}>
         <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'5px'}}>
+          <Storefront size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg, fontWeight:'600', color:T.text0}}>Tenants</span>
           <span style={{fontSize:F.xs, color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
         </div>
@@ -704,8 +705,11 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
         {/* Row 2: title + entity subtitle */}
         <div style={{marginBottom:'5px'}}>
-          <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
-            {data.tenant_dba || 'Untitled Tenant'}
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <Storefront size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+            <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
+              {data.tenant_dba || 'Untitled Tenant'}
+            </div>
           </div>
           {data.entity_name && (
             <div style={{fontSize:F.sm, color:T.text2, marginTop:'1px'}}>{data.entity_name}</div>

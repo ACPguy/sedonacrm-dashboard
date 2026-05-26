@@ -673,6 +673,7 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
 
         {/* Title + count + view toggle */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
+          <Wrench size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Work Orders</span>
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
           <div style={{marginLeft:'auto',display:'flex',gap:'2px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'2px'}}>
@@ -933,8 +934,11 @@ export const WorkOrderDetail = ({ wo, onBack }) => {
             <StatusBadge status={data.priority || '???'}/>
           </span>
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3'}}>
-          {data.short_description || 'Untitled Work Order'}
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <Wrench size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3'}}>
+            {data.short_description || 'Untitled Work Order'}
+          </div>
         </div>
         <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>
           {data.prop_code} · {data.category || data.wo_category || 'Uncategorized'}
