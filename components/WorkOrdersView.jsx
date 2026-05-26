@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Wrench } from '@phosphor-icons/react';
+import RichTextEditor from './RichTextEditor';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable,
@@ -859,19 +860,200 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WorkOrder Detail (read-only)
+// WorkOrder Detail — form micro-components
 // ─────────────────────────────────────────────────────────────────────────────
-export const WorkOrderDetail = ({ wo, onBack }) => {
-  const [tab, setTab]                       = useState('info');
-  const [data]                              = useState(wo);
-  const [rightCollapsed, setRightCollapsed] = useState(true);
-  const [rightWidth, setRightWidth]         = useState(280);
+const WoFieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
+  <div
+    style={{display:'grid',gridTemplateColumns:'170px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
+    onMouseEnter={hoverable ? e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } : undefined}
+    onMouseLeave={hoverable ? e => { e.currentTarget.style.background = ''; } : undefined}
+  >
+    <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
+      {label}
+    </div>
+    <div style={{alignSelf:topAlign?'start':'center',paddingRight:'4px'}}>
+      {children}
+    </div>
+  </div>
+);
+
+const WoInlineBlur = ({ value, onSave, type = 'text', highlight = false, readOnly = false }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState(value ?? '');
+  const [saving, setSaving]   = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { setVal(value ?? ''); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  const commit = async () => {
+    setEditing(false);
+    const trimmed = typeof val === 'string' ? val.trim() : String(val ?? '');
+    if (trimmed === String(value ?? '')) return;
+    setSaving(true);
+    try { await onSave(trimmed || null); }
+    catch { setVal(value ?? ''); }
+    finally { setSaving(false); }
+  };
+  const displayVal = type === 'date' && val ? fmtDate(val) : val;
+  if (readOnly) return <div style={{fontSize:F.base,color:T.text1,lineHeight:'1.4'}}>{displayVal||'—'}</div>;
+  return editing ? (
+    <input ref={inputRef} type={type} value={val} onChange={e => setVal(e.target.value)}
+      onFocus={type==='date'?(e=>{try{e.target.showPicker();}catch(_){}}) : undefined}
+      onBlur={commit}
+      onKeyDown={e=>{
+        if(e.key==='Escape'){setVal(value??'');setEditing(false);}
+        if(e.key==='Enter')commit();
+      }}
+      style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',
+        ...(type==='date'?{appearance:'none',WebkitAppearance:'none',MozAppearance:'none'}:{})}}
+    />
+  ) : (
+    <div onClick={() => setEditing(true)} title="Click to edit"
+      style={{fontSize:F.base,color:highlight?'#E8630A':(displayVal?T.text0:T.text3),fontWeight:highlight?'700':'normal',cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
+      onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
+      onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
+      {displayVal||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+      {saving&&<span style={{color:T.text3,fontSize:F.xs,marginLeft:'6px'}}>saving…</span>}
+    </div>
+  );
+};
+
+const WoInlineSelect = ({ value, options, onSave }) => (
+  <select value={value||''} onChange={async e => { await onSave(e.target.value||null); }}
+    style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+    <option value="">—</option>
+    {options.map(o=>typeof o==='object'
+      ?<option key={o.value} value={o.value}>{o.label}</option>
+      :<option key={o} value={o}>{o}</option>)}
+  </select>
+);
+
+const WoPriorityPills = ({ value, onSave }) => {
+  const opts = ['???','Urgent','High','Medium','Low'];
+  const styles = {
+    '???':  {activeBg:T.bg3,    activeColor:T.text0, border:T.text2,  hoverBg:'rgba(107,114,128,0.25)'},
+    Urgent: {activeBg:T.danger, activeColor:'#fff',  border:T.danger, hoverBg:'rgba(224,112,112,0.20)'},
+    High:   {activeBg:T.warn,   activeColor:'#fff',  border:T.warn,   hoverBg:'rgba(212,146,74,0.20)'},
+    Medium: {activeBg:T.success,activeColor:'#fff',  border:T.success,hoverBg:'rgba(106,176,106,0.20)'},
+    Low:    {activeBg:T.accent, activeColor:'#fff',  border:T.accent, hoverBg:'rgba(110,159,216,0.20)'},
+  };
+  return (
+    <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+      {opts.map(opt=>{
+        const active=(value||'???')===opt;
+        const s=styles[opt]||styles['???'];
+        return(
+          <button key={opt} onClick={()=>!active&&onSave(opt)}
+            style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',
+              border:`1px solid ${s.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:s.border,
+              transition:'background 0.15s ease'}}
+            onMouseEnter={e=>{if(!active)e.currentTarget.style.background=s.hoverBg;}}
+            onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const WO_STATUS_OPTS = ['New','Request Sent','Re-Opened','Closed','Closed - Not Done'];
+const WO_STATUS_STYLES = {
+  'New':               {activeBg:T.accent,  activeColor:'#fff',border:T.accent,  hoverBg:'rgba(110,159,216,0.20)'},
+  'Request Sent':      {activeBg:'#9a7ad4', activeColor:'#fff',border:'#9a7ad4', hoverBg:'rgba(154,122,212,0.20)'},
+  'Re-Opened':         {activeBg:T.warn,    activeColor:'#fff',border:T.warn,    hoverBg:'rgba(212,146,74,0.20)'},
+  'Closed':            {activeBg:T.success, activeColor:'#fff',border:T.success, hoverBg:'rgba(106,176,106,0.20)'},
+  'Closed - Not Done': {activeBg:T.danger,  activeColor:'#fff',border:T.danger,  hoverBg:'rgba(224,112,112,0.20)'},
+};
+
+const WoStatusPills = ({ value, onSave }) => (
+  <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+    {WO_STATUS_OPTS.map(opt=>{
+      const active=(value||'New')===opt;
+      const s=WO_STATUS_STYLES[opt];
+      return(
+        <button key={opt} onClick={()=>!active&&onSave(opt)}
+          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',
+            border:`1px solid ${s.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:s.border,
+            transition:'background 0.15s ease'}}
+          onMouseEnter={e=>{if(!active)e.currentTarget.style.background=s.hoverBg;}}
+          onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+          {opt}
+        </button>
+      );
+    })}
+  </div>
+);
+
+const WoTypePills = ({ value, onSave }) => {
+  const opts = ['Work Order Request','Request for Proposal'];
+  const styles = {
+    'Work Order Request':   {activeBg:T.accent,  activeColor:'#fff',border:T.accent,  hoverBg:'rgba(110,159,216,0.20)'},
+    'Request for Proposal': {activeBg:'#9a7ad4', activeColor:'#fff',border:'#9a7ad4', hoverBg:'rgba(154,122,212,0.20)'},
+  };
+  return (
+    <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+      {opts.map(opt=>{
+        const active=value===opt;
+        const s=styles[opt];
+        return(
+          <button key={opt} onClick={()=>!active&&onSave(opt)}
+            style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',
+              border:`1px solid ${s.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:s.border,
+              transition:'background 0.15s ease'}}
+            onMouseEnter={e=>{if(!active)e.currentTarget.style.background=s.hoverBg;}}
+            onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const WO_CATEGORY_OPTIONS = [
+  'Roof','Plumbing','HVAC','Lighting',"TI's",'Common Area','Landscape','Other',
+  'Bldg. Shell','P-Lot','Signs','Electrical','Pest Control','Fire / Security',
+  'Restroom','Trash','Utilities','Windows/Doors','Flooring','Keys',
+];
+
+const PhaseButton = ({ label }) => (
+  <button onClick={() => alert('Coming in Phase 3')}
+    style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 12px',color:T.text2,fontSize:F.sm,cursor:'pointer',transition:'border-color 0.15s,color 0.15s'}}
+    onMouseEnter={e=>{e.currentTarget.style.borderColor=T.accent;e.currentTarget.style.color=T.accent;}}
+    onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text2;}}>
+    {label}
+  </button>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WorkOrder Detail
+// ─────────────────────────────────────────────────────────────────────────────
+export const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
+  const [data, setData]                     = useState(wo);
+  const [activeProps, setActiveProps]       = useState([]);
+  const [vendorName, setVendorName]         = useState('');
+  const [tenantName, setTenantName]         = useState('');
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [rightWidth, setRightWidth]         = useState(300);
+  const [copied, setCopied]                 = useState(false);
   const resizingRight = useRef(false);
+
+  useEffect(() => {
+    sbFetch('properties','select=prop_code,property_name,address,city,state,zip,podio_id&status=eq.active&order=prop_code.asc')
+      .then(setActiveProps).catch(()=>{});
+    if (data.vendor_id) {
+      sbFetch('vendors',`id=eq.${data.vendor_id}&select=id,company_dba`)
+        .then(d=>{if(d[0])setVendorName(d[0].company_dba||'');}).catch(()=>{});
+    }
+    if (data.tenant_id) {
+      sbFetch('tenants',`id=eq.${data.tenant_id}&select=id,tenant_dba,podio_id`)
+        .then(d=>{if(d[0])setTenantName(d[0].tenant_dba||'');}).catch(()=>{});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startRightResize = useCallback((e) => {
     resizingRight.current = true;
-    const startX = e.clientX;
-    const startW = rightWidth;
+    const startX = e.clientX, startW = rightWidth;
     const onMove = me => {
       if (!resizingRight.current) return;
       setRightWidth(Math.max(180, Math.min(500, startW - (me.clientX - startX))));
@@ -903,110 +1085,301 @@ export const WorkOrderDetail = ({ wo, onBack }) => {
     return () => { document.title = 'SedonaCRM'; };
   }, [data.prop_code, data.short_description]);
 
-  const TABS   = ['Info', 'Notes'];
-  const tabKey = t => t.toLowerCase();
+  const save = async (field, val) => {
+    await sbPatch('work_orders', data.id, { [field]: val ?? null });
+    const updated = { ...data, [field]: val };
+    setData(updated);
+    onUpdate?.(updated);
+  };
 
-  const field = (label, value, color) => (
-    <div style={{marginBottom:'10px'}}>
-      <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
-      <div style={{fontSize:F.base,color:color||(value?T.text0:T.text3),padding:'3px 5px',lineHeight:'1.4',fontStyle:value?'normal':'italic'}}>
-        {value || '—'}
-      </div>
-    </div>
-  );
+  const handleWoStatusChange = async (newStatus) => {
+    const updates = { wo_status: newStatus };
+    const isClosed = newStatus === 'Closed' || newStatus === 'Closed - Not Done';
+    if (isClosed && !data.closed_at) {
+      const d = new Date();
+      updates.closed_at = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    await sbPatch('work_orders', data.id, updates);
+    const updated = { ...data, ...updates };
+    setData(updated);
+    onUpdate?.(updated);
+  };
+
+  const copyLink = () => {
+    const url = `${window.location.origin}/work-orders/${data.podio_id ?? 'X'+data.id.slice(-6)}`;
+    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  };
+
+  const vendorHref = data.vendor_podio_id
+    ? `/vendors/${data.vendor_podio_id}`
+    : data.vendor_id ? `/vendors/X${data.vendor_id.slice(-6)}` : undefined;
+  const tenantHref = data.tenant_podio_id ? `/tenants/${data.tenant_podio_id}` : undefined;
+
+  const renderVendorLink = () => vendorName ? (
+    vendorHref
+      ? <a href={vendorHref} style={{color:T.accent,fontSize:F.sm,textDecoration:'none'}}
+          onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+          onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>{vendorName}</a>
+      : <span style={{fontSize:F.sm,color:T.text1}}>{vendorName}</span>
+  ) : <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>;
+
+  const renderTenantLink = () => tenantName ? (
+    tenantHref
+      ? <a href={tenantHref} style={{color:T.accent,fontSize:F.sm,textDecoration:'none'}}
+          onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+          onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>{tenantName}</a>
+      : <span style={{fontSize:F.sm,color:T.text1}}>{tenantName}</span>
+  ) : <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>;
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      {/* ── Header ── */}
       <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={onBack}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'5px'}}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',flexShrink:0,display:'inline-flex',alignItems:'center',gap:'5px'}}
             onMouseEnter={e=>e.currentTarget.style.color=T.text0}
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             <Wrench size={14} weight="bold"/>← Work Orders
           </button>
-          <span style={{color:T.text3,fontSize:F.sm}}>{data.prop_code || '—'}</span>
-          {data.podio_wo_number && (
-            <span style={{color:T.text2,fontSize:F.xs}}>#{data.podio_wo_number}</span>
+          {data.prop_code && (
+            <span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'2px 8px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>
+              {data.prop_code}
+            </span>
           )}
-          <span style={{marginLeft:'auto',display:'flex',gap:'8px',alignItems:'center'}}>
-            <StatusBadge status={data.wo_status || 'New'}/>
-            <StatusBadge status={data.priority || '???'}/>
-          </span>
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <Wrench size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
-          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,lineHeight:'1.3'}}>
-            {data.short_description || 'Untitled Work Order'}
+          {data.podio_id && <span style={{fontSize:F.xs,color:T.text3}}>#{data.podio_id}</span>}
+          <button onClick={copyLink}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',flexShrink:0,transition:'color 0.2s'}}
+            onMouseEnter={e=>{if(!copied)e.currentTarget.style.color=T.text0;}}
+            onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
+            {copied?'✓ Copied':'⧉ Copy Link'}
+          </button>
+          <div style={{marginLeft:'auto',display:'flex',gap:'6px',alignItems:'center',flexShrink:0}}>
+            <StatusBadge status={data.wo_status||'New'}/>
+            {data.priority && <StatusBadge status={data.priority}/>}
           </div>
         </div>
-        <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>
-          {data.prop_code} · {data.category || data.wo_category || 'Uncategorized'}
+        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:'6px'}}>
+          <Wrench size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
+          <div style={{fontSize:F.lg,fontWeight:'700',color:'#E8630A',lineHeight:'1.3'}}>
+            {data.short_description||'Untitled Work Order'}
+          </div>
         </div>
       </div>
 
-      <div style={{display:'flex',gap:'2px',padding:'6px 16px 0',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,flexShrink:0}}>
-        {TABS.map(t => (
-          <button key={t} onClick={() => setTab(tabKey(t))}
-            style={{background:'transparent',border:'none',padding:'6px 12px',fontSize:F.sm,cursor:'pointer',borderRadius:'4px 4px 0 0',
-              color:tab===tabKey(t)?T.accent:T.text1,
-              borderBottom:tab===tabKey(t)?`2px solid ${T.accent}`:'2px solid transparent',
-              fontWeight:tab===tabKey(t)?'600':'400'}}>
-            {t}
-          </button>
-        ))}
-      </div>
-
+      {/* ── Body ── */}
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
-        <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
-          {tab === 'info' && (
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-              <div style={css.card}>
-                <div style={css.secTitle}>Work Order Info</div>
-                {data.podio_wo_number != null && field('WO Number', String(data.podio_wo_number))}
-                {field('WO Title', data.short_description)}
-                {field('Category', data.category || data.wo_category)}
-                {field('WO Type', data.wo_type)}
-                {field('Priority', data.priority)}
-                {field('Stage', data.wo_status)}
-              </div>
-              <div style={css.card}>
-                <div style={css.secTitle}>Dates</div>
-                {field(
-                  'Follow-Up Date',
-                  data.follow_up_date ? fmtNumDate(data.follow_up_date) : null,
-                  data.follow_up_date && isFuOverdue(data.follow_up_date, data) ? T.warn : undefined
-                )}
-                {field('Close Date', data.close_date ? fmtNumDate(data.close_date) : null)}
-                {field('Closed At', data.closed_at ? fmtNumDate(data.closed_at) : null, data.closed_at ? T.success : undefined)}
-                {field('Opened', data.created_at ? fmtNumDate(data.created_at) : null)}
-                {field('Last Updated', data.updated_at ? fmtNumDate(data.updated_at) : null)}
-              </div>
-              <div style={{...css.card, gridColumn:'1 / -1'}}>
-                <div style={css.secTitle}>Instructions &amp; Details</div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-                  <div>
-                    {field('Instructions to Vendor', data.instructions_to_vendor || data.vendor_instructions)}
-                    {field('Key Safe Info', data.key_safe_info || data.keys_keysafes)}
+        <div style={{flex:1,overflowY:'auto'}}>
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
+
+            {/* 1. Short Description */}
+            <WoFieldRow label="Short Description">
+              <WoInlineBlur value={data.short_description} onSave={v=>save('short_description',v)} highlight/>
+            </WoFieldRow>
+
+            {/* 2. Prop Code */}
+            <WoFieldRow label="Prop Code" topAlign>
+              <select value={data.prop_code||''} onChange={async e=>{await save('prop_code',e.target.value||null);}}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.prop_code?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {activeProps.map(p=>(<option key={p.prop_code} value={p.prop_code}>{p.prop_code} — {p.property_name}</option>))}
+              </select>
+              {(()=>{
+                const prop=activeProps.find(p=>p.prop_code===data.prop_code);
+                if(!prop)return null;
+                const addr2=[prop.city,prop.state,prop.zip].filter(Boolean).join(' ');
+                const line2=prop.address?(addr2?`${prop.address}, ${addr2}`:prop.address):addr2;
+                return(
+                  <div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px 10px'}}>
+                    <div style={{fontSize:F.sm,fontWeight:'500',color:T.text0}}>{prop.property_name}</div>
+                    {line2&&<div style={{fontSize:F.xs,color:T.text2,marginTop:'2px'}}>{line2}</div>}
                   </div>
-                  <div>
-                    {field('Alert', data.alert)}
-                    {data.estimate_amount != null && field('Estimate', `$${Number(data.estimate_amount).toLocaleString()}`)}
-                    {field('Final Closeout Notes', data.final_closeout_notes || data.final_close_notes)}
-                  </div>
-                </div>
+                );
+              })()}
+            </WoFieldRow>
+
+            {/* 3. FU Date */}
+            <WoFieldRow label="FU Date">
+              <WoInlineBlur type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
+            </WoFieldRow>
+
+            {/* 4. FU Notes (follow_up_topic) */}
+            <WoFieldRow label="FU Notes" topAlign>
+              <RichTextEditor value={data.follow_up_topic} onSave={v=>save('follow_up_topic',v)} minRows={5}/>
+            </WoFieldRow>
+
+            {/* 5. Priority */}
+            <WoFieldRow label="Priority">
+              <WoPriorityPills value={data.priority} onSave={v=>save('priority',v)}/>
+            </WoFieldRow>
+
+            {/* 6. Assigned To — not in schema */}
+            <WoFieldRow label="Assigned To" hoverable={false}>
+              <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Not in schema yet</span>
+            </WoFieldRow>
+
+            {/* 7. WO Category */}
+            <WoFieldRow label="WO Category">
+              <WoInlineSelect value={data.wo_category} options={WO_CATEGORY_OPTIONS} onSave={v=>save('wo_category',v)}/>
+            </WoFieldRow>
+
+            {/* 8. Budget Item (boolean) */}
+            <WoFieldRow label="Budget Item">
+              <div style={{display:'flex',gap:'6px'}}>
+                {[true,false].map(opt=>{
+                  const active=data.budget_item===opt;
+                  const color=opt?T.success:T.text2;
+                  const hoverBg=opt?'rgba(106,176,106,0.15)':'rgba(90,98,114,0.15)';
+                  return(
+                    <button key={String(opt)} onClick={async()=>{if(!active)await save('budget_item',opt);}}
+                      style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',
+                        border:`1px solid ${active?color:T.border}`,
+                        background:active?(opt?'rgba(106,176,106,0.18)':'rgba(90,98,114,0.18)'):'transparent',
+                        color:active?color:T.text2,transition:'background 0.15s ease'}}
+                      onMouseEnter={e=>{if(!active)e.currentTarget.style.background=hoverBg;}}
+                      onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+                      {opt?'Yes':'No'}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-          )}
-          {tab === 'notes' && (
-            <div style={css.card}>
-              <div style={css.secTitle}>Internal Notes</div>
-              <div style={{fontSize:F.base,color:data.internal_notes?T.text0:T.text3,lineHeight:'1.6',whiteSpace:'pre-wrap',padding:'3px 5px',fontStyle:data.internal_notes?'normal':'italic'}}>
-                {data.internal_notes || 'No notes recorded.'}
-              </div>
-            </div>
-          )}
+            </WoFieldRow>
+
+            {/* 9. Internal Notes */}
+            <WoFieldRow label="Internal Notes" topAlign>
+              <RichTextEditor value={data.internal_notes} onSave={v=>save('internal_notes',v)} minRows={5}/>
+            </WoFieldRow>
+
+            {/* 10. Instructions to Vendor (vendor_instructions — 2563 rows) */}
+            <WoFieldRow label="Instructions to Vendor" topAlign>
+              <RichTextEditor value={data.vendor_instructions} onSave={v=>save('vendor_instructions',v)} minRows={5}/>
+            </WoFieldRow>
+
+            {/* 11. Property Linker */}
+            <WoFieldRow label="Property" hoverable={false}>
+              {(()=>{
+                const prop=activeProps.find(p=>p.prop_code===data.prop_code);
+                if(!prop)return<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>;
+                const href=prop.podio_id?`/properties/${prop.podio_id}`:undefined;
+                return href?(
+                  <a href={href} style={{color:T.accent,fontSize:F.sm,textDecoration:'none'}}
+                    onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                    onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                    {data.prop_code} — {prop.property_name}
+                  </a>
+                ):(
+                  <span style={{fontSize:F.sm,color:T.text1}}>{data.prop_code} — {prop.property_name}</span>
+                );
+              })()}
+            </WoFieldRow>
+
+            {/* 12. Key Safe */}
+            <WoFieldRow label="Key Safe" hoverable={false}>
+              <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Linked at go-live</span>
+            </WoFieldRow>
+
+            {/* 13. Vendor Linker */}
+            <WoFieldRow label="Vendor" hoverable={false}>
+              {renderVendorLink()}
+            </WoFieldRow>
+
+            {/* 14. Tenant Linker */}
+            <WoFieldRow label="Tenant (if any)" hoverable={false}>
+              {renderTenantLink()}
+            </WoFieldRow>
+
+            {/* 15. WO Type */}
+            <WoFieldRow label="WO Type">
+              <WoTypePills value={data.wo_type} onSave={v=>save('wo_type',v)}/>
+            </WoFieldRow>
+
+            {/* 16–19. Phase 3 action buttons */}
+            <WoFieldRow label="Email to Vendor" hoverable={false}>
+              <PhaseButton label="Draft Email"/>
+            </WoFieldRow>
+            <WoFieldRow label="Request Update" hoverable={false}>
+              <PhaseButton label="Draft Request"/>
+            </WoFieldRow>
+            <WoFieldRow label="Tenant Update" hoverable={false}>
+              <PhaseButton label="Draft Update"/>
+            </WoFieldRow>
+            <WoFieldRow label="Owner FYI" hoverable={false}>
+              <PhaseButton label="Draft FYI"/>
+            </WoFieldRow>
+
+            {/* 20. Contacts */}
+            <WoFieldRow label="Contacts" hoverable={false}>
+              <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Available after Podio sync</span>
+            </WoFieldRow>
+
+            {/* 21. Pmt Instructions */}
+            <WoFieldRow label="Pmt Instructions" topAlign>
+              <RichTextEditor value={data.pmt_instructions_to_bk} onSave={v=>save('pmt_instructions_to_bk',v)} minRows={5}/>
+            </WoFieldRow>
+
+            {/* 22. Invoice Location */}
+            <WoFieldRow label="Invoice Location">
+              <WoInlineBlur value={data.invoice_location} onSave={v=>save('invoice_location',v)}/>
+            </WoFieldRow>
+
+            {/* 23. Invoice Stage */}
+            <WoFieldRow label="Invoice Stage">
+              <WoInlineBlur value={data.invoice_stage} onSave={v=>save('invoice_stage',v)}/>
+            </WoFieldRow>
+
+            {/* 24. Close Out Notes (final_close_notes — 5 rows) */}
+            <WoFieldRow label="Close Out Notes" topAlign>
+              <RichTextEditor value={data.final_close_notes} onSave={v=>save('final_close_notes',v)} minRows={5}/>
+            </WoFieldRow>
+
+            {/* 25. Work Stage (wo_status) */}
+            <WoFieldRow label="Work Stage">
+              <WoStatusPills value={data.wo_status} onSave={handleWoStatusChange}/>
+            </WoFieldRow>
+
+            {/* 26. APP Links */}
+            <WoFieldRow label="APP Links" hoverable={false}>
+              <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Available after Podio sync</span>
+            </WoFieldRow>
+
+            {/* 27. Vendor Company */}
+            <WoFieldRow label="Vendor Company" hoverable={false}>
+              {renderVendorLink()}
+            </WoFieldRow>
+
+            {/* 28. Tenant Company */}
+            <WoFieldRow label="Tenant Company" hoverable={false}>
+              {renderTenantLink()}
+            </WoFieldRow>
+
+            {/* 29. Suite — no FK on work_orders */}
+            <WoFieldRow label="Suite" hoverable={false}>
+              <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>
+            </WoFieldRow>
+
+            {/* 30. Podio ID */}
+            <WoFieldRow label="Podio ID" hoverable={false}>
+              <span style={{fontSize:F.sm,color:T.text3}}>{data.podio_id||'—'}</span>
+            </WoFieldRow>
+
+            {/* 31. Podio URL */}
+            <WoFieldRow label="Podio URL" hoverable={false}>
+              {(()=>{
+                const url=data.podio_url||(data.podio_id?`https://podio.com/item/${data.podio_id}`:null);
+                return url?(
+                  <a href={url} target="_blank" rel="noopener noreferrer"
+                    style={{color:T.accent,textDecoration:'none',fontSize:F.sm}}
+                    onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                    onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                    Open in Podio ↗
+                  </a>
+                ):<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>;
+              })()}
+            </WoFieldRow>
+
+          </div>
         </div>
+
         <ActivityPanel
           collapsed={rightCollapsed}
           onCollapse={() => setRightCollapsed(c => !c)}

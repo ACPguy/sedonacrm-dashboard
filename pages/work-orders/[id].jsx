@@ -25,16 +25,12 @@ export default function WorkOrderDetailPage() {
   }, [router.isReady, router.query.id]);
 
   const handleBack = () => {
-    if (router.query.from === 'properties') {
-      const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('workOrdersBackUrl')) || '/properties';
-      router.push(backUrl);
-    } else {
-      router.push('/work-orders');
-    }
+    const backUrl = (typeof window !== 'undefined' ? sessionStorage.getItem('workOrdersBackUrl') : null) || '/work-orders';
+    router.push(backUrl);
   };
 
   return (
-    <AppShell activeView={router.query.from === 'properties' ? 'properties' : 'work-orders'}>
+    <AppShell activeView="work-orders">
       <div style={{height:'100%',overflow:'hidden',background:T.bg1}}>
         {loading && (
           <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:T.text3,fontSize:F.sm}}>
@@ -55,6 +51,7 @@ export default function WorkOrderDetailPage() {
             key={wo.id}
             wo={wo}
             onBack={handleBack}
+            onUpdate={updated => setWo(updated)}
           />
         )}
       </div>
