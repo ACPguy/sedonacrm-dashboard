@@ -1319,6 +1319,7 @@ const generatePortfolioPDF = (rows, occupancy) => {
       <td style="text-align:right">${fmt(r.base_rent)}</td>
       <td style="text-align:right">${fmt(r.nnn)}</td>
       <td style="text-align:right">${fmt(r.other_amt)}</td>
+      <td style="text-align:right">${fmt(r.cam_impound)}</td>
       <td style="text-align:right">${fmt(r.tpt_tax)}</td>
       <td style="text-align:right">${fmt(r.total)}</td>
       <td style="text-align:right">${r.base_per_sf ? Number(r.base_per_sf).toFixed(2) : '—'}</td>
@@ -1342,13 +1343,14 @@ const generatePortfolioPDF = (rows, occupancy) => {
   </div>
   <table><thead><tr>
     <th>Tenant DBA</th><th>Prop</th><th>Suite</th><th>Sq Ft</th><th>Security</th><th>Lease Ends</th>
-    <th>Base Rent</th><th>NNN</th><th>Other</th><th>TPT Tax</th><th>Total</th><th>Base/sf</th><th>NNN/sf</th>
+    <th>Base Rent</th><th>NNN</th><th>Other</th><th>CAMi</th><th>TPT Tax</th><th>Total</th><th>Base/sf</th><th>NNN/sf</th>
   </tr></thead><tbody>${tableRows}</tbody>
   <tfoot><tr>
     <td colspan="6">TOTALS</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
+    <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.cam_impound)||0),0))}</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.tpt_tax)||0),0))}</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
     <td colspan="2"></td>
@@ -1388,7 +1390,7 @@ export const TenantRentList = ({
   };
 
   const sorted = useMemo(() => {
-    const numeric = ['sqft','security_deposit','base_rent','nnn','other_amt','tpt_tax','total','base_per_sf','nnn_per_sf'];
+    const numeric = ['sqft','security_deposit','base_rent','nnn','other_amt','cam_impound','tpt_tax','total','base_per_sf','nnn_per_sf'];
     return [...rows].sort((a, b) => {
       const av = numeric.includes(sortCol) ? (Number(a[sortCol])||0) : String(a[sortCol]??'');
       const bv = numeric.includes(sortCol) ? (Number(b[sortCol])||0) : String(b[sortCol]??'');
@@ -1453,7 +1455,56 @@ export const TenantRentList = ({
     color: active ? '#fff' : T.text2, fontWeight: active ? '600' : '400',
   });
 
-  const colSpan = hidePropertyFilter ? 12 : 13;
+  const colSpan = hidePropertyFilter ? 13 : 14;
+  const propMap = Object.fromEntries(properties.map(p => [p.prop_code, p.property_name || '']));
+  const groups  = propFilter.length > 0
+    ? [...propFilter].sort().map(pc => ({
+        prop_code: pc,
+        property_name: propMap[pc] || '',
+        rows: filtered.filter(r => r.prop_code === pc),
+      })).filter(g => g.rows.length > 0)
+    : null;
+
+  const renderRow = (r, i) => {
+    const mo      = calcMo(r.lease_ends);
+    const rowBg   = i % 2 === 0 ? 'transparent' : T.bg0;
+    const podioId = r.tenants?.podio_id;
+    const href    = podioId ? `/tenants/${podioId}` : undefined;
+    return (
+      <tr key={r.id}
+        style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
+        onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+        onMouseLeave={e => e.currentTarget.style.background = rowBg}
+        onClick={e => {
+          if (e.target.closest('a')) return;
+          if ((e.ctrlKey||e.metaKey) && href) window.open(href,'_blank');
+          else if (onRowClick) onRowClick(r);
+        }}>
+        <td style={css.td}>
+          {href ? (
+            <a href={href}
+              onClick={e => { if (!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0) { e.preventDefault(); onRowClick?.(r); } }}
+              style={{color:T.accent,textDecoration:'none',fontWeight:'500'}}>
+              {r.tenant_dba||'—'}
+            </a>
+          ) : (r.tenant_dba||'—')}
+        </td>
+        {!hidePropertyFilter && <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{r.prop_code||'—'}</td>}
+        <td style={css.td}>{r.suite_num||'—'}</td>
+        <td style={{...css.td,textAlign:'right'}}>{fmtNum(r.sqft)}</td>
+        <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.security_deposit)}</td>
+        <td style={{...css.td,color:moColor(mo),fontWeight:mo!==null&&mo<=12?'600':'400'}}>{fmtDate(r.lease_ends)}</td>
+        <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.base_rent)}</td>
+        <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.nnn)}</td>
+        <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.other_amt)}</td>
+        <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.cam_impound)}</td>
+        <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.tpt_tax)}</td>
+        <td style={{...css.td,textAlign:'right',fontWeight:'600',color:T.text0}}>{fmtCurrency(r.total)}</td>
+        <td style={{...css.td,textAlign:'right'}}>{r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
+        <td style={{...css.td,textAlign:'right'}}>{r.nnn_per_sf?Number(r.nnn_per_sf).toFixed(2):'—'}</td>
+      </tr>
+    );
+  };
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -1524,11 +1575,11 @@ export const TenantRentList = ({
           ))}
           <button
             onClick={() => onGeneratePDF ? onGeneratePDF() : generatePortfolioPDF(filtered, occupancy)}
-            style={{marginLeft:'auto',background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'5px',
-              padding:'5px 12px',color:T.text1,fontSize:F.xs,cursor:'pointer',flexShrink:0,
-              transition:'border-color 0.15s,color 0.15s'}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor=T.accent;e.currentTarget.style.color=T.accent;}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
+            style={{marginLeft:'auto',background:T.accent,border:'none',borderRadius:'5px',
+              padding:'6px 14px',color:'#fff',fontSize:F.sm,cursor:'pointer',flexShrink:0,
+              transition:'filter 0.15s'}}
+            onMouseEnter={e=>{e.currentTarget.style.filter='brightness(0.9)';}}
+            onMouseLeave={e=>{e.currentTarget.style.filter='none';}}>
             Rent Roll PDF
           </button>
         </div>
@@ -1552,6 +1603,7 @@ export const TenantRentList = ({
                 <Th col="base_rent"       label="Base Rent" align="right"/>
                 <Th col="nnn"             label="NNN"       align="right"/>
                 <Th col="other_amt"       label="Other"     align="right"/>
+                <Th col="cam_impound"     label="CAMi"      align="right"/>
                 <Th col="tpt_tax"         label="TPT Tax"   align="right"/>
                 <Th col="total"           label="Total"     align="right"/>
                 <Th col="base_per_sf"     label="Base/sf"   align="right"/>
@@ -1562,45 +1614,19 @@ export const TenantRentList = ({
               {filtered.length === 0 && (
                 <tr><td colSpan={colSpan} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No current rent schedule rows match filters</td></tr>
               )}
-              {filtered.map((r, i) => {
-                const mo     = calcMo(r.lease_ends);
-                const rowBg  = i % 2 === 0 ? 'transparent' : T.bg0;
-                const podioId = r.tenants?.podio_id;
-                const href   = podioId ? `/tenants/${podioId}` : undefined;
-                return (
-                  <tr key={r.id}
-                    style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
-                    onMouseEnter={e => e.currentTarget.style.background = T.bg2}
-                    onMouseLeave={e => e.currentTarget.style.background = rowBg}
-                    onClick={e => {
-                      if (e.target.closest('a')) return;
-                      if ((e.ctrlKey||e.metaKey) && href) window.open(href,'_blank');
-                      else if (onRowClick) onRowClick(r);
-                    }}>
-                    <td style={css.td}>
-                      {href ? (
-                        <a href={href}
-                          onClick={e => { if (!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0) { e.preventDefault(); onRowClick?.(r); } }}
-                          style={{color:T.accent,textDecoration:'none',fontWeight:'500'}}>
-                          {r.tenant_dba||'—'}
-                        </a>
-                      ) : (r.tenant_dba||'—')}
-                    </td>
-                    {!hidePropertyFilter && <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{r.prop_code||'—'}</td>}
-                    <td style={css.td}>{r.suite_num||'—'}</td>
-                    <td style={{...css.td,textAlign:'right'}}>{fmtNum(r.sqft)}</td>
-                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.security_deposit)}</td>
-                    <td style={{...css.td,color:moColor(mo),fontWeight:mo!==null&&mo<=12?'600':'400'}}>{fmtDate(r.lease_ends)}</td>
-                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.base_rent)}</td>
-                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.nnn)}</td>
-                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.other_amt)}</td>
-                    <td style={{...css.td,textAlign:'right'}}>{fmtCurrency(r.tpt_tax)}</td>
-                    <td style={{...css.td,textAlign:'right',fontWeight:'600',color:T.text0}}>{fmtCurrency(r.total)}</td>
-                    <td style={{...css.td,textAlign:'right'}}>{r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
-                    <td style={{...css.td,textAlign:'right'}}>{r.nnn_per_sf?Number(r.nnn_per_sf).toFixed(2):'—'}</td>
-                  </tr>
-                );
-              })}
+              {groups
+                ? groups.map(g => (
+                    <React.Fragment key={g.prop_code}>
+                      <tr style={{background:T.bg3, position:'sticky', top:'28px', zIndex:1}}>
+                        <td colSpan={colSpan} style={{...css.td, color:T.accent, fontWeight:'600', padding:'4px 10px', fontSize:F.xs, textTransform:'uppercase', letterSpacing:'0.07em'}}>
+                          {g.prop_code}{g.property_name ? ` — ${g.property_name}` : ''} <span style={{color:T.text3, fontWeight:'400'}}>· {g.rows.length} tenant{g.rows.length !== 1 ? 's' : ''}</span>
+                        </td>
+                      </tr>
+                      {g.rows.map((r, i) => renderRow(r, i))}
+                    </React.Fragment>
+                  ))
+                : filtered.map((r, i) => renderRow(r, i))
+              }
             </tbody>
             {filtered.length > 0 && (
               <tfoot>
@@ -1612,6 +1638,7 @@ export const TenantRentList = ({
                   <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
                   <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
                   <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
+                  <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.cam_impound)||0),0))}</td>
                   <td style={{...css.th,textAlign:'right',background:T.bg3}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.tpt_tax)||0),0))}</td>
                   <td style={{...css.th,textAlign:'right',background:T.bg3,color:T.text0,fontWeight:'700'}}>{fmtCurrency(filtered.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
                   <td colSpan={2} style={{...css.th,background:T.bg3}}></td>

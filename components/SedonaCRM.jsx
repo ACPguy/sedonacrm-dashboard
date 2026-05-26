@@ -308,6 +308,7 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
       <td style="text-align:right">${fmt(r.base_rent)}</td>
       <td style="text-align:right">${fmt(r.nnn)}</td>
       <td style="text-align:right">${fmt(r.other_amt)}</td>
+      <td style="text-align:right">${fmt(r.cam_impound)}</td>
       <td style="text-align:right">${fmt(r.tpt_tax)}</td>
       <td style="text-align:right">${fmt(r.total)}</td>
       <td style="text-align:right">${r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
@@ -329,13 +330,14 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
   </div>
   <table><thead><tr>
     <th>Tenant DBA</th><th>Suite</th><th>Sq Ft</th><th>Security</th><th>Lease Ends</th>
-    <th>Base Rent</th><th>NNN</th><th>Other</th><th>TPT Tax</th><th>Total</th><th>Base/sf</th><th>NNN/sf</th>
+    <th>Base Rent</th><th>NNN</th><th>Other</th><th>CAMi</th><th>TPT Tax</th><th>Total</th><th>Base/sf</th><th>NNN/sf</th>
   </tr></thead><tbody>${rows}</tbody>
   <tfoot><tr>
     <td colspan="5">TOTALS</td>
     <td style="text-align:right">${fmt(rentRows.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
     <td style="text-align:right">${fmt(rentRows.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
     <td style="text-align:right">${fmt(rentRows.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
+    <td style="text-align:right">${fmt(rentRows.reduce((s,r)=>s+(Number(r.cam_impound)||0),0))}</td>
     <td style="text-align:right">${fmt(rentRows.reduce((s,r)=>s+(Number(r.tpt_tax)||0),0))}</td>
     <td style="text-align:right">${fmt(rentRows.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
     <td colspan="2"></td>
