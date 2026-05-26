@@ -259,40 +259,39 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 ## Next Priorities
 
-**Completed this session:**
-- Owners detail form — full build at /owners/[id]:
-  - OwFieldRow two-column grid (160px label / 1fr field), OwInlineBlur, OwInlineSelect
-  - OwTaxIdField (password-style, show/hide Eye/EyeSlash), OwActivityPanel
-  - All 21 fields in exact DB column order; Entity section divider
-  - Properties sub-tab (eager mount fetch, clickable property card)
-  - Listing Agreement sub-tab (lazy fetch, expiry urgency color, "View full Listing tab →" link)
-  - ActivityPanel defaults OPEN; resizable right panel
-  - pages/owners/[id].jsx: X-prefix lookup, sessionStorage back URL, onUpdate
-  - sbPatch + fmtDate added as named exports
-- Listing Expiry double-render fix (SedonaCRM.jsx):
-  - Added ListingExpiryField: single component, urgency color in display span
-- vendor_category text[] migration + multi-select pills + list view fix:
-  - vendor_category column migrated text → text[] (existing values wrapped as single-element arrays)
-  - VendorCategoryPills multi-select picker in VendorDetail (66 clean category options)
-  - catIncludes, catCounts, search, sort, row display all updated for text[]
-  - ALL_VENDOR_CATS constant: merged atomic unnest() values + hardcoded list
+**Completed this session (commit 143f159):**
+- ContactDetail tabs wired with real data (lazy reverse lookups):
+  - Tenant tab: tenants WHERE primary_contact_id OR accounting_contact_id = contact.id
+  - Owner tab: added new tab — property_owners WHERE primary_contact_id = contact.id
+  - Vendor tab: added new tab — vendors WHERE primary_contact_id = contact.id
+  - Issues tab: placeholder updated (issue_contacts junction confirmed; no anon SELECT policy)
+  - Work Orders tab: placeholder updated (no contact FK on work_orders — deferred to Podio sync)
+- Mobile responsiveness pass:
+  - AppShell hamburger menu (mobile drawer sidebar, overlay, <640px)
+  - globals.css: responsive CSS for field-rows, table→card, desktop sidebar hide
+  - All 5 FieldRow components: crm-field-row / crm-field-label classNames added (CSS stacking)
+  - All 8 list views: crm-list-table + mobile card layouts
+- Prop Info tab fixes (SedonaCRM.jsx):
+  - save() / saveAgreement(): val||null → correct null handling (fixes boolean false save bug)
+  - gross_sqft: comma-formatted display; parseInt on save
 
 **Completed previous sessions:**
+- Owners detail form — full build; Vendors detail form — full build
+- Property detail: Prop Info + Listing tabs built out
 - Work Orders detail form + Open-only default load
 - Suites fully routed; SuitesTable shared component
-- ContactDetail full tabbed form; Vendors detail form full build
-- Issues detail form overhaul; Nav always-navigate fix
+- ContactDetail full tabbed form; Issues detail overhaul; Nav always-navigate fix
 
 **Next:**
 1. Property detail refinements:
    - Tenants tab: add Base Rent / Total columns (requires rent_schedule join)
    - Work Orders tab: vendor name (denormalized field or vendor lookup)
-   - Dashboard tab: lazy-load counts (currently fetches all tabs on property open — violates lazy rule)
+   - Dashboard tab: lazy-load counts (currently fetches all on property open — violates lazy rule)
+   - Remaining 3 tab groups: Financial, Operations, Ownership tabs not yet built
 
-2. Properties detail page — full build at /properties/[id] (currently placeholder)
-   - Same pattern as other detail pages; all 5 tab groups
+2. Properties detail page — full build at /properties/[id]
+   - Prop Info + Listing tabs are built; Financial / Operations / Ownership still needed
 
-3. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
+3. issue_contacts anon SELECT policy — grant anon SELECT to wire Issues tab in ContactDetail
 
-4. contacts table FK columns — tenant_id / vendor_id / owner_id not yet in schema; ContactsTable
-   filterTenantId / filterVendorId / filterOwnerId will return empty until those columns are added
+4. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners
