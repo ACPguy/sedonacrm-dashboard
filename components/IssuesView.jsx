@@ -1232,7 +1232,7 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
               <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
             </FieldRow>
             <FieldRow label="FU Notes" topAlign>
-              <RichTextEditor value={data.follow_up_notes} onSave={v=>save('follow_up_notes',v)}/>
+              <RichTextEditor value={data.follow_up_notes} onSave={v=>save('follow_up_notes',v)} minRows={5}/>
             </FieldRow>
             <FieldRow label="Priority">
               <PriorityPills value={data.priority} onSave={v=>save('priority',v)}/>
