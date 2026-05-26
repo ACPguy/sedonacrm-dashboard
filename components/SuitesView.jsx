@@ -100,7 +100,7 @@ const EditableField = ({ label, value, onSave, type='text' }) => {
           style={{fontSize:F.base,color:val?T.text0:T.text3,cursor:'text',padding:'3px 5px',borderRadius:'4px',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4'}}
           onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
           onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
-          {val||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>click to edit</span>}
+          {(type==='date'?fmtDate(val):val)||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>click to edit</span>}
         </div>
       )}
     </div>
