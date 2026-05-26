@@ -1028,11 +1028,11 @@ const InlineSelect = ({ value, options, onSave }) => (
 
 const PriorityPills = ({ value, onSave }) => {
   const styles = {
-    '???':  { activeBg: T.bg3,     activeColor: T.text0, border: T.text2 },
-    Urgent: { activeBg: T.danger,  activeColor: '#fff',  border: T.danger },
-    High:   { activeBg: T.warn,    activeColor: '#fff',  border: T.warn },
-    Medium: { activeBg: T.success, activeColor: '#fff',  border: T.success },
-    Low:    { activeBg: T.accent,  activeColor: '#fff',  border: T.accent },
+    '???':  { activeBg: T.bg3,     activeColor: T.text0, border: T.text2,   hoverBg: 'rgba(107,114,128,0.25)' },
+    Urgent: { activeBg: T.danger,  activeColor: '#fff',  border: T.danger,  hoverBg: 'rgba(239,68,68,0.20)' },
+    High:   { activeBg: T.warn,    activeColor: '#fff',  border: T.warn,    hoverBg: 'rgba(249,115,22,0.20)' },
+    Medium: { activeBg: T.success, activeColor: '#fff',  border: T.success, hoverBg: 'rgba(234,179,8,0.20)' },
+    Low:    { activeBg: T.accent,  activeColor: '#fff',  border: T.accent,  hoverBg: 'rgba(34,197,94,0.20)' },
   };
   return (
     <div style={{display:'flex', gap:'5px', flexWrap:'wrap'}}>
@@ -1047,8 +1047,10 @@ const PriorityPills = ({ value, onSave }) => {
               border: `1px solid ${s.border}`,
               background: active ? s.activeBg : 'transparent',
               color: active ? s.activeColor : s.border,
-              transition: 'all 0.1s',
-            }}>
+              transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.background = s.hoverBg; }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
             {opt}
           </button>
         );
@@ -1059,8 +1061,8 @@ const PriorityPills = ({ value, onSave }) => {
 
 const StatusPills = ({ value, onSave }) => {
   const styles = {
-    Open:   { activeBg: T.danger, activeColor: '#fff', border: T.danger },
-    Closed: { activeBg: T.warn,   activeColor: T.bg0,  border: T.warn },
+    Open:   { activeBg: T.danger, activeColor: '#fff', border: T.danger, hoverBg: 'rgba(239,68,68,0.20)' },
+    Closed: { activeBg: T.warn,   activeColor: T.bg0,  border: T.warn,  hoverBg: 'rgba(245,158,11,0.20)' },
   };
   return (
     <div style={{display:'flex', gap:'5px', flexWrap:'wrap'}}>
@@ -1075,8 +1077,10 @@ const StatusPills = ({ value, onSave }) => {
               border: `1px solid ${s.border}`,
               background: active ? s.activeBg : 'transparent',
               color: active ? s.activeColor : s.border,
-              transition: 'all 0.1s',
-            }}>
+              transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.background = s.hoverBg; }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
             {opt}
           </button>
         );
