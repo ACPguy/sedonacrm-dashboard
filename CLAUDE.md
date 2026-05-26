@@ -260,34 +260,39 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 ## Next Priorities
 
 **Completed this session:**
-- Issues detail form — full overhaul across two sessions:
-  - Round 1: PropCode live dropdown (properties table), property info box, FU Date calendar picker,
-    FU Notes TipTap rich text editor, Date Closed conditional on Status=Closed, global MM-DD-YYYY dates
-  - Round 2: Remove Calc field, Issue Name orange+bold, label typography update, IssuePriorityField
-    (click-to-dropdown pill), Issue Details minRows=5
-  - Round 3 (this session): IssueDetail body rewritten as 160px-label / 1fr-field two-column grid;
-    new FieldRow, InlineBlurField, InlineSelect, PriorityPills (all options always visible),
-    StatusPills (Open/Closed inline toggles) components; RichTextEditor label made conditional
-- Nav always-navigate fix (real fix):
-  - AppShell go() + SedonaCRM handleNav(): router.replace(path).then(reload) when already on
-    that path or sub-path; otherwise router.push(path)
-  - Replaced all 7 router.push('?t=Date.now()') calls in SedonaCRM.jsx with handleNav()
-  - CLAUDE.md Development Rule #3 updated to document this pattern and warn against ?t= approach
+- Work Orders detail form — full build at /work-orders/[id]:
+  - WoFieldRow two-column grid (170px label / 1fr field), WoInlineBlur, WoInlineSelect
+  - WoPriorityPills, WoStatusPills, WoTypePills, PhaseButton micro-components
+  - All 31 fields in exact DB column order; ActivityPanel defaults OPEN
+  - Detail page uses sessionStorage back navigation and onUpdate callback
+- Work Orders + Issues: server-side Open-only default load (Dev Rule #8):
+  - WorkOrdersList and IssuesList now self-fetch based on active status filter
+  - Open is default on load; Closed fetched only when Closed/All pill clicked
+  - Each pill click = new Supabase query (not client-side filter of full dataset)
+  - Record count shown on active status pill (e.g. "Open ·247")
+  - All embedded contexts (Property detail tabs) inherit same behavior
+  - WorkOrdersTable and IssuesTable wrappers simplified (no data management)
+  - SedonaCRM.jsx Issues tab now passes filterPropCode instead of pre-fetched array
+  - FU Date calendar auto-open (showPicker() on focus), hide native icon via CSS
+  - Rent Roll PDF button: inline with occupancy bar, blue styling, portfolio PDF generator
+  - Tenants table: property group headers when pill selected; CAMi column; blue PDF button
 
 **Completed previous sessions:**
 - Suites fully routed: /suites + /suites/[id], cold-loadable by podio_id
 - SuitesTable shared component; Property detail Suites tab
 - ContactDetail — full tabbed form (Dashboard | Contact Info | WOs | Issues | Tenant | Comms)
 - contacts/[id].jsx back button via sessionStorage
+- Issues detail form — full overhaul (FieldRow grid, InlineBlurField, PriorityPills, StatusPills)
+- Nav always-navigate fix: router.replace(path).then(reload) when already on that path
 
 **Next:**
-1. Work Orders detail form — full build (standalone /work-orders/[id] currently a placeholder)
-   - Same pattern as Issues detail: two-column FieldRow grid, InlineBlurField, inline pills
-   - Check columns first: SELECT DISTINCT for status values
-
-2. Property detail refinements:
+1. Property detail refinements:
    - Tenants tab: add Base Rent / Total columns (requires rent_schedule join)
    - Work Orders tab: vendor name (denormalized field or vendor lookup)
+   - Dashboard tab: lazy-load counts (currently fetches all tabs on property open — violates lazy rule)
+
+2. Properties detail page — full build at /properties/[id] (currently placeholder)
+   - Same pattern as other detail pages; all 5 tab groups
 
 3. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners (no source file)
 
