@@ -346,6 +346,94 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
   win.document.close();
 };
 
+// ── Property Detail micro-components ─────────────────────────────────────────
+const PropFieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
+  <div
+    style={{display:'grid',gridTemplateColumns:'160px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
+    onMouseEnter={hoverable ? e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';} : undefined}
+    onMouseLeave={hoverable ? e=>{e.currentTarget.style.background='';} : undefined}
+  >
+    <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
+      {label}
+    </div>
+    <div style={{alignSelf:topAlign?'start':'center',paddingRight:'4px'}}>
+      {children}
+    </div>
+  </div>
+);
+
+const PropInlineBlur = ({ value, onSave, type='text', highlight=false, readOnly=false, displayTransform }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState(value ?? '');
+  const [saving, setSaving]   = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { setVal(value ?? ''); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  const commit = async () => {
+    setEditing(false);
+    const trimmed = typeof val === 'string' ? val.trim() : String(val ?? '');
+    if (trimmed === String(value ?? '')) return;
+    setSaving(true);
+    try { await onSave(trimmed || null); }
+    catch { setVal(value ?? ''); }
+    finally { setSaving(false); }
+  };
+  const rawDisplay = type === 'date' && val ? fmtDate(val) : (val != null ? String(val) : '');
+  const displayVal = displayTransform ? displayTransform(val) : rawDisplay;
+  if (readOnly) return <div style={{fontSize:F.base,color:T.text1,lineHeight:'1.4'}}>{displayVal||'—'}</div>;
+  return editing ? (
+    <input ref={inputRef} type={type} value={val} onChange={e=>setVal(e.target.value)}
+      onFocus={type==='date'?(e=>{try{e.target.showPicker();}catch(_){}}) : undefined}
+      onBlur={commit}
+      onKeyDown={e=>{if(e.key==='Escape'){setVal(value??'');setEditing(false);}if(e.key==='Enter')commit();}}
+      style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',
+        ...(type==='date'?{appearance:'none',WebkitAppearance:'none',MozAppearance:'none'}:{})}}
+    />
+  ) : (
+    <div onClick={()=>setEditing(true)} title="Click to edit"
+      style={{fontSize:F.base,color:highlight?'#E8630A':(rawDisplay?T.text0:T.text3),fontWeight:highlight?'700':'normal',cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
+      onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
+      onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
+      {displayVal || <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+      {saving && <span style={{color:T.text3,fontSize:F.xs,marginLeft:'6px'}}>saving…</span>}
+    </div>
+  );
+};
+
+const PropInlineSelect = ({ value, options, onSave }) => (
+  <select value={value||''} onChange={async e=>{await onSave(e.target.value||null);}}
+    style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+    <option value="">—</option>
+    {options.map(o=>typeof o==='object'
+      ?<option key={o.value} value={o.value}>{o.label}</option>
+      :<option key={o} value={o}>{o}</option>)}
+  </select>
+);
+
+const BoolPill = ({ value, onSave }) => {
+  const opts = [
+    {val:true,  label:'Yes', activeBg:T.success,  activeColor:'#fff',  border:T.success, hoverBg:'rgba(106,176,106,0.20)'},
+    {val:false, label:'No',  activeBg:T.bg3,      activeColor:T.text0, border:T.text2,   hoverBg:'rgba(107,114,128,0.20)'},
+  ];
+  return (
+    <div style={{display:'flex',gap:'5px'}}>
+      {opts.map(o=>{
+        const active = value === o.val;
+        return (
+          <button key={o.label} onClick={()=>!active&&onSave(o.val)}
+            style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',
+              border:`1px solid ${o.border}`,background:active?o.activeBg:'transparent',color:active?o.activeColor:o.border,
+              transition:'background 0.15s ease'}}
+            onMouseEnter={e=>{if(!active)e.currentTarget.style.background=o.hoverBg;}}
+            onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 // ── Property Detail ───────────────────────────────────────────────────────────
 export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   const router = useRouter();
@@ -359,6 +447,9 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   const [propTaxes,setPropTaxes] = useState([]);
   const [agreement,setAgreement] = useState(null);
   const [suites,setSuites] = useState([]);
+  const [propOwners,setPropOwners] = useState([]);
+  const [propOwnerContacts,setPropOwnerContacts] = useState([]);
+  const listingFetched = useRef(false);
   const [rightCollapsed,setRightCollapsed] = useState(true);
   const [rightWidth,setRightWidth] = useState(280);
   const resizingRight = useRef(false);
@@ -390,6 +481,21 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
     sbFetch('suites',`prop_code=eq.${pc}&select=*&order=suite_num.asc`).then(setSuites).catch(()=>{});
   },[data.prop_code]);
 
+  useEffect(()=>{
+    if(tab!=='listing'||listingFetched.current) return;
+    listingFetched.current=true;
+    const pc=data.prop_code;
+    sbFetch('property_owners',`prop_code=eq.${pc}&select=*`)
+      .then(async rows=>{
+        setPropOwners(rows||[]);
+        const ids=[...new Set((rows||[]).map(r=>r.primary_contact_id).filter(Boolean))];
+        if(ids.length){
+          const cs=await sbFetch('contacts',`id=in.(${ids.join(',')})&select=id,full_name,podio_id`);
+          setPropOwnerContacts(cs||[]);
+        }
+      }).catch(()=>{});
+  },[tab,data.prop_code]);
+
   const save = async (field, val) => {
     await sbPatch('properties', data.id, { [field]: val||null });
     const updated = {...data,[field]:val};
@@ -400,6 +506,23 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
     if(!agreement) return;
     await sbPatch('property_agreements', agreement.id, { [field]: val||null });
     setAgreement(prev=>({...prev,[field]:val}));
+  };
+
+  const pctIn  = v => v != null ? String((Number(v)*100).toFixed(4).replace(/\.?0+$/,'')) : '';
+  const pctOut = v => v ? String(parseFloat(v)/100) : null;
+  const pctFmt = v => v ? Number(v).toFixed(2)+'%' : '';
+
+  const listingExpiryStyle = d => {
+    if(!d) return {};
+    const now=new Date(); now.setHours(0,0,0,0);
+    const exp=new Date(d+'T00:00:00');
+    const days=Math.round((exp-now)/(1000*60*60*24));
+    if(days<0)   return {color:'#fff',fontWeight:'700',background:'#7a0000',padding:'2px 7px',borderRadius:'3px',display:'inline-block'};
+    if(days<=30)  return {color:T.danger,fontWeight:'700'};
+    if(days<=60)  return {color:'#d4924a',fontWeight:'700'};
+    if(days<=90)  return {color:'#f0d060',fontWeight:'700'};
+    if(days<=120) return {color:T.success,fontWeight:'700'};
+    return {};
   };
 
   const calcMoLeft = endDate => {
@@ -428,7 +551,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   const openWOs    = workOrders.filter(w=>w.wo_status!=='Closed'&&w.wo_status!=='Closed - Not Done').length;
   const openIssues = issues.filter(i=>(i.status||'').toLowerCase()!=='closed').length;
 
-  const TABS = ['Dashboard','Tenants','Suites','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Info','Listing Info','CAMs','Inspections','Contacts','Documents'];
+  const TABS = ['Dashboard','Tenants','Suites','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Prop Info','Listing','CAMs','Inspections','Contacts','Documents'];
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -558,7 +681,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                   {agreement&&(()=>{
                     const mo=calcMoLeft(agreement.listing_expiry_date);
                     return (
-                      <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('listing-info')}
+                      <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('listing')}
                         onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                         onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
                         <div style={css.secTitle}>Listing Expiry</div>
@@ -713,100 +836,299 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
               </div>
             )}
 
-            {/* INFO */}
-            {tab==='info'&&(
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
-                <div style={css.card}>
-                  <div style={css.secTitle}>Property Info</div>
-                  <EditableField label="Property Name" value={data.property_name} onSave={v=>save('property_name',v)}/>
-                  <EditableField label="Marketing Name" value={data.property_marketing_name} onSave={v=>save('property_marketing_name',v)}/>
-                  <EditableField label="Ownership Company" value={data.ownership_company} onSave={v=>save('ownership_company',v)}/>
-                  <EditableField label="Address" value={data.address} onSave={v=>save('address',v)}/>
-                  <EditableField label="City" value={data.city} onSave={v=>save('city',v)}/>
-                  <EditableField label="Zip" value={data.zip} onSave={v=>save('zip',v)}/>
-                </div>
-                <div style={css.card}>
-                  <div style={css.secTitle}>Building Details</div>
-                  <EditableField label="Gross Sq Ft" value={data.gross_sqft} display={fmtNum(data.gross_sqft)||undefined} onSave={v=>save('gross_sqft',v)} type="number"/>
-                  <EditableField label="Year Built" value={data.year_built} onSave={v=>save('year_built',v)} type="number"/>
-                  <EditableField label="Zoning" value={data.zoning} onSave={v=>save('zoning',v)}/>
-                  <EditableField label="Construction Type" value={data.construction_type} onSave={v=>save('construction_type',v)}/>
-                  <EditableField label="Roof Type" value={data.roof_type} onSave={v=>save('roof_type',v)}/>
-                  <EditableField label="TPT Tax %" value={data.tpt_tax_pct} onSave={v=>save('tpt_tax_pct',v)} type="number"/>
-                </div>
-                <div style={css.card}>
-                  <div style={css.secTitle}>Parking & Access</div>
-                  <EditableField label="Standard Stalls" value={data.parking_stalls_standard} onSave={v=>save('parking_stalls_standard',v)} type="number"/>
-                  <EditableField label="HC Stalls" value={data.parking_stalls_hc} onSave={v=>save('parking_stalls_hc',v)} type="number"/>
-                  <EditableField label="ADOR License #" value={data.ador_license_num} onSave={v=>save('ador_license_num',v)}/>
-                  <EditableField label="Bank Account Name" value={data.bank_account_name} onSave={v=>save('bank_account_name',v)}/>
-                </div>
-                <div style={css.card}>
-                  <div style={css.secTitle}>Notes</div>
-                  <EditableField label="Other Notes" value={data.other_notes} onSave={v=>save('other_notes',v)} type="textarea"/>
-                  <EditableField label="Rent Roll Notes" value={data.rent_roll_notes} onSave={v=>save('rent_roll_notes',v)} type="textarea"/>
-                  <EditableField label="Snow / Ice Instructions" value={data.snow_ice_instructions} onSave={v=>save('snow_ice_instructions',v)} type="textarea"/>
-                </div>
+            {/* PROP INFO */}
+            {tab==='prop-info'&&(
+              <div>
+                <PropFieldRow label="Property Name">
+                  <PropInlineBlur value={data.property_name||''} onSave={v=>save('property_name',v)} highlight/>
+                </PropFieldRow>
+                <PropFieldRow label="Prop Code" hoverable={false}>
+                  <span style={{fontSize:F.base,color:T.text1,fontFamily:'monospace'}}>{data.prop_code}</span>
+                </PropFieldRow>
+                <PropFieldRow label="Ownership Link" hoverable={false}>
+                  {data.ownership_company
+                    ? <span style={{fontSize:F.base,color:T.accent,cursor:'pointer',textDecoration:'underline'}}
+                        onClick={()=>router.push('/owners?prop='+data.prop_code)}>
+                        {data.ownership_company}
+                      </span>
+                    : <span style={{fontSize:F.base,color:T.text3,fontStyle:'italic'}}>—</span>
+                  }
+                </PropFieldRow>
+                <PropFieldRow label="Status">
+                  <PropInlineSelect value={data.status} options={['acp-entity','active','archived']} onSave={v=>save('status',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Location">
+                  <PropInlineBlur value={data.location_area||''} onSave={v=>save('location_area',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Marketing Name">
+                  <PropInlineBlur value={data.property_marketing_name||''} onSave={v=>save('property_marketing_name',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Address">
+                  <PropInlineBlur value={data.address||''} onSave={v=>save('address',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="City">
+                  <PropInlineBlur value={data.city||''} onSave={v=>save('city',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="State">
+                  <PropInlineBlur value={data.state||''} onSave={v=>save('state',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Zip">
+                  <PropInlineBlur value={data.zip||''} onSave={v=>save('zip',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="TPT Tax %">
+                  <PropInlineBlur
+                    value={pctIn(data.tpt_tax_pct)}
+                    type="number"
+                    onSave={v=>save('tpt_tax_pct',pctOut(v))}
+                    displayTransform={pctFmt}
+                  />
+                </PropFieldRow>
+                <PropFieldRow label="Cross Streets">
+                  <PropInlineBlur value={data.nearest_cross_streets||''} onSave={v=>save('nearest_cross_streets',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Zoning">
+                  <PropInlineBlur value={data.zoning||''} onSave={v=>save('zoning',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Acres">
+                  <PropInlineBlur value={data.acres!=null?String(data.acres):''} type="number" onSave={v=>save('acres',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Year Built">
+                  <PropInlineBlur value={data.year_built!=null?String(data.year_built):''} type="number" onSave={v=>save('year_built',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Fire Sprinkled">
+                  <BoolPill value={data.fire_sprinkled} onSave={v=>save('fire_sprinkled',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Fire Monitored">
+                  <BoolPill value={data.fire_monitored} onSave={v=>save('fire_monitored',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="# of Stories">
+                  <PropInlineBlur value={data.num_stories!=null?String(data.num_stories):''} type="number" onSave={v=>save('num_stories',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Standard Parking">
+                  <PropInlineBlur value={data.parking_stalls_standard!=null?String(data.parking_stalls_standard):''} type="number" onSave={v=>save('parking_stalls_standard',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="H/C Parking">
+                  <PropInlineBlur value={data.parking_stalls_hc!=null?String(data.parking_stalls_hc):''} type="number" onSave={v=>save('parking_stalls_hc',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Construction Type">
+                  <PropInlineBlur value={data.construction_type||''} onSave={v=>save('construction_type',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Roof Type">
+                  <PropInlineBlur value={data.roof_type||''} onSave={v=>save('roof_type',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Other Notes" topAlign>
+                  <RichTextEditor value={data.other_notes||''} onSave={v=>save('other_notes',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Bank 1">
+                  <PropInlineBlur value={data.bank_account_name||''} onSave={v=>save('bank_account_name',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="ADOR Lic. #">
+                  <PropInlineBlur value={data.ador_license_num||''} onSave={v=>save('ador_license_num',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="APS LL Agreement">
+                  <BoolPill value={data.aps_landlord_agreement} onSave={v=>save('aps_landlord_agreement',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="APS Notes" topAlign>
+                  <RichTextEditor value={data.aps_notes||''} onSave={v=>save('aps_notes',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Gross Sq Ftg">
+                  <PropInlineBlur value={data.gross_sqft!=null?String(data.gross_sqft):''} type="number" onSave={v=>save('gross_sqft',v)}/>
+                </PropFieldRow>
+                <PropFieldRow label="Snow & Ice" topAlign>
+                  <RichTextEditor value={data.snow_ice_instructions||''} onSave={v=>save('snow_ice_instructions',v)}/>
+                </PropFieldRow>
               </div>
             )}
 
-            {/* LISTING INFO — management agreement from property_agreements */}
-            {tab==='listing-info'&&(
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px'}}>
+            {/* LISTING — management agreement from property_agreements */}
+            {tab==='listing'&&(
+              <div>
                 {!agreement&&(
-                  <div style={{gridColumn:'1/-1',textAlign:'center',padding:'32px',color:T.text3,fontSize:F.sm}}>No management agreement on file</div>
+                  <div style={{background:'#3a1a00',border:`0.5px solid #c47a20`,borderRadius:'6px',padding:'16px',marginBottom:'16px',color:'#f0a040',fontSize:F.base,fontWeight:'600'}}>
+                    ⚠ No listing agreement on record for this property.
+                  </div>
                 )}
-                {agreement&&(<>
-                  <div style={css.card}>
-                    <div style={css.secTitle}>Listing Agreement</div>
-                    <EditableField label="Type" value={agreement.listing_agreement_type} onSave={v=>saveAgreement('listing_agreement_type',v)}/>
-                    <EditableField label="Start" value={agreement.listing_start_date} display={fmtDate(agreement.listing_start_date)||undefined} onSave={v=>saveAgreement('listing_start_date',v)} type="date"/>
-                    <EditableField label="Expiry" value={agreement.listing_expiry_date} display={fmtDate(agreement.listing_expiry_date)||undefined} onSave={v=>saveAgreement('listing_expiry_date',v)} type="date"/>
-                    <EditableField label="Closed" value={agreement.listing_closed_date} display={fmtDate(agreement.listing_closed_date)||undefined} onSave={v=>saveAgreement('listing_closed_date',v)} type="date"/>
-                    <EditableField label="Status" value={agreement.acp_listing_status} onSave={v=>saveAgreement('acp_listing_status',v)}/>
-                    <EditableField label="Notes" value={agreement.general_listing_notes} onSave={v=>saveAgreement('general_listing_notes',v)} type="textarea"/>
-                  </div>
-                  <div style={css.card}>
-                    <div style={css.secTitle}>PM Fee</div>
-                    <EditableField label="Fee Type" value={agreement.pm_fee_type} onSave={v=>saveAgreement('pm_fee_type',v)}/>
-                    <EditableField label="Fee % (as decimal, e.g. 0.05 = 5%)" value={agreement.pm_fee_pct} display={agreement.pm_fee_pct?(Number(agreement.pm_fee_pct)*100).toFixed(2)+'%':undefined} onSave={v=>saveAgreement('pm_fee_pct',v)} type="number"/>
-                    <EditableField label="No Less Than" value={agreement.pm_fee_no_less_than} display={fmtMoney(agreement.pm_fee_no_less_than)||undefined} onSave={v=>saveAgreement('pm_fee_no_less_than',v)} type="number"/>
-                    <EditableField label="Fixed Amt" value={agreement.pm_fee_fixed_amt} display={fmtMoney(agreement.pm_fee_fixed_amt)||undefined} onSave={v=>saveAgreement('pm_fee_fixed_amt',v)} type="number"/>
-                    <EditableField label="How Paid" value={agreement.pm_fee_how_paid} onSave={v=>saveAgreement('pm_fee_how_paid',v)}/>
-                    <EditableField label="Current EFT" value={agreement.pm_fee_current_eft_amt} display={fmtMoney(agreement.pm_fee_current_eft_amt)||undefined} onSave={v=>saveAgreement('pm_fee_current_eft_amt',v)} type="number"/>
-                    <EditableField label="Current QBO" value={agreement.pm_fee_current_qbo_amt} display={fmtMoney(agreement.pm_fee_current_qbo_amt)||undefined} onSave={v=>saveAgreement('pm_fee_current_qbo_amt',v)} type="number"/>
-                    <EditableField label="Notes" value={agreement.pm_fee_notes} onSave={v=>saveAgreement('pm_fee_notes',v)} type="textarea"/>
-                  </div>
-                  <div style={css.card}>
-                    <div style={css.secTitle}>Distributions</div>
-                    <EditableField label="Type" value={agreement.distribution_type} onSave={v=>saveAgreement('distribution_type',v)}/>
-                    <EditableField label="Fixed Amt" value={agreement.distribution_fixed_amt} display={fmtMoney(agreement.distribution_fixed_amt)||undefined} onSave={v=>saveAgreement('distribution_fixed_amt',v)} type="number"/>
-                    <EditableField label="Paid Via" value={agreement.distribution_paid_via} onSave={v=>saveAgreement('distribution_paid_via',v)}/>
-                    <EditableField label="Notes" value={agreement.distribution_notes} onSave={v=>saveAgreement('distribution_notes',v)} type="textarea"/>
-                    <EditableField label="Min Bank Balance" value={agreement.min_bank_balance} display={fmtMoney(agreement.min_bank_balance)||undefined} onSave={v=>saveAgreement('min_bank_balance',v)} type="number"/>
-                    <EditableField label="Reserve Op Funds" value={agreement.reserve_op_funds} display={fmtMoney(agreement.reserve_op_funds)||undefined} onSave={v=>saveAgreement('reserve_op_funds',v)} type="number"/>
-                    <EditableField label="Bank Acct Type" value={agreement.bank_acct_type} onSave={v=>saveAgreement('bank_acct_type',v)}/>
-                    <EditableField label="LL Approval Over" value={agreement.ll_approval_over_amt} display={fmtMoney(agreement.ll_approval_over_amt)||undefined} onSave={v=>saveAgreement('ll_approval_over_amt',v)} type="number"/>
-                  </div>
-                  <div style={css.card}>
-                    <div style={css.secTitle}>Leasing Fees</div>
-                    <EditableField label="Leasing Fee Type" value={agreement.leasing_fee_type} onSave={v=>saveAgreement('leasing_fee_type',v)}/>
-                    <EditableField label="Leasing Fee % (decimal)" value={agreement.leasing_fee_pct} display={agreement.leasing_fee_pct?(Number(agreement.leasing_fee_pct)*100).toFixed(2)+'%':undefined} onSave={v=>saveAgreement('leasing_fee_pct',v)} type="number"/>
-                    <EditableField label="Leasing Notes" value={agreement.leasing_fee_notes} onSave={v=>saveAgreement('leasing_fee_notes',v)} type="textarea"/>
-                    <EditableField label="Renewal Type" value={agreement.lease_renewal_type} onSave={v=>saveAgreement('lease_renewal_type',v)}/>
-                    <EditableField label="Renewal Fee % (decimal)" value={agreement.lease_renewal_fee_pct} display={agreement.lease_renewal_fee_pct?(Number(agreement.lease_renewal_fee_pct)*100).toFixed(2)+'%':undefined} onSave={v=>saveAgreement('lease_renewal_fee_pct',v)} type="number"/>
-                    <EditableField label="Renewal Notes" value={agreement.lease_renewal_fee_notes} onSave={v=>saveAgreement('lease_renewal_fee_notes',v)} type="textarea"/>
-                    <EditableField label="Hourly Rate" value={agreement.other_fees_hourly_rate} display={fmtMoney(agreement.other_fees_hourly_rate)||undefined} onSave={v=>saveAgreement('other_fees_hourly_rate',v)} type="number"/>
-                    <EditableField label="Project Mgmt Hourly" value={agreement.project_mgmt_hourly_rate} display={fmtMoney(agreement.project_mgmt_hourly_rate)||undefined} onSave={v=>saveAgreement('project_mgmt_hourly_rate',v)} type="number"/>
-                    <EditableField label="Asset Improv Fee % (decimal)" value={agreement.asset_improv_fee_pct} display={agreement.asset_improv_fee_pct?(Number(agreement.asset_improv_fee_pct)*100).toFixed(2)+'%':undefined} onSave={v=>saveAgreement('asset_improv_fee_pct',v)} type="number"/>
-                    <EditableField label="Asset Improv Term (months)" value={agreement.asset_improv_term_months} onSave={v=>saveAgreement('asset_improv_term_months',v)} type="number"/>
-                  </div>
-                  <div style={css.card}>
-                    <div style={css.secTitle}>PM Reports</div>
-                    <EditableField label="Email To" value={agreement.pm_reports_email_to} onSave={v=>saveAgreement('pm_reports_email_to',v)}/>
-                    <EditableField label="Notes" value={agreement.pm_reports_notes} onSave={v=>saveAgreement('pm_reports_notes',v)} type="textarea"/>
-                  </div>
-                </>)}
+                {agreement&&(()=>{
+                  const agr=agreement;
+                  const boxStyle={...css.card,padding:'16px',marginBottom:'16px'};
+                  return (
+                    <div>
+                      {/* BOX 1: STATUS */}
+                      <div style={boxStyle}>
+                        <div style={css.secTitle}>Status</div>
+                        <PropFieldRow label="Property" hoverable={false}>
+                          <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                            <span style={{fontSize:F.base,color:T.text0,fontWeight:'600'}}>{data.property_name||data.prop_code}</span>
+                            <span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{data.prop_code}</span>
+                          </div>
+                        </PropFieldRow>
+                        <PropFieldRow label="Prop Code" hoverable={false}>
+                          <span style={{fontSize:F.base,color:T.text1,fontFamily:'monospace'}}>{agr.prop_code}</span>
+                        </PropFieldRow>
+                        <PropFieldRow label="LL Company" hoverable={false}>
+                          {propOwners.length>0
+                            ? propOwners.map(o=>(
+                                <span key={o.id}
+                                  style={{fontSize:F.base,color:T.accent,cursor:'pointer',textDecoration:'underline',marginRight:'8px'}}
+                                  onClick={()=>router.push('/owners/'+(o.podio_id??'X'+o.id.slice(-6)))}>
+                                  {o.company_dba||'(no name)'}
+                                </span>
+                              ))
+                            : <span style={{fontSize:F.base,color:T.text3}}>—</span>
+                          }
+                        </PropFieldRow>
+                        <PropFieldRow label="LL Contact(s)" hoverable={false}>
+                          {propOwnerContacts.length>0
+                            ? propOwnerContacts.map(c=>(
+                                <span key={c.id}
+                                  style={{fontSize:F.base,color:T.accent,cursor:'pointer',textDecoration:'underline',marginRight:'8px'}}
+                                  onClick={()=>router.push('/contacts/'+(c.podio_id??'X'+c.id.slice(-6)))}>
+                                  {c.full_name}
+                                </span>
+                              ))
+                            : <span style={{fontSize:F.base,color:T.text3}}>—</span>
+                          }
+                        </PropFieldRow>
+                        <PropFieldRow label="Agreement Type">
+                          <PropInlineSelect value={agr.listing_agreement_type} options={['PM+LSG']} onSave={v=>saveAgreement('listing_agreement_type',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Listing Expiry">
+                          <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                            <PropInlineBlur type="date" value={agr.listing_expiry_date||''} onSave={v=>saveAgreement('listing_expiry_date',v)}/>
+                            {agr.listing_expiry_date&&(
+                              <span style={listingExpiryStyle(agr.listing_expiry_date)}>
+                                {fmtDate(agr.listing_expiry_date)}
+                              </span>
+                            )}
+                          </div>
+                        </PropFieldRow>
+                        <PropFieldRow label="ACP Listing Status">
+                          <PropInlineSelect value={agr.acp_listing_status} options={['Active','Expired']} onSave={v=>saveAgreement('acp_listing_status',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="General Notes" topAlign>
+                          <RichTextEditor value={agr.general_listing_notes||''} onSave={v=>saveAgreement('general_listing_notes',v)}/>
+                        </PropFieldRow>
+                      </div>
+
+                      {/* BOX 2: PM FEE INFO */}
+                      <div style={boxStyle}>
+                        <div style={css.secTitle}>PM Fee Info</div>
+                        <PropFieldRow label="PM Fee Type">
+                          <PropInlineSelect value={agr.pm_fee_type} options={["% of Base Rent - But 'No Less Than'...","% of Gross Rent - But 'No Less Than'...",'Fixed Mo. $ Amount']} onSave={v=>saveAgreement('pm_fee_type',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="PM Fee %">
+                          <PropInlineBlur value={pctIn(agr.pm_fee_pct)} type="number" onSave={v=>saveAgreement('pm_fee_pct',pctOut(v))} displayTransform={pctFmt}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="But No Less Than">
+                          <PropInlineBlur value={agr.pm_fee_no_less_than!=null?String(agr.pm_fee_no_less_than):''} type="number" onSave={v=>saveAgreement('pm_fee_no_less_than',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Fixed Mo. $ Amount">
+                          <PropInlineBlur value={agr.pm_fee_fixed_amt!=null?String(agr.pm_fee_fixed_amt):''} type="number" onSave={v=>saveAgreement('pm_fee_fixed_amt',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="How Paid?">
+                          <PropInlineSelect value={agr.pm_fee_how_paid} options={['EFT']} onSave={v=>saveAgreement('pm_fee_how_paid',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Current Recurring EFT">
+                          <PropInlineBlur value={agr.pm_fee_current_eft_amt!=null?String(agr.pm_fee_current_eft_amt):''} type="number" onSave={v=>saveAgreement('pm_fee_current_eft_amt',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Current Recurring QBO">
+                          <PropInlineBlur value={agr.pm_fee_current_qbo_amt!=null?String(agr.pm_fee_current_qbo_amt):''} type="number" onSave={v=>saveAgreement('pm_fee_current_qbo_amt',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="PM Fee Notes" topAlign>
+                          <RichTextEditor value={agr.pm_fee_notes||''} onSave={v=>saveAgreement('pm_fee_notes',v)}/>
+                        </PropFieldRow>
+                      </div>
+
+                      {/* BOX 3: LL EXPENSE APPROVAL THRESHOLD */}
+                      <div style={boxStyle}>
+                        <div style={css.secTitle}>Landlord Expense Approval Threshold</div>
+                        <PropFieldRow label="LL Approval for Exp. Over">
+                          <PropInlineBlur value={agr.ll_approval_over_amt!=null?String(agr.ll_approval_over_amt):''} type="number" onSave={v=>saveAgreement('ll_approval_over_amt',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Req. Min. Bank Balance">
+                          <PropInlineBlur value={agr.min_bank_balance!=null?String(agr.min_bank_balance):''} type="number" onSave={v=>saveAgreement('min_bank_balance',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Reserve Op. Funds">
+                          <PropInlineBlur value={agr.reserve_op_funds!=null?String(agr.reserve_op_funds):''} type="number" onSave={v=>saveAgreement('reserve_op_funds',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Bank Acct Type">
+                          <PropInlineBlur value={agr.bank_acct_type||''} onSave={v=>saveAgreement('bank_acct_type',v)}/>
+                        </PropFieldRow>
+                      </div>
+
+                      {/* BOX 4: PM OWNER REPORTS */}
+                      <div style={boxStyle}>
+                        <div style={css.secTitle}>PM Owner Reports</div>
+                        <PropFieldRow label="Internal Notes" topAlign>
+                          <RichTextEditor value={agr.pm_reports_notes||''} onSave={v=>saveAgreement('pm_reports_notes',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Email To">
+                          <PropInlineBlur value={agr.pm_reports_email_to||''} onSave={v=>saveAgreement('pm_reports_email_to',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Current Distribution">
+                          <PropInlineSelect value={agr.distribution_type} options={['Calculated Monthly','Fixed $ Amt (see below)','Gets None']} onSave={v=>saveAgreement('distribution_type',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Distribution Fixed Amt">
+                          <PropInlineBlur value={agr.distribution_fixed_amt!=null?String(agr.distribution_fixed_amt):''} type="number" onSave={v=>saveAgreement('distribution_fixed_amt',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Distribution Notes" topAlign>
+                          <RichTextEditor value={agr.distribution_notes||''} onSave={v=>saveAgreement('distribution_notes',v)}/>
+                        </PropFieldRow>
+                      </div>
+
+                      {/* BOX 5: NEW LEASING COMMISSIONS */}
+                      <div style={boxStyle}>
+                        <div style={css.secTitle}>New Leasing Commissions</div>
+                        <PropFieldRow label="Leasing Fee Type" topAlign>
+                          <PropInlineBlur value={agr.leasing_fee_type||''} onSave={v=>saveAgreement('leasing_fee_type',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Leasing Fee %">
+                          <PropInlineBlur value={pctIn(agr.leasing_fee_pct)} type="number" onSave={v=>saveAgreement('leasing_fee_pct',pctOut(v))} displayTransform={pctFmt}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Leasing Fee Notes" topAlign>
+                          <RichTextEditor value={agr.leasing_fee_notes||''} onSave={v=>saveAgreement('leasing_fee_notes',v)}/>
+                        </PropFieldRow>
+                      </div>
+
+                      {/* BOX 6: LEASE RENEWAL COMMISSION */}
+                      <div style={boxStyle}>
+                        <div style={css.secTitle}>Lease Renewal Commission</div>
+                        <PropFieldRow label="Lease Renewal Type" topAlign>
+                          <PropInlineBlur value={agr.lease_renewal_type||''} onSave={v=>saveAgreement('lease_renewal_type',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Lease Renewal Fee %">
+                          <PropInlineBlur value={pctIn(agr.lease_renewal_fee_pct)} type="number" onSave={v=>saveAgreement('lease_renewal_fee_pct',pctOut(v))} displayTransform={pctFmt}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Lease Renewal Notes" topAlign>
+                          <RichTextEditor value={agr.lease_renewal_fee_notes||''} onSave={v=>saveAgreement('lease_renewal_fee_notes',v)}/>
+                        </PropFieldRow>
+                      </div>
+
+                      {/* BOX 7: OTHER FEES */}
+                      <div style={boxStyle}>
+                        <div style={css.secTitle}>Other Fees</div>
+                        <PropFieldRow label="Other Fees - Hourly Rate">
+                          <PropInlineBlur value={agr.other_fees_hourly_rate!=null?String(agr.other_fees_hourly_rate):''} type="number" onSave={v=>saveAgreement('other_fees_hourly_rate',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Project Mgmt - Hourly">
+                          <PropInlineBlur value={agr.project_mgmt_hourly_rate!=null?String(agr.project_mgmt_hourly_rate):''} type="number" onSave={v=>saveAgreement('project_mgmt_hourly_rate',v)} displayTransform={v=>v?fmtMoney(v):''}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Asset Improv. - Fee %">
+                          <PropInlineBlur value={pctIn(agr.asset_improv_fee_pct)} type="number" onSave={v=>saveAgreement('asset_improv_fee_pct',pctOut(v))} displayTransform={pctFmt}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Asset Improv. - Term (mo.)">
+                          <PropInlineBlur value={agr.asset_improv_term_months!=null?String(agr.asset_improv_term_months):''} type="number" onSave={v=>saveAgreement('asset_improv_term_months',v)}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="TNT Late Fee %">
+                          <PropInlineBlur value={pctIn(agr.tnt_late_fee_pct)} type="number" onSave={v=>saveAgreement('tnt_late_fee_pct',pctOut(v))} displayTransform={pctFmt}/>
+                        </PropFieldRow>
+                        <PropFieldRow label="Other Fees Notes" topAlign>
+                          <RichTextEditor value={agr.other_fees_notes||''} onSave={v=>saveAgreement('other_fees_notes',v)}/>
+                        </PropFieldRow>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
