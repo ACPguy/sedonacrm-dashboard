@@ -478,12 +478,11 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
           </div>
         )}
 
-        {/* Issues tab — full component, needs overflow:hidden wrapper */}
+        {/* Issues tab — self-fetching, Open-only by default */}
         {tab==='issues'&&(
           <div style={{flex:1,overflow:'hidden'}}>
             <IssuesList
-              issues={issues} setIssues={setIssues}
-              loading={false} error={null}
+              filterPropCode={data.prop_code}
               onSelect={iss=>{
                 if(typeof window!=='undefined'){
                   const base = window.location.href.split('?')[0];

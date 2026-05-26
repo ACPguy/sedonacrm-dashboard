@@ -410,10 +410,11 @@ const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) 
 // ─────────────────────────────────────────────────────────────────────────────
 // WorkOrders List
 // ─────────────────────────────────────────────────────────────────────────────
-export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hidePropStrip = false, hidePropertyFilter = false, hideSearch = false, filterPropCode }) => {
-  // filterPropCode: client-side filter when data is pre-fetched for all props
-  if (filterPropCode) wos = wos.filter(w => w.prop_code === filterPropCode);
+export const WorkOrdersList = ({ onSelect, hidePropStrip = false, hidePropertyFilter = false, hideSearch = false, filterPropCode }) => {
   const _hidePropStrip = hidePropStrip || hidePropertyFilter;
+  const [wos, setWos]                       = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState(null);
   const [vendors, setVendors]               = useState([]);
   const [tenants, setTenants]               = useState([]);
   const [statusFilter, setStatusFilter]     = useState('Open');
@@ -427,6 +428,21 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
   const [dateFilters, setDateFilters]       = useState({ opened: null, updated: null, closed: null });
   const [moreOpen, setMoreOpen]             = useState(false);
   const moreAnchorRef = useRef(null);
+
+  // Server-side fetch — re-runs when status filter or prop filter changes
+  useEffect(() => {
+    setLoading(true); setError(null); setWos([]);
+    const propPart = filterPropCode ? `&prop_code=eq.${encodeURIComponent(filterPropCode)}` : '';
+    const statusPart =
+      statusFilter === 'Open'   ? '&wo_status=not.in.(Closed,Closed%20-%20Not%20Done)' :
+      statusFilter === 'Closed' ? '&wo_status=in.(Closed,Closed%20-%20Not%20Done)'     : '';
+    const params = `select=*${statusPart}${propPart}&order=created_at.desc`;
+    // All-status cross-property fetch can exceed 1000 rows — use paginated fetch
+    const fetchFn = (statusFilter === 'All' && !filterPropCode) ? sbFetchAll : sbFetch;
+    fetchFn('work_orders', params)
+      .then(data => { setWos(data); setLoading(false); })
+      .catch(e   => { setError(e.message); setLoading(false); });
+  }, [statusFilter, filterPropCode]);
 
   useEffect(() => {
     sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
@@ -723,15 +739,20 @@ export const WorkOrdersList = ({ wos, setWos, loading, error, onSelect, hideProp
 
           {/* Open / Closed / All */}
           <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
-            {['Open','Closed','All'].map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
-                  background:statusFilter===s?T.bg3:'transparent',
-                  color:statusFilter===s?T.text0:T.text2,
-                  fontWeight:statusFilter===s?'600':'400'}}>
-                {s}
-              </button>
-            ))}
+            {['Open','Closed','All'].map(s => {
+              const active = statusFilter === s;
+              return (
+                <button key={s} onClick={() => setStatusFilter(s)}
+                  style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
+                    background:active?T.bg3:'transparent',
+                    color:active?T.text0:T.text2,
+                    fontWeight:active?'600':'400',
+                    display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
+                  {s}
+                  {active && !loading && <span style={{color:T.text3,fontSize:'10px'}}>·{wos.length}</span>}
+                </button>
+              );
+            })}
           </div>
 
           {/* More... button */}
@@ -1392,20 +1413,8 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main export — WO state lives here so Kanban drags survive detail/back
-// ─────────────────────────────────────────────────────────────────────────────
 export default function WorkOrdersView() {
-  const [wos, setWos]           = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
   const [selected, setSelected] = useState(null);
-
-  useEffect(() => {
-    setLoading(true); setError(null);
-    sbFetchAll('work_orders', 'select=*&order=created_at.desc')
-      .then(data => { setWos(data); setLoading(false); })
-      .catch(e   => { setError(e.message); setLoading(false); });
-  }, []);
 
   const handleSelect = useCallback((wo) => {
     history.pushState({ woId: wo.id }, '');
@@ -1426,11 +1435,7 @@ export default function WorkOrdersView() {
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>
       <div style={{display:selected?'none':'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
-        <WorkOrdersList
-          wos={wos} setWos={setWos}
-          loading={loading} error={error}
-          onSelect={handleSelect}
-        />
+        <WorkOrdersList onSelect={handleSelect}/>
       </div>
       {selected && (
         <WorkOrderDetail

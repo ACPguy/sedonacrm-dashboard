@@ -444,9 +444,11 @@ const MorePopover = ({ open, onClose, anchorRef, assignedFilter, setAssignedFilt
 // ─────────────────────────────────────────────────────────────────────────────
 // Issues List
 // ─────────────────────────────────────────────────────────────────────────────
-export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePropStrip = false, hidePropertyFilter = false, hideSearch = false, filterPropCode }) => {
-  if (filterPropCode) issues = issues.filter(i => i.prop_code === filterPropCode);
+export const IssuesList = ({ onSelect, hidePropStrip = false, hidePropertyFilter = false, hideSearch = false, filterPropCode, refreshKey = 0 }) => {
   const _hidePropStrip = hidePropStrip || hidePropertyFilter;
+  const [issues, setIssues]     = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
   const [users, setUsers]         = useState([]);
   const [statusFilter, setStatusFilter]     = useState('Open');
   const [priorityFilter, setPriorityFilter] = useState('All');
@@ -460,6 +462,18 @@ export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePr
   const [dateFilters, setDateFilters] = useState({ opened: null, updated: null, closed: null });
   const [moreOpen, setMoreOpen]   = useState(false);
   const moreAnchorRef = useRef(null);
+
+  // Server-side fetch — re-runs when status filter, prop filter, or refreshKey changes
+  useEffect(() => {
+    setLoading(true); setError(null); setIssues([]);
+    const propPart   = filterPropCode ? `&prop_code=eq.${encodeURIComponent(filterPropCode)}` : '';
+    const statusPart = statusFilter === 'Open'   ? '&status=eq.Open'   :
+                       statusFilter === 'Closed' ? '&status=eq.Closed' : '';
+    const params = `select=*${statusPart}${propPart}&order=create_date.desc`;
+    sbFetch('issues', params)
+      .then(data => { setIssues(data); setLoading(false); })
+      .catch(e   => { setError(e.message); setLoading(false); });
+  }, [statusFilter, filterPropCode, refreshKey]);
 
   useEffect(() => {
     sbFetch('properties', 'select=prop_code&status=eq.active&order=prop_code.asc')
@@ -726,15 +740,20 @@ export const IssuesList = ({ issues, setIssues, loading, error, onSelect, hidePr
 
           {/* Open / Closed / All */}
           <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
-            {['Open','Closed','All'].map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
-                  background:statusFilter===s?T.bg3:'transparent',
-                  color:statusFilter===s?T.text0:T.text2,
-                  fontWeight:statusFilter===s?'600':'400'}}>
-                {s}
-              </button>
-            ))}
+            {['Open','Closed','All'].map(s => {
+              const active = statusFilter === s;
+              return (
+                <button key={s} onClick={() => setStatusFilter(s)}
+                  style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
+                    background:active?T.bg3:'transparent',
+                    color:active?T.text0:T.text2,
+                    fontWeight:active?'600':'400',
+                    display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
+                  {s}
+                  {active && !loading && <span style={{color:T.text3,fontSize:'10px'}}>·{issues.length}</span>}
+                </button>
+              );
+            })}
           </div>
 
           {/* More... button */}
@@ -1292,32 +1311,23 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
 // Main export — issues state lives here so Kanban drags survive detail/back
 // ─────────────────────────────────────────────────────────────────────────────
 export default function IssuesView() {
-  const [issues, setIssues]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
-  const [selected, setSelected] = useState(null);
-
-  useEffect(() => {
-    setLoading(true); setError(null);
-    sbFetch('issues', 'select=*&limit=10000')
-      .then(data => { setIssues(data); setLoading(false); })
-      .catch(e   => { setError(e.message); setLoading(false); });
-  }, []); // fetch once — local state carries all subsequent updates
+  const [selected, setSelected]       = useState(null);
+  const [listRefreshKey, setListRefreshKey] = useState(0);
 
   const handleSelect = useCallback((iss) => {
     history.pushState({ issueId: iss.id }, '');
     setSelected(iss);
   }, []);
 
-  // Back: no re-fetch — Kanban drags and inline edits already updated local state
   const handleBack = useCallback(() => {
     if (window.history.state?.issueId) history.replaceState({}, '');
     setSelected(null);
   }, []);
 
+  // Bump refreshKey so IssuesList re-fetches after an inline edit (e.g. status changed to Closed)
   const handleUpdate = useCallback((updated) => {
     setSelected(updated);
-    setIssues(prev => prev.map(iss => iss.id === updated.id ? updated : iss));
+    setListRefreshKey(k => k + 1);
   }, []);
 
   useEffect(() => {
@@ -1329,11 +1339,7 @@ export default function IssuesView() {
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>
       <div style={{display:selected?'none':'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
-        <IssuesList
-          issues={issues} setIssues={setIssues}
-          loading={loading} error={error}
-          onSelect={handleSelect}
-        />
+        <IssuesList onSelect={handleSelect} refreshKey={listRefreshKey}/>
       </div>
       {selected && (
         <IssueDetail

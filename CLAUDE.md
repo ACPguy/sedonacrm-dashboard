@@ -213,6 +213,8 @@ echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
    This rule applies even when --dangerously-skip-permissions is active.
    For all other operations (file reads, file writes, git, npm, SELECT queries), proceed without asking.
 
+8. **High-volume list views default to Open only — never fetch all records on mount** — Work Orders and Issues list views load only Open (non-closed) records by default. Closed records are NOT fetched until the user explicitly selects a Closed or All filter pill. Each filter pill click triggers a new Supabase query — do NOT filter a pre-loaded full dataset client-side. This applies everywhere these tables render: standalone list views, Property detail tabs, Tenant detail tabs, Contact detail tabs, and any other embedded context.
+
 ## URL Routing Rules (permanent)
 
 - All detail page routes use `podio_id`, NOT UUID
