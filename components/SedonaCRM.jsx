@@ -400,6 +400,47 @@ const PropInlineBlur = ({ value, onSave, type='text', highlight=false, readOnly=
   );
 };
 
+const ListingExpiryField = ({ value, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState(value ?? '');
+  const inputRef = useRef(null);
+  useEffect(() => { setVal(value ?? ''); }, [value]);
+  useEffect(() => { if (editing) { inputRef.current?.focus(); try { inputRef.current?.showPicker(); } catch(_) {} } }, [editing]);
+  const commit = async () => {
+    setEditing(false);
+    if (val === (value ?? '')) return;
+    try { await onSave(val || null); } catch { setVal(value ?? ''); }
+  };
+  const urgStyle = d => {
+    if (!d) return {};
+    const days = Math.round((new Date(d) - new Date()) / (1000*60*60*24));
+    if (days < 0)    return {color:'#fff',fontWeight:'700',background:'#7a0000',borderRadius:'3px',padding:'2px 6px'};
+    if (days <= 30)  return {color:'#e07070',fontWeight:'700'};
+    if (days <= 60)  return {color:'#d4924a',fontWeight:'700'};
+    if (days <= 90)  return {color:'#f0d060',fontWeight:'700'};
+    if (days <= 120) return {color:'#6ab06a',fontWeight:'700'};
+    return {};
+  };
+  if (editing) return (
+    <input ref={inputRef} type="date" value={val} onChange={e=>setVal(e.target.value)}
+      onFocus={e=>{try{e.target.showPicker();}catch(_){}}}
+      onBlur={commit}
+      onKeyDown={e=>{if(e.key==='Escape'){setVal(value??'');setEditing(false);}if(e.key==='Enter')commit();}}
+      style={{background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',appearance:'none',WebkitAppearance:'none'}}
+    />
+  );
+  return (
+    <div onClick={()=>setEditing(true)} title="Click to edit"
+      style={{cursor:'text',padding:'4px 0',minHeight:'24px',lineHeight:'1.4',border:'1px solid transparent',borderRadius:'4px'}}
+      onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
+      onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
+      {val
+        ? <span style={{fontSize:F.base,...urgStyle(val)}}>{fmtDate(val)}</span>
+        : <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+    </div>
+  );
+};
+
 const PropInlineSelect = ({ value, options, onSave }) => (
   <select value={value||''} onChange={async e=>{await onSave(e.target.value||null);}}
     style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
@@ -993,14 +1034,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                           <PropInlineSelect value={agr.listing_agreement_type} options={['PM+LSG']} onSave={v=>saveAgreement('listing_agreement_type',v)}/>
                         </PropFieldRow>
                         <PropFieldRow label="Listing Expiry">
-                          <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
-                            <PropInlineBlur type="date" value={agr.listing_expiry_date||''} onSave={v=>saveAgreement('listing_expiry_date',v)}/>
-                            {agr.listing_expiry_date&&(
-                              <span style={listingExpiryStyle(agr.listing_expiry_date)}>
-                                {fmtDate(agr.listing_expiry_date)}
-                              </span>
-                            )}
-                          </div>
+                          <ListingExpiryField value={agr.listing_expiry_date||''} onSave={v=>saveAgreement('listing_expiry_date',v)}/>
                         </PropFieldRow>
                         <PropFieldRow label="ACP Listing Status">
                           <PropInlineSelect value={agr.acp_listing_status} options={['Active','Expired']} onSave={v=>saveAgreement('acp_listing_status',v)}/>

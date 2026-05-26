@@ -73,13 +73,27 @@ const isInRange = (dateVal, range) => {
   return false;
 };
 
-// vendor_category is multi-value: "HVAC; Electrical; Plumbing"
-// A vendor matches a category filter if the selected category is in their list
+// vendor_category is text[] — each element is an atomic category name
 const catIncludes = (vendorCat, selected) => {
   if (!selected) return true;
-  if (!vendorCat) return false;
-  return vendorCat.split('; ').map(c => c.trim()).includes(selected);
+  if (!vendorCat || !Array.isArray(vendorCat)) return false;
+  return vendorCat.includes(selected);
 };
+
+// All known category values: atomic unnest() results merged with hardcoded fallback
+const ALL_VENDOR_CATS = [
+  'Accounting','Annual Tests','Architect/Draftsman','Attorney','Bank/Lender','Blinds',
+  'Cleaning','Computer IT','Computer Tech','Computers','Concrete','CPA','Drywaller',
+  'Electrical','Elevator','Engineer','Environmental','Excavating','Fabrication',
+  'Fencing','Fire Safety','Flooring','General Contractor','Gov-State','Government',
+  'Gutters','Handyman','Hauling','HVAC','Insurance','Interior Design','Janitorial',
+  'Landscaping','Legal','Lender','Lighting','Locksmith','Other','Painting','Parking Lot',
+  'Parking Lot - power washing','Pest Control','Phone Systems','Phones','Plumbing',
+  'Powerwashing','RollUp Doors','Roofing','Security','Security Systems','Septic',
+  'Sewer','Sewer/Septic','Signage','Spanish Translation','Stucco','Supplier','Surveyor',
+  'Tenant Improvements','Title Co.','Towing','Trash','Tree Removal + Trimming',
+  'Utility Co.','Welding','Windows',
+];
 
 const STATUS_OPTIONS  = ['Active', 'Inactive', 'Unrated Currently'];
 const TEN99_OPTIONS   = ['Yes', 'No', 'Unknown'];
@@ -207,16 +221,7 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
     } catch {}
   }, [statusFilter, catFilter, ten99Filter, search, sortCol, sortDir, dateFilters]);
 
-  // Derive individual categories from data
-  const allCategories = useMemo(() => {
-    const set = new Set();
-    vendors.forEach(v => {
-      if (v.vendor_category) {
-        v.vendor_category.split('; ').forEach(c => { const t = c.trim(); if (t) set.add(t); });
-      }
-    });
-    return [...set].sort();
-  }, [vendors]);
+  const allCategories = ALL_VENDOR_CATS;
 
   const toggleSort = c => {
     if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -228,7 +233,8 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
       const cmp = tenNinetyNineRank(a.gets_1099) - tenNinetyNineRank(b.gets_1099);
       return sortDir === 'asc' ? cmp : -cmp;
     }
-    const cmp = String(a[sortCol] ?? '').localeCompare(String(b[sortCol] ?? ''));
+    const toStr = v => Array.isArray(v) ? v.join(', ') : String(v ?? '');
+    const cmp = toStr(a[sortCol]).localeCompare(toStr(b[sortCol]));
     return sortDir === 'asc' ? cmp : -cmp;
   }), [vendors, sortCol, sortDir]);
 
@@ -245,7 +251,7 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
         const q = search.toLowerCase();
         return (
           (v.company_dba    ||'').toLowerCase().includes(q) ||
-          (v.vendor_category||'').toLowerCase().includes(q) ||
+          (Array.isArray(v.vendor_category)?v.vendor_category.join(', '):'').toLowerCase().includes(q) ||
           (v.city           ||'').toLowerCase().includes(q) ||
           (v.main_phone     ||'').toLowerCase().includes(q) ||
           (v.prop_code      ||'').toLowerCase().includes(q)
@@ -263,11 +269,8 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
   const catCounts = useMemo(() => {
     const c = {};
     filteredNoCat.forEach(v => {
-      if (v.vendor_category) {
-        v.vendor_category.split('; ').forEach(cat => {
-          const t = cat.trim();
-          if (t) c[t] = (c[t] || 0) + 1;
-        });
+      if (Array.isArray(v.vendor_category)) {
+        v.vendor_category.forEach(cat => { if (cat) c[cat] = (c[cat] || 0) + 1; });
       }
     });
     return c;
@@ -296,7 +299,7 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
         const q = search.toLowerCase();
         return (
           (v.company_dba||'').toLowerCase().includes(q) ||
-          (v.vendor_category||'').toLowerCase().includes(q) ||
+          (Array.isArray(v.vendor_category)?v.vendor_category.join(', '):'').toLowerCase().includes(q) ||
           (v.city||'').toLowerCase().includes(q) ||
           (v.main_phone||'').toLowerCase().includes(q) ||
           (v.prop_code||'').toLowerCase().includes(q)
@@ -352,7 +355,7 @@ const VendorsList = ({ vendors, loading, error, onSelect }) => {
             {v.company_dba||''}
           </a>
         </td>
-        <td style={{...css.td,color:T.text1,fontSize:F.xs}} title={v.vendor_category}>{v.vendor_category||''}</td>
+        <td style={{...css.td,color:T.text1,fontSize:F.xs}} title={Array.isArray(v.vendor_category)?v.vendor_category.join(', '):''}>{Array.isArray(v.vendor_category)?v.vendor_category.join(', '):''}</td>
         <td style={{...css.td,color:T.text1}}>{v.main_phone||''}</td>
         <td style={{...css.td,color:T.text2}}>{cityState}</td>
         <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{v.prop_code||''}</td>
@@ -716,6 +719,44 @@ const VdActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Vendor Category multi-select pill picker
+// ─────────────────────────────────────────────────────────────────────────────
+const VendorCategoryPills = ({ value, onSave }) => {
+  const [selected, setSelected] = useState(Array.isArray(value) ? value : []);
+  useEffect(() => { setSelected(Array.isArray(value) ? value : []); }, [value]);
+
+  const toggle = async cat => {
+    const next = selected.includes(cat)
+      ? selected.filter(c => c !== cat)
+      : [...selected, cat];
+    setSelected(next);
+    try { await onSave(next); } catch { setSelected(selected); }
+  };
+
+  return (
+    <div style={{display:'flex',flexWrap:'wrap',gap:'4px',padding:'4px 0'}}>
+      {ALL_VENDOR_CATS.map(cat => {
+        const active = selected.includes(cat);
+        return (
+          <button key={cat} onClick={() => toggle(cat)}
+            style={{padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,cursor:'pointer',
+              border:'0.5px solid #6e9fd8',
+              background: active ? '#6e9fd8' : 'transparent',
+              color: active ? '#1a2e3a' : T.text1,
+              fontWeight: active ? '600' : '400',
+              transition:'background 0.15s ease',
+            }}
+            onMouseEnter={e=>{if(!active)e.currentTarget.style.background='rgba(110,159,216,0.20)';}}
+            onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+            {cat}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Vendor Detail — full form
 // ─────────────────────────────────────────────────────────────────────────────
 export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
@@ -853,8 +894,13 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             <Truck size={14} weight="bold"/>← Vendors
           </button>
-          {data.vendor_category && (
-            <span style={css.badge(T.text1, T.bg3)}>{data.vendor_category.split(';')[0].trim()}</span>
+          {Array.isArray(data.vendor_category) && data.vendor_category.length > 0 && (
+            <>
+              <span style={css.badge(T.text1, T.bg3)}>{data.vendor_category[0]}</span>
+              {data.vendor_category.length > 1 && (
+                <span style={css.badge(T.text2, T.bg3)}>+{data.vendor_category.length-1} more</span>
+              )}
+            </>
           )}
           <button onClick={copyLink}
             style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',flexShrink:0,transition:'color 0.2s'}}
@@ -888,9 +934,9 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
               <VdInlineSelect value={data.vendor_status} options={VD_STATUS_OPTS} onSave={v=>save('vendor_status',v)}/>
             </VdFieldRow>
 
-            {/* 3. Vendor Category — free-form (103 distinct compound values) */}
-            <VdFieldRow label="Vendor Category">
-              <VdInlineBlur value={data.vendor_category||''} onSave={v=>save('vendor_category',v)}/>
+            {/* 3. Vendor Category — multi-select pills */}
+            <VdFieldRow label="Vendor Category" topAlign>
+              <VendorCategoryPills value={data.vendor_category} onSave={v=>save('vendor_category',v)}/>
             </VdFieldRow>
 
             {/* 4. Primary Contact linker */}
