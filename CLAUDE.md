@@ -260,30 +260,28 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 ## Next Priorities
 
 **Completed this session:**
-- Work Orders detail form — full build at /work-orders/[id]:
-  - WoFieldRow two-column grid (170px label / 1fr field), WoInlineBlur, WoInlineSelect
-  - WoPriorityPills, WoStatusPills, WoTypePills, PhaseButton micro-components
-  - All 31 fields in exact DB column order; ActivityPanel defaults OPEN
-  - Detail page uses sessionStorage back navigation and onUpdate callback
-- Work Orders + Issues: server-side Open-only default load (Dev Rule #8):
-  - WorkOrdersList and IssuesList now self-fetch based on active status filter
-  - Open is default on load; Closed fetched only when Closed/All pill clicked
-  - Each pill click = new Supabase query (not client-side filter of full dataset)
-  - Record count shown on active status pill (e.g. "Open ·247")
-  - All embedded contexts (Property detail tabs) inherit same behavior
-  - WorkOrdersTable and IssuesTable wrappers simplified (no data management)
-  - SedonaCRM.jsx Issues tab now passes filterPropCode instead of pre-fetched array
-  - FU Date calendar auto-open (showPicker() on focus), hide native icon via CSS
-  - Rent Roll PDF button: inline with occupancy bar, blue styling, portfolio PDF generator
-  - Tenants table: property group headers when pill selected; CAMi column; blue PDF button
+- Owners detail form — full build at /owners/[id]:
+  - OwFieldRow two-column grid (160px label / 1fr field), OwInlineBlur, OwInlineSelect
+  - OwTaxIdField (password-style, show/hide Eye/EyeSlash), OwActivityPanel
+  - All 21 fields in exact DB column order; Entity section divider
+  - Properties sub-tab (eager mount fetch, clickable property card)
+  - Listing Agreement sub-tab (lazy fetch, expiry urgency color, "View full Listing tab →" link)
+  - ActivityPanel defaults OPEN; resizable right panel
+  - pages/owners/[id].jsx: X-prefix lookup, sessionStorage back URL, onUpdate
+  - sbPatch + fmtDate added as named exports
+- Listing Expiry double-render fix (SedonaCRM.jsx):
+  - Added ListingExpiryField: single component, urgency color in display span
+- vendor_category text[] migration + multi-select pills + list view fix:
+  - vendor_category column migrated text → text[] (existing values wrapped as single-element arrays)
+  - VendorCategoryPills multi-select picker in VendorDetail (66 clean category options)
+  - catIncludes, catCounts, search, sort, row display all updated for text[]
+  - ALL_VENDOR_CATS constant: merged atomic unnest() values + hardcoded list
 
 **Completed previous sessions:**
-- Suites fully routed: /suites + /suites/[id], cold-loadable by podio_id
-- SuitesTable shared component; Property detail Suites tab
-- ContactDetail — full tabbed form (Dashboard | Contact Info | WOs | Issues | Tenant | Comms)
-- contacts/[id].jsx back button via sessionStorage
-- Issues detail form — full overhaul (FieldRow grid, InlineBlurField, PriorityPills, StatusPills)
-- Nav always-navigate fix: router.replace(path).then(reload) when already on that path
+- Work Orders detail form + Open-only default load
+- Suites fully routed; SuitesTable shared component
+- ContactDetail full tabbed form; Vendors detail form full build
+- Issues detail form overhaul; Nav always-navigate fix
 
 **Next:**
 1. Property detail refinements:

@@ -3,7 +3,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Briefcase } from '@phosphor-icons/react';
+import { Briefcase, Eye, EyeSlash } from '@phosphor-icons/react';
+import { useRouter } from 'next/router';
+import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
 
 const SUPABASE_URL    = 'https://edxcvyleielzevpappui.supabase.co';
@@ -12,6 +14,19 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 export const sbFetch = async (table, params = '') => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+};
+
+export const sbPatch = async (table, id, updates) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(updates),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
@@ -38,6 +53,7 @@ const fmtNumDate = d => {
   if (isNaN(dt.getTime())) return '';
   return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
 };
+export const fmtDate = fmtNumDate;
 
 const isInRange = (dateVal, range) => {
   if (!dateVal || !range) return false;
@@ -363,17 +379,220 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Owner Detail — placeholder
+// Owner Detail — micro-components
 // ─────────────────────────────────────────────────────────────────────────────
-export const OwnerDetail = ({ owner, onBack }) => {
-  const [tab, setTab] = useState('info');
+const OW_CAT_OPTS    = ['Active', 'Inactive', '???'];
+const OW_ENTITY_OPTS = ['Limited Liability Company', 'Partnership', 'Sole Proprietor'];
 
+const OwFieldRow = ({ label, children, topAlign = false, hoverable = true }) => (
+  <div
+    style={{display:'grid',gridTemplateColumns:'160px 1fr',borderBottom:`0.5px solid ${T.border}`,padding:'10px 0',minHeight:'48px'}}
+    onMouseEnter={hoverable ? e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';} : undefined}
+    onMouseLeave={hoverable ? e=>{e.currentTarget.style.background='';} : undefined}
+  >
+    <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',textAlign:'right',paddingRight:'16px',alignSelf:topAlign?'start':'center',paddingTop:topAlign?'4px':'0',lineHeight:'1.4',userSelect:'none'}}>
+      {label}
+    </div>
+    <div style={{alignSelf:topAlign?'start':'center',paddingRight:'4px'}}>
+      {children}
+    </div>
+  </div>
+);
+
+const OwInlineBlur = ({ value, onSave, type='text', highlight=false, readOnly=false }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState(value ?? '');
+  const [saving, setSaving]   = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { setVal(value ?? ''); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  const commit = async () => {
+    setEditing(false);
+    const trimmed = typeof val === 'string' ? val.trim() : String(val ?? '');
+    if (trimmed === String(value ?? '')) return;
+    setSaving(true);
+    try { await onSave(trimmed || null); }
+    catch { setVal(value ?? ''); }
+    finally { setSaving(false); }
+  };
+  const displayVal = type === 'date' && val ? fmtDate(val) : (val != null ? String(val) : '');
+  if (readOnly) return <div style={{fontSize:F.base,color:T.text1,lineHeight:'1.4'}}>{displayVal||'—'}</div>;
+  return editing ? (
+    <input ref={inputRef} type={type} value={val} onChange={e=>setVal(e.target.value)}
+      onFocus={type==='date'?(e=>{try{e.target.showPicker();}catch(_){}}) : undefined}
+      onBlur={commit}
+      onKeyDown={e=>{if(e.key==='Escape'){setVal(value??'');setEditing(false);}if(e.key==='Enter')commit();}}
+      style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',
+        ...(type==='date'?{appearance:'none',WebkitAppearance:'none',MozAppearance:'none'}:{})}}
+    />
+  ) : (
+    <div onClick={()=>setEditing(true)} title="Click to edit"
+      style={{fontSize:F.base,color:highlight?'#E8630A':(displayVal?T.text0:T.text3),fontWeight:highlight?'700':'normal',cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
+      onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
+      onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
+      {displayVal || <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+      {saving && <span style={{color:T.text3,fontSize:F.xs,marginLeft:'6px'}}>saving…</span>}
+    </div>
+  );
+};
+
+const OwInlineSelect = ({ value, options, onSave }) => (
+  <select value={value||''} onChange={async e=>{await onSave(e.target.value||null);}}
+    style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+    <option value="">—</option>
+    {options.map(o=><option key={o} value={o}>{o}</option>)}
+  </select>
+);
+
+const OwTaxIdField = ({ value, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState(value ?? '');
+  const [show, setShow]       = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => { setVal(value ?? ''); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  const commit = async () => {
+    setEditing(false);
+    const trimmed = val.trim();
+    if (trimmed === String(value ?? '')) return;
+    setSaving(true);
+    try { await onSave(trimmed || null); }
+    catch { setVal(value ?? ''); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+      {editing ? (
+        <input ref={inputRef} type={show?'text':'password'} value={val}
+          onChange={e=>setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e=>{if(e.key==='Escape'){setVal(value??'');setEditing(false);}if(e.key==='Enter')commit();}}
+          style={{flex:1,background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none'}}
+        />
+      ) : (
+        <div onClick={()=>setEditing(true)} title="Click to edit"
+          style={{flex:1,fontSize:F.base,color:val?T.text0:T.text3,cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
+          onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
+          onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
+          {val
+            ? (show ? val : '•'.repeat(Math.min(val.length, 9)))
+            : <span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>
+          }
+          {saving && <span style={{color:T.text3,fontSize:F.xs,marginLeft:'6px'}}>saving…</span>}
+        </div>
+      )}
+      <button onClick={()=>setShow(s=>!s)} title={show?'Hide':'Show'}
+        style={{background:'transparent',border:'none',cursor:'pointer',color:T.text2,padding:'2px',display:'flex',alignItems:'center',flexShrink:0}}
+        onMouseEnter={e=>e.currentTarget.style.color=T.text0}
+        onMouseLeave={e=>e.currentTarget.style.color=T.text2}>
+        {show ? <EyeSlash size={16}/> : <Eye size={16}/>}
+      </button>
+    </div>
+  );
+};
+
+const OwActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
+  const [tab, setTab] = useState('comments');
+  return (
+    <div style={{display:'flex',flexShrink:0,height:'100%'}}>
+      <div onMouseDown={onMouseDown}
+        style={{width:'4px',cursor:'col-resize',background:T.border,flexShrink:0,transition:'background 0.15s'}}
+        onMouseEnter={e=>e.currentTarget.style.background=T.accent}
+        onMouseLeave={e=>e.currentTarget.style.background=T.border}/>
+      <div style={{width:collapsed?'36px':`${width}px`,background:T.bg0,borderLeft:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',overflow:'hidden',transition:'width 200ms ease',flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:collapsed?'center':'space-between',padding:collapsed?'9px 0':'8px 12px',borderBottom:`0.5px solid ${T.border}`,minHeight:'42px',flexShrink:0}}>
+          {!collapsed&&(
+            <div style={{display:'flex',gap:'2px'}}>
+              {['Comments','Activity'].map(t=>(
+                <button key={t} onClick={()=>setTab(t.toLowerCase())}
+                  style={{background:tab===t.toLowerCase()?T.bg2:'transparent',border:'none',padding:'4px 10px',borderRadius:'4px',cursor:'pointer',fontSize:F.sm,color:tab===t.toLowerCase()?T.accent:T.text1,fontWeight:tab===t.toLowerCase()?'600':'400'}}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={onCollapse}
+            title={collapsed?'Expand panel':'Collapse panel'}
+            style={{background:T.bg3,border:`1px solid ${T.border}`,color:T.text0,cursor:'pointer',padding:'4px 7px',display:'flex',alignItems:'center',borderRadius:'4px',flexShrink:0,fontSize:'14px',lineHeight:1}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+            {collapsed ? '«' : '»'}
+          </button>
+        </div>
+        {!collapsed&&(
+          <div style={{flex:1,overflowY:'auto',padding:'12px'}}>
+            {tab==='comments'&&(
+              <div>
+                <div style={{...css.card,marginBottom:'10px'}}>
+                  <p style={{fontSize:F.sm,color:T.text2,fontStyle:'italic',lineHeight:'1.6',margin:0}}>Comments and attached files will sync from Podio via API at go-live.</p>
+                </div>
+                <div style={{textAlign:'center',marginTop:'32px'}}>
+                  <span style={{fontSize:'32px',color:T.bg3,display:'block',marginBottom:'8px'}}>💬</span>
+                  <span style={{fontSize:F.sm,color:T.text3}}>Comments sync at go-live</span>
+                </div>
+              </div>
+            )}
+            {tab==='activity'&&(
+              <div>
+                <div style={{...css.card,marginBottom:'10px'}}>
+                  <p style={{fontSize:F.sm,color:T.text2,fontStyle:'italic',lineHeight:'1.6',margin:0}}>Activity tracking begins at go-live.</p>
+                </div>
+                <div style={{textAlign:'center',marginTop:'32px'}}>
+                  <span style={{fontSize:'32px',color:T.bg3,display:'block',marginBottom:'8px'}}>🕐</span>
+                  <span style={{fontSize:F.sm,color:T.text3}}>No activity before go-live</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Owner Detail — full form
+// ─────────────────────────────────────────────────────────────────────────────
+export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
+  const router = useRouter();
+  const [data, setData]                       = useState(owner);
+  const [primaryContact, setPrimaryContact]   = useState(null);
+  const [linkedProp, setLinkedProp]           = useState(null);
+  const [rightCollapsed, setRightCollapsed]   = useState(false);
+  const [rightWidth, setRightWidth]           = useState(300);
+  const [copied, setCopied]                   = useState(false);
+  const [ownerTab, setOwnerTab]               = useState('properties');
+  const [agmtData, setAgmtData]               = useState(null);
+  const [agmtLoading, setAgmtLoading]         = useState(false);
+  const agmtFetched = useRef(false);
+  const resizingRight = useRef(false);
+
+  // Mount: fetch primary contact + linked property (for linker display + Properties tab)
   useEffect(() => {
-    const name = owner?.company_dba || 'Owner';
-    document.title = `${name} | SedonaCRM`;
-    return () => { document.title = 'SedonaCRM'; };
-  }, [owner]);
+    if (data.primary_contact_id) {
+      sbFetch('contacts', `id=eq.${data.primary_contact_id}&select=id,full_name,podio_id`)
+        .then(rows => setPrimaryContact(rows[0]||null)).catch(()=>{});
+    }
+    if (data.prop_code) {
+      sbFetch('properties', `prop_code=eq.${data.prop_code}&select=*`)
+        .then(rows => setLinkedProp(rows[0]||null)).catch(()=>{});
+    }
+  }, []);
 
+  // Lazy: Listing Agreement tab
+  useEffect(() => {
+    if (ownerTab !== 'listing' || agmtFetched.current) return;
+    agmtFetched.current = true;
+    if (!data.prop_code) { setAgmtData([]); return; }
+    setAgmtLoading(true);
+    sbFetch('property_agreements', `prop_code=eq.${data.prop_code}&select=*`)
+      .then(rows => setAgmtData(rows||[]))
+      .catch(()=>setAgmtData([]))
+      .finally(()=>setAgmtLoading(false));
+  }, [ownerTab]);
+
+  // Escape key
   useEffect(() => {
     const onKey = e => {
       if (e.key !== 'Escape') return;
@@ -385,81 +604,300 @@ export const OwnerDetail = ({ owner, onBack }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack]);
 
-  if (!owner) return null;
+  // Document title
+  useEffect(() => {
+    document.title = `${data.company_dba || 'Owner'} | SedonaCRM`;
+    return () => { document.title = 'SedonaCRM'; };
+  }, [data.company_dba]);
 
-  const TABS = ['Info', 'Contacts'];
+  const startRightResize = useCallback(e => {
+    resizingRight.current = true;
+    const startX = e.clientX, startW = rightWidth;
+    const onMove = me => { if (!resizingRight.current) return; setRightWidth(Math.max(180, Math.min(500, startW - (me.clientX - startX)))); };
+    const onUp   = () => { resizingRight.current = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [rightWidth]);
+
+  const save = async (field, val) => {
+    await sbPatch('property_owners', data.id, { [field]: val ?? null });
+    const updated = { ...data, [field]: val };
+    setData(updated);
+    onUpdate?.(updated);
+  };
+
+  const copyLink = () => {
+    const url = `${window.location.origin}/owners/${data.podio_id ?? 'X'+data.id.slice(-6)}`;
+    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  };
+
+  const expiryStyle = d => {
+    if (!d) return {};
+    const days = Math.round((new Date(d) - new Date()) / (1000*60*60*24));
+    if (days < 0)    return {color:'#fff',fontWeight:'700',background:'#7a0000',borderRadius:'3px',padding:'2px 6px',display:'inline-block'};
+    if (days <= 30)  return {color:'#e07070',fontWeight:'700'};
+    if (days <= 60)  return {color:'#d4924a',fontWeight:'700'};
+    if (days <= 90)  return {color:'#f0d060',fontWeight:'700'};
+    if (days <= 120) return {color:'#6ab06a',fontWeight:'700'};
+    return {};
+  };
+
+  const owCatBadge = cat => {
+    if (cat === 'Active')   return css.badge(T.success, '#1e2a1e');
+    if (cat === 'Inactive') return css.badge(T.text2, T.bg3);
+    return css.badge(T.text3, T.bg3);
+  };
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
-      <div style={{padding:'10px 16px 0',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'6px'}}>
+      <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}}>
           <button onClick={onBack}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'5px'}}
-            onMouseEnter={e => e.currentTarget.style.color = T.text0}
-            onMouseLeave={e => e.currentTarget.style.color = T.text1}>
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',flexShrink:0,display:'inline-flex',alignItems:'center',gap:'5px'}}
+            onMouseEnter={e=>e.currentTarget.style.color=T.text0}
+            onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             <Briefcase size={14} weight="bold"/>← Owners
           </button>
-          {owner.prop_code && <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{owner.prop_code}</span>}
-          {owner.category && (
-            <span style={{marginLeft:'auto'}}>
-              <span style={catBadgeStyle(owner.category)}>{owner.category}</span>
-            </span>
-          )}
+          {data.category && <span style={owCatBadge(data.category)}>{data.category}</span>}
+          {data.entity_type && <span style={css.badge(T.text2, T.bg3)}>{data.entity_type}</span>}
+          <button onClick={copyLink}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',flexShrink:0,transition:'color 0.2s'}}
+            onMouseEnter={e=>{if(!copied)e.currentTarget.style.color=T.text0;}}
+            onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
+            {copied ? '✓ Copied' : '⧉ Copy Link'}
+          </button>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:'6px'}}>
           <Briefcase size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
-          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{owner.company_dba||'Untitled Owner'}</div>
-        </div>
-        {owner.entity_name && (
-          <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>{owner.entity_name}</div>
-        )}
-        {/* Tab bar */}
-        <div style={{display:'flex',gap:'2px',marginTop:'8px'}}>
-          {TABS.map(t => (
-            <button key={t} onClick={() => setTab(t.toLowerCase())}
-              style={{background:'transparent',border:'none',padding:'6px 12px',fontSize:F.sm,cursor:'pointer',borderRadius:'4px 4px 0 0',
-                color: tab === t.toLowerCase() ? T.accent : T.text1,
-                borderBottom: tab === t.toLowerCase() ? `2px solid ${T.accent}` : '2px solid transparent',
-                fontWeight: tab === t.toLowerCase() ? '600' : '400'}}>
-              {t}
-            </button>
-          ))}
+          <div style={{fontSize:F.lg,fontWeight:'700',color:'#E8630A'}}>{data.company_dba||'Untitled Owner'}</div>
         </div>
       </div>
 
-      {/* Info tab */}
-      {tab === 'info' && (
-        <div style={{flex:1,overflowY:'auto',padding:'20px'}}>
-          <div style={{...css.card,maxWidth:'600px'}}>
-            <div style={css.secTitle}>Owner Info</div>
-            {[
-              ['Company DBA',  owner.company_dba],
-              ['Prop Code',    owner.prop_code],
-              ['Category',     owner.category],
-              ['Entity Name',  owner.entity_name],
-              ['Entity Type',  owner.entity_type],
-              ['Entity State', owner.entity_state],
-              ['Tax ID (EIN)', owner.tax_id_ein],
-              ['Phone',        owner.main_phone],
-              ['Address',      [owner.address, owner.city, owner.state, owner.zip].filter(Boolean).join(', ')],
-              ['Notes',        owner.company_notes],
-            ].map(([label, val]) => val ? (
-              <div key={label} style={{marginBottom:'8px'}}>
-                <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
-                <div style={{fontSize:F.base,color:T.text0,lineHeight:'1.4'}}>{val}</div>
-              </div>
-            ) : null)}
-          </div>
-        </div>
-      )}
+      {/* Body */}
+      <div style={{display:'flex',flex:1,overflow:'hidden'}}>
+        {/* Left: fields + sub-tabs */}
+        <div style={{flex:1,overflowY:'auto'}}>
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
 
-      {/* Contacts tab */}
-      {tab === 'contacts' && (
-        <div style={{flex:1,overflow:'hidden'}}>
-          <ContactsTable filterOwnerId={owner.id} hidePropertyFilter={true}/>
+            {/* 2. Property linker */}
+            <OwFieldRow label="Property" hoverable={false}>
+              {linkedProp
+                ? <span style={{fontSize:F.base,color:T.accent,cursor:'pointer',textDecoration:'underline'}}
+                    onClick={()=>router.push('/properties/'+(linkedProp.podio_id??'X'+linkedProp.id.slice(-6)))}>
+                    {linkedProp.prop_code} — {linkedProp.property_name}
+                  </span>
+                : <span style={{fontSize:F.base,color:T.text3,fontStyle:'italic'}}>
+                    {data.prop_code || '—'}
+                  </span>
+              }
+            </OwFieldRow>
+
+            {/* 3. Company DBA */}
+            <OwFieldRow label="Company DBA">
+              <OwInlineBlur value={data.company_dba||''} onSave={v=>save('company_dba',v)} highlight/>
+            </OwFieldRow>
+
+            {/* 4. Category */}
+            <OwFieldRow label="Category">
+              <OwInlineSelect value={data.category} options={OW_CAT_OPTS} onSave={v=>save('category',v)}/>
+            </OwFieldRow>
+
+            {/* 5. Primary Contact linker */}
+            <OwFieldRow label="Primary Contact" hoverable={false}>
+              {primaryContact
+                ? <span style={{fontSize:F.base,color:T.accent,cursor:'pointer',textDecoration:'underline'}}
+                    onClick={()=>router.push('/contacts/'+(primaryContact.podio_id??'X'+primaryContact.id.slice(-6)))}>
+                    {primaryContact.full_name}
+                  </span>
+                : <span style={{fontSize:F.base,color:T.text3,fontStyle:'italic'}}>—</span>
+              }
+            </OwFieldRow>
+
+            {/* 6. Main Phone */}
+            <OwFieldRow label="Main Phone">
+              <OwInlineBlur value={data.main_phone||''} onSave={v=>save('main_phone',v)}/>
+            </OwFieldRow>
+
+            {/* 7. Fax */}
+            <OwFieldRow label="Fax">
+              <OwInlineBlur value={data.fax||''} onSave={v=>save('fax',v)}/>
+            </OwFieldRow>
+
+            {/* 8. Company Notes */}
+            <OwFieldRow label="Company Notes" topAlign>
+              <RichTextEditor value={data.company_notes||''} onSave={v=>save('company_notes',v)} minRows={5}/>
+            </OwFieldRow>
+
+            {/* 9–12. Address */}
+            <OwFieldRow label="Address">
+              <OwInlineBlur value={data.address||''} onSave={v=>save('address',v)}/>
+            </OwFieldRow>
+            <OwFieldRow label="City">
+              <OwInlineBlur value={data.city||''} onSave={v=>save('city',v)}/>
+            </OwFieldRow>
+            <OwFieldRow label="State">
+              <OwInlineBlur value={data.state||''} onSave={v=>save('state',v)}/>
+            </OwFieldRow>
+            <OwFieldRow label="ZIP">
+              <OwInlineBlur value={data.zip||''} onSave={v=>save('zip',v)}/>
+            </OwFieldRow>
+
+            {/* ENTITY section divider */}
+            <div style={{padding:'7px 16px 5px',background:'rgba(255,255,255,0.015)',borderTop:`0.5px solid ${T.border}`,borderBottom:`0.5px solid ${T.border}`}}>
+              <span style={{fontSize:F.xs,fontWeight:'700',color:T.text3,textTransform:'uppercase',letterSpacing:'0.1em'}}>Entity</span>
+            </div>
+
+            {/* 13. Entity Type */}
+            <OwFieldRow label="Entity Type">
+              <OwInlineSelect value={data.entity_type} options={OW_ENTITY_OPTS} onSave={v=>save('entity_type',v)}/>
+            </OwFieldRow>
+
+            {/* 14. Entity Name */}
+            <OwFieldRow label="Entity Name">
+              <OwInlineBlur value={data.entity_name||''} onSave={v=>save('entity_name',v)}/>
+            </OwFieldRow>
+
+            {/* 15. Entity State */}
+            <OwFieldRow label="Entity State">
+              <OwInlineBlur value={data.entity_state||''} onSave={v=>save('entity_state',v)}/>
+            </OwFieldRow>
+
+            {/* 16. Entity Sig Block */}
+            <OwFieldRow label="Sig Block" topAlign>
+              <RichTextEditor value={data.entity_sig_block||''} onSave={v=>save('entity_sig_block',v)} minRows={5}/>
+            </OwFieldRow>
+
+            {/* 17. Tax ID / EIN — sensitive */}
+            <OwFieldRow label="Tax ID / EIN" hoverable={false}>
+              <OwTaxIdField value={data.tax_id_ein||''} onSave={v=>save('tax_id_ein',v)}/>
+              <div style={{fontSize:F.xs,color:T.text3,fontStyle:'italic',marginTop:'3px'}}>Stored encrypted in app layer</div>
+            </OwFieldRow>
+
+            {/* 18. Old Archived Property */}
+            <OwFieldRow label="Old Archived Prop">
+              <OwInlineBlur value={data.old_archived_property||''} onSave={v=>save('old_archived_property',v)}/>
+            </OwFieldRow>
+
+            {/* 19. Podio ID — read-only */}
+            <OwFieldRow label="Podio ID" hoverable={false}>
+              {data.podio_id
+                ? <span style={{fontSize:F.sm,color:T.text1,fontFamily:'monospace'}}>{data.podio_id}</span>
+                : <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Available after Podio sync</span>
+              }
+            </OwFieldRow>
+
+            {/* 20–21. Timestamps — read-only */}
+            <OwFieldRow label="Created" hoverable={false}>
+              <span style={{fontSize:F.sm,color:T.text2}}>{data.created_at ? fmtDate(data.created_at) : '—'}</span>
+            </OwFieldRow>
+            <OwFieldRow label="Last Updated" hoverable={false}>
+              <span style={{fontSize:F.sm,color:T.text2}}>{data.updated_at ? fmtDate(data.updated_at) : '—'}</span>
+            </OwFieldRow>
+          </div>
+
+          {/* Sub-tabs: Properties | Listing Agreement */}
+          <div style={{margin:'16px 16px 0'}}>
+            <div style={{display:'flex',gap:'2px',borderBottom:`0.5px solid ${T.border}`}}>
+              {[['properties','Properties'],['listing','Listing Agreement']].map(([key,label])=>(
+                <button key={key} onClick={()=>setOwnerTab(key)}
+                  style={{background:'transparent',border:'none',padding:'7px 14px',fontSize:F.sm,cursor:'pointer',
+                    color:ownerTab===key?T.accent:T.text1,
+                    borderBottom:ownerTab===key?`2px solid ${T.accent}`:'2px solid transparent',
+                    fontWeight:ownerTab===key?'600':'400'}}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Properties tab */}
+            {ownerTab==='properties'&&(
+              <div style={{padding:'16px 0'}}>
+                {!linkedProp && !data.prop_code && (
+                  <div style={{color:T.text3,fontSize:F.sm,fontStyle:'italic'}}>No property linked to this owner</div>
+                )}
+                {!linkedProp && data.prop_code && (
+                  <div style={{color:T.text3,fontSize:F.sm}}>Loading…</div>
+                )}
+                {linkedProp && (
+                  <div onClick={()=>router.push('/properties/'+(linkedProp.podio_id??'X'+linkedProp.id.slice(-6)))}
+                    style={{...css.card,cursor:'pointer',display:'flex',flexDirection:'column',gap:'6px'}}
+                    onMouseEnter={e=>e.currentTarget.style.background=T.bg3}
+                    onMouseLeave={e=>e.currentTarget.style.background=T.bg2}>
+                    <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                      <span style={{fontSize:F.base,fontWeight:'700',color:T.accent}}>{linkedProp.prop_code}</span>
+                      {linkedProp.status && (
+                        <span style={css.badge(
+                          linkedProp.status==='Active'?T.success:T.text2,
+                          linkedProp.status==='Active'?'#1e2a1e':T.bg3
+                        )}>{linkedProp.status}</span>
+                      )}
+                    </div>
+                    <div style={{fontSize:F.base,color:T.text0}}>{linkedProp.property_name||''}</div>
+                    {linkedProp.address && (
+                      <div style={{fontSize:F.sm,color:T.text2}}>
+                        {[linkedProp.address,linkedProp.city,linkedProp.state].filter(Boolean).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Listing Agreement tab */}
+            {ownerTab==='listing'&&(
+              <div style={{padding:'16px 0'}}>
+                {agmtLoading && <div style={{color:T.text3,fontSize:F.sm}}>Loading…</div>}
+                {!agmtLoading && agmtData && agmtData.length === 0 && (
+                  <div style={{color:T.text3,fontSize:F.sm,fontStyle:'italic'}}>No listing agreement on record</div>
+                )}
+                {!agmtLoading && agmtData && agmtData.map(agmt => (
+                  <div key={agmt.id} style={{...css.card,marginBottom:'10px'}}>
+                    {[
+                      ['Agreement Type',    agmt.listing_agreement_type],
+                      ['Listing Start',     agmt.listing_start_date ? fmtDate(agmt.listing_start_date) : null],
+                      ['ACP Listing Status',agmt.acp_listing_status],
+                      ['PM Fee Type',       agmt.pm_fee_type],
+                      ['PM Fee %',          agmt.pm_fee_pct != null ? (Number(agmt.pm_fee_pct)*100).toFixed(2)+'%' : null],
+                    ].map(([label,val])=>val?(
+                      <div key={label} style={{display:'flex',gap:'12px',padding:'5px 0',borderBottom:`0.5px solid ${T.border}`}}>
+                        <div style={{width:'150px',fontSize:F.sm,color:T.text2,flexShrink:0}}>{label}</div>
+                        <div style={{fontSize:F.sm,color:T.text0}}>{val}</div>
+                      </div>
+                    ):null)}
+                    {agmt.listing_expiry_date&&(
+                      <div style={{display:'flex',gap:'12px',padding:'5px 0',borderBottom:`0.5px solid ${T.border}`}}>
+                        <div style={{width:'150px',fontSize:F.sm,color:T.text2,flexShrink:0}}>Listing Expiry</div>
+                        <div style={{fontSize:F.sm,...expiryStyle(agmt.listing_expiry_date)}}>{fmtDate(agmt.listing_expiry_date)}</div>
+                      </div>
+                    )}
+                    {linkedProp&&(
+                      <div style={{marginTop:'12px'}}>
+                        <button
+                          onClick={()=>router.push('/properties/'+(linkedProp.podio_id??'X'+linkedProp.id.slice(-6))+'?tab=listing')}
+                          style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 12px',color:T.accent,fontSize:F.sm,cursor:'pointer'}}
+                          onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                          onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                          View full Listing tab →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{height:'40px'}}/>
         </div>
-      )}
+
+        {/* Right: Activity panel */}
+        <OwActivityPanel
+          collapsed={rightCollapsed}
+          onCollapse={()=>setRightCollapsed(c=>!c)}
+          width={rightWidth}
+          onMouseDown={startRightResize}
+        />
+      </div>
     </div>
   );
 };
@@ -502,7 +940,7 @@ export default function OwnersView() {
         <OwnersList owners={owners} loading={loading} error={error} onSelect={handleSelect}/>
       </div>
       {selected && (
-        <OwnerDetail key={selected.id} owner={selected} onBack={handleBack}/>
+        <OwnerDetail key={selected.id} owner={selected} onBack={handleBack} onUpdate={updated=>setSelected(updated)}/>
       )}
     </div>
   );

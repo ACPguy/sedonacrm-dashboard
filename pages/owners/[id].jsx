@@ -15,8 +15,22 @@ export default function OwnerDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
-    sbFetch('property_owners', `select=*&${filter}`)
+
+    let fetchPromise;
+    if (id.includes('-')) {
+      // UUID fallback
+      fetchPromise = sbFetch('property_owners', `select=*&id=eq.${id}`);
+    } else if (id.startsWith('X')) {
+      // X-prefix: property_owners have 0 podio_ids — match by last 6 chars of UUID
+      const suffix = id.slice(1);
+      fetchPromise = sbFetch('property_owners', `select=*`).then(rows =>
+        (rows || []).filter(o => o.id && o.id.slice(-6) === suffix)
+      );
+    } else {
+      fetchPromise = sbFetch('property_owners', `select=*&podio_id=eq.${id}`);
+    }
+
+    fetchPromise
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Owner not found');
@@ -30,7 +44,10 @@ export default function OwnerDetailPage() {
       .catch(e => { setError(e.message); setLoading(false); });
   }, [router.isReady, router.query.id]);
 
-  const handleBack = () => router.push('/owners');
+  const handleBack = () => {
+    const backUrl = (typeof window !== 'undefined' && sessionStorage.getItem('ownersBackUrl')) || '/owners';
+    router.push(backUrl);
+  };
 
   return (
     <AppShell activeView="owners">
@@ -49,7 +66,14 @@ export default function OwnerDetailPage() {
             </button>
           </div>
         )}
-        {owner && <OwnerDetail key={owner.id} owner={owner} onBack={handleBack}/>}
+        {owner && (
+          <OwnerDetail
+            key={owner.id}
+            owner={owner}
+            onBack={handleBack}
+            onUpdate={updated => setOwner(updated)}
+          />
+        )}
       </div>
     </AppShell>
   );
