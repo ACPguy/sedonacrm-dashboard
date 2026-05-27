@@ -1856,6 +1856,141 @@ const HomeView = () => {
   );
 };
 
+// ── Tenant COIs Portfolio View ────────────────────────────────────────────────
+const TntCoisView = () => {
+  const [rows, setRows]           = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [statusFilter, setStatus] = useState('All');
+  const [propFilter, setProp]     = useState('All');
+  const [search, setSearch]       = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    sbFetch('tnt_cois', 'select=*,tenants!tnt_cois_tenant_id_fkey(id,tenant_dba,podio_id)&order=expiry_date.asc')
+      .then(d => { setRows(d || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const props = [...new Set(rows.map(r => r.prop_code).filter(Boolean))].sort();
+  const STATUSES = ['All', 'COI Current', 'Expiring Soon', 'Expired', 'New ..Awaiting COI'];
+
+  const filtered = rows.filter(r => {
+    if (statusFilter !== 'All' && r.coi_status !== statusFilter) return false;
+    if (propFilter !== 'All' && r.prop_code !== propFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const tname = (r.tenants?.tenant_dba || '').toLowerCase();
+      if (!tname.includes(q) && !(r.prop_code||'').toLowerCase().includes(q) && !(r.insured_company||'').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const withName = filtered.map(r => ({ ...r, _tenant_dba: r.tenants?.tenant_dba || '' }));
+  const { sorted, Th } = useSortable(withName, 'expiry_date', 'asc');
+
+  const coiBadge = s => {
+    if (s === 'COI Current')        return css.badge(T.success,'#1e2a1e');
+    if (s === 'Expired')            return css.badge(T.danger,'#3d1f1f');
+    if (s === 'Expiring Soon')      return css.badge(T.warn,'#3d2e1a');
+    if (s === 'New ..Awaiting COI') return css.badge(T.accent,'#1a2e3a');
+    return css.badge(T.text2,T.bg3);
+  };
+  const addlStyle = s => {
+    if (s === 'Add. Insured - Is Correct') return { color:T.success };
+    if (s === 'Request Sent - Waiting')    return { color:T.warn };
+    if (s === 'Missing' || s === 'Wrong')  return { color:T.danger, fontWeight:'600' };
+    return { color:T.text2 };
+  };
+  const expiryStyle = d => {
+    if (!d) return {};
+    const days = Math.round((new Date(d+'T00:00:00') - new Date()) / (1000*60*60*24));
+    if (days < 0)   return { color:'#fff', fontWeight:'700', background:'#7a0000', borderRadius:'3px', padding:'1px 5px' };
+    if (days <= 30) return { color:T.danger, fontWeight:'700' };
+    if (days <= 90) return { color:T.warn, fontWeight:'700' };
+    return {};
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      <div style={{padding:'10px 16px 8px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}}>
+          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Tenant COIs</span>
+          <span style={{fontSize:F.sm,color:T.text2}}>{filtered.length} of {rows.length}</span>
+        </div>
+        {/* Status filter */}
+        <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'8px'}}>
+          {STATUSES.map(s => (
+            <button key={s} onClick={() => setStatus(s)}
+              style={{padding:'3px 10px',borderRadius:'4px',border:`0.5px solid ${statusFilter===s?T.accent:T.border}`,cursor:'pointer',fontSize:F.xs,
+                background:statusFilter===s?'#1a2e3a':'transparent',color:statusFilter===s?T.accent:T.text2,fontWeight:statusFilter===s?'600':'400'}}>
+              {s}
+            </button>
+          ))}
+        </div>
+        {/* Property filter + search */}
+        <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:'4px',flexWrap:'wrap',flex:1}}>
+            {['All',...props].map(p => (
+              <button key={p} onClick={()=>setProp(p)}
+                style={{padding:'2px 8px',borderRadius:'3px',border:`0.5px solid ${propFilter===p?T.accent:T.border}`,cursor:'pointer',fontSize:F.xs,
+                  background:propFilter===p?'#1a2e3a':'transparent',color:propFilter===p?T.accent:T.text2,fontWeight:propFilter===p?'600':'400',whiteSpace:'nowrap'}}>
+                {p}
+              </button>
+            ))}
+          </div>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tenant, company…"
+            style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'4px 10px',color:T.text0,fontSize:F.sm,outline:'none',minWidth:'180px'}}/>
+        </div>
+      </div>
+
+      <div style={{flex:1,overflowY:'auto'}}>
+        {loading && <div style={{padding:'32px',textAlign:'center',color:T.text3}}>Loading…</div>}
+        {!loading && (
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead style={{position:'sticky',top:0,zIndex:1}}>
+              <tr>
+                <Th c="prop_code"                  label="Prop"/>
+                <Th c="_tenant_dba"                label="Tenant"/>
+                <Th c="coi_status"                 label="COI Status"/>
+                <Th c="expiry_date"                label="Expiry"/>
+                <Th c="additional_insured_status"  label="Add. Insured"/>
+                <Th c="insured_company"            label="Insured Co"/>
+                <Th c="follow_up_date"             label="Follow Up"/>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.length === 0 && <tr><td colSpan={7} style={{...css.td,textAlign:'center',color:T.text3,padding:'32px'}}>No COI records match</td></tr>}
+              {sorted.map((r, i) => {
+                const tnt = r.tenants;
+                const href = tnt?.podio_id ? `/tenants/${tnt.podio_id}` : tnt?.id ? `/tenants/X${tnt.id.slice(-6)}` : null;
+                return (
+                  <tr key={r.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}
+                    onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
+                    <td style={{...css.td,color:T.accent,fontWeight:'600',whiteSpace:'nowrap'}}>{r.prop_code||'—'}</td>
+                    <td style={css.td}>
+                      {tnt && href
+                        ? <a href={href} style={{color:T.text0,textDecoration:'none',fontSize:F.sm}}
+                            onMouseEnter={e=>e.currentTarget.style.color=T.accent}
+                            onMouseLeave={e=>e.currentTarget.style.color=T.text0}>{tnt.tenant_dba||'—'}</a>
+                        : <span style={{fontSize:F.sm}}>{tnt?.tenant_dba||'—'}</span>}
+                    </td>
+                    <td style={css.td}><span style={coiBadge(r.coi_status)}>{r.coi_status||'—'}</span></td>
+                    <td style={css.td}><span style={expiryStyle(r.expiry_date)}>{fmtDate(r.expiry_date)}</span></td>
+                    <td style={{...css.td,fontSize:F.xs,...addlStyle(r.additional_insured_status)}}>{r.additional_insured_status||'—'}</td>
+                    <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{r.insured_company||'—'}</td>
+                    <td style={{...css.td,fontSize:F.xs,color:r.follow_up_date?T.warn:T.text3}}>{fmtDate(r.follow_up_date)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ── Stub View ─────────────────────────────────────────────────────────────────
 const StubView = ({ title, note }) => (
   <div style={{padding:'32px'}}>
@@ -1918,7 +2053,7 @@ export default function SedonaCRM() {
       case 'issues':             return <IssuesView key={resetKey}/>;
       case 'leasing':            return <StubView title="Leasing Pipeline" note="Pipeline and stage tracking — coming soon."/>;
       case 'leases':             return <StubView title="Leases" note="Lease management — coming soon."/>;
-      case 'tnt-cois':           return <StubView title="Tenant COIs" note="Insurance certificate tracking — coming soon."/>;
+      case 'tnt-cois':           return <TntCoisView key={resetKey}/>;
       case 'property-insurance': return <StubView title="Property Insurance" note="Property insurance management — coming soon."/>;
       case 'inspections':        return <StubView title="Inspections" note="Inspection module — coming soon."/>;
       case 'qbo':                return <StubView title="QBO Dashboard" note="QuickBooks Online dashboard — coming soon."/>;
