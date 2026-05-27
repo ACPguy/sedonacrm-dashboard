@@ -1856,6 +1856,146 @@ const HomeView = () => {
   );
 };
 
+// ── Leasing Pipeline Portfolio View ──────────────────────────────────────────
+const PIPELINE_ACTIVE_STAGES = ['Replied','Showing','LS APP','LOI','LS - Out For Sigs','LS - Signed','CLOSED-New TNT','Lease'];
+
+const LeasingPipelineView = () => {
+  const [rows, setRows]         = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [stageGroup, setGroup]  = useState('Active');
+  const [propFilter, setProp]   = useState('All');
+  const [search, setSearch]     = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    sbFetch('leasing_pipeline', 'select=id,prop_code,prospect_name,stage,priority,suite_num,size_sqft_interest,source,follow_up_date,created_at&status=eq.Open&order=follow_up_date.asc.nullslast,created_at.desc')
+      .then(d => { setRows(d || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const props = [...new Set(rows.map(r => r.prop_code).filter(p => p && !p.includes('?') && !p.includes(';')))].sort();
+  const STAGE_GROUPS = ['Active', 'All', 'Untouched', 'Showing+'];
+
+  const stageFilter = r => {
+    if (stageGroup === 'All')       return true;
+    if (stageGroup === 'Untouched') return r.stage === 'Untouched';
+    if (stageGroup === 'Showing+')  return ['Showing','LS APP','LOI','LS - Out For Sigs','LS - Signed'].includes(r.stage);
+    return PIPELINE_ACTIVE_STAGES.includes(r.stage);
+  };
+
+  const filtered = rows.filter(r => {
+    if (!stageFilter(r)) return false;
+    if (propFilter !== 'All') {
+      if (r.prop_code !== propFilter) return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      if (!(r.prospect_name||'').toLowerCase().includes(q) && !(r.prop_code||'').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const { sorted, Th } = useSortable(filtered, 'follow_up_date', 'asc');
+
+  const stageColor = s => {
+    if (['CLOSED-New TNT','LS - Signed','Lease'].includes(s)) return css.badge(T.success,'#1e2a1e');
+    if (['LS - Out For Sigs','LS APP','LOI'].includes(s))      return css.badge(T.accent,'#1a2e3a');
+    if (['Showing','Replied'].includes(s))                      return css.badge(T.warn,'#3d2e1a');
+    return css.badge(T.text2,T.bg3);
+  };
+  const priBadge = p => {
+    if (p === 'Urgent') return css.badge(T.danger,'#3d1f1f');
+    if (p === 'High')   return css.badge(T.warn,'#3d2e1a');
+    if (p === 'Medium') return css.badge('#f0d060','#3d3500');
+    return null;
+  };
+  const fuStyle = d => {
+    if (!d) return { color:T.text3 };
+    const days = Math.round((new Date(d+'T00:00:00') - new Date()) / (1000*60*60*24));
+    if (days < 0)   return { color:T.danger, fontWeight:'700' };
+    if (days <= 7)  return { color:T.danger };
+    if (days <= 30) return { color:T.warn };
+    return { color:T.text1 };
+  };
+
+  const counts = { total: rows.length, shown: sorted.length };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      <div style={{padding:'10px 16px 8px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}}>
+          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Leasing Pipeline</span>
+          <span style={{fontSize:F.sm,color:T.text2}}>{counts.shown} shown · {counts.total} open total</span>
+        </div>
+        {/* Stage group filter */}
+        <div style={{display:'flex',gap:'6px',marginBottom:'8px',flexWrap:'wrap'}}>
+          {STAGE_GROUPS.map(g => (
+            <button key={g} onClick={() => setGroup(g)}
+              style={{padding:'3px 12px',borderRadius:'4px',border:`0.5px solid ${stageGroup===g?T.accent:T.border}`,cursor:'pointer',fontSize:F.xs,
+                background:stageGroup===g?'#1a2e3a':'transparent',color:stageGroup===g?T.accent:T.text2,fontWeight:stageGroup===g?'600':'400'}}>
+              {g}
+            </button>
+          ))}
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search prospect, prop…"
+            style={{marginLeft:'auto',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'3px 10px',color:T.text0,fontSize:F.xs,outline:'none',minWidth:'160px'}}/>
+        </div>
+        {/* Property filter */}
+        <div style={{display:'flex',gap:'4px',flexWrap:'wrap'}}>
+          {['All',...props].map(p => (
+            <button key={p} onClick={() => setProp(p)}
+              style={{padding:'2px 8px',borderRadius:'3px',border:`0.5px solid ${propFilter===p?T.accent:T.border}`,cursor:'pointer',fontSize:F.xs,
+                background:propFilter===p?'#1a2e3a':'transparent',color:propFilter===p?T.accent:T.text2,fontWeight:propFilter===p?'600':'400',whiteSpace:'nowrap'}}>
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{flex:1,overflowY:'auto'}}>
+        {loading && <div style={{padding:'32px',textAlign:'center',color:T.text3}}>Loading…</div>}
+        {!loading && (
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead style={{position:'sticky',top:0,zIndex:1}}>
+              <tr>
+                <Th c="prop_code"          label="Prop"/>
+                <Th c="prospect_name"      label="Prospect"/>
+                <Th c="stage"              label="Stage"/>
+                <Th c="suite_num"          label="Suite"/>
+                <Th c="size_sqft_interest" label="SF Interest" align="right"/>
+                <Th c="priority"           label="Priority"/>
+                <Th c="source"             label="Source"/>
+                <Th c="follow_up_date"     label="Follow Up"/>
+                <Th c="created_at"         label="Created"/>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.length === 0 && <tr><td colSpan={9} style={{...css.td,textAlign:'center',color:T.text3,padding:'32px'}}>No leads match</td></tr>}
+              {sorted.map((p, i) => {
+                const pb = p.priority && p.priority !== '???' ? priBadge(p.priority) : null;
+                return (
+                  <tr key={p.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}
+                    onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
+                    <td style={{...css.td,color:T.accent,fontWeight:'600',whiteSpace:'nowrap'}}>{p.prop_code&&!p.prop_code.includes('?')?p.prop_code:<span style={{color:T.text3}}>—</span>}</td>
+                    <td style={css.td}>{p.prospect_name||<span style={{color:T.text3}}>—</span>}</td>
+                    <td style={css.td}><span style={stageColor(p.stage)}>{p.stage||'—'}</span></td>
+                    <td style={{...css.td,color:T.text2}}>{p.suite_num||'—'}</td>
+                    <td style={{...css.tdNum,color:T.text1}}>{p.size_sqft_interest?fmtNum(p.size_sqft_interest)+' sf':'—'}</td>
+                    <td style={css.td}>{pb?<span style={pb}>{p.priority}</span>:<span style={{color:T.text3,fontSize:F.xs}}>—</span>}</td>
+                    <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{p.source&&!p.source.includes('?')?p.source:'—'}</td>
+                    <td style={{...css.td,...fuStyle(p.follow_up_date)}}>{fmtDate(p.follow_up_date)}</td>
+                    <td style={{...css.td,fontSize:F.xs,color:T.text3}}>{fmtDate(p.created_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ── Tenant COIs Portfolio View ────────────────────────────────────────────────
 const TntCoisView = () => {
   const [rows, setRows]           = useState([]);
@@ -2051,7 +2191,7 @@ export default function SedonaCRM() {
       case 'work-orders':        return <WorkOrdersView key={resetKey}/>;
       case 'suites':             return <SuitesView />;
       case 'issues':             return <IssuesView key={resetKey}/>;
-      case 'leasing':            return <StubView title="Leasing Pipeline" note="Pipeline and stage tracking — coming soon."/>;
+      case 'leasing':            return <LeasingPipelineView key={resetKey}/>;
       case 'leases':             return <StubView title="Leases" note="Lease management — coming soon."/>;
       case 'tnt-cois':           return <TntCoisView key={resetKey}/>;
       case 'property-insurance': return <StubView title="Property Insurance" note="Property insurance management — coming soon."/>;
