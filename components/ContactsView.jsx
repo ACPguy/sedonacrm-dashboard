@@ -562,6 +562,7 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
   const [tenantTab, setTenantTab] = useState({ rows: null, loading: false });
   const [ownerTab,  setOwnerTab]  = useState({ rows: null, loading: false });
   const [vendorTab, setVendorTab] = useState({ rows: null, loading: false });
+  const [issueTab,  setIssueTab]  = useState({ rows: null, loading: false });
 
   // Document title
   useEffect(() => {
@@ -606,6 +607,18 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
     sbFetch('vendors', `select=id,company_dba,vendor_status,vendor_category&primary_contact_id=eq.${data.id}`)
       .then(rows => setVendorTab({ rows: rows || [], loading: false }))
       .catch(() => setVendorTab({ rows: [], loading: false }));
+  }, [tab, data.id]);
+
+  // Lazy fetch: issues via junction table (anon SELECT policy added 2026-05-27)
+  useEffect(() => {
+    if (tab !== 'issues' || issueTab.rows !== null) return;
+    setIssueTab({ rows: null, loading: true });
+    sbFetch('issue_contacts', `select=issue_id,issues!issue_contacts_issue_id_fkey(id,podio_id,issue_name,prop_code,status,priority,follow_up_date)&contact_id=eq.${data.id}`)
+      .then(rows => {
+        const issues = (rows || []).map(r => r.issues).filter(Boolean);
+        setIssueTab({ rows: issues, loading: false });
+      })
+      .catch(() => setIssueTab({ rows: [], loading: false }));
   }, [tab, data.id]);
 
   const save = async (field, val) => {
@@ -861,11 +874,36 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
 
         {/* ── ISSUES ── */}
         {tab === 'issues' && (
-          placeholderPanel(
-            '⚠',
-            'Issue linking via junction table — confirm schema then wire up',
-            'issue_contacts(issue_id, contact_id) confirmed. Anon SELECT policy needed before data appears.'
-          )
+          <div style={css.card}>
+            <div style={css.secTitle}>Linked Issues</div>
+            <div style={{fontSize:F.xs,color:T.text3,marginBottom:'10px'}}>
+              Issues linked via issue_contacts junction table.
+            </div>
+            {issueTab.loading && <div style={{color:T.text3,fontSize:F.sm,padding:'16px 0',textAlign:'center'}}>Loading…</div>}
+            {!issueTab.loading && issueTab.rows !== null && issueTab.rows.length === 0 && (
+              <div style={{padding:'16px 0',textAlign:'center',color:T.text3,fontSize:F.sm}}>No issues linked to this contact</div>
+            )}
+            {(issueTab.rows||[]).map(iss => {
+              const href = iss.podio_id ? `/issues/${iss.podio_id}` : iss.id ? `/issues/X${iss.id.slice(-6)}` : null;
+              const priColor = p => p==='High'?T.danger:p==='Medium'?T.warn:p==='Low'?T.success:T.text2;
+              const stColor = s => (s||'').toLowerCase()==='closed'?[T.text2,T.bg3]:[T.accent,'#1a2e3a'];
+              const [sc,sb] = stColor(iss.status);
+              return (
+                <a key={iss.id} href={href||'#'} onClick={!href?e=>e.preventDefault():undefined}
+                  style={{display:'block',textDecoration:'none',padding:'10px 12px',borderRadius:'5px',border:`0.5px solid ${T.border}`,marginBottom:'8px',background:T.bg3,cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}>
+                    <span style={{fontSize:F.base,fontWeight:'600',color:T.text0,flex:1}}>{iss.issue_name||'—'}</span>
+                    {iss.prop_code&&<span style={css.badge(T.accent,'#1a2e3a')}>{iss.prop_code}</span>}
+                    <span style={css.badge(sc,sb)}>{iss.status||'—'}</span>
+                    {iss.priority&&<span style={{fontSize:F.xs,color:priColor(iss.priority),fontWeight:'600'}}>{iss.priority}</span>}
+                  </div>
+                  {iss.follow_up_date&&<div style={{fontSize:F.xs,color:T.text3,marginTop:'4px'}}>FU: {fmtDate(iss.follow_up_date)}</div>}
+                </a>
+              );
+            })}
+          </div>
         )}
 
         {/* ── OWNER ── */}
