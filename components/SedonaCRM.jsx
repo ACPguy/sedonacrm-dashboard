@@ -490,7 +490,15 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   const [suites,setSuites] = useState([]);
   const [propOwners,setPropOwners] = useState([]);
   const [propOwnerContacts,setPropOwnerContacts] = useState([]);
+  const [cois, setCois] = useState([]);
+  const [pipeline, setPipeline] = useState([]);
   const listingFetched = useRef(false);
+  const dashFetched = useRef(false);
+  const insuranceFetched = useRef(false);
+  const monthlyFetched = useRef(false);
+  const taxesFetched = useRef(false);
+  const coisFetched = useRef(false);
+  const pipelineFetched = useRef(false);
   const [rightCollapsed,setRightCollapsed] = useState(true);
   const [rightWidth,setRightWidth] = useState(280);
   const resizingRight = useRef(false);
@@ -509,18 +517,66 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
     return ()=>window.removeEventListener('keydown',onKey);
   },[onBack]);
 
+  // Dashboard lazy fetch — rent-roll occupancy, suites count, open WO/issue counts, agreement for listing card
   useEffect(()=>{
-    const pc = data.prop_code;
-    const todayStr = new Date().toISOString().slice(0,10);
-    sbFetch('rent_schedule',`prop_code=eq.${pc}&rent_status=eq.Current&rent_starts=lte.${todayStr}&rent_ends=gte.${todayStr}&select=*,tenants!rent_schedule_tenant_id_fkey(id,podio_id)&order=suite_num.asc`).then(setRentRows).catch(()=>{});
-    sbFetch('work_orders',`prop_code=eq.${pc}&select=*&order=created_at.desc`).then(setWorkOrders).catch(()=>{});
-    sbFetch('issues',`prop_code=eq.${pc}&select=*&order=created_at.desc`).then(setIssues).catch(()=>{});
-    sbFetch('property_insurance',`prop_code=eq.${pc}&select=*&order=expiry_date.desc`).then(setInsurance).catch(()=>{});
-    sbFetch('monthly_reports',`prop_code=eq.${pc}&select=*&order=report_date.desc&limit=24`).then(setMonthlyReports).catch(()=>{});
-    sbFetch('property_taxes',`prop_code=eq.${pc}&select=*&order=year.desc`).then(setPropTaxes).catch(()=>{});
-    sbFetch('property_agreements',`prop_code=eq.${pc}&select=*&limit=1`).then(rows=>setAgreement(rows[0]||null)).catch(()=>{});
-    sbFetch('suites',`prop_code=eq.${pc}&select=*&order=suite_num.asc`).then(setSuites).catch(()=>{});
-  },[data.prop_code]);
+    if(tab!=='dashboard'||dashFetched.current) return;
+    dashFetched.current=true;
+    const pc=data.prop_code;
+    const today=new Date().toISOString().slice(0,10);
+    Promise.all([
+      sbFetch('rent_schedule',`prop_code=eq.${pc}&rent_status=eq.Current&rent_starts=lte.${today}&rent_ends=gte.${today}&select=sqft,total,suite_num&order=suite_num.asc`),
+      sbFetch('suites',`prop_code=eq.${pc}&select=id`),
+      sbFetch('work_orders',`prop_code=eq.${pc}&wo_status=not.in.(Closed,Closed%20-%20Not%20Done)&select=id`),
+      sbFetch('issues',`prop_code=eq.${pc}&status=eq.Open&select=id`),
+      sbFetch('property_agreements',`prop_code=eq.${pc}&select=*&limit=1`),
+    ]).then(([rent,stes,wos,iss,agrs])=>{
+      setRentRows(rent||[]);
+      setSuites(stes||[]);
+      setWorkOrders(wos||[]);
+      setIssues(iss||[]);
+      setAgreement(agrs?.[0]||null);
+    }).catch(()=>{});
+  },[tab,data.prop_code]);
+
+  // Insurance — fetched lazily for Dashboard card AND Insurance tab (whichever comes first)
+  useEffect(()=>{
+    if(!['dashboard','insurance'].includes(tab)||insuranceFetched.current) return;
+    insuranceFetched.current=true;
+    sbFetch('property_insurance',`prop_code=eq.${data.prop_code}&select=*&order=expiry_date.desc`)
+      .then(setInsurance).catch(()=>{});
+  },[tab,data.prop_code]);
+
+  // Monthly Reports tab lazy fetch
+  useEffect(()=>{
+    if(tab!=='monthly-reports'||monthlyFetched.current) return;
+    monthlyFetched.current=true;
+    sbFetch('monthly_reports',`prop_code=eq.${data.prop_code}&select=*&order=report_date.desc&limit=24`)
+      .then(setMonthlyReports).catch(()=>{});
+  },[tab,data.prop_code]);
+
+  // Property Taxes tab lazy fetch
+  useEffect(()=>{
+    if(tab!=='property-taxes'||taxesFetched.current) return;
+    taxesFetched.current=true;
+    sbFetch('property_taxes',`prop_code=eq.${data.prop_code}&select=*&order=year.desc`)
+      .then(setPropTaxes).catch(()=>{});
+  },[tab,data.prop_code]);
+
+  // COIs tab lazy fetch
+  useEffect(()=>{
+    if(tab!=='cois'||coisFetched.current) return;
+    coisFetched.current=true;
+    sbFetch('tnt_cois',`prop_code=eq.${data.prop_code}&select=*,tenants!tnt_cois_tenant_id_fkey(id,tenant_dba,podio_id)&order=expiry_date.asc`)
+      .then(setCois).catch(()=>{});
+  },[tab,data.prop_code]);
+
+  // Leasing Pipeline tab lazy fetch — open only by default
+  useEffect(()=>{
+    if(tab!=='pipeline'||pipelineFetched.current) return;
+    pipelineFetched.current=true;
+    sbFetch('leasing_pipeline',`prop_code=eq.${data.prop_code}&status=eq.Open&select=id,prospect_name,stage,suite_num,size_sqft_interest,priority,source,follow_up_date,created_at&order=follow_up_date.asc`)
+      .then(setPipeline).catch(()=>{});
+  },[tab,data.prop_code]);
 
   useEffect(()=>{
     if(tab!=='listing'||listingFetched.current) return;
@@ -591,10 +647,10 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
     return { occupied_sf, vacant_sf, gross_sf, occ_pct, monthly_total };
   })();
 
-  const openWOs    = workOrders.filter(w=>w.wo_status!=='Closed'&&w.wo_status!=='Closed - Not Done').length;
-  const openIssues = issues.filter(i=>(i.status||'').toLowerCase()!=='closed').length;
+  const openWOs    = workOrders.length;  // server-side filtered to open only
+  const openIssues = issues.length;      // server-side filtered to open only
 
-  const TABS = ['Dashboard','Tenants','Suites','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Prop Info','Listing','CAMs','Inspections','Contacts','Documents'];
+  const TABS = ['Dashboard','Tenants','Suites','Pipeline','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Prop Info','Listing','CAMs','Inspections','Contacts','Documents'];
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -699,14 +755,14 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                     onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
                     <div style={css.secTitle}>Work Orders</div>
                     <div style={{fontSize:F.xl,fontWeight:'700',color:openWOs>0?T.warn:T.text3}}>{openWOs}</div>
-                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{workOrders.length} total</div>
+                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>open</div>
                   </div>
                   <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('issues')}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
                     <div style={css.secTitle}>Issues</div>
                     <div style={{fontSize:F.xl,fontWeight:'700',color:openIssues>0?T.danger:T.text3}}>{openIssues}</div>
-                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{issues.length} total</div>
+                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>open</div>
                   </div>
                   {insurance.length>0&&(()=>{
                     const ins=insurance[0];
@@ -748,6 +804,72 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                 />
               </div>
             )}
+
+            {/* LEASING PIPELINE */}
+            {tab==='pipeline'&&(()=>{
+              const stageColor = s => {
+                if(!s) return [T.text2,T.bg3];
+                if(['CLOSED-New TNT','LS - Signed','Lease'].includes(s)) return [T.success,'#1e2a1e'];
+                if(['LS - Out For Sigs','LS APP','LOI'].includes(s))      return [T.accent,'#1a2e3a'];
+                if(['Showing','Replied'].includes(s))                      return [T.warn,'#3d2e1a'];
+                if(['CLOSED-Hang-up','Closed - Hang-up','Duplicate'].includes(s)) return [T.text2,T.bg3];
+                return [T.text1,T.bg2];
+              };
+              const priBadge = p => {
+                if(p==='Urgent') return css.badge(T.danger,'#3d1f1f');
+                if(p==='High')   return css.badge(T.warn,'#3d2e1a');
+                if(p==='Medium') return css.badge('#f0d060','#3d3500');
+                return css.badge(T.text2,T.bg3);
+              };
+              const fuStyle = d => {
+                if(!d) return {color:T.text3};
+                const days=Math.round((new Date(d+'T00:00:00')-new Date())/(1000*60*60*24));
+                if(days<0)   return {color:T.danger,fontWeight:'700'};
+                if(days<=7)  return {color:T.danger};
+                if(days<=30) return {color:T.warn};
+                return {color:T.text1};
+              };
+              return (
+                <div>
+                  <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'12px'}}>
+                    <span style={{fontSize:F.sm,color:T.text2}}>{pipeline.length} open lead{pipeline.length!==1?'s':''}</span>
+                    <span style={{fontSize:F.xs,color:T.text3}}>Closed leads not shown</span>
+                  </div>
+                  {pipeline.length===0&&<div style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No open pipeline leads</div>}
+                  {pipeline.length>0&&(
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <thead><tr>
+                        <th style={css.th}>Prospect</th>
+                        <th style={css.th}>Stage</th>
+                        <th style={css.th}>Suite</th>
+                        <th style={css.th}>SF Interest</th>
+                        <th style={css.th}>Priority</th>
+                        <th style={css.th}>Source</th>
+                        <th style={css.th}>Follow Up</th>
+                        <th style={css.th}>Created</th>
+                      </tr></thead>
+                      <tbody>
+                        {pipeline.map((p,i)=>{
+                          const [sc,sb]=stageColor(p.stage);
+                          return (
+                            <tr key={p.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
+                              <td style={css.td}>{p.prospect_name||'—'}</td>
+                              <td style={css.td}><span style={css.badge(sc,sb)}>{p.stage||'—'}</span></td>
+                              <td style={{...css.td,color:T.text2}}>{p.suite_num||'—'}</td>
+                              <td style={{...css.td,textAlign:'right',color:T.text1}}>{p.size_sqft_interest?fmtNum(p.size_sqft_interest)+' sf':'—'}</td>
+                              <td style={css.td}>{p.priority&&p.priority!=='???'?<span style={priBadge(p.priority)}>{p.priority}</span>:<span style={{color:T.text3}}>—</span>}</td>
+                              <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{p.source&&p.source!=='???'?p.source:'—'}</td>
+                              <td style={{...css.td,...fuStyle(p.follow_up_date)}}>{fmtDate(p.follow_up_date)}</td>
+                              <td style={{...css.td,fontSize:F.xs,color:T.text3}}>{fmtDate(p.created_at)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* MONTHLY REPORTS */}
             {tab==='monthly-reports'&&(
@@ -824,13 +946,69 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
               );
             })()}
 
-            {/* COIs — placeholder */}
-            {tab==='cois'&&(
-              <div style={{...css.card,textAlign:'center',padding:'32px'}}>
-                <i className="ti ti-certificate" style={{fontSize:'32px',color:T.bg3,display:'block',marginBottom:'8px'}} aria-hidden="true"></i>
-                <div style={{fontSize:F.sm,color:T.text3}}>Certificate of Insurance tracking — coming soon</div>
-              </div>
-            )}
+            {/* COIs */}
+            {tab==='cois'&&(()=>{
+              const coiStatusStyle = s => {
+                if(s==='COI Current')       return css.badge(T.success,'#1e2a1e');
+                if(s==='Expired')           return css.badge(T.danger,'#3d1f1f');
+                if(s==='Expiring Soon')     return css.badge(T.warn,'#3d2e1a');
+                if(s==='New ..Awaiting COI') return css.badge(T.accent,'#1a2e3a');
+                return css.badge(T.text2,T.bg3);
+              };
+              const addlStyle = s => {
+                if(s==='Add. Insured - Is Correct') return {color:T.success};
+                if(s==='Request Sent - Waiting')    return {color:T.warn};
+                if(s==='Missing'||s==='Wrong')      return {color:T.danger,fontWeight:'600'};
+                return {color:T.text2};
+              };
+              const expiryStyle = d => {
+                if(!d) return {};
+                const days=Math.round((new Date(d+'T00:00:00')-new Date())/(1000*60*60*24));
+                if(days<0)   return {color:'#fff',fontWeight:'700',background:'#7a0000',borderRadius:'3px',padding:'1px 5px'};
+                if(days<=30) return {color:T.danger,fontWeight:'700'};
+                if(days<=90) return {color:T.warn,fontWeight:'700'};
+                return {};
+              };
+              return (
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr>
+                    <th style={css.th}>Tenant</th>
+                    <th style={css.th}>COI Status</th>
+                    <th style={css.th}>Expiry</th>
+                    <th style={css.th}>Add. Insured</th>
+                    <th style={css.th}>Request</th>
+                    <th style={css.th}>Insured Co</th>
+                    <th style={css.th}>Follow Up</th>
+                  </tr></thead>
+                  <tbody>
+                    {cois.length===0&&<tr><td colSpan={7} style={{...css.td,textAlign:'center',color:T.text3,padding:'24px'}}>No COI records</td></tr>}
+                    {cois.map((c,i)=>{
+                      const tnt=c.tenants;
+                      const href=tnt?.podio_id?`/tenants/${tnt.podio_id}`:tnt?.id?`/tenants/X${tnt.id.slice(-6)}`:null;
+                      return (
+                        <tr key={c.id} style={{borderBottom:`0.5px solid ${T.border}`,background:i%2===0?'transparent':T.bg0}}>
+                          <td style={css.td}>
+                            {tnt&&href
+                              ? <a href={href} style={{color:T.accent,textDecoration:'none',fontSize:F.sm}}
+                                  onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                                  onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                                  {tnt.tenant_dba||'—'}
+                                </a>
+                              : <span>{tnt?.tenant_dba||'—'}</span>}
+                          </td>
+                          <td style={css.td}><span style={coiStatusStyle(c.coi_status)}>{c.coi_status||'—'}</span></td>
+                          <td style={css.td}><span style={expiryStyle(c.expiry_date)}>{fmtDate(c.expiry_date)}</span></td>
+                          <td style={{...css.td,fontSize:F.xs,...addlStyle(c.additional_insured_status)}}>{c.additional_insured_status||'—'}</td>
+                          <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{c.coi_request_status||'—'}</td>
+                          <td style={{...css.td,fontSize:F.xs,color:T.text2}}>{c.insured_company||'—'}</td>
+                          <td style={{...css.td,fontSize:F.xs,color:c.follow_up_date?T.warn:T.text3}}>{fmtDate(c.follow_up_date)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              );
+            })()}
 
             {/* PROPERTY TAXES */}
             {tab==='property-taxes'&&(
