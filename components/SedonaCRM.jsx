@@ -2241,7 +2241,6 @@ export default function SedonaCRM() {
         </div>
         {/* Bottom */}
         <div style={{padding:'8px 6px',borderTop:`0.5px solid ${T.border}`,flexShrink:0}}>
-          <NavItem label="Settings" href="/?view=settings" active={currentView==='settings'} onClick={()=>navTo('settings')} {...navProps}/>
         </div>
       </div>
 
