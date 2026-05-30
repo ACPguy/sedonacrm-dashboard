@@ -8,7 +8,7 @@ import TenantsTable from './shared/TenantsTable';
 import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -2241,6 +2241,7 @@ export default function SedonaCRM() {
         </div>
         {/* Bottom */}
         <div style={{padding:'8px 6px',borderTop:`0.5px solid ${T.border}`,flexShrink:0}}>
+          <NavItem iconComp={<Gear size={18} weight="bold"/>} label="Settings" href="/settings" active={currentView==='settings'} onClick={()=>handleNav('/settings')} {...navProps}/>
         </div>
       </div>
 
