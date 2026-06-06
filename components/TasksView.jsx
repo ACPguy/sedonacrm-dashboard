@@ -717,8 +717,9 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         </div>
         {/* Property filter pills */}
         {!filterPropCode&&propCodes.length>0&&(
-          <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',paddingBottom:'2px'}}>
+          <div style={{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',paddingBottom:'4px',flexWrap:'nowrap'}}>
             <button onClick={()=>setPropFilter('')} style={propBtn(!propFilter)}>All Props</button>
+            <button onClick={()=>setPropFilter(propFilter==='ACP'?'':'ACP')} style={propBtn(propFilter==='ACP')}>ACP</button>
             {propCodes.map(pc=>(
               <button key={pc} onClick={()=>setPropFilter(propFilter===pc?'':pc)} style={propBtn(propFilter===pc)}>{pc}</button>
             ))}
@@ -733,19 +734,19 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         <div style={{flex:1,overflowY:'auto'}}>
           <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
-              <col style={{width:'32px'}}/>
-              <col style={{width:'68px',minWidth:'68px'}}/>
+              <col style={{width:'36px'}}/>
+              <col style={{width:'90px'}}/>
               <col/>
-              <col style={{width:'90px',minWidth:'86px'}}/>
-              <col style={{width:'58px',minWidth:'58px'}}/>
-              <col style={{width:'88px',minWidth:'80px'}}/>
-              <col style={{width:'120px',minWidth:'80px'}}/>
-              <col style={{width:'80px',minWidth:'72px'}}/>
-              <col style={{width:'100px',minWidth:'80px'}}/>
-              <col style={{width:'90px',minWidth:'80px'}}/>
-              {showUpdated&&<col style={{width:'82px',minWidth:'76px'}}/>}
-              {showClosed &&<col style={{width:'82px',minWidth:'76px'}}/>}
-              <col style={{width:'82px',minWidth:'76px'}}/>
+              <col style={{width:'100px'}}/>
+              <col style={{width:'70px'}}/>
+              <col style={{width:'90px'}}/>
+              <col style={{width:'110px'}}/>
+              <col style={{width:'90px'}}/>
+              <col style={{width:'130px'}}/>
+              <col style={{width:'130px'}}/>
+              {showUpdated&&<col style={{width:'100px'}}/>}
+              {showClosed &&<col style={{width:'100px'}}/>}
+              <col style={{width:'100px'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
@@ -829,7 +830,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [activeProps,setActiveProps] = useState([]);
   const [vendors,setVendors]     = useState([]);
   const [tenants,setTenants]     = useState([]);
-  const [rightCollapsed,setRightCollapsed] = useState(false);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+  const [rightCollapsed,setRightCollapsed] = useState(isMobile);
   const [rightWidth,setRightWidth] = useState(300);
   const [copied,setCopied]       = useState(false);
   const resizingRight = useRef(false);
@@ -982,7 +984,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
 
       {/* Body */}
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
-        <div style={{flex:1,overflowY:'auto'}}>
+        <div style={{flex:1,overflowY:'auto',minWidth:0}}>
           {/* Base fields */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
             <FieldRow label="Title">
@@ -1120,8 +1122,23 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           )}
         </div>
 
-        <ActivityPanel collapsed={rightCollapsed} onCollapse={()=>setRightCollapsed(c=>!c)} width={rightWidth} onMouseDown={startRightResize}/>
+        {/* Desktop: always in flow. Mobile: only when open. */}
+        {(!rightCollapsed || !isMobile) && (
+          <ActivityPanel
+            collapsed={rightCollapsed}
+            onCollapse={()=>setRightCollapsed(c=>!c)}
+            width={rightWidth}
+            onMouseDown={isMobile ? undefined : startRightResize}
+          />
+        )}
       </div>
+      {/* Mobile: floating button when panel is closed */}
+      {isMobile && rightCollapsed && (
+        <button onClick={()=>setRightCollapsed(false)}
+          style={{position:'fixed',bottom:'16px',right:'16px',zIndex:50,background:'#E8630A',color:'#fff',border:'none',borderRadius:'24px',padding:'10px 18px',fontSize:'13px',fontWeight:'600',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.4)'}}>
+          Activity ›
+        </button>
+      )}
     </div>
   );
 };
