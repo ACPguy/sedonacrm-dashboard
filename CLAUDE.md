@@ -12,7 +12,7 @@ Production domain: crm.andersoncp.com
 
 ## Working Directory
 
-ALWAYS use `~/sedonacrm-dashboard-fresh/`. The old `~/sedonacrm-dashboard/` is dead — do not use it.
+ALWAYS use `~/sedonacrm-dashboard/`. This is the active repo.
 
 ## Commands
 
@@ -22,7 +22,7 @@ npm run build
 npm run start
 
 # Daily workflow
-cd ~/sedonacrm-dashboard-fresh
+cd ~/sedonacrm-dashboard
 npm run dev
 git add .
 git commit -m "description"
@@ -45,7 +45,7 @@ git push
 - Anon key: *(Scott to paste anon key here)*
 - DB connection: `postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-east-1.pooler.supabase.com:5432/postgres`
 - All tables have RLS enabled
-- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`
+- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`
 
 ## Core Architecture — Property as Hub
 
@@ -65,20 +65,25 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
 ## Current Component Structure
 
 ```
-~/sedonacrm-dashboard-fresh/components/
+~/sedonacrm-dashboard/components/
   AppShell.jsx         — shared sidebar/chrome for all routed pages
   SedonaCRM.jsx        — main shell, nav, routing, Home dashboard, Properties list
   IssuesView.jsx       — issues list + detail (routed, accepts prop_code filter)
   WorkOrdersView.jsx   — work orders list + detail (routed, accepts prop_code filter)
+  TasksView.jsx        — unified tasks list + detail, all 6 record types (routed)
   TenantsView.jsx      — tenants list + detail (routed, accepts prop_code filter)
   SuitesView.jsx       — suites list + detail (routed, accepts prop_code filter)
   RentScheduleView.jsx — rent schedule list + detail (routed, accepts prop_code filter)
   ContactsView.jsx     — contacts list + detail (routed)
   VendorsView.jsx      — vendors list + detail (routed)
   OwnersView.jsx       — property owners list + detail (routed)
+  shared/
+    TasksTable.jsx     — shared reusable tasks table (self-fetching, filterable)
+    WorkOrdersTable.jsx, TenantsTable.jsx, SuitesTable.jsx, IssuesTable.jsx, ContactsTable.jsx
 
-~/sedonacrm-dashboard-fresh/pages/
+~/sedonacrm-dashboard/pages/
   index.jsx            — main SPA entry (SedonaCRM shell)
+  tasks/index.jsx + [id].jsx   — /tasks, /tasks/WO-3737 (prefixed task_num URLs)
   issues/index.jsx + [id].jsx
   work-orders/index.jsx + [id].jsx
   tenants/index.jsx + [id].jsx
@@ -86,10 +91,12 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   contacts/index.jsx + [id].jsx
   vendors/index.jsx + [id].jsx
   owners/index.jsx + [id].jsx
+  settings/index.jsx
 ```
 
 ## Standalone Portfolio Views (routed Next.js pages)
 
+- Tasks — fully routed (`/tasks`, `/tasks/[prefixed_id]` e.g. `/tasks/WO-3737`)
 - Issues — fully routed (`/issues`, `/issues/[id]`)
 - Work Orders — fully routed (`/work-orders`, `/work-orders/[id]`)
 - Tenants — fully routed (`/tenants`, `/tenants/[id]`)
@@ -98,8 +105,9 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
 - Contacts — fully routed (`/contacts`, `/contacts/[id]`)
 - Vendors — fully routed (`/vendors`, `/vendors/[id]`)
 - Owners — fully routed (`/owners`, `/owners/[id]`)
+- Settings — fully routed (`/settings`) — Gmail OAuth connect
 - Properties list — built (SPA only, property detail is the next build)
-- Leasing Pipeline — pending
+- Leasing Pipeline — SPA view only (not routed)
 - Calendar — pending
 - Morning Briefing / Dashboard — pending
 
@@ -139,7 +147,7 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - Chromebook: all files land in `/home/scott/` (Linux files root), NOT `~/Downloads`
 - Before seeding any table: check columns, drop CHECK+FK constraints, test with R01, run full loop
 - CASCADE check before any TRUNCATE
-- Component copy command: `cp ~/SedonaCRM.jsx ~/sedonacrm-dashboard-fresh/components/SedonaCRM.jsx`
+- Working directory for all file edits: `~/sedonacrm-dashboard/`
 
 ## Phase Status
 
@@ -257,41 +265,59 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 4. Add nav item to AppShell pointing to `/<module>`
 5. Change SedonaCRM nav onClick to `router.push('/<module>')`
 
+## Tasks Module — DB Architecture Notes
+
+**tasks table** (4,368 rows as of 2026-06-06):
+- record_type: work_order (2,914), task (1,234), sg_task (220), note/project/acp_task (0 — ready for new records)
+- UNIQUE index: `(record_type, task_num)` — global unique on task_num alone is impossible because WO and issue Podio IDs overlap in 1,046 values across apps
+- task_num is the Podio ID for work_orders and tasks; sequential (1–220) for sg_tasks
+- URL prefix: WO-N, TSK-N, SG-N, NOTE-N, PRJ-N, ACP-N
+- Sequences: work_order=3717, task=1846, acp_task=518, note=1, sg_task=220
+- wo_status mapping applied: work_order status = Open (151), Closed (2,336), Cancelled (427)
+
+**task_sequences table**: tracks next task_num per record_type. Trigger `trg_tasks_assign_num` fires BEFORE INSERT, auto-increments and assigns task_num.
+
+**task_contacts table**: junction between tasks and contacts (migrated from issue_contacts; 0 rows since issue_contacts was empty).
+
 ## Next Priorities
 
-**Completed this session (commit 143f159):**
-- ContactDetail tabs wired with real data (lazy reverse lookups):
-  - Tenant tab: tenants WHERE primary_contact_id OR accounting_contact_id = contact.id
-  - Owner tab: added new tab — property_owners WHERE primary_contact_id = contact.id
-  - Vendor tab: added new tab — vendors WHERE primary_contact_id = contact.id
-  - Issues tab: placeholder updated (issue_contacts junction confirmed; no anon SELECT policy)
-  - Work Orders tab: placeholder updated (no contact FK on work_orders — deferred to Podio sync)
-- Mobile responsiveness pass:
-  - AppShell hamburger menu (mobile drawer sidebar, overlay, <640px)
-  - globals.css: responsive CSS for field-rows, table→card, desktop sidebar hide
-  - All 5 FieldRow components: crm-field-row / crm-field-label classNames added (CSS stacking)
-  - All 8 list views: crm-list-table + mobile card layouts
-- Prop Info tab fixes (SedonaCRM.jsx):
-  - save() / saveAgreement(): val||null → correct null handling (fixes boolean false save bug)
-  - gross_sqft: comma-formatted display; parseInt on save
+**Completed this session (2026-06-06):**
+
+Tasks Module Stage 1 — DB:
+- `task_sequences`, `tasks`, `task_contacts` tables created with full RLS and anon SELECT
+- Migrated 2,914 work_orders + 1,234 issues (all as 'task', scope was NULL) + 220 S&G Projects
+- WO statuses corrected from wo_status field: 151 Open, 2,336 Closed, 427 Cancelled
+- S&G Projects seeded via Python script (`~/seed_sg_tasks.py`); xlsx at `/home/scott/S+G Projects - Last view used.xlsx`
+
+Tasks Module Stage 2 — UI (on `preview` branch, commit fbbc5ec):
+- `components/TasksView.jsx`: unified list + detail for all 6 record types
+  - sbFetchAll for >1000 row pagination
+  - Priority sort default (??? → Urgent → High → Medium → Low)
+  - Grouped property headers (alphabetical, null prop_code → "—" group at bottom)
+  - Columns: type icon | # | title | FU Date | prop | priority | stage | status | vendor | tenant | updated/closed | opened
+  - Closed/Updated column swap on status filter
+  - More… date filter dropdown (Opened/Updated/Closed × Week/Month/Year)
+  - ACP pill hardcoded (status='acp-entity', not in active properties query)
+  - Type conversion pills in detail header
+  - WO-specific detail section (stage, vendor, tenant, invoice, etc.)
+  - Mobile: activity panel closed by default, floating "Activity ›" button
+- `components/shared/TasksTable.jsx`: self-fetching shared table, prop/type/vendor/tenant filters
+- `pages/tasks/index.jsx` + `pages/tasks/[id].jsx`: routed pages
+- `AppShell.jsx` + `SedonaCRM.jsx`: Tasks nav item added after Issues (ClipboardText icon)
 
 **Completed previous sessions:**
-- Owners detail form — full build; Vendors detail form — full build
-- Property detail: Prop Info + Listing tabs built out
-- Work Orders detail form + Open-only default load
-- Suites fully routed; SuitesTable shared component
-- ContactDetail full tabbed form; Issues detail overhaul; Nav always-navigate fix
+- Phase 3 Stage 1: Gmail OAuth + /settings page
+- LeasingPipelineView, TntCoisView (SPA views)
+- PropertyDetail: all tabs lazy-loaded
+- ContactDetail: full tabbed form, Issues tab wired
+- All major list views routed with shared table components
 
 **Next:**
-1. Property detail refinements:
-   - Tenants tab: add Base Rent / Total columns (requires rent_schedule join)
-   - Work Orders tab: vendor name (denormalized field or vendor lookup)
-   - Dashboard tab: lazy-load counts (currently fetches all on property open — violates lazy rule)
-   - Remaining 3 tab groups: Financial, Operations, Ownership tabs not yet built
-
-2. Properties detail page — full build at /properties/[id]
-   - Prop Info + Listing tabs are built; Financial / Operations / Ownership still needed
-
-3. issue_contacts anon SELECT policy — grant anon SELECT to wire Issues tab in ContactDetail
-
-4. Populate podio_id for vendors (deferred to go-live Podio API sync) and property_owners
+1. Test Tasks detail form on preview — verify field saves, type conversion, WO section
+2. Merge preview → main (`git push origin preview:main`) when Scott approves
+3. Property detail — remaining tab groups:
+   - Financial: CAM, Taxes, PM Fees, Invoices, Insurance
+   - Operations: Work Orders (vendor name), Inspections, Key Safe
+   - Ownership: Owners, Agreements, Monthly Reports, YR End Reports
+4. Phase 3 Stage 2: Gmail compose/send, thread sync, AI summarize
+5. Populate podio_id for vendors (deferred to go-live Podio API sync)
