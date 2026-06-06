@@ -368,33 +368,46 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const [statusFilter,setStatusFilter] = useState('Open');
   const [propFilter,setPropFilter]     = useState('');
   const [search,setSearch]             = useState('');
-  const [sortCol,setSortCol]           = useState('updated_at');
-  const [sortDir,setSortDir]           = useState('desc');
+  const [sortCol,setSortCol]           = useState('priority');
+  const [sortDir,setSortDir]           = useState('asc');
+  const [typeCounts,setTypeCounts]     = useState({work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0});
 
   useEffect(()=>{
     setLoading(true); setError(null); setTasks([]);
-    const parts=[];
-    if (statusFilter==='Open') parts.push('status=not.in.(Closed,Cancelled)');
-    else if (statusFilter==='Closed') parts.push('status=in.(Closed,Cancelled)');
-    else if (statusFilter==='In Progress') parts.push('status=eq.In%20Progress');
-    else if (statusFilter==='On Hold') parts.push('status=eq.On%20Hold');
-    if (typeFilter!=='All') parts.push(`record_type=eq.${typeFilter}`);
+
+    // Shared filters (no type filter) — used for both main fetch and counts
+    const shared=[];
+    if (statusFilter==='Open') shared.push('status=not.in.(Closed,Cancelled)');
+    else if (statusFilter==='Closed') shared.push('status=in.(Closed,Cancelled)');
+    else if (statusFilter==='In Progress') shared.push('status=eq.In%20Progress');
+    else if (statusFilter==='On Hold') shared.push('status=eq.On%20Hold');
     const pc=filterPropCode||propFilter;
-    if (pc) parts.push(`prop_code=eq.${encodeURIComponent(pc)}`);
-    parts.push('order=updated_at.desc.nullslast');
-    sbFetch('tasks',`select=*&${parts.join('&')}`)
-      .then(d=>{setTasks(d);setLoading(false);})
-      .catch(e=>{setError(e.message);setLoading(false);});
-  },[statusFilter,typeFilter,propFilter,filterPropCode,refreshKey]);
+    if (pc) shared.push(`prop_code=eq.${encodeURIComponent(pc)}`);
+    if (search) shared.push(`title=ilike.*${encodeURIComponent(search)}*`);
+
+    // Main fetch also filters by type
+    const mainParts=[...shared];
+    if (typeFilter!=='All') mainParts.push(`record_type=eq.${typeFilter}`);
+    mainParts.push('order=updated_at.desc.nullslast');
+
+    Promise.all([
+      sbFetch('tasks',`select=*&${mainParts.join('&')}`),
+      sbFetch('tasks',`select=record_type&${shared.join('&')}`),
+    ]).then(([data,countData])=>{
+      setTasks(data);
+      const counts={work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0};
+      countData.forEach(r=>{if(counts[r.record_type]!==undefined)counts[r.record_type]++;});
+      setTypeCounts(counts);
+      setLoading(false);
+    }).catch(e=>{setError(e.message);setLoading(false);});
+  },[statusFilter,typeFilter,propFilter,filterPropCode,search,refreshKey]);
 
   useEffect(()=>{
     sbFetch('users','select=id,full_name&order=full_name.asc').then(setUsers).catch(()=>{});
     if (!filterPropCode) {
-      sbFetch('tasks','select=prop_code&prop_code=not.is.null&order=prop_code.asc')
-        .then(d=>{
-          const codes=[...new Set(d.map(r=>r.prop_code).filter(Boolean))].sort();
-          setPropCodes(codes);
-        }).catch(()=>{});
+      sbFetch('properties','select=prop_code&status=eq.active&order=prop_code.asc')
+        .then(d=>setPropCodes(d.map(r=>r.prop_code)))
+        .catch(()=>{});
     }
   },[filterPropCode]);
 
@@ -403,29 +416,21 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     return ()=>{document.title='SedonaCRM';};
   },[]);
 
-  const filtered = useMemo(()=>{
-    if (!search) return tasks;
-    const q=search.toLowerCase();
-    return tasks.filter(t=>
-      (t.title||'').toLowerCase().includes(q)||
-      (t.prop_code||'').toLowerCase().includes(q)||
-      (t.category||'').toLowerCase().includes(q)
-    );
-  },[tasks,search]);
-
-  const typeCounts = useMemo(()=>{
-    const c={work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0};
-    tasks.forEach(t=>{if(c[t.record_type]!=null)c[t.record_type]++;});
-    return c;
-  },[tasks]);
-
-  const sorted = useMemo(()=>[...filtered].sort((a,b)=>{
-    let cmp;
-    if(sortCol==='priority') cmp=(PRIORITY_ORDER[a.priority]??99)-(PRIORITY_ORDER[b.priority]??99);
-    else if(sortCol==='updated_at') cmp=(a.updated_at||'0000')<(b.updated_at||'0000')?-1:1;
-    else cmp=String(a[sortCol]??'').localeCompare(String(b[sortCol]??''));
+  // Search is server-side; tasks is already the filtered result
+  const sorted = useMemo(()=>[...tasks].sort((a,b)=>{
+    if (sortCol==='priority') {
+      const pa=PRIORITY_ORDER[a.priority]??99, pb=PRIORITY_ORDER[b.priority]??99;
+      if (pa!==pb) return sortDir==='asc'?pa-pb:pb-pa;
+      // secondary: updated_at DESC always
+      return new Date(b.updated_at||0)-new Date(a.updated_at||0);
+    }
+    if (sortCol==='updated_at') {
+      const cmp=(a.updated_at||'0000')<(b.updated_at||'0000')?-1:1;
+      return sortDir==='asc'?cmp:-cmp;
+    }
+    const cmp=String(a[sortCol]??'').localeCompare(String(b[sortCol]??''));
     return sortDir==='asc'?cmp:-cmp;
-  }),[filtered,sortCol,sortDir]);
+  }),[tasks,sortCol,sortDir]);
 
   const toggleSort=c=>{
     if(c===sortCol)setSortDir(d=>d==='asc'?'desc':'asc');
@@ -507,7 +512,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
           <ClipboardText size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Tasks</span>
-          <span style={{fontSize:F.xs,color:T.text3}}>{sorted.length.toLocaleString()} shown</span>
+          <span style={{fontSize:F.xs,color:T.text3}}>{tasks.length.toLocaleString()} shown</span>
           <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'6px'}}>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…"
               style={{width:'160px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'4px 10px',color:T.text0,fontSize:F.xs,outline:'none'}}/>
@@ -518,15 +523,15 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           {TYPE_PILLS.map(({key,label})=>{
             const active=typeFilter===key;
             const color=TYPE_COLOR[key]||T.accent;
-            const cnt=key==='All'?tasks.length:(typeCounts[key]??0);
+            const allTotal=Object.values(typeCounts).reduce((s,n)=>s+n,0);
+            const cnt=key==='All'?allTotal:(typeCounts[key]??0);
             return (
               <button key={key} onClick={()=>setTypeFilter(key)}
                 style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${key==='All'?T.accent:color}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':(key==='All'?T.accent:color),transition:'background 0.15s ease'}}
                 onMouseEnter={e=>{if(!active)e.currentTarget.style.background=key==='All'?'rgba(110,159,216,0.20)':`${color}33`;}}
                 onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
                 {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
-                {label}
-                <span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>
+                {label} <span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>
               </button>
             );
           })}
