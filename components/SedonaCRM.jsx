@@ -3,6 +3,7 @@ import WorkOrdersTable from './shared/WorkOrdersTable';
 import SuitesView from './SuitesView';
 import SuitesTable from './shared/SuitesTable';
 import IssuesView, { IssuesList } from './IssuesView';
+import TasksView from './TasksView';
 import ContactsTable from './shared/ContactsTable';
 import TenantsTable from './shared/TenantsTable';
 import RichTextEditor from './RichTextEditor';
@@ -2225,6 +2226,7 @@ export default function SedonaCRM() {
           <NavItem iconComp={<Cube size={18} weight="bold"/>} label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>handleNav('/suites')} {...navProps}/>
           <NavItem iconComp={<Wrench size={18} weight="bold"/>} label="Work Orders" href="/work-orders"        active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
           <NavItem iconComp={<CheckFat size={18} weight="bold"/>} label="Issues"      href="/issues"             active={currentView==='issues'}      onClick={()=>handleNav('/issues')}   {...navProps}/>
+          <NavItem iconComp={<ClipboardText size={18} weight="bold"/>} label="Tasks"       href="/tasks"              active={currentView==='tasks'}       onClick={()=>handleNav('/tasks')}    {...navProps}/>
           <NavItem iconComp={<UserCircle size={18} weight="bold"/>} label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>handleNav('/contacts')} {...navProps}/>
           <NavItem iconComp={<Truck size={18} weight="bold"/>} label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>handleNav('/vendors')}  {...navProps}/>
           <NavItem iconComp={<Briefcase size={18} weight="bold"/>} label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>handleNav('/owners')}   {...navProps}/>

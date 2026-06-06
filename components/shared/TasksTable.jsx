@@ -1,0 +1,163 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// TasksTable.jsx — shared reusable tasks table
+// Used everywhere a task list is embedded (property detail, tenant detail, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/router';
+import {
+  sbFetch, T, F, css, StatusBadge, PriorityDot, fmtDate,
+  formatTaskNum, TaskTypeIcon, PRIORITY_ORDER,
+} from '../TasksView';
+
+const fmtNumDate = d => {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
+};
+
+export default function TasksTable({
+  filterPropCode,
+  filterProjectId,
+  filterType,
+  filterVendorId,
+  filterTenantId,
+  hidePropertyFilter = false,
+  hideSearch = false,
+  hideTypeFilter = false,
+}) {
+  const router = useRouter();
+  const [tasks, setTasks]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState(null);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    setLoading(true); setError(null);
+    const parts = ['status=not.in.(Closed,Cancelled)', 'order=updated_at.desc.nullslast'];
+    if (filterPropCode)  parts.push(`prop_code=eq.${encodeURIComponent(filterPropCode)}`);
+    if (filterProjectId) parts.push(`project_id=eq.${filterProjectId}`);
+    if (filterType)      parts.push(`record_type=eq.${filterType}`);
+    if (filterVendorId)  parts.push(`vendor_id=eq.${filterVendorId}`);
+    if (filterTenantId)  parts.push(`tenant_id=eq.${filterTenantId}`);
+    sbFetch('tasks', `select=id,task_num,record_type,title,prop_code,priority,status,assigned_to,updated_at,created_at&${parts.join('&')}`)
+      .then(d => { setTasks(d); setLoading(false); })
+      .catch(e => { setError(e.message); setLoading(false); });
+  }, [filterPropCode, filterProjectId, filterType, filterVendorId, filterTenantId]);
+
+  const filtered = useMemo(() => {
+    if (!search) return tasks;
+    const q = search.toLowerCase();
+    return tasks.filter(t =>
+      (t.title||'').toLowerCase().includes(q) ||
+      (t.prop_code||'').toLowerCase().includes(q)
+    );
+  }, [tasks, search]);
+
+  const navigate = task => {
+    const prefixed = formatTaskNum(task.record_type, task.task_num);
+    router.push(`/tasks/${prefixed}`);
+  };
+
+  if (loading) return <div style={{padding:'20px',textAlign:'center',color:T.text3,fontSize:F.sm}}>Loading…</div>;
+  if (error)   return <div style={{padding:'20px',textAlign:'center',color:T.danger,fontSize:F.sm}}>Error: {error}</div>;
+
+  return (
+    <div>
+      {!hideSearch && (
+        <div style={{marginBottom:'8px'}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tasks…"
+            style={{width:'200px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'4px 10px',color:T.text0,fontSize:F.xs,outline:'none'}}/>
+        </div>
+      )}
+      <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+        <colgroup>
+          <col style={{width:'28px'}}/>
+          <col style={{width:'68px'}}/>
+          <col/>
+          {!hidePropertyFilter&&<col style={{width:'56px'}}/>}
+          <col style={{width:'70px'}}/>
+          <col style={{width:'76px'}}/>
+          <col style={{width:'80px'}}/>
+        </colgroup>
+        <thead>
+          <tr>
+            <th style={{...css.th,cursor:'default'}}></th>
+            <th style={css.th}>#</th>
+            <th style={css.th}>Title</th>
+            {!hidePropertyFilter&&<th style={css.th}>Prop</th>}
+            <th style={css.th}>Priority</th>
+            <th style={css.th}>Status</th>
+            <th style={css.th}>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.length===0&&(
+            <tr><td colSpan={hidePropertyFilter?6:7} style={{...css.td,textAlign:'center',padding:'20px',color:T.text3}}>No open tasks</td></tr>
+          )}
+          {filtered.map((task,i)=>{
+            const prefixed=formatTaskNum(task.record_type,task.task_num);
+            const href=`/tasks/${prefixed}`;
+            const rowBg=i%2===0?'transparent':T.bg0;
+            return (
+              <tr key={task.id}
+                style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+                onMouseLeave={e=>e.currentTarget.style.background=rowBg}
+                onClick={e=>{if(e.ctrlKey||e.metaKey){window.open(href,'_blank');}else{navigate(task);}}}>
+                <td style={{...css.td,width:'28px',textAlign:'center',overflow:'visible',padding:'4px'}}>
+                  <TaskTypeIcon recordType={task.record_type} size={13}/>
+                </td>
+                <td style={{...css.td,fontSize:F.xs,color:T.text2}}>
+                  <a href={href} onClick={e=>{if(!e.ctrlKey&&!e.metaKey){e.preventDefault();navigate(task);}}} style={{color:'inherit',textDecoration:'none'}}>{prefixed}</a>
+                </td>
+                <td style={css.td} title={task.title}>
+                  <a href={href} onClick={e=>{if(!e.ctrlKey&&!e.metaKey){e.preventDefault();navigate(task);}}} style={{color:'inherit',textDecoration:'none'}}>{task.title||''}</a>
+                </td>
+                {!hidePropertyFilter&&(
+                  <td style={{...css.td,fontSize:F.xs}}>
+                    {task.prop_code&&<span style={{background:'#1a2e3a',color:T.accent,padding:'1px 5px',borderRadius:'3px',fontWeight:'600'}}>{task.prop_code}</span>}
+                  </td>
+                )}
+                <td style={css.td}>
+                  <span style={{display:'flex',alignItems:'center'}}>
+                    <PriorityDot priority={task.priority||'???'}/>{task.priority||'???'}
+                  </span>
+                </td>
+                <td style={{...css.td,overflow:'visible'}}><StatusBadge status={task.status||'Open'}/></td>
+                <td style={{...css.td,color:T.text2,fontSize:F.xs}}>
+                  {task.updated_at?fmtNumDate(task.updated_at):task.created_at?fmtNumDate(task.created_at):''}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {/* Mobile cards */}
+      <div className="crm-mobile-cards">
+        {filtered.map((task,i)=>{
+          const prefixed=formatTaskNum(task.record_type,task.task_num);
+          const rowBg=i%2===0?'transparent':T.bg0;
+          return (
+            <div key={task.id}
+              style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
+              onClick={()=>router.push(`/tasks/${prefixed}`)}
+              onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
+              onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
+              <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'3px'}}>
+                <TaskTypeIcon recordType={task.record_type} size={16}/>
+                <span style={{fontSize:F.xs,color:T.text2}}>{prefixed}</span>
+                <span style={{fontWeight:'600',fontSize:F.sm,color:T.text0}}>{task.title||'—'}</span>
+              </div>
+              <div style={{display:'flex',gap:'4px',flexWrap:'wrap',alignItems:'center'}}>
+                {!hidePropertyFilter&&task.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 5px',borderRadius:'3px',fontWeight:'600'}}>{task.prop_code}</span>}
+                <StatusBadge status={task.status||'Open'}/>
+                {task.priority&&<span style={{display:'flex',alignItems:'center',gap:'3px',fontSize:F.xs,color:T.text2}}><PriorityDot priority={task.priority}/>{task.priority}</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

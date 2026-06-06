@@ -92,6 +92,7 @@ export default function AppShell({ children, activeView }) {
       <NavBtn label="Suites"      href="/suites"             active={is('suites')}      onClick={()=>go('/suites')}            collapsed={collapsed} icon={<Cube size={18} weight="bold"/>}/>
       <NavBtn label="Work Orders" href="/work-orders"        active={is('work-orders')} onClick={()=>go('/work-orders')}       collapsed={collapsed} icon={<Wrench size={18} weight="bold"/>}/>
       <NavBtn label="Issues"      href="/issues"             active={is('issues')}      onClick={()=>go('/issues')}            collapsed={collapsed} icon={<CheckFat size={18} weight="bold"/>}/>
+      <NavBtn label="Tasks"       href="/tasks"              active={is('tasks')}       onClick={()=>go('/tasks')}             collapsed={collapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
       <NavBtn label="Contacts"    href="/contacts"           active={is('contacts')}    onClick={()=>go('/contacts')}          collapsed={collapsed} icon={<UserCircle size={18} weight="bold"/>}/>
       <NavBtn label="Vendors"     href="/vendors"            active={is('vendors')}     onClick={()=>go('/vendors')}           collapsed={collapsed} icon={<Truck size={18} weight="bold"/>}/>
       <NavBtn label="Owners"      href="/owners"             active={is('owners')}      onClick={()=>go('/owners')}            collapsed={collapsed} icon={<Briefcase size={18} weight="bold"/>}/>
