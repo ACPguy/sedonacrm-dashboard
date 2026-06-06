@@ -32,6 +32,39 @@ export const sbPatch = async (table, id, updates) => {
   return res.json();
 };
 
+// Paginates through all rows 1000 at a time (Supabase anon cap = 1000/request).
+export const sbFetchAll = async (table, baseParams = '') => {
+  const PAGE = 1000;
+  let offset = 0, all = [];
+  while (true) {
+    const sep = baseParams ? '&' : '';
+    const page = await sbFetch(table, `${baseParams}${sep}limit=${PAGE}&offset=${offset}`);
+    all = all.concat(page);
+    if (page.length < PAGE) break;
+    offset += PAGE;
+  }
+  return all;
+};
+
+const isFuOverdue = (d, task) => {
+  if (!d || task.status === 'Closed' || task.status === 'Cancelled') return false;
+  const date = new Date(d + 'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  return date <= today;
+};
+
+const isInRange = (dateVal, range) => {
+  if (!dateVal || !range) return false;
+  const d = new Date(typeof dateVal === 'string' && dateVal.length === 10
+    ? dateVal + 'T00:00:00' : dateVal);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  if (range === 'week')  { const w = new Date(now); w.setDate(w.getDate()-7); return d >= w; }
+  if (range === 'month') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+  if (range === 'year')  return d.getFullYear()===now.getFullYear();
+  return false;
+};
+
 export const T = {
   bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
   text0:'#c9cdd6', text1:'#8a95a8', text2:'#5a6272', text3:'#4a5264',
@@ -355,27 +388,85 @@ const BoolPill = ({ value, labelTrue, labelFalse, colorTrue=T.success, onSave })
   );
 };
 
+// ── MorePopover (date sub-filters) ───────────────────────────────────────────
+const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) => {
+  const ref = useRef(null);
+  useEffect(()=>{
+    if(!open)return;
+    const handle=e=>{
+      if(ref.current&&!ref.current.contains(e.target)&&
+         anchorRef.current&&!anchorRef.current.contains(e.target))onClose();
+    };
+    document.addEventListener('mousedown',handle);
+    return ()=>document.removeEventListener('mousedown',handle);
+  },[open,onClose]);
+  if(!open)return null;
+
+  const toggleDate=(row,period)=>{
+    setDateFilters(prev=>{
+      const isActive=prev[row]===period;
+      if(isActive)return{opened:null,updated:null,closed:null};
+      return{opened:null,updated:null,closed:null,[row]:period};
+    });
+  };
+
+  const dateRows=[{key:'opened',label:'Opened'},{key:'updated',label:'Updated'},{key:'closed',label:'Closed'}];
+  const periods=[{key:'week',label:'This Week'},{key:'month',label:'This Month'},{key:'year',label:'This Year'}];
+  const btnStyle=active=>({
+    padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,cursor:'pointer',
+    border:`0.5px solid ${active?T.warn:T.border}`,
+    background:active?'rgba(212,146,74,0.18)':'transparent',
+    color:active?T.warn:T.text2,
+    fontWeight:active?'600':'400',
+    transition:'all 0.15s',
+  });
+
+  return (
+    <div ref={ref} style={{position:'absolute',top:'calc(100% + 4px)',left:0,zIndex:200,
+      background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',
+      padding:'10px 12px',minWidth:'280px',boxShadow:'0 6px 20px rgba(0,0,0,0.5)'}}>
+      {dateRows.map(({key,label},idx)=>(
+        <div key={key} style={{marginBottom:idx<dateRows.length-1?10:0}}>
+          <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'5px',fontWeight:'600'}}>{label}</div>
+          <div style={{display:'flex',gap:'4px'}}>
+            {periods.map(({key:pk,label:pl})=>(
+              <button key={pk} onClick={()=>toggleDate(key,pk)} style={btnStyle(dateFilters[key]===pk)}>{pl}</button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TasksList
 // ─────────────────────────────────────────────────────────────────────────────
 const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=0 }) => {
-  const [tasks,setTasks]         = useState([]);
-  const [loading,setLoading]     = useState(true);
-  const [error,setError]         = useState(null);
-  const [users,setUsers]         = useState([]);
-  const [propCodes,setPropCodes] = useState([]);
-  const [typeFilter,setTypeFilter]     = useState(initType||'All');
+  const [tasks,setTasks]             = useState([]);
+  const [loading,setLoading]         = useState(true);
+  const [error,setError]             = useState(null);
+  const [vendors,setVendors]         = useState([]);
+  const [tenants,setTenants]         = useState([]);
+  const [propCodes,setPropCodes]     = useState([]);
+  const [typeFilter,setTypeFilter]   = useState(initType||'All');
   const [statusFilter,setStatusFilter] = useState('Open');
-  const [propFilter,setPropFilter]     = useState('');
-  const [search,setSearch]             = useState('');
-  const [sortCol,setSortCol]           = useState('priority');
-  const [sortDir,setSortDir]           = useState('asc');
-  const [typeCounts,setTypeCounts]     = useState({work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0});
+  const [propFilter,setPropFilter]   = useState('');
+  const [search,setSearch]           = useState('');
+  const [sortCol,setSortCol]         = useState('priority');
+  const [sortDir,setSortDir]         = useState('asc');
+  const [typeCounts,setTypeCounts]   = useState({work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0});
+  const [dateFilters,setDateFilters] = useState({opened:null,updated:null,closed:null});
+  const [moreOpen,setMoreOpen]       = useState(false);
+  const moreAnchorRef                = useRef(null);
+
+  const showClosed  = statusFilter === 'Closed';
+  const showUpdated = !showClosed;
+  const NCOLS = 12; // type|#|title|fudate|prop|priority|stage|status|vendor|tenant|updated-or-closed|opened
 
   useEffect(()=>{
     setLoading(true); setError(null); setTasks([]);
 
-    // Shared filters (no type filter) — used for both main fetch and counts
     const shared=[];
     if (statusFilter==='Open') shared.push('status=not.in.(Closed,Cancelled)');
     else if (statusFilter==='Closed') shared.push('status=in.(Closed,Cancelled)');
@@ -385,14 +476,13 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     if (pc) shared.push(`prop_code=eq.${encodeURIComponent(pc)}`);
     if (search) shared.push(`title=ilike.*${encodeURIComponent(search)}*`);
 
-    // Main fetch also filters by type
     const mainParts=[...shared];
     if (typeFilter!=='All') mainParts.push(`record_type=eq.${typeFilter}`);
     mainParts.push('order=updated_at.desc.nullslast');
 
     Promise.all([
-      sbFetch('tasks',`select=*&${mainParts.join('&')}`),
-      sbFetch('tasks',`select=record_type&${shared.join('&')}`),
+      sbFetchAll('tasks',`select=*&${mainParts.join('&')}`),
+      sbFetchAll('tasks',`select=record_type&${shared.join('&')}`),
     ]).then(([data,countData])=>{
       setTasks(data);
       const counts={work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0};
@@ -403,7 +493,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   },[statusFilter,typeFilter,propFilter,filterPropCode,search,refreshKey]);
 
   useEffect(()=>{
-    sbFetch('users','select=id,full_name&order=full_name.asc').then(setUsers).catch(()=>{});
+    sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     if (!filterPropCode) {
       sbFetch('properties','select=prop_code&status=eq.active&order=prop_code.asc')
         .then(d=>setPropCodes(d.map(r=>r.prop_code)))
@@ -416,12 +507,11 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     return ()=>{document.title='SedonaCRM';};
   },[]);
 
-  // Search is server-side; tasks is already the filtered result
+  // Client-side sort (priority → updated_at secondary)
   const sorted = useMemo(()=>[...tasks].sort((a,b)=>{
     if (sortCol==='priority') {
       const pa=PRIORITY_ORDER[a.priority]??99, pb=PRIORITY_ORDER[b.priority]??99;
       if (pa!==pb) return sortDir==='asc'?pa-pb:pb-pa;
-      // secondary: updated_at DESC always
       return new Date(b.updated_at||0)-new Date(a.updated_at||0);
     }
     if (sortCol==='updated_at') {
@@ -432,9 +522,42 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     return sortDir==='asc'?cmp:-cmp;
   }),[tasks,sortCol,sortDir]);
 
+  // Client-side date filter
+  const filtered = useMemo(()=>sorted.filter(t=>{
+    if (dateFilters.opened  && !isInRange(t.created_at,   dateFilters.opened))  return false;
+    if (dateFilters.updated && !isInRange(t.updated_at,   dateFilters.updated)) return false;
+    if (dateFilters.closed  && !isInRange(t.close_date,   dateFilters.closed))  return false;
+    return true;
+  }),[sorted,dateFilters]);
+
+  // Grouped by prop_code when no specific prop selected (All Props = default)
+  const grouped = useMemo(()=>{
+    if (propFilter) return null; // specific prop → flat
+    const map={};
+    filtered.forEach(t=>{
+      const key=t.prop_code||'—';
+      if(!map[key])map[key]=[];
+      map[key].push(t);
+    });
+    return Object.entries(map)
+      .sort(([a],[b])=>{
+        if(a==='—')return 1; if(b==='—')return -1;
+        return a.localeCompare(b);
+      })
+      .map(([prop_code,rows])=>({prop_code,rows}));
+  },[filtered,propFilter]);
+
   const toggleSort=c=>{
     if(c===sortCol)setSortDir(d=>d==='asc'?'desc':'asc');
     else{setSortCol(c);setSortDir('asc');}
+  };
+
+  const hasActiveDateFilter = !!(dateFilters.opened||dateFilters.updated||dateFilters.closed);
+  const hasActiveFilters    = !!propFilter||statusFilter!=='Open'||search!==''||hasActiveDateFilter;
+
+  const clearFilters=()=>{
+    setPropFilter(''); setStatusFilter('Open');
+    setSearch(''); setDateFilters({opened:null,updated:null,closed:null});
   };
 
   const TYPE_PILLS=[
@@ -453,18 +576,20 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     color:active?'#fff':T.text2,fontWeight:active?'600':'400',
   });
 
-  const renderTh=(c,label)=>(
-    <th key={c} style={css.th} onClick={()=>toggleSort(c)}>
+  const renderTh=(c,label,extra={})=>(
+    <th key={c} style={{...css.th,...extra}} onClick={()=>toggleSort(c)}>
       {label}{sortCol===c?<span style={{marginLeft:'3px'}}>{sortDir==='asc'?'↑':'↓'}</span>:<span style={{marginLeft:'3px',color:T.bg3}}>↕</span>}
     </th>
   );
 
   const renderRow=(task,i)=>{
-    const user=users.find(u=>u.id===task.assigned_to);
-    const firstName=user?.full_name?.split(' ')[0]||'';
     const prefixed=formatTaskNum(task.record_type,task.task_num);
     const href=`/tasks/${prefixed}`;
     const rowBg=i%2===0?'transparent':T.bg0;
+    const fuOverdue=isFuOverdue(task.follow_up_date,task);
+    const fuDisplay=task.follow_up_date?fmtNumDate(task.follow_up_date):'';
+    const vendorName=vendors.find(v=>v.id===task.vendor_id)?.company_dba||'';
+    const tenantName=tenants.find(t=>t.id===task.tenant_id)?.tenant_dba||'';
     const openDetail=e=>{
       if(e.ctrlKey||e.metaKey){window.open(href,'_blank');}
       else{sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);onSelect(task);}
@@ -478,8 +603,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         <td style={{...css.td,width:'32px',textAlign:'center',overflow:'visible',padding:'4px'}}>
           <TaskTypeIcon recordType={task.record_type} size={14}/>
         </td>
-        <td style={{...css.td,fontSize:F.xs,color:T.text2}}>
-          <a href={href} onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();openDetail(e);}}} style={{color:'inherit',textDecoration:'none'}}>
+        <td style={{...css.td,fontSize:F.xs,color:T.text2,minWidth:'52px'}}>
+          <a href={href} onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();openDetail(e);}}} style={{color:T.text2,textDecoration:'none'}}>
             {prefixed}
           </a>
         </td>
@@ -488,18 +613,33 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             {task.title||''}
           </a>
         </td>
-        <td style={{...css.td,fontSize:F.xs}}>
-          {task.prop_code&&<span style={{background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{task.prop_code}</span>}
+        <td style={{...css.td,overflow:'visible',color:fuOverdue?T.warn:T.text2}}>
+          {fuDisplay?<span style={{fontWeight:fuOverdue?'600':'400'}}>{fuOverdue&&'⚠ '}{fuDisplay}</span>:''}
         </td>
+        <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{task.prop_code||''}</td>
         <td style={css.td}>
           <span style={{display:'flex',alignItems:'center'}}>
             <PriorityDot priority={task.priority||'???'}/>{task.priority||'???'}
           </span>
         </td>
-        <td style={{...css.td,fontSize:F.xs,color:T.text1}}>{firstName}</td>
+        <td style={{...css.td,overflow:'visible'}}>
+          {task.stage&&<span style={css.badge(T.purple,'#2a1f3a')}>{task.stage}</span>}
+        </td>
         <td style={{...css.td,overflow:'visible'}}><StatusBadge status={task.status||'Open'}/></td>
+        <td style={{...css.td,fontSize:F.xs,color:T.text1}} title={vendorName}>{vendorName}</td>
+        <td style={{...css.td,fontSize:F.xs,color:T.text1}} title={tenantName}>{tenantName}</td>
+        {showUpdated&&(
+          <td style={{...css.td,color:T.text2,fontSize:F.xs}}>
+            {task.updated_at?fmtNumDate(task.updated_at):''}
+          </td>
+        )}
+        {showClosed&&(
+          <td style={{...css.td,color:task.close_date?T.success:T.text3,fontSize:F.xs}}>
+            {task.close_date?fmtNumDate(task.close_date):''}
+          </td>
+        )}
         <td style={{...css.td,color:T.text2,fontSize:F.xs}}>
-          {task.updated_at?fmtNumDate(task.updated_at):task.created_at?fmtNumDate(task.created_at):''}
+          {task.created_at?fmtNumDate(task.created_at):''}
         </td>
       </tr>
     );
@@ -509,13 +649,18 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
       <div style={{padding:'7px 14px 6px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+        {/* Title + count + search */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
           <ClipboardText size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Tasks</span>
-          <span style={{fontSize:F.xs,color:T.text3}}>{tasks.length.toLocaleString()} shown</span>
-          <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'6px'}}>
+          <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
+          <div style={{marginLeft:'auto',position:'relative',display:'flex',alignItems:'center',flexShrink:0}}>
+            {search&&(
+              <button onClick={()=>setSearch('')}
+                style={{position:'absolute',left:'7px',background:'transparent',border:'none',cursor:'pointer',color:T.text2,fontSize:'14px',lineHeight:1,padding:0,zIndex:1}}>×</button>
+            )}
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…"
-              style={{width:'160px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'4px 10px',color:T.text0,fontSize:F.xs,outline:'none'}}/>
+              style={{width:'160px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:`4px 10px 4px ${search?'26px':'10px'}`,color:T.text0,fontSize:F.xs,outline:'none'}}/>
           </div>
         </div>
         {/* Type pills */}
@@ -536,21 +681,41 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             );
           })}
         </div>
-        {/* Status pills */}
-        <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'5px'}}>
-          {['Open','In Progress','On Hold','Closed','All'].map(s=>{
-            const active=statusFilter===s;
-            return (
-              <button key={s} onClick={()=>setStatusFilter(s)}
-                style={{padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`0.5px solid ${active?T.accent:T.border}`,background:active?T.bg3:'transparent',color:active?T.text0:T.text2,transition:'background 0.15s ease'}}
-                onMouseEnter={e=>{if(!active)e.currentTarget.style.background=T.bg2;}}
-                onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
-                {s}
-              </button>
-            );
-          })}
+        {/* Status | More... | Clear */}
+        <div style={{display:'flex',gap:'6px',alignItems:'center',marginBottom:'5px'}}>
+          <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+            {['Open','In Progress','On Hold','Closed','All'].map(s=>{
+              const active=statusFilter===s;
+              return (
+                <button key={s} onClick={()=>setStatusFilter(s)}
+                  style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,background:active?T.bg3:'transparent',color:active?T.text0:T.text2,fontWeight:active?'600':'400',display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
+                  {s}
+                  {active&&!loading&&<span style={{color:T.text3,fontSize:'10px'}}>·{tasks.length}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{position:'relative',flexShrink:0}} ref={moreAnchorRef}>
+            <button onClick={()=>setMoreOpen(o=>!o)}
+              style={{padding:'3px 9px',borderRadius:'5px',cursor:'pointer',fontSize:F.xs,
+                border:`0.5px solid ${hasActiveDateFilter?T.warn:T.border}`,
+                background:moreOpen?T.bg3:'transparent',color:hasActiveDateFilter?T.warn:T.text1,
+                display:'flex',alignItems:'center',gap:'5px'}}>
+              More…
+              {hasActiveDateFilter&&<span style={{width:'5px',height:'5px',borderRadius:'50%',background:T.warn,flexShrink:0,display:'inline-block'}}/>}
+            </button>
+            <MorePopover open={moreOpen} onClose={()=>setMoreOpen(false)} anchorRef={moreAnchorRef}
+              dateFilters={dateFilters} setDateFilters={setDateFilters}/>
+          </div>
+          <button onClick={clearFilters}
+            style={{padding:'3px 9px',borderRadius:'5px',cursor:'pointer',fontSize:F.xs,
+              border:`0.5px solid ${hasActiveFilters?T.warn:T.border}`,background:'transparent',
+              color:hasActiveFilters?T.warn:T.text3,display:'flex',alignItems:'center',gap:'3px',
+              transition:'all 0.15s',visibility:hasActiveFilters?'visible':'hidden'}}>
+            <span style={{fontSize:'12px'}}>×</span> Clear
+          </button>
         </div>
-        {/* Property filter */}
+        {/* Property filter pills */}
         {!filterPropCode&&propCodes.length>0&&(
           <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',paddingBottom:'2px'}}>
             <button onClick={()=>setPropFilter('')} style={propBtn(!propFilter)}>All Props</button>
@@ -569,37 +734,62 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               <col style={{width:'32px'}}/>
-              <col style={{width:'72px'}}/>
+              <col style={{width:'68px',minWidth:'68px'}}/>
               <col/>
-              <col style={{width:'60px'}}/>
-              <col style={{width:'80px'}}/>
-              <col style={{width:'78px'}}/>
-              <col style={{width:'82px'}}/>
-              <col style={{width:'82px'}}/>
+              <col style={{width:'90px',minWidth:'86px'}}/>
+              <col style={{width:'58px',minWidth:'58px'}}/>
+              <col style={{width:'88px',minWidth:'80px'}}/>
+              <col style={{width:'120px',minWidth:'80px'}}/>
+              <col style={{width:'80px',minWidth:'72px'}}/>
+              <col style={{width:'100px',minWidth:'80px'}}/>
+              <col style={{width:'90px',minWidth:'80px'}}/>
+              {showUpdated&&<col style={{width:'82px',minWidth:'76px'}}/>}
+              {showClosed &&<col style={{width:'82px',minWidth:'76px'}}/>}
+              <col style={{width:'82px',minWidth:'76px'}}/>
             </colgroup>
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
-                <th style={{...css.th,width:'32px',cursor:'default'}}></th>
+                <th style={{...css.th,cursor:'default'}}/>
                 {renderTh('task_num','#')}
                 {renderTh('title','Title')}
+                {renderTh('follow_up_date','FU Date')}
                 {renderTh('prop_code','Prop')}
                 {renderTh('priority','Priority')}
-                {renderTh('assigned_to','Assigned')}
+                {renderTh('stage','Stage')}
                 <th style={css.th}>Status</th>
-                {renderTh('updated_at','Updated')}
+                {renderTh('vendor_id','Vendor')}
+                {renderTh('tenant_id','Tenant')}
+                {showUpdated&&renderTh('updated_at','Updated')}
+                {showClosed &&renderTh('close_date','Closed')}
+                {renderTh('created_at','Opened')}
               </tr>
             </thead>
             <tbody>
-              {sorted.length===0&&(
-                <tr><td colSpan={8} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No tasks match filters</td></tr>
+              {filtered.length===0&&(
+                <tr><td colSpan={NCOLS} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No tasks match filters</td></tr>
               )}
-              {sorted.map((t,i)=>renderRow(t,i))}
+              {grouped ? (
+                grouped.map(group=>(
+                  <React.Fragment key={group.prop_code}>
+                    <tr style={{background:T.bg3,position:'sticky',top:'29px',zIndex:1}}>
+                      <td colSpan={NCOLS} style={{...css.td,fontWeight:'600',color:T.accent,padding:'4px 10px',fontSize:F.xs,textTransform:'uppercase',letterSpacing:'0.07em'}}>
+                        {group.prop_code} <span style={{color:T.text3,fontWeight:'400'}}>({group.rows.length})</span>
+                      </td>
+                    </tr>
+                    {group.rows.map((t,i)=>renderRow(t,i))}
+                  </React.Fragment>
+                ))
+              ) : (
+                filtered.map((t,i)=>renderRow(t,i))
+              )}
             </tbody>
           </table>
+          {/* Mobile cards */}
           <div className="crm-mobile-cards">
-            {sorted.length===0&&<div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No tasks match filters</div>}
-            {sorted.map((t,i)=>{
+            {filtered.length===0&&<div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No tasks match filters</div>}
+            {filtered.map((t,i)=>{
               const prefixed=formatTaskNum(t.record_type,t.task_num);
+              const fuOverdue=isFuOverdue(t.follow_up_date,t);
               const rowBg=i%2===0?'transparent':T.bg0;
               return (
                 <div key={t.id}
@@ -616,6 +806,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
                     {t.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{t.prop_code}</span>}
                     <StatusBadge status={t.status||'Open'}/>
                     {t.priority&&<span style={{display:'flex',alignItems:'center',gap:'3px',fontSize:F.xs,color:T.text2}}><PriorityDot priority={t.priority}/>{t.priority}</span>}
+                    {fuOverdue&&t.follow_up_date&&<span style={{fontSize:F.xs,color:T.warn,fontWeight:'600'}}>⚠ {fmtNumDate(t.follow_up_date)}</span>}
                   </div>
                 </div>
               );
