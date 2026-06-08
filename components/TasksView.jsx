@@ -4,7 +4,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Wrench, Warning, NotePencil, FolderOpen, Buildings, House, ClipboardText, ChatCircle
+  Wrench, Warning, NotePencil, FolderOpen, Buildings, House, ClipboardText, ChatCircle,
+  CaretLeft, CaretRight,
 } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 
@@ -235,7 +236,7 @@ const FieldRow = ({ label, children, topAlign=false, hoverable=true }) => (
 );
 
 // ── InlineBlurField ───────────────────────────────────────────────────────────
-const InlineBlurField = ({ value, onSave, type='text', highlight=false, readOnly=false, moneyFormat=false }) => {
+const InlineBlurField = ({ value, onSave, type='text', highlight=false, readOnly=false, moneyFormat=false, bigTitle=false }) => {
   const [editing,setEditing] = useState(false);
   const [val,setVal]         = useState(value??'');
   const [saving,setSaving]   = useState(false);
@@ -274,12 +275,12 @@ const InlineBlurField = ({ value, onSave, type='text', highlight=false, readOnly
         if(e.key==='Escape'){setVal(value??'');setEditing(false);}
         if(e.key==='Enter') commit();
       }}
-      style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',
+      style={{width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:bigTitle?'18px':F.base,fontWeight:bigTitle?'600':'normal',outline:'none',
         ...(type==='date'?{appearance:'none',WebkitAppearance:'none'}:{})}}
     />
   ) : (
     <div onClick={()=>setEditing(true)} title="Click to edit"
-      style={{fontSize:F.base,color:highlight?'#E8630A':(displayVal?T.text0:T.text3),fontWeight:highlight?'700':'normal',cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
+      style={{fontSize:bigTitle?'18px':F.base,color:highlight?'#E8630A':(displayVal?T.text0:T.text3),fontWeight:bigTitle?'600':(highlight?'700':'normal'),cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
       onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
       onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
       {displayVal||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
@@ -592,7 +593,13 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     const tenantName=tenants.find(t=>t.id===task.tenant_id)?.tenant_dba||'';
     const openDetail=e=>{
       if(e.ctrlKey||e.metaKey){window.open(href,'_blank');}
-      else{sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);onSelect(task);}
+      else{
+        sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);
+        const navL=filtered.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
+        sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
+        sessionStorage.setItem('tasksNavIndex',String(filtered.findIndex(t=>t.id===task.id)));
+        onSelect(task);
+      }
     };
     return (
       <tr key={task.id}
@@ -795,7 +802,13 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
               return (
                 <div key={t.id}
                   style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-                  onClick={()=>{sessionStorage.setItem('tasksBackUrl',window.location.pathname);onSelect(t);}}
+                  onClick={()=>{
+                    sessionStorage.setItem('tasksBackUrl',window.location.pathname);
+                    const navL=filtered.map(x=>({id:x.id,task_num:x.task_num,record_type:x.record_type}));
+                    sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
+                    sessionStorage.setItem('tasksNavIndex',String(i));
+                    onSelect(t);
+                  }}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px'}}>
@@ -834,6 +847,9 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [rightCollapsed,setRightCollapsed] = useState(isMobile);
   const [rightWidth,setRightWidth] = useState(300);
   const [copied,setCopied]       = useState(false);
+  const [navList,setNavList]     = useState(null);
+  const [navIdx,setNavIdx]       = useState(-1);
+  const [navLoading,setNavLoading] = useState(false);
   const resizingRight = useRef(false);
 
   useEffect(()=>{
@@ -854,6 +870,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('vendors','select=id,company_dba,podio_id&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba,podio_id&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+  },[]);
+
+  useEffect(()=>{
+    try{
+      const list=JSON.parse(sessionStorage.getItem('tasksNavList')||'null');
+      const idx=parseInt(sessionStorage.getItem('tasksNavIndex')||'-1',10);
+      if(list&&Array.isArray(list)&&idx>=0){setNavList(list);setNavIdx(idx);}
+    }catch{}
   },[]);
 
   useEffect(()=>{
@@ -921,6 +945,24 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     navigator.clipboard.writeText(url).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);});
   };
 
+  const goNav=async dir=>{
+    if(!navList||navLoading)return;
+    const newIdx=navIdx+dir;
+    if(newIdx<0||newIdx>=navList.length)return;
+    setNavLoading(true);
+    try{
+      const entry=navList[newIdx];
+      const rows=await sbFetch('tasks',`task_num=eq.${entry.task_num}&record_type=eq.${entry.record_type}&select=*&limit=1`);
+      if(!rows.length)return;
+      const newTask=rows[0];
+      setData(newTask);
+      setNavIdx(newIdx);
+      sessionStorage.setItem('tasksNavIndex',String(newIdx));
+      window.history.replaceState({taskId:newTask.id},'',`/tasks/${formatTaskNum(newTask.record_type,newTask.task_num)}`);
+    }catch{}
+    finally{setNavLoading(false);}
+  };
+
   if(loading) return <div style={{padding:'40px',textAlign:'center',color:T.text3}}>Loading…</div>;
   if(notFound) return <div style={{padding:'40px',textAlign:'center',color:T.danger}}>Task not found.</div>;
   if(!data) return null;
@@ -957,10 +999,23 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             {copied?'✓ Copied':'⧉ Copy Link'}
           </button>
           {data.podio_id&&<span style={{fontSize:F.xs,color:T.text3}}>Podio ref: {data.podio_id}</span>}
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
-          <TaskTypeIcon recordType={data.record_type} size={28}/>
-          <div style={{fontSize:F.lg,fontWeight:'700',color:'#E8630A',lineHeight:'1.3'}}>{data.title||'Untitled'}</div>
+          {navList&&navList.length>1&&(
+            <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'3px',flexShrink:0}}>
+              <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx<=0?'not-allowed':'pointer',opacity:navIdx<=0?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretLeft size={18} weight="bold"/>
+              </button>
+              <span style={{fontSize:F.xs,color:T.text3,padding:'0 6px',whiteSpace:'nowrap'}}>{navIdx+1} of {navList.length}</span>
+              <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx>=navList.length-1?'not-allowed':'pointer',opacity:navIdx>=navList.length-1?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretRight size={18} weight="bold"/>
+              </button>
+            </div>
+          )}
         </div>
         {/* Type conversion pills */}
         <div className="crm-task-type-pills" style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
@@ -987,6 +1042,17 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
         <div style={{flex:1,overflowY:'auto',minWidth:0}}>
           {/* Base fields */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
+            {/* Title — icon + large editable field */}
+            <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,minHeight:'52px'}}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.04)'}
+              onMouseLeave={e=>e.currentTarget.style.background=''}>
+              <div style={{display:'flex',alignItems:'center',flexShrink:0}}>
+                <TaskTypeIcon recordType={data.record_type} size={22}/>
+              </div>
+              <div style={{flex:1}}>
+                <InlineBlurField value={data.title} onSave={v=>save('title',v)} bigTitle/>
+              </div>
+            </div>
             <FieldRow label="Property" topAlign>
               <InlineSelect value={data.prop_code} options={activeProps.map(p=>({value:p.prop_code,label:`${p.prop_code} — ${p.property_name}`}))} onSave={v=>save('prop_code',v)}/>
               {propInfo&&(
