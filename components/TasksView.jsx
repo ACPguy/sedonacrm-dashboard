@@ -7,6 +7,10 @@ import {
   Wrench, Warning, NotePencil, FolderOpen, Buildings, House, ClipboardText, ChatCircle,
   CaretLeft, CaretRight,
 } from '@phosphor-icons/react';
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  useDraggable, useDroppable,
+} from '@dnd-kit/core';
 import RichTextEditor from './RichTextEditor';
 
 const SUPABASE_URL      = 'https://edxcvyleielzevpappui.supabase.co';
@@ -280,7 +284,7 @@ const InlineBlurField = ({ value, onSave, type='text', highlight=false, readOnly
     />
   ) : (
     <div onClick={()=>setEditing(true)} title="Click to edit"
-      style={{fontSize:bigTitle?'18px':F.base,color:highlight?'#E8630A':(displayVal?T.text0:T.text3),fontWeight:bigTitle?'600':(highlight?'700':'normal'),cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
+      style={{fontSize:bigTitle?'18px':F.base,color:bigTitle?'#E8630A':(highlight?'#E8630A':(displayVal?T.text0:T.text3)),fontWeight:bigTitle?'600':(highlight?'700':'normal'),cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
       onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
       onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
       {displayVal||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
@@ -440,6 +444,113 @@ const MorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilters }) 
   );
 };
 
+// ── Kanban view (priority columns) ───────────────────────────────────────────
+const TaskKanbanCardContent = ({ task, vendors, tenants }) => {
+  const vendor = vendors.find(v=>v.id===task.vendor_id);
+  const shortVendor = vendor?.company_dba ? vendor.company_dba.split(' ').slice(0,2).join(' ') : null;
+  const fuDate = task.follow_up_date ? fmtDate(task.follow_up_date) : null;
+  const fuOverdue = isFuOverdue(task.follow_up_date, task);
+  const prefixed = formatTaskNum(task.record_type, task.task_num);
+  return (
+    <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'9px 10px',userSelect:'none'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'4px',marginBottom:'4px'}}>
+        <TaskTypeIcon recordType={task.record_type} size={12}/>
+        <span style={{fontSize:F.xs,color:T.text2}}>{prefixed}</span>
+      </div>
+      <div style={{fontSize:F.sm,color:T.text0,fontWeight:'500',lineHeight:'1.35',marginBottom:'5px'}}>
+        {task.title||'Untitled'}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:'4px',flexWrap:'wrap',marginBottom:'4px'}}>
+        {task.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>{task.prop_code}</span>}
+        {task.stage&&<span style={{fontSize:F.xs,background:'#2a1f3a',color:T.purple,padding:'1px 6px',borderRadius:'3px',fontWeight:'500'}}>{task.stage}</span>}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
+        {shortVendor&&<span style={{fontSize:F.xs,color:T.text2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'90px'}}>{shortVendor}</span>}
+        {fuDate&&<span style={{fontSize:F.xs,color:fuOverdue?T.warn:T.text2,fontWeight:fuOverdue?'600':'400'}}>{fuOverdue&&'⚠ '}{fuDate}</span>}
+      </div>
+    </div>
+  );
+};
+
+const TaskKanbanCard = ({ task, vendors, tenants, onCardClick }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id });
+  const style = {
+    transform: transform?`translate(${transform.x}px,${transform.y}px)`:undefined,
+    opacity: isDragging?0.4:1,
+    cursor: isDragging?'grabbing':'grab',
+    marginBottom:'7px',
+    touchAction:'none',
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}
+      onClick={e=>{e.stopPropagation();if(!isDragging)onCardClick(task);}}>
+      <TaskKanbanCardContent task={task} vendors={vendors} tenants={tenants}/>
+    </div>
+  );
+};
+
+const TaskKanbanColumn = ({ priority, tasks, vendors, tenants, onCardClick }) => {
+  const { setNodeRef, isOver } = useDroppable({ id: priority });
+  const priColor = { '???':T.text2, Urgent:T.danger, High:T.warn, Medium:T.success, Low:T.accent };
+  const color = priColor[priority]||T.text2;
+  const colTasks = [...tasks].sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
+  return (
+    <div style={{flex:'1 1 0',minWidth:'180px',maxWidth:'280px',display:'flex',flexDirection:'column'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'6px',padding:'6px 8px 8px',borderBottom:`0.5px solid ${T.border}`,marginBottom:'8px',flexShrink:0}}>
+        <PriorityDot priority={priority}/>
+        <span style={{fontSize:F.xs,fontWeight:'700',color,textTransform:'uppercase',letterSpacing:'0.05em'}}>{priority}</span>
+        <span style={{fontSize:F.xs,color:T.text3,marginLeft:'auto'}}>({tasks.length})</span>
+      </div>
+      <div ref={setNodeRef} style={{flex:1,overflowY:'auto',padding:'0 2px',minHeight:'80px',borderRadius:'4px',
+        background:isOver?'rgba(110,159,216,0.07)':'transparent',transition:'background 0.15s'}}>
+        {colTasks.map(t=>(
+          <TaskKanbanCard key={t.id} task={t} vendors={vendors} tenants={tenants} onCardClick={onCardClick}/>
+        ))}
+        {tasks.length===0&&<div style={{color:T.text3,fontSize:F.xs,textAlign:'center',padding:'16px 0',fontStyle:'italic'}}>empty</div>}
+      </div>
+    </div>
+  );
+};
+
+const TaskKanbanView = ({ tasks, vendors, tenants, onCardClick, onPriorityChange }) => {
+  const [activeTask,setActiveTask] = useState(null);
+  const sensors = useSensors(useSensor(PointerSensor,{activationConstraint:{distance:6}}));
+  const PRIORITY_OPTIONS_K = ['???','Urgent','High','Medium','Low'];
+  const byPriority = useMemo(()=>
+    PRIORITY_OPTIONS_K.reduce((acc,p)=>{
+      acc[p]=tasks.filter(t=>(t.priority||'???')===p);
+      return acc;
+    },{})
+  ,[tasks]);
+  const handleDragStart=({active})=>setActiveTask(tasks.find(t=>t.id===active.id)||null);
+  const handleDragEnd=({active,over})=>{
+    setActiveTask(null);
+    if(!over)return;
+    const newPriority=over.id;
+    const task=tasks.find(t=>t.id===active.id);
+    if(!task)return;
+    const cur=task.priority||'???';
+    if(cur===newPriority)return;
+    onPriorityChange(task.id,newPriority,cur);
+  };
+  return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div style={{display:'flex',gap:'10px',height:'100%',overflow:'hidden',padding:'12px 14px'}}>
+        {PRIORITY_OPTIONS_K.map(p=>(
+          <TaskKanbanColumn key={p} priority={p} tasks={byPriority[p]||[]} vendors={vendors} tenants={tenants} onCardClick={onCardClick}/>
+        ))}
+      </div>
+      <DragOverlay dropAnimation={null}>
+        {activeTask?(
+          <div style={{width:'220px',opacity:0.9,boxShadow:'0 8px 24px rgba(0,0,0,0.5)',cursor:'grabbing'}}>
+            <TaskKanbanCardContent task={activeTask} vendors={vendors} tenants={tenants}/>
+          </div>
+        ):null}
+      </DragOverlay>
+    </DndContext>
+  );
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TasksList
 // ─────────────────────────────────────────────────────────────────────────────
@@ -459,6 +570,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const [typeCounts,setTypeCounts]   = useState({work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0});
   const [dateFilters,setDateFilters] = useState({opened:null,updated:null,closed:null});
   const [moreOpen,setMoreOpen]       = useState(false);
+  const [priorityFilter,setPriorityFilter] = useState('All');
+  const [viewMode,setViewMode]       = useState('table');
   const moreAnchorRef                = useRef(null);
 
   const showClosed  = statusFilter === 'Closed';
@@ -475,7 +588,10 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     else if (statusFilter==='On Hold') shared.push('status=eq.On%20Hold');
     const pc=filterPropCode||propFilter;
     if (pc) shared.push(`prop_code=eq.${encodeURIComponent(pc)}`);
-    if (search) shared.push(`title=ilike.*${encodeURIComponent(search)}*`);
+    if (search) {
+      if (/^\d+$/.test(search)) shared.push(`task_num=eq.${parseInt(search,10)}`);
+      else shared.push(`title=ilike.*${encodeURIComponent(search)}*`);
+    }
 
     const mainParts=[...shared];
     if (typeFilter!=='All') mainParts.push(`record_type=eq.${typeFilter}`);
@@ -523,13 +639,24 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     return sortDir==='asc'?cmp:-cmp;
   }),[tasks,sortCol,sortDir]);
 
-  // Client-side date filter
-  const filtered = useMemo(()=>sorted.filter(t=>{
+  // Client-side date filter (no priority)
+  const filteredNoPriority = useMemo(()=>sorted.filter(t=>{
     if (dateFilters.opened  && !isInRange(t.created_at,   dateFilters.opened))  return false;
     if (dateFilters.updated && !isInRange(t.updated_at,   dateFilters.updated)) return false;
     if (dateFilters.closed  && !isInRange(t.close_date,   dateFilters.closed))  return false;
     return true;
   }),[sorted,dateFilters]);
+
+  const filtered = useMemo(()=>filteredNoPriority.filter(t=>{
+    if (priorityFilter!=='All' && (t.priority||'???')!==priorityFilter) return false;
+    return true;
+  }),[filteredNoPriority,priorityFilter]);
+
+  const priorityCounts = useMemo(()=>{
+    const c={'???':0,Urgent:0,High:0,Medium:0,Low:0};
+    filteredNoPriority.forEach(t=>{const p=t.priority||'???';c[p]=(c[p]||0)+1;});
+    return c;
+  },[filteredNoPriority]);
 
   // Grouped by prop_code when no specific prop selected (All Props = default)
   const grouped = useMemo(()=>{
@@ -554,11 +681,25 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   };
 
   const hasActiveDateFilter = !!(dateFilters.opened||dateFilters.updated||dateFilters.closed);
-  const hasActiveFilters    = !!propFilter||statusFilter!=='Open'||search!==''||hasActiveDateFilter;
+  const hasActiveFilters    = !!propFilter||priorityFilter!=='All'||statusFilter!=='Open'||search!==''||hasActiveDateFilter;
 
   const clearFilters=()=>{
-    setPropFilter(''); setStatusFilter('Open');
+    setPropFilter(''); setStatusFilter('Open'); setPriorityFilter('All');
     setSearch(''); setDateFilters({opened:null,updated:null,closed:null});
+  };
+
+  const handlePriorityChange=async(taskId,newPriority,prevPriority)=>{
+    setTasks(prev=>prev.map(t=>t.id===taskId?{...t,priority:newPriority}:t));
+    try{ await sbPatch('tasks',taskId,{priority:newPriority}); }
+    catch{ setTasks(prev=>prev.map(t=>t.id===taskId?{...t,priority:prevPriority}:t)); }
+  };
+
+  const handleKanbanCardClick=task=>{
+    sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);
+    const navL=filtered.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
+    sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
+    sessionStorage.setItem('tasksNavIndex',String(filtered.findIndex(t=>t.id===task.id)));
+    onSelect(task);
   };
 
   const TYPE_PILLS=[
@@ -595,9 +736,10 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
       if(e.ctrlKey||e.metaKey){window.open(href,'_blank');}
       else{
         sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);
-        const navL=filtered.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
+        const visualList=grouped?grouped.flatMap(g=>g.rows):filtered;
+        const navL=visualList.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
         sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
-        sessionStorage.setItem('tasksNavIndex',String(filtered.findIndex(t=>t.id===task.id)));
+        sessionStorage.setItem('tasksNavIndex',String(visualList.findIndex(t=>t.id===task.id)));
         onSelect(task);
       }
     };
@@ -661,13 +803,25 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           <ClipboardText size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Tasks</span>
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
-          <div style={{marginLeft:'auto',position:'relative',display:'flex',alignItems:'center',flexShrink:0}}>
-            {search&&(
-              <button onClick={()=>setSearch('')}
-                style={{position:'absolute',left:'7px',background:'transparent',border:'none',cursor:'pointer',color:T.text2,fontSize:'14px',lineHeight:1,padding:0,zIndex:1}}>×</button>
-            )}
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…"
-              style={{width:'160px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:`4px 10px 4px ${search?'26px':'10px'}`,color:T.text0,fontSize:F.xs,outline:'none'}}/>
+          <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'8px',flexShrink:0}}>
+            <div style={{display:'flex',gap:'2px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'2px'}}>
+              {[{mode:'table',icon:'≡',title:'Table view'},{mode:'kanban',icon:'⊞',title:'Kanban view'}].map(({mode,icon,title})=>(
+                <button key={mode} onClick={()=>setViewMode(mode)} title={title}
+                  style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:'14px',lineHeight:1,
+                    background:viewMode===mode?T.bg3:'transparent',
+                    color:viewMode===mode?T.text0:T.text2,fontWeight:viewMode===mode?'600':'400'}}>
+                  {icon}
+                </button>
+              ))}
+            </div>
+            <div style={{position:'relative',display:'flex',alignItems:'center'}}>
+              {search&&(
+                <button onClick={()=>setSearch('')}
+                  style={{position:'absolute',left:'7px',background:'transparent',border:'none',cursor:'pointer',color:T.text2,fontSize:'14px',lineHeight:1,padding:0,zIndex:1}}>×</button>
+              )}
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…"
+                style={{width:'160px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:`4px 10px 4px ${search?'26px':'10px'}`,color:T.text0,fontSize:F.xs,outline:'none'}}/>
+            </div>
           </div>
         </div>
         {/* Property filter pills */}
@@ -732,12 +886,35 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             <span style={{fontSize:'12px'}}>×</span> Clear
           </button>
         </div>
+        {/* Priority filter pills */}
+        <div className="crm-tasks-status-strip" style={{display:'flex',gap:'6px',alignItems:'center',marginBottom:'4px'}}>
+          <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+            {['All','???','Urgent','High','Medium','Low'].map(p=>{
+              const cnt=p==='All'?null:priorityCounts[p]??0;
+              const active=priorityFilter===p;
+              return (
+                <button key={p} onClick={()=>setPriorityFilter(p)}
+                  style={{padding:'3px 6px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
+                    background:active?T.bg3:'transparent',color:active?T.text0:T.text2,
+                    fontWeight:active?'600':'400',display:'flex',alignItems:'center',gap:'2px',whiteSpace:'nowrap'}}>
+                  {p!=='All'&&<PriorityDot priority={p}/>}
+                  {p}{cnt!==null&&<span style={{color:active?T.text1:T.text3,fontSize:'10px'}}>·{cnt}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Body */}
       {loading&&<div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>Loading tasks…</div>}
       {error&&<div style={{padding:'32px',textAlign:'center',color:T.danger,fontSize:F.sm}}>Error: {error}</div>}
-      {!loading&&!error&&(
+      {!loading&&!error&&viewMode==='kanban'&&(
+        <div style={{flex:1,overflow:'hidden'}}>
+          <TaskKanbanView tasks={filtered} vendors={vendors} tenants={tenants} onCardClick={handleKanbanCardClick} onPriorityChange={handlePriorityChange}/>
+        </div>
+      )}
+      {!loading&&!error&&viewMode==='table'&&(
         <div style={{flex:1,overflowY:'auto'}}>
           <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
@@ -749,8 +926,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
               <col style={{width:'90px'}}/>
               <col style={{width:'110px'}}/>
               <col style={{width:'90px'}}/>
-              <col style={{width:'130px'}}/>
-              <col style={{width:'130px'}}/>
+              <col style={{width:'120px'}}/>
+              <col style={{width:'120px'}}/>
               {showUpdated&&<col style={{width:'100px'}}/>}
               {showClosed &&<col style={{width:'100px'}}/>}
               <col style={{width:'100px'}}/>
