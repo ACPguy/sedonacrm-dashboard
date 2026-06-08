@@ -9,7 +9,7 @@ import TenantsTable from './shared/TenantsTable';
 import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -2230,6 +2230,7 @@ export default function SedonaCRM() {
           <NavItem iconComp={<UserCircle size={18} weight="bold"/>} label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>handleNav('/contacts')} {...navProps}/>
           <NavItem iconComp={<Truck size={18} weight="bold"/>} label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>handleNav('/vendors')}  {...navProps}/>
           <NavItem iconComp={<Briefcase size={18} weight="bold"/>} label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>handleNav('/owners')}   {...navProps}/>
+          <NavItem iconComp={<Key size={18} weight="bold"/>} label="Key Safes"   href="/key-safes"          active={currentView==='key-safes'}   onClick={()=>handleNav('/key-safes')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
           <NavItem label="Pipeline" href="/?view=leasing"       active={currentView==='leasing'}       onClick={()=>navTo('leasing')}   {...navProps}/>
           <NavItem label="Leases"   href="/?view=leases"        active={currentView==='leases'}        onClick={()=>navTo('leases')}             {...navProps}/>

@@ -91,3 +91,19 @@ input[type="date"]::-moz-calendar-picker-indicator    { display: none; }
 @media (min-width: 640px) {
   .crm-mobile-cards { display: none !important; }
 }
+
+/* ── Tasks list — mobile filter reorder & scrollable strips ── */
+@media (max-width: 639px) {
+  .crm-tasks-header { display: flex !important; flex-direction: column; }
+  /* Prop pills: move to top (after title row) */
+  .crm-tasks-prop-strip   { order: 1; }
+  /* Type pills: second */
+  .crm-tasks-type-strip   { order: 2; flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .crm-tasks-type-strip::-webkit-scrollbar { display: none; }
+  /* Status strip: third */
+  .crm-tasks-status-strip { order: 3; flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .crm-tasks-status-strip::-webkit-scrollbar { display: none; }
+  /* Detail type pills — scrollable on mobile */
+  .crm-task-type-pills { flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .crm-task-type-pills::-webkit-scrollbar { display: none; }
+}

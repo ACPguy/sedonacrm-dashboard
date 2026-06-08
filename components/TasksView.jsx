@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Wrench, Warning, NotePencil, FolderOpen, Buildings, House, ClipboardText
+  Wrench, Warning, NotePencil, FolderOpen, Buildings, House, ClipboardText, ChatCircle
 } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 
@@ -648,7 +648,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
-      <div style={{padding:'7px 14px 6px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+      <div className="crm-tasks-header" style={{padding:'7px 14px 6px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
         {/* Title + count + search */}
         <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'5px'}}>
           <ClipboardText size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
@@ -663,8 +663,18 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
               style={{width:'160px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:`4px 10px 4px ${search?'26px':'10px'}`,color:T.text0,fontSize:F.xs,outline:'none'}}/>
           </div>
         </div>
+        {/* Property filter pills */}
+        {!filterPropCode&&propCodes.length>0&&(
+          <div className="crm-tasks-prop-strip" style={{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',paddingBottom:'4px',flexWrap:'nowrap'}}>
+            <button onClick={()=>setPropFilter('')} style={propBtn(!propFilter)}>All Props</button>
+            <button onClick={()=>setPropFilter(propFilter==='ACP'?'':'ACP')} style={propBtn(propFilter==='ACP')}>ACP</button>
+            {propCodes.map(pc=>(
+              <button key={pc} onClick={()=>setPropFilter(propFilter===pc?'':pc)} style={propBtn(propFilter===pc)}>{pc}</button>
+            ))}
+          </div>
+        )}
         {/* Type pills */}
-        <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'5px'}}>
+        <div className="crm-tasks-type-strip" style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'5px'}}>
           {TYPE_PILLS.map(({key,label})=>{
             const active=typeFilter===key;
             const color=TYPE_COLOR[key]||T.accent;
@@ -672,7 +682,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             const cnt=key==='All'?allTotal:(typeCounts[key]??0);
             return (
               <button key={key} onClick={()=>setTypeFilter(key)}
-                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${key==='All'?T.accent:color}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':(key==='All'?T.accent:color),transition:'background 0.15s ease'}}
+                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${key==='All'?T.accent:color}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':(key==='All'?T.accent:color),transition:'background 0.15s ease',flexShrink:0}}
                 onMouseEnter={e=>{if(!active)e.currentTarget.style.background=key==='All'?'rgba(110,159,216,0.20)':`${color}33`;}}
                 onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
                 {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
@@ -682,7 +692,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           })}
         </div>
         {/* Status | More... | Clear */}
-        <div style={{display:'flex',gap:'6px',alignItems:'center',marginBottom:'5px'}}>
+        <div className="crm-tasks-status-strip" style={{display:'flex',gap:'6px',alignItems:'center',marginBottom:'5px'}}>
           <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
             {['Open','In Progress','On Hold','Closed','All'].map(s=>{
               const active=statusFilter===s;
@@ -715,16 +725,6 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             <span style={{fontSize:'12px'}}>×</span> Clear
           </button>
         </div>
-        {/* Property filter pills */}
-        {!filterPropCode&&propCodes.length>0&&(
-          <div style={{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',paddingBottom:'4px',flexWrap:'nowrap'}}>
-            <button onClick={()=>setPropFilter('')} style={propBtn(!propFilter)}>All Props</button>
-            <button onClick={()=>setPropFilter(propFilter==='ACP'?'':'ACP')} style={propBtn(propFilter==='ACP')}>ACP</button>
-            {propCodes.map(pc=>(
-              <button key={pc} onClick={()=>setPropFilter(propFilter===pc?'':pc)} style={propBtn(propFilter===pc)}>{pc}</button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Body */}
@@ -963,7 +963,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           <div style={{fontSize:F.lg,fontWeight:'700',color:'#E8630A',lineHeight:'1.3'}}>{data.title||'Untitled'}</div>
         </div>
         {/* Type conversion pills */}
-        <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
+        <div className="crm-task-type-pills" style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
           <span style={{fontSize:F.xs,color:T.text3,fontWeight:'600'}}>Type:</span>
           {Object.keys(TYPE_PREFIX).map(key=>{
             const active=data.record_type===key;
@@ -987,9 +987,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
         <div style={{flex:1,overflowY:'auto',minWidth:0}}>
           {/* Base fields */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
-            <FieldRow label="Title">
-              <InlineBlurField value={data.title} onSave={v=>save('title',v)} highlight/>
-            </FieldRow>
             <FieldRow label="Property" topAlign>
               <InlineSelect value={data.prop_code} options={activeProps.map(p=>({value:p.prop_code,label:`${p.prop_code} — ${p.property_name}`}))} onSave={v=>save('prop_code',v)}/>
               {propInfo&&(
@@ -1135,8 +1132,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
       {/* Mobile: floating button when panel is closed */}
       {isMobile && rightCollapsed && (
         <button onClick={()=>setRightCollapsed(false)}
-          style={{position:'fixed',bottom:'16px',right:'16px',zIndex:50,background:'#E8630A',color:'#fff',border:'none',borderRadius:'24px',padding:'10px 18px',fontSize:'13px',fontWeight:'600',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.4)'}}>
-          Activity ›
+          style={{position:'fixed',bottom:'16px',right:'16px',zIndex:50,background:'#E8630A',color:'#fff',border:'none',borderRadius:'50%',width:'48px',height:'48px',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.4)'}}>
+          <ChatCircle size={22} weight="bold" color="white"/>
         </button>
       )}
     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -96,6 +96,7 @@ export default function AppShell({ children, activeView }) {
       <NavBtn label="Contacts"    href="/contacts"           active={is('contacts')}    onClick={()=>go('/contacts')}          collapsed={collapsed} icon={<UserCircle size={18} weight="bold"/>}/>
       <NavBtn label="Vendors"     href="/vendors"            active={is('vendors')}     onClick={()=>go('/vendors')}           collapsed={collapsed} icon={<Truck size={18} weight="bold"/>}/>
       <NavBtn label="Owners"      href="/owners"             active={is('owners')}      onClick={()=>go('/owners')}            collapsed={collapsed} icon={<Briefcase size={18} weight="bold"/>}/>
+      <NavBtn label="Key Safes"   href="/key-safes"          active={is('key-safes')}   onClick={()=>go('/key-safes')}         collapsed={collapsed} icon={<Key size={18} weight="bold"/>}/>
       <SectionLabel label="Leasing" collapsed={collapsed}/>
       <NavBtn label="Pipeline"      href="/?view=leasing"       active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={collapsed}/>
       <NavBtn label="Leases"        href="/?view=leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={collapsed}/>
