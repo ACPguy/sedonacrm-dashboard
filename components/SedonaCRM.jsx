@@ -2149,6 +2149,10 @@ export default function SedonaCRM() {
   const [expandedMenu,setExpandedMenu] = useState(null);
   const [resetKey,setResetKey] = useState(0);
   const [activeProps,setActiveProps] = useState([]);
+  const [showLegacy,setShowLegacy] = useState(()=>{
+    if(typeof window==='undefined')return false;
+    return localStorage.getItem('showLegacyNav')==='true';
+  });
   const resizingSidebar = useRef(false);
 
   useEffect(() => {
@@ -2221,16 +2225,14 @@ export default function SedonaCRM() {
         <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
           <NavItem iconComp={<HouseLine size={18} weight="bold"/>} label="Home" href="/?view=morning-briefing" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Operations</div>}
-          <NavItem iconComp={<BuildingOffice size={18} weight="bold"/>} label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}  {...navProps}/>
-          <NavItem iconComp={<Storefront size={18} weight="bold"/>} label="Tenants"     href="/tenants"            active={currentView==='tenants'}     onClick={()=>handleNav('/tenants')} {...navProps}/>
-          <NavItem iconComp={<Cube size={18} weight="bold"/>} label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>handleNav('/suites')} {...navProps}/>
-          <NavItem iconComp={<Wrench size={18} weight="bold"/>} label="Work Orders" href="/work-orders"        active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
-          <NavItem iconComp={<CheckFat size={18} weight="bold"/>} label="Issues"      href="/issues"             active={currentView==='issues'}      onClick={()=>handleNav('/issues')}   {...navProps}/>
-          <NavItem iconComp={<ClipboardText size={18} weight="bold"/>} label="Tasks"       href="/tasks"              active={currentView==='tasks'}       onClick={()=>handleNav('/tasks')}    {...navProps}/>
-          <NavItem iconComp={<UserCircle size={18} weight="bold"/>} label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>handleNav('/contacts')} {...navProps}/>
-          <NavItem iconComp={<Truck size={18} weight="bold"/>} label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>handleNav('/vendors')}  {...navProps}/>
-          <NavItem iconComp={<Briefcase size={18} weight="bold"/>} label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>handleNav('/owners')}   {...navProps}/>
-          <NavItem iconComp={<Key size={18} weight="bold"/>} label="Key Safes"   href="/key-safes"          active={currentView==='key-safes'}   onClick={()=>handleNav('/key-safes')} {...navProps}/>
+          <NavItem iconComp={<BuildingOffice size={18} weight="bold"/>} label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}        {...navProps}/>
+          <NavItem iconComp={<ClipboardText size={18} weight="bold"/>} label="Tasks"       href="/tasks"              active={currentView==='tasks'}       onClick={()=>handleNav('/tasks')}        {...navProps}/>
+          <NavItem iconComp={<Storefront size={18} weight="bold"/>} label="Tenants"     href="/tenants"            active={currentView==='tenants'}     onClick={()=>handleNav('/tenants')}      {...navProps}/>
+          <NavItem iconComp={<Truck size={18} weight="bold"/>} label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>handleNav('/vendors')}      {...navProps}/>
+          <NavItem iconComp={<Briefcase size={18} weight="bold"/>} label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>handleNav('/owners')}       {...navProps}/>
+          <NavItem iconComp={<UserCircle size={18} weight="bold"/>} label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>handleNav('/contacts')}     {...navProps}/>
+          <NavItem iconComp={<Cube size={18} weight="bold"/>} label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>handleNav('/suites')}       {...navProps}/>
+          <NavItem iconComp={<Key size={18} weight="bold"/>} label="Key Safes"   href="/key-safes"          active={currentView==='key-safes'}   onClick={()=>handleNav('/key-safes')}    {...navProps}/>
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
           <NavItem label="Pipeline" href="/?view=leasing"       active={currentView==='leasing'}       onClick={()=>navTo('leasing')}   {...navProps}/>
           <NavItem label="Leases"   href="/?view=leases"        active={currentView==='leases'}        onClick={()=>navTo('leases')}             {...navProps}/>
@@ -2241,6 +2243,20 @@ export default function SedonaCRM() {
           {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Finance</div>}
           <NavItem label="QBO Dashboard" href="/?view=qbo"      active={currentView==='qbo'}      onClick={()=>navTo('qbo')}      {...navProps}/>
           <NavItem label="Invoices"      href="/?view=invoices" active={currentView==='invoices'} onClick={()=>navTo('invoices')} {...navProps}/>
+          {!sidebarCollapsed&&(
+            <button onClick={()=>{const next=!showLegacy;setShowLegacy(next);localStorage.setItem('showLegacyNav',String(next));}}
+              style={{width:'100%',padding:'5px 4px',background:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontSize:'11px',color:T.text3,letterSpacing:'0.06em',textTransform:'uppercase',fontWeight:'600',userSelect:'none',marginTop:'4px'}}
+              onMouseEnter={e=>e.currentTarget.style.color=T.text2}
+              onMouseLeave={e=>e.currentTarget.style.color=T.text3}>
+              <span style={{fontSize:'10px'}}>{showLegacy?'▾':'▸'}</span> Legacy
+            </button>
+          )}
+          {showLegacy&&(
+            <div style={{opacity:0.6}}>
+              <NavItem iconComp={<Wrench size={18} weight="bold"/>} label="Work Orders" href="/work-orders" active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
+              <NavItem iconComp={<CheckFat size={18} weight="bold"/>} label="Issues"    href="/issues"      active={currentView==='issues'}      onClick={()=>handleNav('/issues')}   {...navProps}/>
+            </div>
+          )}
         </div>
         {/* Bottom */}
         <div style={{padding:'8px 6px',borderTop:`0.5px solid ${T.border}`,flexShrink:0}}>

@@ -93,13 +93,27 @@ export default function AppShell({ children, activeView }) {
     <>
       <NavBtn label="Home" href="/?view=morning-briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={effectiveCollapsed} icon={<HouseLine size={18} weight="bold"/>}/>
       <SectionLabel label="Operations" collapsed={effectiveCollapsed}/>
-      <NavBtn label="Properties"  href="/properties"        active={is('properties')}  onClick={()=>go('/properties')}        collapsed={effectiveCollapsed} icon={<BuildingOffice size={18} weight="bold"/>}/>
-      <NavBtn label="Tenants"     href="/tenants"            active={is('tenants')}     onClick={()=>go('/tenants')}           collapsed={effectiveCollapsed} icon={<Storefront size={18} weight="bold"/>}/>
-      <NavBtn label="Suites"      href="/suites"             active={is('suites')}      onClick={()=>go('/suites')}            collapsed={effectiveCollapsed} icon={<Cube size={18} weight="bold"/>}/>
-      <NavBtn label="Tasks"       href="/tasks"              active={is('tasks')}       onClick={()=>go('/tasks')}             collapsed={effectiveCollapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
+      <NavBtn label="Properties"  href="/properties"   active={is('properties')}  onClick={()=>go('/properties')}   collapsed={effectiveCollapsed} icon={<BuildingOffice size={18} weight="bold"/>}/>
+      <NavBtn label="Tasks"       href="/tasks"        active={is('tasks')}       onClick={()=>go('/tasks')}        collapsed={effectiveCollapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
+      <NavBtn label="Tenants"     href="/tenants"      active={is('tenants')}     onClick={()=>go('/tenants')}      collapsed={effectiveCollapsed} icon={<Storefront size={18} weight="bold"/>}/>
+      <NavBtn label="Vendors"     href="/vendors"      active={is('vendors')}     onClick={()=>go('/vendors')}      collapsed={effectiveCollapsed} icon={<Truck size={18} weight="bold"/>}/>
+      <NavBtn label="Owners"      href="/owners"       active={is('owners')}      onClick={()=>go('/owners')}       collapsed={effectiveCollapsed} icon={<Briefcase size={18} weight="bold"/>}/>
+      <NavBtn label="Contacts"    href="/contacts"     active={is('contacts')}    onClick={()=>go('/contacts')}     collapsed={effectiveCollapsed} icon={<UserCircle size={18} weight="bold"/>}/>
+      <NavBtn label="Suites"      href="/suites"       active={is('suites')}      onClick={()=>go('/suites')}       collapsed={effectiveCollapsed} icon={<Cube size={18} weight="bold"/>}/>
+      <NavBtn label="Key Safes"   href="/key-safes"    active={is('key-safes')}   onClick={()=>go('/key-safes')}    collapsed={effectiveCollapsed} icon={<Key size={18} weight="bold"/>}/>
+      <SectionLabel label="Leasing" collapsed={effectiveCollapsed}/>
+      <NavBtn label="Pipeline"      href="/?view=leasing"       active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={effectiveCollapsed}/>
+      <NavBtn label="Leases"        href="/?view=leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={effectiveCollapsed}/>
+      <NavBtn label="Rents"         href="/rent-schedule"       active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={effectiveCollapsed} icon={<ChartBar size={18} weight="bold"/>}/>
+      <SectionLabel label="Compliance" collapsed={effectiveCollapsed}/>
+      <NavBtn label="Insurance"   href="/?view=tnt-cois"    active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={effectiveCollapsed} icon={<Umbrella size={18} weight="bold"/>}/>
+      <NavBtn label="Inspections" href="/?view=inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={effectiveCollapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
+      <SectionLabel label="Finance" collapsed={effectiveCollapsed}/>
+      <NavBtn label="QBO Dashboard" href="/?view=qbo"      active={is('qbo')}      onClick={()=>go('/?view=qbo')}      collapsed={effectiveCollapsed}/>
+      <NavBtn label="Invoices"      href="/?view=invoices" active={is('invoices')} onClick={()=>go('/?view=invoices')} collapsed={effectiveCollapsed}/>
       {!effectiveCollapsed && (
         <button onClick={()=>{ const next=!showLegacy; setShowLegacy(next); localStorage.setItem('showLegacyNav',String(next)); }}
-          style={{width:'100%',padding:'5px 4px',background:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontSize:'11px',color:T.text3,letterSpacing:'0.06em',textTransform:'uppercase',fontWeight:'600',userSelect:'none'}}
+          style={{width:'100%',padding:'5px 4px',background:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontSize:'11px',color:T.text3,letterSpacing:'0.06em',textTransform:'uppercase',fontWeight:'600',userSelect:'none',marginTop:'4px'}}
           onMouseEnter={e=>e.currentTarget.style.color=T.text2}
           onMouseLeave={e=>e.currentTarget.style.color=T.text3}>
           <span style={{fontSize:'10px'}}>{showLegacy?'▾':'▸'}</span> Legacy
@@ -111,20 +125,6 @@ export default function AppShell({ children, activeView }) {
           <NavBtn label="Issues"      href="/issues"      active={is('issues')}      onClick={()=>go('/issues')}      collapsed={effectiveCollapsed} icon={<CheckFat size={18} weight="bold"/>}/>
         </div>
       )}
-      <NavBtn label="Contacts"    href="/contacts"           active={is('contacts')}    onClick={()=>go('/contacts')}          collapsed={effectiveCollapsed} icon={<UserCircle size={18} weight="bold"/>}/>
-      <NavBtn label="Vendors"     href="/vendors"            active={is('vendors')}     onClick={()=>go('/vendors')}           collapsed={effectiveCollapsed} icon={<Truck size={18} weight="bold"/>}/>
-      <NavBtn label="Owners"      href="/owners"             active={is('owners')}      onClick={()=>go('/owners')}            collapsed={effectiveCollapsed} icon={<Briefcase size={18} weight="bold"/>}/>
-      <NavBtn label="Key Safes"   href="/key-safes"          active={is('key-safes')}   onClick={()=>go('/key-safes')}         collapsed={effectiveCollapsed} icon={<Key size={18} weight="bold"/>}/>
-      <SectionLabel label="Leasing" collapsed={effectiveCollapsed}/>
-      <NavBtn label="Pipeline"      href="/?view=leasing"       active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={effectiveCollapsed}/>
-      <NavBtn label="Leases"        href="/?view=leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={effectiveCollapsed}/>
-      <NavBtn label="Rents"         href="/rent-schedule"       active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={effectiveCollapsed} icon={<ChartBar size={18} weight="bold"/>}/>
-      <SectionLabel label="Compliance" collapsed={effectiveCollapsed}/>
-      <NavBtn label="Insurance"   href="/?view=tnt-cois"    active={is('tnt-cois')}    onClick={()=>go('/?view=tnt-cois')}    collapsed={effectiveCollapsed} icon={<Umbrella size={18} weight="bold"/>}/>
-      <NavBtn label="Inspections" href="/?view=inspections" active={is('inspections')} onClick={()=>go('/?view=inspections')} collapsed={effectiveCollapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
-      <SectionLabel label="Finance" collapsed={effectiveCollapsed}/>
-      <NavBtn label="QBO Dashboard" href="/?view=qbo"      active={is('qbo')}      onClick={()=>go('/?view=qbo')}      collapsed={effectiveCollapsed}/>
-      <NavBtn label="Invoices"      href="/?view=invoices" active={is('invoices')} onClick={()=>go('/?view=invoices')} collapsed={effectiveCollapsed}/>
     </>
   );
 

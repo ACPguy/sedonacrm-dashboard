@@ -659,9 +659,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     return c;
   },[filteredNoPriority]);
 
-  // Grouped by prop_code when no specific prop selected (All Props = default)
+  // Grouped by prop_code — always group, even when one prop selected
   const grouped = useMemo(()=>{
-    if (propFilter.length===1) return null; // single prop → flat
     const map={};
     filtered.forEach(t=>{
       const key=t.prop_code||'—';
@@ -682,10 +681,10 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   };
 
   const hasActiveDateFilter = !!(dateFilters.opened||dateFilters.updated||dateFilters.closed);
-  const hasActiveFilters    = propFilter.length>0||priorityFilter!=='All'||statusFilter!=='Open'||search!==''||hasActiveDateFilter;
+  const hasActiveFilters    = propFilter.length>0||typeFilter!=='All'||priorityFilter!=='All'||statusFilter!=='Open'||search!==''||hasActiveDateFilter;
 
   const clearFilters=()=>{
-    setPropFilter([]); setStatusFilter('Open'); setPriorityFilter('All');
+    setPropFilter([]); setTypeFilter('All'); setStatusFilter('Open'); setPriorityFilter('All');
     setSearch(''); setDateFilters({opened:null,updated:null,closed:null});
   };
 
@@ -835,25 +834,43 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             ))}
           </div>
         )}
-        {/* Type pills + Status pills on same row */}
-        <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'5px',flexWrap:'wrap'}}>
-          <div className="crm-tasks-type-strip" style={{display:'flex',gap:'4px',flexWrap:'wrap',flexShrink:1,minWidth:0}}>
-            {TYPE_PILLS.map(({key,label})=>{
-              const active=typeFilter===key;
-              const color=TYPE_COLOR[key]||T.accent;
-              const allTotal=Object.values(typeCounts).reduce((s,n)=>s+n,0);
-              const cnt=key==='All'?allTotal:(typeCounts[key]??0);
+        {/* Type pills — own row */}
+        <div className="crm-tasks-type-strip" style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'5px'}}>
+          {TYPE_PILLS.map(({key,label})=>{
+            const active=typeFilter===key;
+            const color=TYPE_COLOR[key]||T.accent;
+            const allTotal=Object.values(typeCounts).reduce((s,n)=>s+n,0);
+            const cnt=key==='All'?allTotal:(typeCounts[key]??0);
+            return (
+              <button key={key} onClick={()=>setTypeFilter(key)}
+                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${key==='All'?T.accent:color}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':(key==='All'?T.accent:color),transition:'background 0.15s ease',flexShrink:0}}
+                onMouseEnter={e=>{if(!active)e.currentTarget.style.background=key==='All'?'rgba(110,159,216,0.20)':`${color}33`;}}
+                onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+                {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
+                {label} <span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>
+              </button>
+            );
+          })}
+        </div>
+        {/* Priority + Status pills on same row */}
+        <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px',flexWrap:'wrap'}}>
+          {/* Priority left */}
+          <div className="crm-tasks-priority-strip" style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+            {['All','???','Urgent','High','Medium','Low'].map(p=>{
+              const cnt=p==='All'?null:priorityCounts[p]??0;
+              const active=priorityFilter===p;
               return (
-                <button key={key} onClick={()=>setTypeFilter(key)}
-                  style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${key==='All'?T.accent:color}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':(key==='All'?T.accent:color),transition:'background 0.15s ease',flexShrink:0}}
-                  onMouseEnter={e=>{if(!active)e.currentTarget.style.background=key==='All'?'rgba(110,159,216,0.20)':`${color}33`;}}
-                  onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
-                  {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
-                  {label} <span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>
+                <button key={p} onClick={()=>setPriorityFilter(p)}
+                  style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
+                    background:active?T.bg3:'transparent',color:active?T.text0:T.text2,
+                    fontWeight:active?'600':'400',display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
+                  {p!=='All'&&<PriorityDot priority={p}/>}
+                  {p}{cnt!==null&&<span style={{color:active?T.text1:T.text3,fontSize:'10px'}}>·{cnt}</span>}
                 </button>
               );
             })}
           </div>
+          {/* Status + More + Clear right */}
           <div className="crm-tasks-status-strip" style={{display:'flex',gap:'4px',alignItems:'center',marginLeft:'auto',flexShrink:0}}>
             <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
               {['Open','In Progress','On Hold','Closed','All'].map(s=>{
@@ -886,24 +903,6 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
                 transition:'all 0.15s',visibility:hasActiveFilters?'visible':'hidden'}}>
               <span style={{fontSize:'12px'}}>×</span> Clear
             </button>
-          </div>
-        </div>
-        {/* Priority filter pills */}
-        <div className="crm-tasks-status-strip" style={{display:'flex',gap:'6px',alignItems:'center',marginBottom:'4px'}}>
-          <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
-            {['All','???','Urgent','High','Medium','Low'].map(p=>{
-              const cnt=p==='All'?null:priorityCounts[p]??0;
-              const active=priorityFilter===p;
-              return (
-                <button key={p} onClick={()=>setPriorityFilter(p)}
-                  style={{padding:'3px 6px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
-                    background:active?T.bg3:'transparent',color:active?T.text0:T.text2,
-                    fontWeight:active?'600':'400',display:'flex',alignItems:'center',gap:'2px',whiteSpace:'nowrap'}}>
-                  {p!=='All'&&<PriorityDot priority={p}/>}
-                  {p}{cnt!==null&&<span style={{color:active?T.text1:T.text3,fontSize:'10px'}}>·{cnt}</span>}
-                </button>
-              );
-            })}
           </div>
         </div>
       </div>
@@ -1141,6 +1140,23 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     }catch{}
     finally{setNavLoading(false);}
   };
+
+  const goNavRef = useRef(goNav);
+  goNavRef.current = goNav;
+
+  useEffect(()=>{
+    const onArrow=e=>{
+      if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
+      const tag=document.activeElement?.tagName?.toLowerCase();
+      const isEditing=tag==='input'||tag==='textarea'||document.activeElement?.contentEditable==='true';
+      if(isEditing)return;
+      e.preventDefault();
+      if(e.key==='ArrowLeft')goNavRef.current(-1);
+      else goNavRef.current(1);
+    };
+    window.addEventListener('keydown',onArrow);
+    return ()=>window.removeEventListener('keydown',onArrow);
+  },[]);
 
   if(loading) return <div style={{padding:'40px',textAlign:'center',color:T.text3}}>Loading…</div>;
   if(notFound) return <div style={{padding:'40px',textAlign:'center',color:T.danger}}>Task not found.</div>;
