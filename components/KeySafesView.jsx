@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Key } from '@phosphor-icons/react';
+import { Key, ChatCircle } from '@phosphor-icons/react';
+import RichTextEditor from './RichTextEditor';
+import { ActivityPanel } from './TasksView';
 
 const SUPABASE_URL      = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -200,7 +202,10 @@ const KeySafesList = ({ onSelect, filterPropCode }) => {
   useEffect(()=>{
     setLoading(true); setError(null);
     const parts=[];
-    if (statusFilter!=='All') parts.push(`status=eq.${encodeURIComponent(statusFilter)}`);
+    if (statusFilter==='In Use') parts.push('status=eq.In%20Use');
+    else if (statusFilter==='Available') parts.push('status=in.(Avail.-D.Holt,Avail.-Office,Avail.-FIT,Avail.-SA%20House)');
+    else if (statusFilter==='Archived') parts.push('status=eq.Archived');
+    else if (statusFilter==='Other') parts.push('status=in.(Unknown,REPLACE)');
     const pc=filterPropCode||propFilter;
     if (pc) parts.push(`prop_code=eq.${encodeURIComponent(pc)}`);
     if (search) parts.push(`key_safe_code=ilike.*${encodeURIComponent(search)}*`);
@@ -253,7 +258,7 @@ const KeySafesList = ({ onSelect, filterPropCode }) => {
         </div>
         {/* Status filter */}
         <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,width:'fit-content',marginBottom:'5px'}}>
-          {['All','In Use','Removed'].map(s=>(
+          {['All','In Use','Available','Archived','Other'].map(s=>(
             <button key={s} onClick={()=>setStatusFilter(s)} style={statBtn(s,statusFilter===s)}>{s}</button>
           ))}
         </div>
@@ -276,6 +281,7 @@ const KeySafesList = ({ onSelect, filterPropCode }) => {
           <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               <col style={{width:'70px'}}/>
+              <col style={{width:'80px'}}/>
               <col style={{width:'120px'}}/>
               <col style={{width:'150px'}}/>
               <col/>
@@ -285,6 +291,7 @@ const KeySafesList = ({ onSelect, filterPropCode }) => {
             <thead style={{position:'sticky',top:0,zIndex:2}}>
               <tr>
                 <th style={css.th}>Prop</th>
+                <th style={css.th}>ID#</th>
                 <th style={css.th}>Code</th>
                 <th style={css.th}>Location</th>
                 <th style={css.th}>Contents</th>
@@ -294,7 +301,7 @@ const KeySafesList = ({ onSelect, filterPropCode }) => {
             </thead>
             <tbody>
               {items.length===0&&(
-                <tr><td colSpan={6} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No key safes found</td></tr>
+                <tr><td colSpan={7} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No key safes found</td></tr>
               )}
               {items.map((item,i)=>{
                 const href=`/key-safes/X${item.id.slice(-6)}`;
@@ -306,6 +313,7 @@ const KeySafesList = ({ onSelect, filterPropCode }) => {
                     onMouseLeave={e=>e.currentTarget.style.background=rowBg}
                     onClick={e=>{if(e.target.closest('a'))return;sessionStorage.setItem('keySafesBackUrl',window.location.pathname);onSelect(item);}}>
                     <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{item.prop_code||''}</td>
+                    <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{item.id_num||''}</td>
                     <td style={{...css.td,fontWeight:'600'}}>
                       <a href={href}
                         onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();sessionStorage.setItem('keySafesBackUrl',window.location.pathname);onSelect(item);}}}
@@ -358,6 +366,26 @@ export const KeySafeDetail = ({ keySafe: initialItem, itemId, onBack, onUpdate }
   const [notFound,setNotFound] = useState(false);
   const [activeProps,setActiveProps] = useState([]);
   const [copied,setCopied]   = useState(false);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+  const [activityCollapsed,setActivityCollapsed] = useState(isMobile);
+  const [activityWidth,setActivityWidth] = useState(280);
+  const activityResizingRef = useRef(false);
+
+  const startActivityResize = useCallback(e => {
+    activityResizingRef.current = true;
+    const startX = e.clientX, startW = activityWidth;
+    const onMove = me => {
+      if (!activityResizingRef.current) return;
+      setActivityWidth(Math.max(200, Math.min(480, startW - (me.clientX - startX))));
+    };
+    const onUp = () => {
+      activityResizingRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [activityWidth]);
 
   useEffect(()=>{
     if (initialItem){setData(initialItem);setLoading(false);return;}
@@ -451,37 +479,58 @@ export const KeySafeDetail = ({ keySafe: initialItem, itemId, onBack, onUpdate }
       </div>
 
       {/* Body */}
-      <div style={{flex:1,overflowY:'auto'}}>
-        <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
-          <FieldRow label="Prop Code">
-            <InlineSelect value={data.prop_code} options={activeProps.map(p=>({value:p.prop_code,label:`${p.prop_code} — ${p.property_name}`}))} onSave={v=>save('prop_code',v)}/>
-          </FieldRow>
-          <FieldRow label="Status">
-            <StatusPills value={data.status} onSave={v=>save('status',v)}/>
-          </FieldRow>
-          <FieldRow label="Key Safe Code">
-            <InlineBlurField value={data.key_safe_code||''} onSave={v=>save('key_safe_code',v)}/>
-          </FieldRow>
-          <FieldRow label="On-Site Location">
-            <InlineBlurField value={data.on_site_location||''} onSave={v=>save('on_site_location',v)}/>
-          </FieldRow>
-          <FieldRow label="Contents" topAlign>
-            <InlineTextarea value={data.contents||''} onSave={v=>save('contents',v)}/>
-          </FieldRow>
-          <FieldRow label="Other Notes" topAlign>
-            <InlineTextarea value={data.other_notes||''} onSave={v=>save('other_notes',v)}/>
-          </FieldRow>
-          <FieldRow label="Follow-Up Date">
-            <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
-          </FieldRow>
-          <FieldRow label="Created" hoverable={false}>
-            <InlineBlurField readOnly value={data.created_at?fmtDate(data.created_at):''}/>
-          </FieldRow>
-          <FieldRow label="Last Updated" hoverable={false}>
-            <InlineBlurField readOnly value={data.updated_at?fmtDate(data.updated_at):''}/>
-          </FieldRow>
+      <div style={{display:'flex',flex:1,overflow:'hidden'}}>
+        <div style={{flex:1,overflowY:'auto',minWidth:0}}>
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
+            <FieldRow label="Prop Code">
+              <InlineSelect value={data.prop_code} options={activeProps.map(p=>({value:p.prop_code,label:`${p.prop_code} — ${p.property_name}`}))} onSave={v=>save('prop_code',v)}/>
+            </FieldRow>
+            <FieldRow label="Status">
+              <InlineSelect value={data.status}
+                options={['In Use','Avail.-D.Holt','Avail.-Office','Avail.-FIT','Avail.-SA House','Unknown','REPLACE','Archived']}
+                onSave={v=>save('status',v)}/>
+            </FieldRow>
+            <FieldRow label="Key Safe Code">
+              <InlineBlurField value={data.key_safe_code||''} onSave={v=>save('key_safe_code',v)}/>
+            </FieldRow>
+            <FieldRow label="Key Safe ID#">
+              <InlineBlurField value={data.id_num||''} onSave={v=>save('id_num',v)}/>
+            </FieldRow>
+            <FieldRow label="On-Site Location">
+              <InlineBlurField value={data.on_site_location||''} onSave={v=>save('on_site_location',v)}/>
+            </FieldRow>
+            <FieldRow label="Contents" topAlign>
+              <RichTextEditor value={data.contents} onSave={v=>save('contents',v)} minRows={5}/>
+            </FieldRow>
+            <FieldRow label="Other Notes" topAlign>
+              <RichTextEditor value={data.other_notes} onSave={v=>save('other_notes',v)} minRows={5}/>
+            </FieldRow>
+            <FieldRow label="Follow-Up Date">
+              <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
+            </FieldRow>
+            <FieldRow label="Created" hoverable={false}>
+              <InlineBlurField readOnly value={data.created_at?fmtDate(data.created_at):''}/>
+            </FieldRow>
+            <FieldRow label="Last Updated" hoverable={false}>
+              <InlineBlurField readOnly value={data.updated_at?fmtDate(data.updated_at):''}/>
+            </FieldRow>
+          </div>
         </div>
+        {(!activityCollapsed || !isMobile) && (
+          <ActivityPanel
+            collapsed={activityCollapsed}
+            onCollapse={()=>setActivityCollapsed(c=>!c)}
+            width={activityWidth}
+            onMouseDown={isMobile ? undefined : startActivityResize}
+          />
+        )}
       </div>
+      {isMobile && activityCollapsed && (
+        <button onClick={()=>setActivityCollapsed(false)}
+          style={{position:'fixed',bottom:'16px',right:'16px',zIndex:50,background:'#E8630A',color:'#fff',border:'none',borderRadius:'50%',width:'48px',height:'48px',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.4)'}}>
+          <ChatCircle size={22} weight="bold" color="white"/>
+        </button>
+      )}
     </div>
   );
 };

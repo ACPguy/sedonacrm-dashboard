@@ -51,6 +51,10 @@ export default function AppShell({ children, activeView }) {
   const [activeProps, setActiveProps] = useState([]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [hoverExpanded, setHoverExpanded] = useState(false);
+  const [showLegacy, setShowLegacy] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('showLegacyNav') === 'true';
+  });
 
   useEffect(() => {
     fetch(`${SUPABASE_URL}/rest/v1/properties?select=prop_code,property_name,podio_id,id&status=eq.active&order=prop_code.asc`, {
@@ -92,9 +96,21 @@ export default function AppShell({ children, activeView }) {
       <NavBtn label="Properties"  href="/properties"        active={is('properties')}  onClick={()=>go('/properties')}        collapsed={effectiveCollapsed} icon={<BuildingOffice size={18} weight="bold"/>}/>
       <NavBtn label="Tenants"     href="/tenants"            active={is('tenants')}     onClick={()=>go('/tenants')}           collapsed={effectiveCollapsed} icon={<Storefront size={18} weight="bold"/>}/>
       <NavBtn label="Suites"      href="/suites"             active={is('suites')}      onClick={()=>go('/suites')}            collapsed={effectiveCollapsed} icon={<Cube size={18} weight="bold"/>}/>
-      <NavBtn label="Work Orders" href="/work-orders"        active={is('work-orders')} onClick={()=>go('/work-orders')}       collapsed={effectiveCollapsed} icon={<Wrench size={18} weight="bold"/>}/>
-      <NavBtn label="Issues"      href="/issues"             active={is('issues')}      onClick={()=>go('/issues')}            collapsed={effectiveCollapsed} icon={<CheckFat size={18} weight="bold"/>}/>
       <NavBtn label="Tasks"       href="/tasks"              active={is('tasks')}       onClick={()=>go('/tasks')}             collapsed={effectiveCollapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
+      {!effectiveCollapsed && (
+        <button onClick={()=>{ const next=!showLegacy; setShowLegacy(next); localStorage.setItem('showLegacyNav',String(next)); }}
+          style={{width:'100%',padding:'5px 4px',background:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontSize:'11px',color:T.text3,letterSpacing:'0.06em',textTransform:'uppercase',fontWeight:'600',userSelect:'none'}}
+          onMouseEnter={e=>e.currentTarget.style.color=T.text2}
+          onMouseLeave={e=>e.currentTarget.style.color=T.text3}>
+          <span style={{fontSize:'10px'}}>{showLegacy?'▾':'▸'}</span> Legacy
+        </button>
+      )}
+      {showLegacy && (
+        <div style={{opacity:0.6}}>
+          <NavBtn label="Work Orders" href="/work-orders" active={is('work-orders')} onClick={()=>go('/work-orders')} collapsed={effectiveCollapsed} icon={<Wrench size={18} weight="bold"/>}/>
+          <NavBtn label="Issues"      href="/issues"      active={is('issues')}      onClick={()=>go('/issues')}      collapsed={effectiveCollapsed} icon={<CheckFat size={18} weight="bold"/>}/>
+        </div>
+      )}
       <NavBtn label="Contacts"    href="/contacts"           active={is('contacts')}    onClick={()=>go('/contacts')}          collapsed={effectiveCollapsed} icon={<UserCircle size={18} weight="bold"/>}/>
       <NavBtn label="Vendors"     href="/vendors"            active={is('vendors')}     onClick={()=>go('/vendors')}           collapsed={effectiveCollapsed} icon={<Truck size={18} weight="bold"/>}/>
       <NavBtn label="Owners"      href="/owners"             active={is('owners')}      onClick={()=>go('/owners')}            collapsed={effectiveCollapsed} icon={<Briefcase size={18} weight="bold"/>}/>

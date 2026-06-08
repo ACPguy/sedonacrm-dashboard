@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Wrench, Warning, NotePencil, FolderOpen, Buildings, House, ClipboardText, ChatCircle,
+  Wrench, CheckFat, NotePencil, FolderOpen, Buildings, House, ClipboardText, ChatCircle,
   CaretLeft, CaretRight,
 } from '@phosphor-icons/react';
 import {
@@ -91,11 +91,11 @@ export const TYPE_PREFIX = {
 const REVERSE_PREFIX = { WO:'work_order', TSK:'task', NOTE:'note', PRJ:'project', ACP:'acp_task', SG:'sg_task' };
 const TYPE_LABEL = { work_order:'Work Order', task:'Task', note:'Note', project:'Project', acp_task:'ACP Task', sg_task:'S&G Task' };
 const TYPE_COLOR = {
-  work_order:'#E8630A', task:'#EF4444', note:'#3B82F6',
-  project:'#8B5CF6', acp_task:'#14B8A6', sg_task:'#10B981',
+  work_order:'#EF4444', task:'#06B6D4', note:'#64748B',
+  project:'#8B5CF6', acp_task:'#E8630A', sg_task:'#84CC16',
 };
 const TYPE_ICON_MAP = {
-  work_order:Wrench, task:Warning, note:NotePencil,
+  work_order:Wrench, task:CheckFat, note:NotePencil,
   project:FolderOpen, acp_task:Buildings, sg_task:House,
 };
 
@@ -563,7 +563,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const [propCodes,setPropCodes]     = useState([]);
   const [typeFilter,setTypeFilter]   = useState(initType||'All');
   const [statusFilter,setStatusFilter] = useState('Open');
-  const [propFilter,setPropFilter]   = useState('');
+  const [propFilter,setPropFilter]   = useState([]);
   const [search,setSearch]           = useState('');
   const [sortCol,setSortCol]         = useState('priority');
   const [sortDir,setSortDir]         = useState('asc');
@@ -586,8 +586,9 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     else if (statusFilter==='Closed') shared.push('status=in.(Closed,Cancelled)');
     else if (statusFilter==='In Progress') shared.push('status=eq.In%20Progress');
     else if (statusFilter==='On Hold') shared.push('status=eq.On%20Hold');
-    const pc=filterPropCode||propFilter;
-    if (pc) shared.push(`prop_code=eq.${encodeURIComponent(pc)}`);
+    if (filterPropCode) shared.push(`prop_code=eq.${encodeURIComponent(filterPropCode)}`);
+    else if (propFilter.length===1) shared.push(`prop_code=eq.${encodeURIComponent(propFilter[0])}`);
+    else if (propFilter.length>1) shared.push(`prop_code=in.(${propFilter.map(encodeURIComponent).join(',')})`);
     if (search) {
       if (/^\d+$/.test(search)) shared.push(`task_num=eq.${parseInt(search,10)}`);
       else shared.push(`title=ilike.*${encodeURIComponent(search)}*`);
@@ -607,7 +608,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
       setTypeCounts(counts);
       setLoading(false);
     }).catch(e=>{setError(e.message);setLoading(false);});
-  },[statusFilter,typeFilter,propFilter,filterPropCode,search,refreshKey]);
+  },[statusFilter,typeFilter,propFilter.join(','),filterPropCode,search,refreshKey]);
 
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
@@ -660,7 +661,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
 
   // Grouped by prop_code when no specific prop selected (All Props = default)
   const grouped = useMemo(()=>{
-    if (propFilter) return null; // specific prop → flat
+    if (propFilter.length===1) return null; // single prop → flat
     const map={};
     filtered.forEach(t=>{
       const key=t.prop_code||'—';
@@ -673,7 +674,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         return a.localeCompare(b);
       })
       .map(([prop_code,rows])=>({prop_code,rows}));
-  },[filtered,propFilter]);
+  },[filtered,propFilter.join(',')]);
 
   const toggleSort=c=>{
     if(c===sortCol)setSortDir(d=>d==='asc'?'desc':'asc');
@@ -681,10 +682,10 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   };
 
   const hasActiveDateFilter = !!(dateFilters.opened||dateFilters.updated||dateFilters.closed);
-  const hasActiveFilters    = !!propFilter||priorityFilter!=='All'||statusFilter!=='Open'||search!==''||hasActiveDateFilter;
+  const hasActiveFilters    = propFilter.length>0||priorityFilter!=='All'||statusFilter!=='Open'||search!==''||hasActiveDateFilter;
 
   const clearFilters=()=>{
-    setPropFilter(''); setStatusFilter('Open'); setPriorityFilter('All');
+    setPropFilter([]); setStatusFilter('Open'); setPriorityFilter('All');
     setSearch(''); setDateFilters({opened:null,updated:null,closed:null});
   };
 
@@ -827,64 +828,65 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         {/* Property filter pills */}
         {!filterPropCode&&propCodes.length>0&&(
           <div className="crm-tasks-prop-strip" style={{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',paddingBottom:'4px',flexWrap:'nowrap'}}>
-            <button onClick={()=>setPropFilter('')} style={propBtn(!propFilter)}>All Props</button>
-            <button onClick={()=>setPropFilter(propFilter==='ACP'?'':'ACP')} style={propBtn(propFilter==='ACP')}>ACP</button>
+            <button onClick={()=>setPropFilter([])} style={propBtn(propFilter.length===0)}>All Props</button>
+            <button onClick={()=>setPropFilter(pf=>pf.includes('ACP')?pf.filter(x=>x!=='ACP'):[...pf,'ACP'])} style={propBtn(propFilter.includes('ACP'))}>ACP</button>
             {propCodes.map(pc=>(
-              <button key={pc} onClick={()=>setPropFilter(propFilter===pc?'':pc)} style={propBtn(propFilter===pc)}>{pc}</button>
+              <button key={pc} onClick={()=>setPropFilter(pf=>pf.includes(pc)?pf.filter(x=>x!==pc):[...pf,pc])} style={propBtn(propFilter.includes(pc))}>{pc}</button>
             ))}
           </div>
         )}
-        {/* Type pills */}
-        <div className="crm-tasks-type-strip" style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'5px'}}>
-          {TYPE_PILLS.map(({key,label})=>{
-            const active=typeFilter===key;
-            const color=TYPE_COLOR[key]||T.accent;
-            const allTotal=Object.values(typeCounts).reduce((s,n)=>s+n,0);
-            const cnt=key==='All'?allTotal:(typeCounts[key]??0);
-            return (
-              <button key={key} onClick={()=>setTypeFilter(key)}
-                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${key==='All'?T.accent:color}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':(key==='All'?T.accent:color),transition:'background 0.15s ease',flexShrink:0}}
-                onMouseEnter={e=>{if(!active)e.currentTarget.style.background=key==='All'?'rgba(110,159,216,0.20)':`${color}33`;}}
-                onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
-                {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
-                {label} <span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>
-              </button>
-            );
-          })}
-        </div>
-        {/* Status | More... | Clear */}
-        <div className="crm-tasks-status-strip" style={{display:'flex',gap:'6px',alignItems:'center',marginBottom:'5px'}}>
-          <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
-            {['Open','In Progress','On Hold','Closed','All'].map(s=>{
-              const active=statusFilter===s;
+        {/* Type pills + Status pills on same row */}
+        <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'5px',flexWrap:'wrap'}}>
+          <div className="crm-tasks-type-strip" style={{display:'flex',gap:'4px',flexWrap:'wrap',flexShrink:1,minWidth:0}}>
+            {TYPE_PILLS.map(({key,label})=>{
+              const active=typeFilter===key;
+              const color=TYPE_COLOR[key]||T.accent;
+              const allTotal=Object.values(typeCounts).reduce((s,n)=>s+n,0);
+              const cnt=key==='All'?allTotal:(typeCounts[key]??0);
               return (
-                <button key={s} onClick={()=>setStatusFilter(s)}
-                  style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,background:active?T.bg3:'transparent',color:active?T.text0:T.text2,fontWeight:active?'600':'400',display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
-                  {s}
-                  {active&&!loading&&<span style={{color:T.text3,fontSize:'10px'}}>·{tasks.length}</span>}
+                <button key={key} onClick={()=>setTypeFilter(key)}
+                  style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${key==='All'?T.accent:color}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':(key==='All'?T.accent:color),transition:'background 0.15s ease',flexShrink:0}}
+                  onMouseEnter={e=>{if(!active)e.currentTarget.style.background=key==='All'?'rgba(110,159,216,0.20)':`${color}33`;}}
+                  onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+                  {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
+                  {label} <span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>
                 </button>
               );
             })}
           </div>
-          <div style={{position:'relative',flexShrink:0}} ref={moreAnchorRef}>
-            <button onClick={()=>setMoreOpen(o=>!o)}
+          <div className="crm-tasks-status-strip" style={{display:'flex',gap:'4px',alignItems:'center',marginLeft:'auto',flexShrink:0}}>
+            <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+              {['Open','In Progress','On Hold','Closed','All'].map(s=>{
+                const active=statusFilter===s;
+                return (
+                  <button key={s} onClick={()=>setStatusFilter(s)}
+                    style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,background:active?T.bg3:'transparent',color:active?T.text0:T.text2,fontWeight:active?'600':'400',display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
+                    {s}
+                    {active&&!loading&&<span style={{color:T.text3,fontSize:'10px'}}>·{tasks.length}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{position:'relative',flexShrink:0}} ref={moreAnchorRef}>
+              <button onClick={()=>setMoreOpen(o=>!o)}
+                style={{padding:'3px 9px',borderRadius:'5px',cursor:'pointer',fontSize:F.xs,
+                  border:`0.5px solid ${hasActiveDateFilter?T.warn:T.border}`,
+                  background:moreOpen?T.bg3:'transparent',color:hasActiveDateFilter?T.warn:T.text1,
+                  display:'flex',alignItems:'center',gap:'5px'}}>
+                More…
+                {hasActiveDateFilter&&<span style={{width:'5px',height:'5px',borderRadius:'50%',background:T.warn,flexShrink:0,display:'inline-block'}}/>}
+              </button>
+              <MorePopover open={moreOpen} onClose={()=>setMoreOpen(false)} anchorRef={moreAnchorRef}
+                dateFilters={dateFilters} setDateFilters={setDateFilters}/>
+            </div>
+            <button onClick={clearFilters}
               style={{padding:'3px 9px',borderRadius:'5px',cursor:'pointer',fontSize:F.xs,
-                border:`0.5px solid ${hasActiveDateFilter?T.warn:T.border}`,
-                background:moreOpen?T.bg3:'transparent',color:hasActiveDateFilter?T.warn:T.text1,
-                display:'flex',alignItems:'center',gap:'5px'}}>
-              More…
-              {hasActiveDateFilter&&<span style={{width:'5px',height:'5px',borderRadius:'50%',background:T.warn,flexShrink:0,display:'inline-block'}}/>}
+                border:`0.5px solid ${hasActiveFilters?T.warn:T.border}`,background:'transparent',
+                color:hasActiveFilters?T.warn:T.text3,display:'flex',alignItems:'center',gap:'3px',
+                transition:'all 0.15s',visibility:hasActiveFilters?'visible':'hidden'}}>
+              <span style={{fontSize:'12px'}}>×</span> Clear
             </button>
-            <MorePopover open={moreOpen} onClose={()=>setMoreOpen(false)} anchorRef={moreAnchorRef}
-              dateFilters={dateFilters} setDateFilters={setDateFilters}/>
           </div>
-          <button onClick={clearFilters}
-            style={{padding:'3px 9px',borderRadius:'5px',cursor:'pointer',fontSize:F.xs,
-              border:`0.5px solid ${hasActiveFilters?T.warn:T.border}`,background:'transparent',
-              color:hasActiveFilters?T.warn:T.text3,display:'flex',alignItems:'center',gap:'3px',
-              transition:'all 0.15s',visibility:hasActiveFilters?'visible':'hidden'}}>
-            <span style={{fontSize:'12px'}}>×</span> Clear
-          </button>
         </div>
         {/* Priority filter pills */}
         <div className="crm-tasks-status-strip" style={{display:'flex',gap:'6px',alignItems:'center',marginBottom:'4px'}}>
