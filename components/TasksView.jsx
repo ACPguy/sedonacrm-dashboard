@@ -1004,20 +1004,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             <FieldRow label="Assigned To">
               <InlineSelect value={data.assigned_to} options={users.map(u=>({value:u.id,label:u.full_name}))} onSave={v=>save('assigned_to',v)}/>
             </FieldRow>
-            <FieldRow label="Follow-Up Date">
-              <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
-            </FieldRow>
-            <FieldRow label="FU End Date">
+            <FieldRow label="FU Date">
               <InlineBlurField type="date" value={data.follow_up_end_date||''} onSave={v=>save('follow_up_end_date',v)}/>
             </FieldRow>
-            <FieldRow label="Follow-Up Notes" topAlign>
+            <FieldRow label="FU Notes" topAlign>
               <RichTextEditor value={data.follow_up_notes} onSave={v=>save('follow_up_notes',v)} minRows={5}/>
             </FieldRow>
             <FieldRow label="Details" topAlign>
               <RichTextEditor value={data.details} onSave={v=>save('details',v)} minRows={5}/>
-            </FieldRow>
-            <FieldRow label="Internal Notes" topAlign>
-              <RichTextEditor value={data.internal_notes} onSave={v=>save('internal_notes',v)} minRows={5}/>
             </FieldRow>
             <FieldRow label="Alert">
               <InlineBlurField value={data.alert||''} onSave={v=>save('alert',v)}/>
@@ -1056,9 +1050,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               <FieldRow label="WO Category">
                 <InlineSelect value={data.wo_category} options={CATEGORY_OPTIONS.work_order} onSave={v=>save('wo_category',v)}/>
               </FieldRow>
-              <FieldRow label="WO Type">
-                <GenericPills value={data.wo_type} options={['Standard','Recurring','Budget Item']} color={T.accent} onSave={v=>save('wo_type',v)}/>
-              </FieldRow>
               <FieldRow label="Stage">
                 <GenericPills value={data.stage} options={['New','In Progress','Waiting on Vendor','Waiting on Parts','Complete']} color={T.purple} onSave={v=>save('stage',v)}/>
               </FieldRow>
@@ -1088,6 +1079,12 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               <FieldRow label="Instructions to Vendor" topAlign>
                 <RichTextEditor value={data.instructions_to_vendor} onSave={v=>save('instructions_to_vendor',v)} minRows={5}/>
               </FieldRow>
+              <FieldRow label="WO Type">
+                <InlineSelect value={data.wo_type} options={['Standard','Recurring','Budget Item']} onSave={v=>save('wo_type',v)}/>
+              </FieldRow>
+              <FieldRow label="Email Request to Vendor">
+                <BoolPill value={data.email_request_sent} labelTrue="Yes" labelFalse="No" colorTrue={T.accent} onSave={v=>save('email_request_sent',v)}/>
+              </FieldRow>
               <FieldRow label="Estimate Amount">
                 <InlineBlurField value={data.estimate_amount!=null?String(data.estimate_amount):''} moneyFormat onSave={v=>save('estimate_amount',v?parseFloat(String(v).replace(/[^0-9.-]/g,'')):null)}/>
               </FieldRow>
@@ -1108,9 +1105,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               </FieldRow>
               <FieldRow label="Final Closeout Notes" topAlign>
                 <RichTextEditor value={data.final_closeout_notes} onSave={v=>save('final_closeout_notes',v)} minRows={5}/>
-              </FieldRow>
-              <FieldRow label="Email Request Sent">
-                <BoolPill value={data.email_request_sent} labelTrue="Sent ✓" labelFalse="Not Sent" colorTrue={T.accent} onSave={v=>save('email_request_sent',v)}/>
               </FieldRow>
               <FieldRow label="Make Recurring">
                 <BoolPill value={data.make_recurring} labelTrue="Yes" labelFalse="No" colorTrue={T.purple} onSave={v=>save('make_recurring',v)}/>
