@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { CheckFat } from '@phosphor-icons/react';
+import { CheckFat, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable,
@@ -613,6 +613,10 @@ export const IssuesList = ({ onSelect, hidePropStrip = false, hidePropertyFilter
         const tab = window.open(`${window.location.origin}/issues/${iss.podio_id ?? 'X'+iss.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
+        sessionStorage.setItem('issuesBackUrl', window.location.pathname + window.location.search);
+        const navL = filtered.map(r => ({ id: r.id, podio_id: r.podio_id }));
+        sessionStorage.setItem('issuesNavList', JSON.stringify(navL));
+        sessionStorage.setItem('issuesNavIndex', String(filtered.findIndex(r => r.id === iss.id)));
         onSelect(iss);
       }
     };
@@ -875,7 +879,7 @@ export const IssuesList = ({ onSelect, hidePropStrip = false, hidePropertyFilter
               const rowBg = i%2===0?'transparent':T.bg0;
               return (
                 <div key={iss.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-                  onClick={()=>onSelect(iss)}
+                  onClick={()=>{sessionStorage.setItem('issuesBackUrl',window.location.pathname+window.location.search);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('issuesNavList',JSON.stringify(navL));sessionStorage.setItem('issuesNavIndex',String(filtered.findIndex(r=>r.id===iss.id)));onSelect(iss);}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px',lineHeight:'1.3'}}>{iss.issue_name||'—'}</div>
@@ -1146,6 +1150,9 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [rightWidth, setRightWidth] = useState(300);
   const [copied, setCopied] = useState(false);
+  const [navList, setNavList]   = useState(null);
+  const [navIdx, setNavIdx]     = useState(-1);
+  const [navLoading, setNavLoading] = useState(false);
   const resizingRight = useRef(false);
 
   useEffect(() => {
@@ -1187,6 +1194,49 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
     document.title = `${data.prop_code || ''} – ${truncated} | SedonaCRM`;
     return () => { document.title = 'SedonaCRM'; };
   }, [data.prop_code, data.issue_name]);
+
+  useEffect(() => {
+    try {
+      const list = JSON.parse(sessionStorage.getItem('issuesNavList') || 'null');
+      const idx  = parseInt(sessionStorage.getItem('issuesNavIndex') || '-1', 10);
+      if (list && Array.isArray(list) && idx >= 0) { setNavList(list); setNavIdx(idx); }
+    } catch {}
+  }, []);
+
+  const goNav = async dir => {
+    if (!navList || navLoading) return;
+    const newIdx = navIdx + dir;
+    if (newIdx < 0 || newIdx >= navList.length) return;
+    setNavLoading(true);
+    try {
+      const entry = navList[newIdx];
+      const rows = await sbFetch('issues', `podio_id=eq.${entry.podio_id}&select=*&limit=1`);
+      if (!rows.length) return;
+      const newRec = rows[0];
+      setData(newRec);
+      setNavIdx(newIdx);
+      sessionStorage.setItem('issuesNavIndex', String(newIdx));
+      window.history.replaceState({}, '', `/issues/${entry.podio_id}`);
+    } catch {}
+    finally { setNavLoading(false); }
+  };
+
+  const goNavRef = useRef(goNav);
+  goNavRef.current = goNav;
+
+  useEffect(() => {
+    const onArrow = e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      const isEditing = tag === 'input' || tag === 'textarea' || document.activeElement?.contentEditable === 'true';
+      if (isEditing) return;
+      e.preventDefault();
+      if (e.key === 'ArrowLeft') goNavRef.current(-1);
+      else goNavRef.current(1);
+    };
+    window.addEventListener('keydown', onArrow);
+    return () => window.removeEventListener('keydown', onArrow);
+  }, []);
 
   const save = async (field, val) => {
     await sbPatch('issues', data.id, { [field]: val ?? null });
@@ -1239,6 +1289,23 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             <StatusBadge status={data.priority}/>
             <StatusBadge status={data.status}/>
           </div>
+          {navList&&navList.length>1&&(
+            <div style={{display:'flex',alignItems:'center',gap:'3px',flexShrink:0}}>
+              <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx<=0?'not-allowed':'pointer',opacity:navIdx<=0?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretLeft size={18} weight="bold"/>
+              </button>
+              <span style={{fontSize:F.xs,color:T.text3,padding:'0 6px',whiteSpace:'nowrap'}}>{navIdx+1} of {navList.length}</span>
+              <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx>=navList.length-1?'not-allowed':'pointer',opacity:navIdx>=navList.length-1?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretRight size={18} weight="bold"/>
+              </button>
+            </div>
+          )}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:'6px'}}>
           <CheckFat size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>

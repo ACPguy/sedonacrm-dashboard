@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Briefcase, Eye, EyeSlash } from '@phosphor-icons/react';
+import { Briefcase, Eye, EyeSlash, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import { useRouter } from 'next/router';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
@@ -228,6 +228,7 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
         const tab = window.open(`${window.location.origin}/owners/${o.podio_id ?? 'X'+o.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
+        try{sessionStorage.setItem('ownersBackUrl',window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('ownersNavList',JSON.stringify(navL));sessionStorage.setItem('ownersNavIndex',String(filtered.findIndex(r=>r.id===o.id)));}catch{}
         onSelect(o);
       }
     };
@@ -379,7 +380,7 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
               const rowBg = i%2===0?'transparent':T.bg0;
               return (
                 <div key={o.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-                  onClick={()=>onSelect(o)}
+                  onClick={()=>{try{sessionStorage.setItem('ownersBackUrl',window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('ownersNavList',JSON.stringify(navL));sessionStorage.setItem('ownersNavIndex',String(filtered.findIndex(r=>r.id===o.id)));}catch{}onSelect(o);}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{o.company_dba||'—'}</div>
@@ -586,6 +587,9 @@ export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
   const [ownerTab, setOwnerTab]               = useState('properties');
   const [agmtData, setAgmtData]               = useState(null);
   const [agmtLoading, setAgmtLoading]         = useState(false);
+  const [navList, setNavList]                 = useState(null);
+  const [navIdx, setNavIdx]                   = useState(-1);
+  const [navLoading, setNavLoading]           = useState(false);
   const agmtFetched = useRef(false);
   const resizingRight = useRef(false);
 
@@ -630,6 +634,56 @@ export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
     document.title = `${data.company_dba || 'Owner'} | SedonaCRM`;
     return () => { document.title = 'SedonaCRM'; };
   }, [data.company_dba]);
+
+  // Nav list from sessionStorage
+  useEffect(() => {
+    try {
+      const nl = sessionStorage.getItem('ownersNavList');
+      const ni = sessionStorage.getItem('ownersNavIndex');
+      if (nl) { setNavList(JSON.parse(nl)); setNavIdx(ni !== null ? parseInt(ni, 10) : -1); }
+    } catch {}
+  }, []);
+
+  const goNav = async (dir) => {
+    if (!navList) return;
+    const next = navIdx + dir;
+    if (next < 0 || next >= navList.length) return;
+    const entry = navList[next];
+    setNavLoading(true);
+    try {
+      const query = entry.podio_id ? `podio_id=eq.${entry.podio_id}&select=*&limit=1` : `id=eq.${entry.id}&select=*&limit=1`;
+      const rows = await sbFetch('property_owners', query);
+      if (rows && rows[0]) {
+        setData(rows[0]);
+        setNavIdx(next);
+        sessionStorage.setItem('ownersNavIndex', String(next));
+        const newUrl = entry.podio_id ? `/owners/${entry.podio_id}` : `/owners/X${entry.id.slice(-6)}`;
+        window.history.replaceState(null, '', newUrl);
+        setPrimaryContact(null);
+        setLinkedProp(null);
+        setAgmtData(null);
+        agmtFetched.current = false;
+        setOwnerTab('properties');
+      }
+    } catch {}
+    setNavLoading(false);
+  };
+
+  const goNavRef = useRef(goNav);
+  goNavRef.current = goNav;
+
+  // Arrow key nav
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (e.key === 'ArrowLeft') goNavRef.current(-1);
+      if (e.key === 'ArrowRight') goNavRef.current(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const startRightResize = useCallback(e => {
     resizingRight.current = true;
@@ -688,6 +742,25 @@ export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
             onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
             {copied ? '✓ Copied' : '⧉ Copy Link'}
           </button>
+
+          {/* Prev/Next nav */}
+          {navList&&navList.length>1&&(
+            <div style={{display:'flex',alignItems:'center',gap:'3px',flexShrink:0,marginLeft:'auto'}}>
+              <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx<=0?'not-allowed':'pointer',opacity:navIdx<=0?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretLeft size={18} weight="bold"/>
+              </button>
+              <span style={{fontSize:F.xs,color:T.text3,padding:'0 6px',whiteSpace:'nowrap'}}>{navIdx+1} of {navList.length}</span>
+              <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx>=navList.length-1?'not-allowed':'pointer',opacity:navIdx>=navList.length-1?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretRight size={18} weight="bold"/>
+              </button>
+            </div>
+          )}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:'6px'}}>
           <Briefcase size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>

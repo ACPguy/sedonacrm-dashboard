@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { UserCircle } from '@phosphor-icons/react';
+import { UserCircle, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -329,6 +329,7 @@ export const ContactsList = ({ contacts, loading, error, onSelect, hidePropertyF
         const tab = window.open(`${window.location.origin}/contacts/${contact.podio_id ?? 'X'+contact.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
+        try{sessionStorage.setItem('contactsBackUrl',window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('contactsNavList',JSON.stringify(navL));sessionStorage.setItem('contactsNavIndex',String(filtered.findIndex(r=>r.id===contact.id)));}catch{}
         onSelect(contact);
       }
     };
@@ -519,7 +520,7 @@ export const ContactsList = ({ contacts, loading, error, onSelect, hidePropertyF
               const statusBg = sLow==='active'?'#1e2a1e':T.bg3;
               return (
                 <div key={c.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-                  onClick={()=>onSelect(c)}
+                  onClick={()=>{try{sessionStorage.setItem('contactsBackUrl',window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('contactsNavList',JSON.stringify(navL));sessionStorage.setItem('contactsNavIndex',String(filtered.findIndex(r=>r.id===c.id)));}catch{}onSelect(c);}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{c.full_name||'—'}</div>
@@ -557,6 +558,9 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
   const [tab,  setTab]  = useState('dashboard');
   const [data, setData] = useState(contact);
   const [copied, setCopied] = useState(false);
+  const [navList, setNavList] = useState(null);
+  const [navIdx, setNavIdx] = useState(-1);
+  const [navLoading, setNavLoading] = useState(false);
 
   // Lazy tab data
   const [tenantTab, setTenantTab] = useState({ rows: null, loading: false });
@@ -581,6 +585,54 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack]);
+
+  // Nav list from sessionStorage
+  useEffect(() => {
+    try {
+      const nl = sessionStorage.getItem('contactsNavList');
+      const ni = sessionStorage.getItem('contactsNavIndex');
+      if (nl) { setNavList(JSON.parse(nl)); setNavIdx(ni !== null ? parseInt(ni, 10) : -1); }
+    } catch {}
+  }, []);
+
+  const goNav = async (dir) => {
+    if (!navList) return;
+    const next = navIdx + dir;
+    if (next < 0 || next >= navList.length) return;
+    const entry = navList[next];
+    setNavLoading(true);
+    try {
+      const rows = await sbFetch('contacts', `podio_id=eq.${entry.podio_id}&select=*&limit=1`);
+      if (rows && rows[0]) {
+        setData(rows[0]);
+        setNavIdx(next);
+        sessionStorage.setItem('contactsNavIndex', String(next));
+        window.history.replaceState(null, '', `/contacts/${entry.podio_id}`);
+        setTab('dashboard');
+        setTenantTab({ rows: null, loading: false });
+        setOwnerTab({ rows: null, loading: false });
+        setVendorTab({ rows: null, loading: false });
+        setIssueTab({ rows: null, loading: false });
+      }
+    } catch {}
+    setNavLoading(false);
+  };
+
+  const goNavRef = useRef(goNav);
+  goNavRef.current = goNav;
+
+  // Arrow key nav
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (e.key === 'ArrowLeft') goNavRef.current(-1);
+      if (e.key === 'ArrowRight') goNavRef.current(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Lazy fetch: tenant
   useEffect(() => {
@@ -671,7 +723,7 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
             onMouseLeave={e => e.currentTarget.style.color = T.text1}>
             <UserCircle size={14} weight="bold"/>← Contacts
           </button>
-          <div style={{marginLeft:'auto', display:'flex', gap:'6px'}}>
+          <div style={{marginLeft:'auto', display:'flex', gap:'6px', alignItems:'center'}}>
             <button onClick={copyLink}
               style={{padding:'3px 10px', borderRadius:'4px', fontSize:F.xs, cursor:'pointer',
                 border:`0.5px solid ${copied ? T.success : T.border}`,
@@ -680,6 +732,25 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
               {copied ? 'Copied!' : 'Copy Link'}
             </button>
           </div>
+
+          {/* Prev/Next nav */}
+          {navList&&navList.length>1&&(
+            <div style={{display:'flex',alignItems:'center',gap:'3px',flexShrink:0}}>
+              <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx<=0?'not-allowed':'pointer',opacity:navIdx<=0?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretLeft size={18} weight="bold"/>
+              </button>
+              <span style={{fontSize:F.xs,color:T.text3,padding:'0 6px',whiteSpace:'nowrap'}}>{navIdx+1} of {navList.length}</span>
+              <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx>=navList.length-1?'not-allowed':'pointer',opacity:navIdx>=navList.length-1?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretRight size={18} weight="bold"/>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Row 2: Name + company */}

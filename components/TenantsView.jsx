@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Storefront } from '@phosphor-icons/react';
+import { Storefront, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
 
@@ -376,6 +376,11 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
         if (tab) tab.focus();
       } else {
         try { sessionStorage.setItem('tenantsBackUrl', window.location.href); } catch {}
+        try {
+          const navL = filtered.map(r => ({ id: r.id, podio_id: r.podio_id }));
+          sessionStorage.setItem('tenantsNavList', JSON.stringify(navL));
+          sessionStorage.setItem('tenantsNavIndex', String(filtered.findIndex(r => r.id === t.id)));
+        } catch {}
         onSelect(t);
       }
     };
@@ -552,7 +557,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
               const expColor = exp===null?T.text3:exp<0?T.danger:exp<180?T.warn:T.text2;
               return (
                 <div key={t.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-                  onClick={()=>onSelect(t)}
+                  onClick={()=>{try{sessionStorage.setItem('tenantsBackUrl',window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('tenantsNavList',JSON.stringify(navL));sessionStorage.setItem('tenantsNavIndex',String(filtered.findIndex(r=>r.id===t.id)));}catch{}onSelect(t);}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{t.tenant_dba||'—'}</div>
@@ -580,6 +585,9 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
   const [data,     setData]     = useState(tenant);
   const [property, setProperty] = useState(null);
   const [suite,    setSuite]    = useState(null);
+  const [navList,  setNavList]  = useState(null);
+  const [navIdx,   setNavIdx]   = useState(-1);
+  const [navLoading, setNavLoading] = useState(false);
 
   // Lazy-loaded tab data
   const [contacts,         setContacts]         = useState(null);
@@ -666,6 +674,51 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack]);
 
+  // Nav list from sessionStorage
+  useEffect(() => {
+    try {
+      const nl = sessionStorage.getItem('tenantsNavList');
+      const ni = sessionStorage.getItem('tenantsNavIndex');
+      if (nl) { setNavList(JSON.parse(nl)); setNavIdx(ni !== null ? parseInt(ni, 10) : -1); }
+    } catch {}
+  }, []);
+
+  const goNav = async (dir) => {
+    if (!navList) return;
+    const next = navIdx + dir;
+    if (next < 0 || next >= navList.length) return;
+    const entry = navList[next];
+    setNavLoading(true);
+    try {
+      const rows = await sbFetch('tenants', `podio_id=eq.${entry.podio_id}&select=*&limit=1`);
+      if (rows && rows[0]) {
+        setData(rows[0]);
+        setNavIdx(next);
+        sessionStorage.setItem('tenantsNavIndex', String(next));
+        window.history.replaceState(null, '', `/tenants/${entry.podio_id}`);
+        loaded.current = new Set();
+        setTab('overview');
+      }
+    } catch {}
+    setNavLoading(false);
+  };
+
+  const goNavRef = useRef(goNav);
+  goNavRef.current = goNav;
+
+  // Arrow key nav
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (e.key === 'ArrowLeft') goNavRef.current(-1);
+      if (e.key === 'ArrowRight') goNavRef.current(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const save = async (field, val) => {
     await sbPatch('tenants', data.id, { [field]: val });
     const updated = { ...data, [field]: val };
@@ -726,6 +779,25 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
               eSign
             </span>
           </div>
+
+          {/* Prev/Next nav */}
+          {navList&&navList.length>1&&(
+            <div style={{display:'flex',alignItems:'center',gap:'3px',flexShrink:0}}>
+              <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx<=0?'not-allowed':'pointer',opacity:navIdx<=0?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretLeft size={18} weight="bold"/>
+              </button>
+              <span style={{fontSize:F.xs,color:T.text3,padding:'0 6px',whiteSpace:'nowrap'}}>{navIdx+1} of {navList.length}</span>
+              <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx>=navList.length-1?'not-allowed':'pointer',opacity:navIdx>=navList.length-1?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretRight size={18} weight="bold"/>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Row 2: title + entity subtitle */}

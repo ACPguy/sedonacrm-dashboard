@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Wrench } from '@phosphor-icons/react';
+import { Wrench, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -596,7 +596,13 @@ export const WorkOrdersList = ({ onSelect, hidePropStrip = false, hidePropertyFi
         onMouseLeave={e => e.currentTarget.style.background = rowBg}
         onClick={e => {
           if (e.target.closest('a')) return;
-          if (!e.ctrlKey && !e.metaKey) onSelect(wo);
+          if (!e.ctrlKey && !e.metaKey) {
+            sessionStorage.setItem('workOrdersBackUrl', window.location.pathname + window.location.search);
+            const navL = filtered.map(r => ({ id: r.id, podio_id: r.podio_id }));
+            sessionStorage.setItem('workOrdersNavList', JSON.stringify(navL));
+            sessionStorage.setItem('workOrdersNavIndex', String(filtered.findIndex(r => r.id === wo.id)));
+            onSelect(wo);
+          }
         }}>
 
         {/* WO # — real anchor enables ctrl+click, middle-click, right-click → open in new tab */}
@@ -605,6 +611,10 @@ export const WorkOrdersList = ({ onSelect, hidePropStrip = false, hidePropertyFi
             onClick={e => {
               if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
                 e.preventDefault();
+                sessionStorage.setItem('workOrdersBackUrl', window.location.pathname + window.location.search);
+                const navL = filtered.map(r => ({ id: r.id, podio_id: r.podio_id }));
+                sessionStorage.setItem('workOrdersNavList', JSON.stringify(navL));
+                sessionStorage.setItem('workOrdersNavIndex', String(filtered.findIndex(r => r.id === wo.id)));
                 onSelect(wo);
               }
             }}
@@ -884,7 +894,7 @@ export const WorkOrdersList = ({ onSelect, hidePropStrip = false, hidePropertyFi
               const rowBg = i%2===0?'transparent':T.bg0;
               return (
                 <div key={wo.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-                  onClick={()=>onSelect(wo)}
+                  onClick={()=>{sessionStorage.setItem('workOrdersBackUrl',window.location.pathname+window.location.search);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('workOrdersNavList',JSON.stringify(navL));sessionStorage.setItem('workOrdersNavIndex',String(filtered.findIndex(r=>r.id===wo.id)));onSelect(wo);}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{display:'flex',gap:'6px',alignItems:'baseline',marginBottom:'4px'}}>
@@ -1084,6 +1094,9 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [rightWidth, setRightWidth]         = useState(300);
   const [copied, setCopied]                 = useState(false);
+  const [navList, setNavList]               = useState(null);
+  const [navIdx, setNavIdx]                 = useState(-1);
+  const [navLoading, setNavLoading]         = useState(false);
   const resizingRight = useRef(false);
 
   useEffect(() => {
@@ -1132,6 +1145,49 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
     document.title = `${data.prop_code || ''} – ${truncated} | SedonaCRM`;
     return () => { document.title = 'SedonaCRM'; };
   }, [data.prop_code, data.short_description]);
+
+  useEffect(() => {
+    try {
+      const list = JSON.parse(sessionStorage.getItem('workOrdersNavList') || 'null');
+      const idx  = parseInt(sessionStorage.getItem('workOrdersNavIndex') || '-1', 10);
+      if (list && Array.isArray(list) && idx >= 0) { setNavList(list); setNavIdx(idx); }
+    } catch {}
+  }, []);
+
+  const goNav = async dir => {
+    if (!navList || navLoading) return;
+    const newIdx = navIdx + dir;
+    if (newIdx < 0 || newIdx >= navList.length) return;
+    setNavLoading(true);
+    try {
+      const entry = navList[newIdx];
+      const rows = await sbFetch('work_orders', `podio_id=eq.${entry.podio_id}&select=*&limit=1`);
+      if (!rows.length) return;
+      const newRec = rows[0];
+      setData(newRec);
+      setNavIdx(newIdx);
+      sessionStorage.setItem('workOrdersNavIndex', String(newIdx));
+      window.history.replaceState({}, '', `/work-orders/${entry.podio_id}`);
+    } catch {}
+    finally { setNavLoading(false); }
+  };
+
+  const goNavRef = useRef(goNav);
+  goNavRef.current = goNav;
+
+  useEffect(() => {
+    const onArrow = e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      const isEditing = tag === 'input' || tag === 'textarea' || document.activeElement?.contentEditable === 'true';
+      if (isEditing) return;
+      e.preventDefault();
+      if (e.key === 'ArrowLeft') goNavRef.current(-1);
+      else goNavRef.current(1);
+    };
+    window.addEventListener('keydown', onArrow);
+    return () => window.removeEventListener('keydown', onArrow);
+  }, []);
 
   const save = async (field, val) => {
     await sbPatch('work_orders', data.id, { [field]: val ?? null });
@@ -1206,6 +1262,23 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
             <StatusBadge status={data.wo_status||'New'}/>
             {data.priority && <StatusBadge status={data.priority}/>}
           </div>
+          {navList&&navList.length>1&&(
+            <div style={{display:'flex',alignItems:'center',gap:'3px',flexShrink:0}}>
+              <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx<=0?'not-allowed':'pointer',opacity:navIdx<=0?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretLeft size={18} weight="bold"/>
+              </button>
+              <span style={{fontSize:F.xs,color:T.text3,padding:'0 6px',whiteSpace:'nowrap'}}>{navIdx+1} of {navList.length}</span>
+              <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx>=navList.length-1?'not-allowed':'pointer',opacity:navIdx>=navList.length-1?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretRight size={18} weight="bold"/>
+              </button>
+            </div>
+          )}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8,marginTop:'6px'}}>
           <Wrench size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Key, ChatCircle } from '@phosphor-icons/react';
+import { Key, ChatCircle, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import { ActivityPanel } from './TasksView';
 
@@ -311,12 +311,12 @@ const KeySafesList = ({ onSelect, filterPropCode }) => {
                     style={{borderBottom:`0.5px solid ${T.border}`,background:rowBg,cursor:'pointer'}}
                     onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                     onMouseLeave={e=>e.currentTarget.style.background=rowBg}
-                    onClick={e=>{if(e.target.closest('a'))return;sessionStorage.setItem('keySafesBackUrl',window.location.pathname);onSelect(item);}}>
+                    onClick={e=>{if(e.target.closest('a'))return;const navL=items.map(r=>({id:r.id}));sessionStorage.setItem('keySafesNavList',JSON.stringify(navL));sessionStorage.setItem('keySafesNavIndex',String(items.findIndex(r=>r.id===item.id)));sessionStorage.setItem('keySafesBackUrl',window.location.pathname);onSelect(item);}}>
                     <td style={{...css.td,color:T.accent,fontWeight:'500',fontSize:F.xs}}>{item.prop_code||''}</td>
                     <td style={{...css.td,color:T.text2,fontSize:F.xs}}>{item.id_num||''}</td>
                     <td style={{...css.td,fontWeight:'600'}}>
                       <a href={href}
-                        onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();sessionStorage.setItem('keySafesBackUrl',window.location.pathname);onSelect(item);}}}
+                        onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();const navL=items.map(r=>({id:r.id}));sessionStorage.setItem('keySafesNavList',JSON.stringify(navL));sessionStorage.setItem('keySafesNavIndex',String(items.findIndex(r=>r.id===item.id)));sessionStorage.setItem('keySafesBackUrl',window.location.pathname);onSelect(item);}}}
                         style={{color:'inherit',textDecoration:'none'}}>
                         {item.key_safe_code||'—'}
                       </a>
@@ -338,7 +338,7 @@ const KeySafesList = ({ onSelect, filterPropCode }) => {
               return (
                 <div key={item.id}
                   style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-                  onClick={()=>{sessionStorage.setItem('keySafesBackUrl',window.location.pathname);onSelect(item);}}
+                  onClick={()=>{const navL=items.map(r=>({id:r.id}));sessionStorage.setItem('keySafesNavList',JSON.stringify(navL));sessionStorage.setItem('keySafesNavIndex',String(items.findIndex(r=>r.id===item.id)));sessionStorage.setItem('keySafesBackUrl',window.location.pathname);onSelect(item);}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px'}}>
@@ -366,6 +366,9 @@ export const KeySafeDetail = ({ keySafe: initialItem, itemId, onBack, onUpdate }
   const [notFound,setNotFound] = useState(false);
   const [activeProps,setActiveProps] = useState([]);
   const [copied,setCopied]   = useState(false);
+  const [navList,setNavList] = useState(null);
+  const [navIdx,setNavIdx]   = useState(-1);
+  const [navLoading,setNavLoading] = useState(false);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
   const [activityCollapsed,setActivityCollapsed] = useState(isMobile);
   const [activityWidth,setActivityWidth] = useState(280);
@@ -410,6 +413,13 @@ export const KeySafeDetail = ({ keySafe: initialItem, itemId, onBack, onUpdate }
   },[itemId,initialItem]);
 
   useEffect(()=>{
+    const stored=sessionStorage.getItem('keySafesNavList');
+    if(stored){try{setNavList(JSON.parse(stored));}catch{}}
+    const idx=sessionStorage.getItem('keySafesNavIndex');
+    if(idx!=null)setNavIdx(parseInt(idx,10));
+  },[]);
+
+  useEffect(()=>{
     sbFetch('properties','select=prop_code,property_name&status=eq.active&order=prop_code.asc')
       .then(setActiveProps).catch(()=>{});
   },[]);
@@ -440,6 +450,39 @@ export const KeySafeDetail = ({ keySafe: initialItem, itemId, onBack, onUpdate }
     onUpdate?.(updated);
   };
 
+  const goNav = async (dir) => {
+    if(!navList||navLoading)return;
+    const next=navIdx+dir;
+    if(next<0||next>=navList.length)return;
+    setNavLoading(true);
+    const entry=navList[next];
+    try{
+      const rows=await sbFetch('key_safes',`id=eq.${entry.id}&select=*&limit=1`);
+      if(!rows||!rows.length){setNavLoading(false);return;}
+      const newRec=rows[0];
+      setData(newRec);
+      setNavIdx(next);
+      sessionStorage.setItem('keySafesNavIndex',String(next));
+      window.history.replaceState({},'',`/key-safes/X${newRec.id.slice(-6)}`);
+      document.title=`Key Safe${newRec.prop_code?' — '+newRec.prop_code:''} | SedonaCRM`;
+    }finally{setNavLoading(false);}
+  };
+
+  const goNavRef=useRef(goNav);
+  goNavRef.current=goNav;
+
+  useEffect(()=>{
+    const onKey=e=>{
+      if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
+      const tag=e.target?.tagName?.toLowerCase();
+      if(tag==='input'||tag==='textarea'||tag==='select')return;
+      if(e.target?.isContentEditable)return;
+      goNavRef.current(e.key==='ArrowLeft'?-1:1);
+    };
+    window.addEventListener('keydown',onKey);
+    return ()=>window.removeEventListener('keydown',onKey);
+  },[]);
+
   const copyLink = () => {
     if (!data) return;
     const url = `${window.location.origin}/key-safes/X${data.id.slice(-6)}`;
@@ -469,6 +512,23 @@ export const KeySafeDetail = ({ keySafe: initialItem, itemId, onBack, onUpdate }
             onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
             {copied?'✓ Copied':'⧉ Copy Link'}
           </button>
+          {navList&&navList.length>1&&(
+            <div style={{display:'flex',alignItems:'center',gap:'4px',marginLeft:'auto',flexShrink:0}}>
+              <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 7px',color:navIdx<=0?T.text3:T.text1,cursor:navIdx<=0?'default':'pointer',display:'inline-flex',alignItems:'center',opacity:navIdx<=0?0.4:1}}
+                onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.color=T.text0;}}
+                onMouseLeave={e=>{if(navIdx>0)e.currentTarget.style.color=T.text1;}}>
+                <CaretLeft size={18} weight="bold"/>
+              </button>
+              <span style={{fontSize:F.xs,color:T.text3,minWidth:'48px',textAlign:'center',userSelect:'none'}}>{navLoading?'…':`${navIdx+1} of ${navList.length}`}</span>
+              <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 7px',color:navIdx>=navList.length-1?T.text3:T.text1,cursor:navIdx>=navList.length-1?'default':'pointer',display:'inline-flex',alignItems:'center',opacity:navIdx>=navList.length-1?0.4:1}}
+                onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.color=T.text0;}}
+                onMouseLeave={e=>{if(navIdx<navList.length-1)e.currentTarget.style.color=T.text1;}}>
+                <CaretRight size={18} weight="bold"/>
+              </button>
+            </div>
+          )}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
           <Key size={24} weight="bold" color="#E8630A"/>

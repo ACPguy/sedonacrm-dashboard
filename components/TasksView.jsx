@@ -855,17 +855,19 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         {/* Priority + Status pills on same row */}
         <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px',flexWrap:'wrap'}}>
           {/* Priority left */}
-          <div className="crm-tasks-priority-strip" style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+          <div className="crm-tasks-priority-strip" style={{display:'flex',gap:'4px',flexShrink:0}}>
             {['All','???','Urgent','High','Medium','Low'].map(p=>{
               const cnt=p==='All'?null:priorityCounts[p]??0;
               const active=priorityFilter===p;
+              const PCOL={'???':T.text3,Urgent:T.danger,High:T.warn,Medium:T.success,Low:T.accent};
+              const color=p==='All'?T.accent:(PCOL[p]||T.text3);
               return (
                 <button key={p} onClick={()=>setPriorityFilter(p)}
-                  style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,
-                    background:active?T.bg3:'transparent',color:active?T.text0:T.text2,
-                    fontWeight:active?'600':'400',display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
+                  style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${color}`,background:active?color:'transparent',color:active?'#fff':color,transition:'background 0.15s ease',flexShrink:0}}
+                  onMouseEnter={e=>{if(!active)e.currentTarget.style.background=`${color}33`;}}
+                  onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
                   {p!=='All'&&<PriorityDot priority={p}/>}
-                  {p}{cnt!==null&&<span style={{color:active?T.text1:T.text3,fontSize:'10px'}}>·{cnt}</span>}
+                  {p}{cnt!==null&&<span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>}
                 </button>
               );
             })}

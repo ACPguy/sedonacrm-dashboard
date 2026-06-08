@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Cube } from '@phosphor-icons/react';
+import { Cube, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -127,6 +127,9 @@ const useSortable = (data, defaultCol, defaultDir='asc') => {
 // ── Suite Detail ──────────────────────────────────────────────────────────────
 export const SuiteDetail = ({ suite, onBack, onUpdate }) => {
   const [data, setData] = useState(suite);
+  const [navList, setNavList] = useState(null);
+  const [navIdx, setNavIdx] = useState(-1);
+  const [navLoading, setNavLoading] = useState(false);
 
   useEffect(() => {
     const onKey = e => {
@@ -138,6 +141,49 @@ export const SuiteDetail = ({ suite, onBack, onUpdate }) => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack]);
+
+  // Nav list from sessionStorage
+  useEffect(() => {
+    try {
+      const nl = sessionStorage.getItem('suitesNavList');
+      const ni = sessionStorage.getItem('suitesNavIndex');
+      if (nl) { setNavList(JSON.parse(nl)); setNavIdx(ni !== null ? parseInt(ni, 10) : -1); }
+    } catch {}
+  }, []);
+
+  const goNav = async (dir) => {
+    if (!navList) return;
+    const next = navIdx + dir;
+    if (next < 0 || next >= navList.length) return;
+    const entry = navList[next];
+    setNavLoading(true);
+    try {
+      const rows = await sbFetch('suites', `podio_id=eq.${entry.podio_id}&select=*&limit=1`);
+      if (rows && rows[0]) {
+        setData(rows[0]);
+        setNavIdx(next);
+        sessionStorage.setItem('suitesNavIndex', String(next));
+        window.history.replaceState(null, '', `/suites/${entry.podio_id}`);
+      }
+    } catch {}
+    setNavLoading(false);
+  };
+
+  const goNavRef = useRef(goNav);
+  goNavRef.current = goNav;
+
+  // Arrow key nav
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (e.key === 'ArrowLeft') goNavRef.current(-1);
+      if (e.key === 'ArrowRight') goNavRef.current(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const save = async (field, val) => {
     await sbPatch('suites', data.id, { [field]: val||null });
@@ -158,6 +204,23 @@ export const SuiteDetail = ({ suite, onBack, onUpdate }) => {
           </button>
           <StatusBadge status={data.status}/>
           <StatusBadge status={data.space_type}/>
+          <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'3px',flexShrink:0}}>
+            {navList&&navList.length>1&&(<>
+              <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx<=0?'not-allowed':'pointer',opacity:navIdx<=0?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretLeft size={18} weight="bold"/>
+              </button>
+              <span style={{fontSize:F.xs,color:T.text3,padding:'0 6px',whiteSpace:'nowrap'}}>{navIdx+1} of {navList.length}</span>
+              <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx>=navList.length-1?'not-allowed':'pointer',opacity:navIdx>=navList.length-1?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretRight size={18} weight="bold"/>
+              </button>
+            </>)}
+          </div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <Cube size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
@@ -364,7 +427,7 @@ export const SuitesList = ({ suites, loading, error, onSelect, hidePropertyFilte
         onClick={e=>{
           if(e.target.closest('a'))return;
           if(e.ctrlKey||e.metaKey){const tab=window.open(`${window.location.origin}/suites/${s.podio_id??'X'+s.id.slice(-6)}`, '_blank');if(tab)tab.focus();}
-          else { try{sessionStorage.setItem('suitesBackUrl', window.location.href);}catch{} onSelect(s); }
+          else { try{sessionStorage.setItem('suitesBackUrl', window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('suitesNavList',JSON.stringify(navL));sessionStorage.setItem('suitesNavIndex',String(filtered.findIndex(r=>r.id===s.id)));}catch{} onSelect(s); }
         }}
         style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
         onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
@@ -510,7 +573,7 @@ export const SuitesList = ({ suites, loading, error, onSelect, hidePropertyFilte
               const rowBg = i%2===0?'transparent':T.bg0;
               return (
                 <div key={s.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-                  onClick={()=>onSelect(s)}
+                  onClick={()=>{try{sessionStorage.setItem('suitesBackUrl',window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('suitesNavList',JSON.stringify(navL));sessionStorage.setItem('suitesNavIndex',String(filtered.findIndex(r=>r.id===s.id)));}catch{}onSelect(s);}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}}>

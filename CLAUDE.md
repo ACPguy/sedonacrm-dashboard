@@ -313,11 +313,43 @@ Tasks Module Stage 2 — UI (on `preview` branch, commit fbbc5ec):
 - All major list views routed with shared table components
 
 **Next:**
-1. Test Tasks detail form on preview — verify field saves, type conversion, WO section
-2. Merge preview → main (`git push origin preview:main`) when Scott approves
-3. Property detail — remaining tab groups:
+1. Merge preview → main (`git push origin preview:main`) when Scott approves
+2. Property detail — remaining tab groups:
    - Financial: CAM, Taxes, PM Fees, Invoices, Insurance
    - Operations: Work Orders (vendor name), Inspections, Key Safe
    - Ownership: Owners, Agreements, Monthly Reports, YR End Reports
-4. Phase 3 Stage 2: Gmail compose/send, thread sync, AI summarize
-5. Populate podio_id for vendors (deferred to go-live Podio API sync)
+3. Phase 3 Stage 2: Gmail compose/send, thread sync, AI summarize
+4. Populate podio_id for vendors (deferred to go-live Podio API sync)
+
+## Prev/Next Navigation Rule (permanent)
+
+All detail views support keyboard (ArrowLeft/ArrowRight) and button (‹ ›) navigation across the list that opened them.
+
+**List view writes to sessionStorage on row click:**
+```js
+const navL = items.map(r => ({ id: r.id, podio_id: r.podio_id })); // include only fields needed by goNav
+sessionStorage.setItem('{module}NavList', JSON.stringify(navL));
+sessionStorage.setItem('{module}NavIndex', String(items.findIndex(r => r.id === item.id)));
+```
+
+**Detail view pattern:**
+- State: `const [navList,setNavList]=useState(null); const [navIdx,setNavIdx]=useState(-1); const [navLoading,setNavLoading]=useState(false);`
+- Mount useEffect reads `{module}NavList` / `{module}NavIndex` from sessionStorage (empty dep array)
+- `goNav(dir)` fetches adjacent record, calls `setData(newRec)`, updates `navIdx`, writes new index to sessionStorage, calls `window.history.replaceState({}, '', newUrl)`
+- `goNavRef` pattern: `const goNavRef=useRef(goNav); goNavRef.current=goNav;` placed after `goNav` definition, before early returns — arrow key useEffect uses `goNavRef.current` with empty dep array
+- Arrow key useEffect skips when `e.target.tagName` is input/textarea/select or `e.target.isContentEditable`
+- Nav UI: shown only when `navList && navList.length > 1`; right-aligned in header first flex div via `marginLeft:'auto'`; CaretLeft/CaretRight size=18 weight="bold" from @phosphor-icons/react
+
+**Per-module keys and identifiers:**
+| Module | NavList key | NavIndex key | Identifier | goNav query | URL |
+|---|---|---|---|---|---|
+| Tasks | tasksNavList | tasksNavIndex | `{task_num,record_type}` | by prefix+num | `/tasks/WO-N` etc |
+| WorkOrders | workOrdersNavList | workOrdersNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/work-orders/N` |
+| Issues | issuesNavList | issuesNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/issues/N` |
+| Tenants | tenantsNavList | tenantsNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/tenants/N` |
+| Suites | suitesNavList | suitesNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/suites/N` |
+| RentSchedule | rentNavList | rentNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/rent-schedule/N` |
+| Contacts | contactsNavList | contactsNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/contacts/N` |
+| Vendors | vendorsNavList | vendorsNavIndex | `{id,podio_id}` | podio_id (or id fallback) | `/vendors/N` or `/vendors/XsufFix` |
+| Owners | ownersNavList | ownersNavIndex | `{id,podio_id}` | podio_id (or id fallback) | `/owners/N` or `/owners/XsufFix` |
+| KeySafes | keySafesNavList | keySafesNavIndex | `{id}` | `id=eq.UUID` | `/key-safes/XsufFix` |

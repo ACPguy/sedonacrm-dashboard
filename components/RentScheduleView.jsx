@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChartBar } from '@phosphor-icons/react';
+import { ChartBar, CaretLeft, CaretRight } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -320,6 +320,7 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
         const tab = window.open(`${window.location.origin}/rent-schedule/${row.podio_id ?? 'X'+row.id.slice(-6)}`, '_blank');
         if (tab) tab.focus();
       } else {
+        try{sessionStorage.setItem('rentScheduleBackUrl',window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('rentNavList',JSON.stringify(navL));sessionStorage.setItem('rentNavIndex',String(filtered.findIndex(r=>r.id===row.id)));}catch{}
         onSelect(row);
       }
     };
@@ -513,7 +514,7 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
               const endSoon = isEndingSoon(row);
               return (
                 <div key={row.id} style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-                  onClick={()=>onSelect(row)}
+                  onClick={()=>{try{sessionStorage.setItem('rentScheduleBackUrl',window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('rentNavList',JSON.stringify(navL));sessionStorage.setItem('rentNavIndex',String(filtered.findIndex(r=>r.id===row.id)));}catch{}onSelect(row);}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{row.tenants?.tenant_dba||'—'}</div>
@@ -538,11 +539,16 @@ const RentScheduleList = ({ rows, loading, error, onSelect }) => {
 // RentScheduleDetail — placeholder detail view
 // ─────────────────────────────────────────────────────────────────────────────
 export const RentScheduleDetail = ({ row, onBack }) => {
+  const [data, setData] = useState(row);
+  const [navList, setNavList] = useState(null);
+  const [navIdx, setNavIdx] = useState(-1);
+  const [navLoading, setNavLoading] = useState(false);
+
   useEffect(() => {
-    const label = `${row.prop_code||''} – ${row.tenants?.tenant_dba||'Rent Record'}`;
+    const label = `${data.prop_code||''} – ${data.tenants?.tenant_dba||'Rent Record'}`;
     document.title = `${label} | SedonaCRM`;
     return () => { document.title = 'SedonaCRM'; };
-  }, [row]);
+  }, [data]);
 
   useEffect(() => {
     const onKey = e => {
@@ -555,6 +561,49 @@ export const RentScheduleDetail = ({ row, onBack }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [onBack]);
 
+  // Nav list from sessionStorage
+  useEffect(() => {
+    try {
+      const nl = sessionStorage.getItem('rentNavList');
+      const ni = sessionStorage.getItem('rentNavIndex');
+      if (nl) { setNavList(JSON.parse(nl)); setNavIdx(ni !== null ? parseInt(ni, 10) : -1); }
+    } catch {}
+  }, []);
+
+  const goNav = async (dir) => {
+    if (!navList) return;
+    const next = navIdx + dir;
+    if (next < 0 || next >= navList.length) return;
+    const entry = navList[next];
+    setNavLoading(true);
+    try {
+      const rows = await sbFetch('rent_schedule', `podio_id=eq.${entry.podio_id}&select=*,tenants!rent_schedule_tenant_id_fkey(tenant_dba,lease_type)&limit=1`);
+      if (rows && rows[0]) {
+        setData(rows[0]);
+        setNavIdx(next);
+        sessionStorage.setItem('rentNavIndex', String(next));
+        window.history.replaceState(null, '', `/rent-schedule/${entry.podio_id}`);
+      }
+    } catch {}
+    setNavLoading(false);
+  };
+
+  const goNavRef = useRef(goNav);
+  goNavRef.current = goNav;
+
+  // Arrow key nav
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (e.key === 'ArrowLeft') goNavRef.current(-1);
+      if (e.key === 'ArrowRight') goNavRef.current(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const field = (label, value) => (
     <div style={{marginBottom:'10px'}}>
       <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>{label}</div>
@@ -562,7 +611,7 @@ export const RentScheduleDetail = ({ row, onBack }) => {
     </div>
   );
 
-  const moLeft = calcMoLeft(row.rent_ends);
+  const moLeft = calcMoLeft(data.rent_ends);
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -574,18 +623,35 @@ export const RentScheduleDetail = ({ row, onBack }) => {
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             <ChartBar size={14} weight="bold"/>← Rent Schedule
           </button>
-          <span style={{color:T.accent,fontWeight:'600',fontSize:F.sm}}>{row.prop_code||'—'}</span>
-          {row.suite_num && <span style={{color:T.text2,fontSize:F.sm}}>Suite {row.suite_num}</span>}
+          <span style={{color:T.accent,fontWeight:'600',fontSize:F.sm}}>{data.prop_code||'—'}</span>
+          {data.suite_num && <span style={{color:T.text2,fontSize:F.sm}}>Suite {data.suite_num}</span>}
           <span style={{marginLeft:'auto'}}>
-            <RentStatusBadge status={row.rent_status}/>
+            <RentStatusBadge status={data.rent_status}/>
           </span>
+
+          {/* Prev/Next nav */}
+          {navList&&navList.length>1&&(<>
+            <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+              style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx<=0?'not-allowed':'pointer',opacity:navIdx<=0?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+              onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.borderColor=T.accent;}}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+              <CaretLeft size={18} weight="bold"/>
+            </button>
+            <span style={{fontSize:F.xs,color:T.text3,padding:'0 6px',whiteSpace:'nowrap'}}>{navIdx+1} of {navList.length}</span>
+            <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+              style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx>=navList.length-1?'not-allowed':'pointer',opacity:navIdx>=navList.length-1?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+              onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.borderColor=T.accent;}}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+              <CaretRight size={18} weight="bold"/>
+            </button>
+          </>)}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <ChartBar size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
-          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{row.tenants?.tenant_dba||'Unnamed Tenant'}</div>
+          <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{data.tenants?.tenant_dba||'Unnamed Tenant'}</div>
         </div>
         <div style={{fontSize:F.sm,color:T.text2,marginTop:'2px'}}>
-          {row.tenants?.lease_type || 'Lease'} · {row.prop_code}{row.suite_num ? ` · Suite ${row.suite_num}` : ''}
+          {data.tenants?.lease_type || 'Lease'} · {data.prop_code}{data.suite_num ? ` · Suite ${data.suite_num}` : ''}
         </div>
       </div>
 
@@ -593,47 +659,47 @@ export const RentScheduleDetail = ({ row, onBack }) => {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'16px',maxWidth:'900px'}}>
           <div style={css.card}>
             <div style={css.secTitle}>Rent Details</div>
-            {field('Prop Code',  row.prop_code)}
-            {field('Suite',      row.suite_num)}
-            {field('Tenant',     row.tenants?.tenant_dba)}
-            {field('Lease Type', row.tenants?.lease_type)}
-            {field('Status',     row.rent_status)}
+            {field('Prop Code',  data.prop_code)}
+            {field('Suite',      data.suite_num)}
+            {field('Tenant',     data.tenants?.tenant_dba)}
+            {field('Lease Type', data.tenants?.lease_type)}
+            {field('Status',     data.rent_status)}
           </div>
           <div style={css.card}>
             <div style={css.secTitle}>Financials</div>
-            {field('Base Rent',   fmtCurrency(row.base_rent))}
-            {field('NNN',         fmtCurrency(row.nnn))}
-            {field('Other',       fmtCurrency(row.other_amt))}
-            {field('CAM Impound', fmtCurrency(row.cam_impound))}
-            {field('TPT Tax',     fmtCurrency(row.tpt_tax))}
-            {field('Total',       fmtCurrency(row.total))}
+            {field('Base Rent',   fmtCurrency(data.base_rent))}
+            {field('NNN',         fmtCurrency(data.nnn))}
+            {field('Other',       fmtCurrency(data.other_amt))}
+            {field('CAM Impound', fmtCurrency(data.cam_impound))}
+            {field('TPT Tax',     fmtCurrency(data.tpt_tax))}
+            {field('Total',       fmtCurrency(data.total))}
           </div>
           <div style={css.card}>
             <div style={css.secTitle}>Term</div>
-            {field('Rent Start', fmtDate(row.rent_starts))}
-            {field('Rent End',   fmtDate(row.rent_ends))}
+            {field('Rent Start', fmtDate(data.rent_starts))}
+            {field('Rent End',   fmtDate(data.rent_ends))}
             <div style={{marginBottom:'10px'}}>
               <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'2px'}}>Mo. Left</div>
               <div style={{fontSize:F.md,fontWeight:'700',color:moLeftColor(moLeft),padding:'3px 5px'}}>
                 {moLeft === null ? '—' : moLeft < 0 ? 'Expired' : `${moLeft} months`}
               </div>
             </div>
-            {field('Lease Start', fmtDate(row.lease_starts))}
-            {field('Lease End',   fmtDate(row.lease_ends))}
+            {field('Lease Start', fmtDate(data.lease_starts))}
+            {field('Lease End',   fmtDate(data.lease_ends))}
           </div>
           <div style={css.card}>
             <div style={css.secTitle}>Additional</div>
-            {field('Sq Ft',       row.sqft ? row.sqft.toLocaleString() : null)}
-            {field('Amendment #', row.amendment_num != null ? String(row.amendment_num) : null)}
-            {field('Base / SF',   row.base_per_sf ? `$${Number(row.base_per_sf).toFixed(2)}` : null)}
-            {field('NNN / SF',    row.nnn_per_sf  ? `$${Number(row.nnn_per_sf).toFixed(2)}`  : null)}
-            {field('CPI Adjusted', row.cpi_adjusted ? 'Yes' : 'No')}
-            {field('TPT Exempt',   row.tpt_tax_exempt ? 'Yes' : 'No')}
+            {field('Sq Ft',       data.sqft ? data.sqft.toLocaleString() : null)}
+            {field('Amendment #', data.amendment_num != null ? String(data.amendment_num) : null)}
+            {field('Base / SF',   data.base_per_sf ? `$${Number(data.base_per_sf).toFixed(2)}` : null)}
+            {field('NNN / SF',    data.nnn_per_sf  ? `$${Number(data.nnn_per_sf).toFixed(2)}`  : null)}
+            {field('CPI Adjusted', data.cpi_adjusted ? 'Yes' : 'No')}
+            {field('TPT Exempt',   data.tpt_tax_exempt ? 'Yes' : 'No')}
           </div>
-          {row.notes && (
+          {data.notes && (
             <div style={{...css.card,gridColumn:'1 / -1'}}>
               <div style={css.secTitle}>Notes</div>
-              <div style={{fontSize:F.base,color:T.text1,lineHeight:'1.5',whiteSpace:'pre-wrap'}}>{row.notes}</div>
+              <div style={{fontSize:F.base,color:T.text1,lineHeight:'1.5',whiteSpace:'pre-wrap'}}>{data.notes}</div>
             </div>
           )}
         </div>
