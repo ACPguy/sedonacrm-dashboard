@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { EnvelopeSimple, NotePencil, Phone } from '@phosphor-icons/react';
+import EmailCompose from './EmailCompose';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -92,7 +93,7 @@ const ActionBtn = ({ label, onClick, disabled }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 // Main export
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CommunicationTimeline({ recordType, recordId, fromAccount = 'scott@andersoncp.com' }) {
+export default function CommunicationTimeline({ recordType, recordId, fromAccount = 'scott@andersoncp.com', crmRecordLabel, crmRecordUrl }) {
   const [entries, setEntries]             = useState([]);
   const [loading, setLoading]             = useState(true);
   const [filter, setFilter]               = useState('all');
@@ -106,6 +107,7 @@ export default function CommunicationTimeline({ recordType, recordId, fromAccoun
   const [callFields, setCallFields]       = useState({ datetime:'', duration:'', direction:'inbound', notes:'' });
   const [savingCall, setSavingCall]       = useState(false);
   const [refreshKey, setRefreshKey]       = useState(0);
+  const [showCompose, setShowCompose]     = useState(false);
 
   useEffect(() => {
     if (!recordId) return;
@@ -417,12 +419,12 @@ export default function CommunicationTimeline({ recordType, recordId, fromAccoun
   );
 
   return (
-    <div style={{display:'flex', flexDirection:'column', height:'100%', background:T.bg1}}>
+    <div style={{display:'flex', flexDirection:'column', height:'100%', background:T.bg1, position:'relative'}}>
 
       {/* ── Action bar ────────────────────────────────────────────────────── */}
       <div style={{padding:'10px 16px', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0}}>
         <div style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center', marginBottom:'8px'}}>
-          <ActionBtn label="✉ Email" onClick={() => console.log('compose email', {recordType, recordId, fromAccount})}/>
+          <ActionBtn label="✉ Email" onClick={() => { setShowCompose(true); setShowNoteCompose(false); setShowCallLog(false); }}/>
           <ActionBtn label="SMS — Phase 6" disabled/>
           <ActionBtn label="📋 Note" onClick={() => { setShowNoteCompose(n => !n); setShowCallLog(false); }}/>
           <ActionBtn label="📞 Call" onClick={() => { setShowCallLog(c => !c); setShowNoteCompose(false); }}/>
@@ -458,6 +460,19 @@ export default function CommunicationTimeline({ recordType, recordId, fromAccoun
           return null;
         })}
       </div>
+
+      {showCompose && (
+        <EmailCompose
+          mode="new"
+          crmRecordType={recordType}
+          crmRecordId={recordId}
+          crmRecordLabel={crmRecordLabel}
+          crmRecordUrl={crmRecordUrl}
+          fromAccount={fromAccount}
+          onSend={() => { setShowCompose(false); setRefreshKey(k => k + 1); }}
+          onClose={() => setShowCompose(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key, EnvelopeSimple } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -13,11 +13,12 @@ const T = {
 };
 const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
 
-const NavBtn = ({ label, active, href, onClick, collapsed, icon }) => (
+const NavBtn = ({ label, active, href, onClick, collapsed, icon, badge }) => (
   <a href={href}
     onClick={e=>{ if(!e.ctrlKey && !e.metaKey){ e.preventDefault(); onClick?.(); } }}
     title={collapsed ? label : undefined}
     style={{
+      position:'relative',
       width:'100%', padding:collapsed?'8px 0':'7px 10px',
       background:active?T.bg2:'transparent', border:'none',
       textAlign:'left', cursor:'pointer', display:'flex',
@@ -34,6 +35,18 @@ const NavBtn = ({ label, active, href, onClick, collapsed, icon }) => (
           : <span style={{fontSize:'16px',fontWeight:'600'}}>{label[0]}</span>)
       : <>{icon && <span style={{display:'flex',alignItems:'center',flexShrink:0}}>{icon}</span>}<span style={{flex:1}}>{label}</span></>
     }
+    {badge > 0 && (
+      <span style={{
+        position:'absolute', top:'4px', right: collapsed ? '4px' : '8px',
+        minWidth:'16px', height:'16px', borderRadius:'8px',
+        background:T.danger, color:'#fff',
+        fontSize:'10px', fontWeight:'700',
+        display:'flex', alignItems:'center', justifyContent:'center',
+        padding:'0 3px', lineHeight:1, pointerEvents:'none',
+      }}>
+        {badge > 99 ? '99+' : badge}
+      </span>
+    )}
   </a>
 );
 
@@ -55,11 +68,26 @@ export default function AppShell({ children, activeView }) {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('showLegacyNav') === 'true';
   });
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     fetch(`${SUPABASE_URL}/rest/v1/properties?select=prop_code,property_name,podio_id,id&status=eq.active&order=prop_code.asc`, {
       headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
     }).then(r => r.json()).then(data => setActiveProps(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const fetchUnread = () => {
+      fetch(`${SUPABASE_URL}/rest/v1/email_threads?is_read=eq.false&select=id`, {
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+      })
+        .then(r => r.json())
+        .then(data => setUnreadCount(Array.isArray(data) ? data.length : 0))
+        .catch(() => {});
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const startResize = useCallback((e) => {
@@ -91,6 +119,7 @@ export default function AppShell({ children, activeView }) {
 
   const navItems = (
     <>
+      <NavBtn label="Inbox" href="/inbox" active={is('inbox')} onClick={()=>go('/inbox')} collapsed={effectiveCollapsed} icon={<EnvelopeSimple size={18} weight="bold"/>} badge={unreadCount}/>
       <NavBtn label="Home" href="/?view=morning-briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={effectiveCollapsed} icon={<HouseLine size={18} weight="bold"/>}/>
       <SectionLabel label="Operations" collapsed={effectiveCollapsed}/>
       <NavBtn label="Properties"  href="/properties"   active={is('properties')}  onClick={()=>go('/properties')}   collapsed={effectiveCollapsed} icon={<BuildingOffice size={18} weight="bold"/>}/>
