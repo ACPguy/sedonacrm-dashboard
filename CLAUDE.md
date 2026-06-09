@@ -164,7 +164,7 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - **Phase 3 Stage 1:** Complete — Gmail OAuth, /settings page
 - **Phase 3 Stage 2A:** Complete — 5 Gmail DB tables, webhook receiver, lib/gmail.js, lib/supabaseServer.js
 - **Phase 3 Stage 2B:** Complete — CommunicationTimeline.jsx wired into Tasks, Contacts, Tenants
-- **Phase 3 Stage 2C:** NEXT — EmailInbox + EmailCompose UI
+- **Phase 3 Stage 2C:** Complete — EmailInbox + EmailCompose + AppShell Inbox nav + unread badge
 - **Phase 4+:** Pending
 
 ## Gmail DB Tables (Phase 3 Stage 2A)
@@ -334,22 +334,20 @@ Gmail Stage 2A + 2B (on preview branch, commits 23210dc + aaf14f2):
 - PropertyDetail: all tabs lazy-loaded; ContactDetail: full tabbed form
 - All major list views routed with shared table components
 
-**Next — Gmail Stage 2C:**
-1. **EmailInbox.jsx** — routed inbox view at `/inbox`
-   - Tabs: Unread | Linked | Flagged (unlinked senders needing attention)
-   - Thread list: subject, snippet, from, timestamp, unread badge
-   - Thread detail: full message list, "Link to record" action, reply button
-   - AI summarize button → calls Claude API to summarize thread
-2. **EmailCompose.jsx** — modal compose window
-   - TO / CC / BCC fields with contact autocomplete
-   - TipTap rich text body
-   - `X-SedonaCRM-Record: {type}:{id}` header injection for auto-linking
-   - File attachments (Google Drive picker)
-   - "Send & link to this record" from any detail view Comms tab
-3. **Unread badge** in AppShell nav — red dot on Inbox nav item when unread_count > 0
-4. Wire EmailCompose into CommunicationTimeline ✉ Email button (currently console.log placeholder)
+**Completed this session (2026-06-09) — Gmail Stage 2C:**
+1. **pages/api/gmail/send.js** — Gmail send via googleapis; injects X-SedonaCRM-Record header + CRM footer; upserts email_threads, email_messages, communication_timeline
+2. **pages/api/ai/summarize.js** + **pages/api/ai/draft-reply.js** — Anthropic API routes (claude-sonnet-4-20250514, 500 tokens)
+3. **pages/api/gmail/thread-update.js** — service-role PATCH for mark-read / archive
+4. **components/EmailCompose.jsx** — modal compose (TO/CC/BCC tag input, TipTap body, drag-and-drop attachments, CRM footer injection, task contact pre-fill)
+5. **components/EmailInbox.jsx** — two-panel inbox at /inbox (Unread/All/Linked/Flagged tabs, thread list, thread detail with expand/collapse messages, AI Summarize + AI Draft Reply, Reply opens EmailCompose)
+6. **pages/inbox/index.jsx** — inbox page wrapping EmailInbox in AppShell
+7. **AppShell.jsx** — Inbox nav item at top with red unread badge (polls every 60s), badge prop added to NavBtn
+8. **SedonaCRM.jsx** — Inbox nav item added (handleNav('/inbox'))
+9. **CommunicationTimeline.jsx** — ✉ Email button now opens EmailCompose modal; accepts crmRecordLabel + crmRecordUrl props
 
-**After Stage 2C:**
+**Next — Stage 2D / polish:**
+- Pass `crmRecordLabel` + `crmRecordUrl` into CommunicationTimeline from TasksView, ContactsView, TenantsView (currently those props are undefined — link appears in compose but label shows blank)
+- "Link to record" button in EmailInbox thread detail (currently console.log placeholder)
 - Property detail remaining tab groups: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 - Populate podio_id for vendors (deferred to go-live Podio API sync)
 
