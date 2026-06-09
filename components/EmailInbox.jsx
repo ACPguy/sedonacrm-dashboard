@@ -1,0 +1,508 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { EnvelopeSimple, ArrowCounterClockwise, CheckCircle, Circle, Spinner, Robot, Archive } from '@phosphor-icons/react';
+import EmailCompose from './EmailCompose';
+
+const SUPABASE_URL  = 'https://edxcvyleielzevpappui.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
+
+const T = {
+  bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
+  text0:'#c9cdd6', text1:'#8a95a8', text2:'#5a6272', text3:'#4a5264',
+  accent:'#6e9fd8', border:'#2e3240',
+  danger:'#e07070', warn:'#d4924a', success:'#6ab06a', purple:'#9a7ad4',
+};
+const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px' };
+
+const sbFetch = async (table, params = '') => {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+    headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` },
+  });
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+};
+
+const relativeTime = d => {
+  if (!d) return '';
+  const diff = Date.now() - new Date(d).getTime();
+  const mins  = Math.floor(diff / 60000);
+  if (mins < 1)  return 'just now';
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(diff / 3600000);
+  if (hrs < 24)  return `${hrs}h`;
+  const days = Math.floor(diff / 86400000);
+  if (days < 7)  return `${days}d`;
+  return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric' });
+};
+
+const stripHtml = html => (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+const FILTER_TABS = [
+  { key:'unread',  label:'Unread' },
+  { key:'all',     label:'All' },
+  { key:'linked',  label:'Linked' },
+  { key:'flagged', label:'Flagged' },
+];
+
+const FilterPill = ({ label, active, onClick }) => (
+  <button type="button" onClick={onClick}
+    onMouseEnter={e => { if (!active) e.currentTarget.style.background = `${T.accent}33`; }}
+    onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+    style={{
+      padding:'4px 12px', borderRadius:'4px', fontSize:F.xs, fontWeight:'500',
+      cursor: active ? 'default' : 'pointer',
+      border:`1px solid ${T.accent}`,
+      background: active ? T.accent : 'transparent',
+      color: active ? '#fff' : T.accent,
+      transition:'background 0.15s ease', whiteSpace:'nowrap',
+    }}>
+    {label}
+  </button>
+);
+
+const ActionBtn = ({ label, icon, onClick, disabled, variant }) => {
+  const base = variant === 'primary'
+    ? { background:T.accent, border:`0.5px solid ${T.accent}`, color:'#fff' }
+    : { background:T.bg2, border:`0.5px solid ${T.border}`, color: disabled ? T.text3 : T.text0 };
+  return (
+    <button type="button" onClick={disabled ? undefined : onClick}
+      onMouseEnter={e => { if (!disabled && variant !== 'primary') e.currentTarget.style.background = T.bg3; }}
+      onMouseLeave={e => { if (!disabled && variant !== 'primary') e.currentTarget.style.background = T.bg2; }}
+      style={{
+        padding:'5px 12px', borderRadius:'4px', fontSize:F.xs, fontWeight:'500',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display:'flex', alignItems:'center', gap:'5px',
+        opacity: disabled ? 0.5 : 1,
+        transition:'background 0.15s ease',
+        ...base,
+      }}>
+      {icon}{label}
+    </button>
+  );
+};
+
+// ── Thread List Item ───────────────────────────────────────────────────────────
+const ThreadListItem = ({ thread, selected, onClick }) => {
+  const isUnread  = !thread.is_read;
+  const sender    = thread.snippet_from || thread.linked_record_type || '—';
+
+  return (
+    <div onClick={onClick}
+      style={{
+        padding:'10px 14px', borderBottom:`0.5px solid ${T.border}`,
+        background: selected ? T.bg2 : 'transparent',
+        cursor:'pointer', transition:'background 0.12s',
+      }}
+      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; }}
+      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
+    >
+      <div style={{ display:'flex', alignItems:'flex-start', gap:'8px' }}>
+        {isUnread
+          ? <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:T.accent, flexShrink:0, marginTop:'5px' }}/>
+          : <div style={{ width:'7px', height:'7px', flexShrink:0 }}/>
+        }
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'6px', marginBottom:'2px' }}>
+            <span style={{
+              fontSize:F.sm, fontWeight: isUnread ? '700' : '500',
+              color: isUnread ? T.text0 : T.text1,
+              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1,
+            }}>
+              {thread.subject || '(no subject)'}
+            </span>
+            <span style={{ fontSize:'11px', color:T.text3, flexShrink:0 }}>{relativeTime(thread.last_message_at)}</span>
+          </div>
+          <div style={{ fontSize:F.xs, color:T.text2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:'4px' }}>
+            {thread.snippet || ''}
+          </div>
+          <div style={{ display:'flex', gap:'4px', alignItems:'center', flexWrap:'wrap' }}>
+            {thread.linked_record_type && (
+              <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'3px', background:`${T.warn}22`, color:T.warn, fontWeight:'600' }}>
+                {thread.linked_record_type}
+              </span>
+            )}
+            {thread.link_status === 'flagged' && (
+              <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'3px', background:`${T.danger}22`, color:T.danger, fontWeight:'600' }}>
+                Unlinked
+              </span>
+            )}
+            {thread.unread_count > 0 && (
+              <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'3px', background:`${T.accent}22`, color:T.accent }}>
+                {thread.unread_count} unread
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Message Row ────────────────────────────────────────────────────────────────
+const MessageRow = ({ msg, defaultExpanded }) => {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const dir = msg.is_outbound ? 'outbound' : 'inbound';
+
+  const fmtFull = d => {
+    if (!d) return '';
+    const dt = new Date(d);
+    return dt.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+      + ' ' + dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+  };
+
+  return (
+    <div style={{ borderBottom:`0.5px solid ${T.border}` }}>
+      {/* Collapsed header */}
+      <div
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          display:'flex', alignItems:'center', gap:'10px',
+          padding:'10px 16px', cursor:'pointer',
+          background: expanded ? T.bg2 : 'transparent',
+          transition:'background 0.12s',
+        }}
+        onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; }}
+        onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = 'transparent'; }}
+      >
+        <div style={{ width:'28px', height:'28px', borderRadius:'50%', background:T.bg3, border:`0.5px solid ${T.border}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:F.xs, color:T.text1, fontWeight:'700' }}>
+          {(msg.from_name || msg.from_address || '?')[0].toUpperCase()}
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+            <span style={{ fontSize:F.sm, fontWeight:'600', color:T.text0 }}>
+              {msg.is_outbound ? 'Scott Anderson' : (msg.from_name || msg.from_address)}
+            </span>
+            <span style={{ fontSize:F.xs, color: dir==='inbound' ? T.success : T.warn }}>
+              {dir==='inbound' ? '↓' : '↑'}
+            </span>
+            <span style={{ fontSize:F.xs, color:T.text3, marginLeft:'auto' }}>{fmtFull(msg.sent_at || msg.received_at)}</span>
+          </div>
+          {!expanded && (
+            <div style={{ fontSize:F.xs, color:T.text2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:'1px' }}>
+              {msg.snippet || stripHtml(msg.body_html || '').substring(0, 100)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded body */}
+      {expanded && (
+        <div style={{ padding:'12px 16px 16px 54px', background:T.bg2 }}>
+          {msg.body_html ? (
+            <div
+              style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', maxWidth:'560px' }}
+              dangerouslySetInnerHTML={{ __html: msg.body_html }}
+            />
+          ) : msg.body_text ? (
+            <pre style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', whiteSpace:'pre-wrap', fontFamily:'inherit', margin:0 }}>
+              {msg.body_text}
+            </pre>
+          ) : (
+            <div style={{ fontSize:F.sm, color:T.text2, fontStyle:'italic' }}>
+              {msg.snippet || 'No body stored.'}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Thread Detail Panel ────────────────────────────────────────────────────────
+const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThreadUpdate }) => {
+  const [messages,     setMessages]     = useState([]);
+  const [loadingMsgs,  setLoadingMsgs]  = useState(true);
+  const [aiSummary,    setAiSummary]    = useState('');
+  const [aiDraft,      setAiDraft]      = useState('');
+  const [aiLoading,    setAiLoading]    = useState(false);
+  const [aiMode,       setAiMode]       = useState(null); // 'summarize' | 'draft'
+  const [showCompose,  setShowCompose]  = useState(false);
+  const [composeMode,  setComposeMode]  = useState('reply');
+  const [composeTo,    setComposeTo]    = useState([]);
+  const [composeSubj,  setComposeSubj]  = useState('');
+  const [composeBody,  setComposeBody]  = useState('');
+
+  useEffect(() => {
+    if (!thread) return;
+    setMessages([]);
+    setAiSummary('');
+    setAiDraft('');
+    setAiMode(null);
+    setLoadingMsgs(true);
+
+    sbFetch('email_messages', `thread_id=eq.${thread.id}&order=sent_at.asc.nullslast&select=*`)
+      .then(setMessages)
+      .catch(() => setMessages([]))
+      .finally(() => setLoadingMsgs(false));
+  }, [thread?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const buildThreadText = useCallback(() => {
+    return messages.map(m => {
+      const from = m.is_outbound ? 'Scott Anderson' : (m.from_name || m.from_address || '');
+      const date = new Date(m.sent_at || m.received_at || m.created_at || '').toLocaleString();
+      const body = m.body_text || stripHtml(m.body_html || m.snippet || '');
+      return `[From: ${from}, Date: ${date}]\n${body}`;
+    }).join('\n\n---\n\n');
+  }, [messages]);
+
+  const runAi = async (mode) => {
+    setAiLoading(true);
+    setAiMode(mode);
+    setAiSummary('');
+    setAiDraft('');
+    try {
+      const endpoint = mode === 'summarize' ? '/api/ai/summarize' : '/api/ai/draft-reply';
+      const res  = await fetch(endpoint, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ threadText: buildThreadText() }),
+      });
+      const data = await res.json();
+      if (mode === 'summarize') setAiSummary(data.summary || '');
+      if (mode === 'draft') {
+        setAiDraft(data.draft || '');
+        // Pre-build reply-to list from latest inbound message
+        const lastInbound = [...messages].reverse().find(m => !m.is_outbound);
+        const replyTo = lastInbound
+          ? [{ email: lastInbound.from_address, name: lastInbound.from_name || '' }]
+          : [];
+        setComposeTo(replyTo);
+        setComposeSubj(`Re: ${thread.subject || ''}`);
+        setComposeBody(`<p>${(data.draft || '').replace(/\n/g, '</p><p>')}</p>`);
+        setComposeMode('reply');
+        setShowCompose(true);
+      }
+    } catch {
+      // fail silently
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleReply = () => {
+    const lastInbound = [...messages].reverse().find(m => !m.is_outbound);
+    setComposeTo(lastInbound ? [{ email: lastInbound.from_address, name: lastInbound.from_name || '' }] : []);
+    setComposeSubj(`Re: ${thread.subject || ''}`);
+    setComposeBody('');
+    setComposeMode('reply');
+    setShowCompose(true);
+  };
+
+  const latestMsgId = messages.length > 0 ? messages[messages.length - 1]?.gmail_message_id : null;
+
+  if (!thread) return null;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%', background:T.bg1 }}>
+      {/* Thread header */}
+      <div style={{ padding:'12px 16px', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0 }}>
+        <div style={{ fontSize:F.md, fontWeight:'600', color:T.text0, marginBottom:'8px', lineHeight:'1.3' }}>
+          {thread.subject || '(no subject)'}
+        </div>
+        <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', alignItems:'center' }}>
+          <ActionBtn label="Reply" variant="primary" onClick={handleReply}/>
+          <ActionBtn label="Archive" icon={<Archive size={13}/>} onClick={() => onArchive(thread.id)}/>
+          <ActionBtn
+            label={thread.is_read ? 'Mark Unread' : 'Mark Read'}
+            icon={thread.is_read ? <Circle size={13}/> : <CheckCircle size={13}/>}
+            onClick={() => onMarkRead(thread.id, !thread.is_read)}
+          />
+          <ActionBtn label="Link to record" onClick={() => console.log('[EmailInbox] link-to-record', thread.id)} disabled={false}/>
+          {thread.gmail_thread_id && (
+            <a href={`https://mail.google.com/mail/u/0/#all/${thread.gmail_thread_id}`}
+              target="_blank" rel="noopener noreferrer"
+              style={{ fontSize:F.xs, color:T.accent, textDecoration:'none', marginLeft:'auto' }}
+              onMouseEnter={e => e.currentTarget.style.textDecoration='underline'}
+              onMouseLeave={e => e.currentTarget.style.textDecoration='none'}>
+              View in Gmail →
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex:1, overflowY:'auto' }}>
+        {loadingMsgs && (
+          <div style={{ padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading messages…</div>
+        )}
+        {!loadingMsgs && messages.length === 0 && (
+          <div style={{ padding:'24px', textAlign:'center', color:T.text2, fontSize:F.sm }}>No messages stored for this thread.</div>
+        )}
+        {!loadingMsgs && messages.map((msg, i) => (
+          <MessageRow key={msg.id} msg={msg} defaultExpanded={i === messages.length - 1}/>
+        ))}
+      </div>
+
+      {/* AI panel */}
+      <div style={{ borderTop:`0.5px solid ${T.border}`, flexShrink:0, background:T.bg0 }}>
+        <div style={{ padding:'10px 16px', display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap' }}>
+          <Robot size={15} color={T.purple}/>
+          <span style={{ fontSize:F.xs, color:T.purple, fontWeight:'600', marginRight:'4px' }}>AI</span>
+          <ActionBtn
+            label="Summarize"
+            disabled={aiLoading || messages.length === 0}
+            icon={aiLoading && aiMode==='summarize' ? <Spinner size={13} className="spin"/> : null}
+            onClick={() => runAi('summarize')}
+          />
+          <ActionBtn
+            label="Draft Reply"
+            disabled={aiLoading || messages.length === 0}
+            icon={aiLoading && aiMode==='draft' ? <Spinner size={13} className="spin"/> : null}
+            onClick={() => runAi('draft')}
+          />
+        </div>
+        {aiSummary && (
+          <div style={{ margin:'0 16px 12px', padding:'10px 12px', background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'4px' }}>
+            <div style={{ fontSize:F.xs, color:T.purple, fontWeight:'600', marginBottom:'4px' }}>Summary</div>
+            <div style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.5', whiteSpace:'pre-wrap' }}>{aiSummary}</div>
+          </div>
+        )}
+      </div>
+
+      {showCompose && (
+        <EmailCompose
+          mode={composeMode}
+          inReplyToMessageId={latestMsgId}
+          gmailThreadId={thread.gmail_thread_id}
+          crmRecordType={thread.linked_record_type}
+          crmRecordId={thread.linked_record_id}
+          prefilledTo={composeTo}
+          defaultSubject={composeSubj}
+          initialBody={composeBody}
+          onSend={() => { setShowCompose(false); onThreadUpdate?.(); }}
+          onClose={() => setShowCompose(false)}
+        />
+      )}
+      <style>{`.spin{animation:spin .8s linear infinite}@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+};
+
+// ── Main Export ────────────────────────────────────────────────────────────────
+export default function EmailInbox() {
+  const [filter,         setFilter]         = useState('unread');
+  const [threads,        setThreads]        = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [selectedThread, setSelectedThread] = useState(null);
+  const [refreshKey,     setRefreshKey]     = useState(0);
+
+  const buildQuery = useCallback((f) => {
+    let params = `order=last_message_at.desc&limit=100&select=*`;
+    if (f === 'unread')  params = `is_read=eq.false&${params}`;
+    if (f === 'linked')  params = `link_status=eq.auto_linked&${params}`;
+    if (f === 'flagged') params = `link_status=eq.flagged&${params}`;
+    return params;
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    setSelectedThread(null);
+    sbFetch('email_threads', buildQuery(filter))
+      .then(setThreads)
+      .catch(() => setThreads([]))
+      .finally(() => setLoading(false));
+  }, [filter, refreshKey, buildQuery]);
+
+  const handleMarkRead = async (threadId, isRead) => {
+    setThreads(ts => ts.map(t => t.id === threadId ? { ...t, is_read: isRead, unread_count: isRead ? 0 : t.unread_count } : t));
+    if (selectedThread?.id === threadId) setSelectedThread(t => ({ ...t, is_read: isRead }));
+    await fetch('/api/gmail/thread-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threadId, updates: { is_read: isRead, unread_count: isRead ? 0 : undefined } }),
+    }).catch(() => {});
+  };
+
+  const handleArchive = async (threadId) => {
+    setThreads(ts => ts.filter(t => t.id !== threadId));
+    if (selectedThread?.id === threadId) setSelectedThread(null);
+    await fetch('/api/gmail/thread-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threadId, updates: { is_archived: true } }),
+    }).catch(() => {});
+  };
+
+  const handleSelectThread = async (thread) => {
+    setSelectedThread(thread);
+    if (!thread.is_read) {
+      setThreads(ts => ts.map(t => t.id === thread.id ? { ...t, is_read: true, unread_count: 0 } : t));
+      await fetch('/api/gmail/thread-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: thread.id, updates: { is_read: true, unread_count: 0 } }),
+      }).catch(() => {});
+    }
+  };
+
+  return (
+    <div style={{ display:'flex', height:'100%', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden' }}>
+
+      {/* Left panel — thread list */}
+      <div style={{ width:'340px', flexShrink:0, display:'flex', flexDirection:'column', borderRight:`0.5px solid ${T.border}`, overflow:'hidden' }}>
+        {/* Header */}
+        <div style={{ padding:'12px 16px', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:'7px' }}>
+              <EnvelopeSimple size={18} weight="bold" color={T.accent}/>
+              <span style={{ fontSize:F.md, fontWeight:'700', color:T.text0 }}>Inbox</span>
+            </div>
+            <button type="button"
+              onClick={() => setRefreshKey(k => k + 1)}
+              title="Refresh"
+              style={{ background:'transparent', border:'none', color:T.text2, cursor:'pointer', padding:'4px', borderRadius:'4px', display:'flex' }}
+              onMouseEnter={e => e.currentTarget.style.color=T.text0}
+              onMouseLeave={e => e.currentTarget.style.color=T.text2}>
+              <ArrowCounterClockwise size={16} weight="bold"/>
+            </button>
+          </div>
+          <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
+            {FILTER_TABS.map(({ key, label }) => (
+              <FilterPill key={key} label={label} active={filter === key} onClick={() => setFilter(key)}/>
+            ))}
+          </div>
+        </div>
+
+        {/* Thread list */}
+        <div style={{ flex:1, overflowY:'auto' }}>
+          {loading && (
+            <div style={{ padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading…</div>
+          )}
+          {!loading && threads.length === 0 && (
+            <div style={{ padding:'40px 20px', textAlign:'center' }}>
+              <div style={{ fontSize:'28px', color:T.bg3, marginBottom:'8px' }}>✉</div>
+              <div style={{ fontSize:F.sm, color:T.text2 }}>
+                {filter === 'unread' ? 'No unread messages.' : filter === 'flagged' ? 'No flagged messages.' : 'No messages found.'}
+              </div>
+            </div>
+          )}
+          {!loading && threads.map(thread => (
+            <ThreadListItem
+              key={thread.id}
+              thread={thread}
+              selected={selectedThread?.id === thread.id}
+              onClick={() => handleSelectThread(thread)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Right panel — thread detail */}
+      <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+        {selectedThread ? (
+          <ThreadDetail
+            thread={selectedThread}
+            onMarkRead={handleMarkRead}
+            onArchive={handleArchive}
+            onReply={() => {}}
+            onThreadUpdate={() => setRefreshKey(k => k + 1)}
+          />
+        ) : (
+          <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:'12px' }}>
+            <EnvelopeSimple size={48} color={T.bg3} weight="bold"/>
+            <div style={{ fontSize:F.base, color:T.text3 }}>Select a thread to read</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
