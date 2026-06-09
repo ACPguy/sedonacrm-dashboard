@@ -1,5 +1,5 @@
 import { createServerClient } from '../../../lib/supabaseServer';
-import { getDriveClient, getOrCreateWorkHistoryFolder, createTaskFolder } from '../../../lib/drive';
+import { getDriveClient, getOrCreateWorkHistoryFolder, createTaskFolder, createIndexPdf } from '../../../lib/drive';
 import { PROPERTY_DRIVE_FOLDERS } from '../../../lib/drivePropertyFolders';
 
 export default async function handler(req, res) {
@@ -57,6 +57,32 @@ export default async function handler(req, res) {
       drive_folder_id: newFolderId,
       drive_folder_url: folderUrl,
     }).eq('id', taskId);
+
+    // Best-effort: create index PDF inside the folder (never blocks or fails the response)
+    const propName = propCode || '';
+    const recordUrl = `https://crm.andersoncp.com/tasks/${task.task_num}`;
+    try {
+      // Also fetch property_name if available
+      let propertyName = '';
+      const { data: prop } = await sb.from('properties').select('property_name').eq('prop_code', propCode).single().catch(() => ({ data: null }));
+      if (prop?.property_name) propertyName = prop.property_name;
+
+      const pdf = await createIndexPdf({
+        taskNum:      task.task_num,
+        propCode,
+        title:        task.title,
+        recordUrl,
+        propertyName,
+        createdAt:    task.created_at,
+        folderId:     newFolderId,
+        driveClient:  drive,
+      });
+      console.log(`[create-drive-folder] Index PDF created: ${pdf.fileName}`);
+
+      await sb.from('tasks').update({ drive_index_pdf_id: pdf.id }).eq('id', taskId);
+    } catch (pdfErr) {
+      console.error('[create-drive-folder] PDF creation failed (non-fatal):', pdfErr.message);
+    }
 
     return res.status(200).json({ folderId: newFolderId, folderUrl });
   } catch (err) {
