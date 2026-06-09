@@ -50,15 +50,17 @@ export default async function handler(req, res) {
       return res.redirect('/settings?gmail=error');
     }
 
+    // Use Gmail users.getProfile — works with gmail.modify, no userinfo.email scope needed
     const profileRes = await fetch(
-      'https://www.googleapis.com/oauth2/v1/userinfo?alt=json',
+      'https://gmail.googleapis.com/gmail/v1/users/me/profile',
       { headers: { Authorization: `Bearer ${tokens.access_token}` } }
     );
-    const profile = await profileRes.json();
+    const gmailProfile = await profileRes.json();
+    const profile = { email: gmailProfile.emailAddress, name: gmailProfile.emailAddress };
 
     const expiryDate = new Date(Date.now() + (tokens.expires_in || 3600) * 1000);
 
-    // Write to gmail_tokens (Stage 1 legacy — keep for backwards compat)
+    // Write to gmail_tokens (Stage 1 legacy — keep for backwards compat); use service key to bypass RLS
     await sbFetch('gmail_tokens', {
       user_id: SCOTT_USER_ID,
       email: profile.email,
@@ -67,7 +69,7 @@ export default async function handler(req, res) {
       token_expiry: expiryDate.toISOString(),
       scope: tokens.scope,
       updated_at: new Date().toISOString(),
-    }, false, 'user_id');
+    }, true, 'user_id');
 
     // Write to email_accounts (Stage 2 canonical token store)
     await sbFetch('email_accounts', {
