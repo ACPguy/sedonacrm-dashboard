@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { UserCircle, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
 import TasksView from './TasksView';
 import RichTextEditor from './RichTextEditor';
+import CommunicationTimeline from './CommunicationTimeline';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -688,7 +689,7 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
     }).catch(() => {});
   };
 
-  const TABS = ['Tasks', 'Contact Info'];
+  const TABS = ['Tasks', 'Contact Info', 'Comms'];
   const tk = t => t.toLowerCase().replace(/ /g, '-');
 
   const tabBtnStyle = active => ({
@@ -1056,6 +1057,17 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
         )}
 
       </div>
+      )}
+
+      {/* ── COMMS (full-height, no scroll wrapper) ── */}
+      {tab === 'comms' && (
+        <div style={{flex:1, overflow:'hidden'}}>
+          <CommunicationTimeline
+            recordType="contact"
+            recordId={data.id}
+            fromAccount="scott@andersoncp.com"
+          />
+        </div>
       )}
     </div>
   );

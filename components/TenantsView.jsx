@@ -8,6 +8,7 @@ import { Storefront, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icon
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
 import TasksView from './TasksView';
+import CommunicationTimeline from './CommunicationTimeline';
 
 const SUPABASE_URL     = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -1323,18 +1324,18 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
           </div>
         )}
 
-        {/* ── COMMUNICATIONS TAB ── */}
-        {tab === 'communications' && (
-          <div style={css.card}>
-            <div style={css.secTitle}>Communications</div>
-            <div style={{padding:'32px 0', textAlign:'center'}}>
-              <div style={{fontSize:'36px', color:T.bg3, marginBottom:'8px'}}>✉</div>
-              <div style={{fontSize:F.base, color:T.text2, marginBottom:'4px'}}>Email thread syncs from Gmail at go-live.</div>
-              <div style={{fontSize:F.sm, color:T.text3}}>SMS via Twilio — Phase 6</div>
-            </div>
-          </div>
-        )}
       </div>
+      )}
+
+      {/* ── COMMUNICATIONS TAB (full-height, no scroll wrapper) ── */}
+      {tab === 'communications' && (
+        <div style={{flex:1, overflow:'hidden'}}>
+          <CommunicationTimeline
+            recordType="tenant"
+            recordId={data.id}
+            fromAccount="scott@andersoncp.com"
+          />
+        </div>
       )}
     </div>
   );

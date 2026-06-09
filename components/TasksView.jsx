@@ -12,6 +12,7 @@ import {
   useDraggable, useDroppable,
 } from '@dnd-kit/core';
 import RichTextEditor from './RichTextEditor';
+import CommunicationTimeline from './CommunicationTimeline';
 
 const SUPABASE_URL      = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -1048,6 +1049,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [rightCollapsed,setRightCollapsed] = useState(isMobile);
   const [rightWidth,setRightWidth] = useState(300);
   const [copied,setCopied]       = useState(false);
+  const [detailTab,setDetailTab] = useState('details');
   const [navList,setNavList]     = useState(null);
   const [navIdx,setNavIdx]       = useState(-1);
   const [navLoading,setNavLoading] = useState(false);
@@ -1256,8 +1258,22 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
       </div>
 
       {/* Body */}
-      <div style={{display:'flex',flex:1,overflow:'hidden'}}>
-        <div style={{flex:1,overflowY:'auto',minWidth:0}}>
+      <div style={{display:'flex',flex:1,overflow:'hidden',flexDirection:'column'}}>
+        {/* Comms / Details tab bar */}
+        <div style={{display:'flex',gap:'2px',padding:'0 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+          {['Details','Comms'].map(t=>(
+            <button key={t} onClick={()=>setDetailTab(t.toLowerCase())}
+              style={{background:'transparent',border:'none',padding:'6px 10px',borderRadius:'4px 4px 0 0',cursor:'pointer',fontSize:F.sm,
+                color:detailTab===t.toLowerCase()?T.accent:T.text1,
+                borderBottom:detailTab===t.toLowerCase()?`2px solid ${T.accent}`:'2px solid transparent',
+                fontWeight:detailTab===t.toLowerCase()?'600':'400',transition:'color 0.15s'}}>
+              {t}
+            </button>
+          ))}
+        </div>
+        {/* Content row */}
+        <div style={{display:'flex',flex:1,overflow:'hidden'}}>
+          {detailTab!=='comms'&&<div style={{flex:1,overflowY:'auto',minWidth:0}}>
           {/* Base fields */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
             {/* Title — icon + large editable field */}
@@ -1395,17 +1411,22 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               </FieldRow>
             </div>
           )}
+          </div>}
+          {detailTab==='comms'&&(
+            <div style={{flex:1,overflow:'auto',background:T.bg1}}>
+              <CommunicationTimeline recordType="task" recordId={data.id} fromAccount="scott@andersoncp.com"/>
+            </div>
+          )}
+          {/* Desktop: always in flow. Mobile: only when open. */}
+          {(!rightCollapsed || !isMobile) && (
+            <ActivityPanel
+              collapsed={rightCollapsed}
+              onCollapse={()=>setRightCollapsed(c=>!c)}
+              width={rightWidth}
+              onMouseDown={isMobile ? undefined : startRightResize}
+            />
+          )}
         </div>
-
-        {/* Desktop: always in flow. Mobile: only when open. */}
-        {(!rightCollapsed || !isMobile) && (
-          <ActivityPanel
-            collapsed={rightCollapsed}
-            onCollapse={()=>setRightCollapsed(c=>!c)}
-            width={rightWidth}
-            onMouseDown={isMobile ? undefined : startRightResize}
-          />
-        )}
       </div>
       {/* Mobile: floating button when panel is closed */}
       {isMobile && rightCollapsed && (
