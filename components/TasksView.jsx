@@ -1055,6 +1055,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [navList,setNavList]     = useState(null);
   const [navIdx,setNavIdx]       = useState(-1);
   const [navLoading,setNavLoading] = useState(false);
+  const [driveFolderLoading,setDriveFolderLoading] = useState(false);
   const resizingRight = useRef(false);
 
   useEffect(()=>{
@@ -1150,6 +1151,24 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     navigator.clipboard.writeText(url).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);});
   };
 
+  const createDriveFolder=async()=>{
+    if(!data||driveFolderLoading)return;
+    setDriveFolderLoading(true);
+    try{
+      const r=await fetch('/api/tasks/create-drive-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({taskId:data.id})});
+      const json=await r.json();
+      if(json.folderId){
+        setData(prev=>({...prev,drive_folder_id:json.folderId,drive_folder_url:json.folderUrl}));
+      } else {
+        console.error('[createDriveFolder]',json.error);
+      }
+    }catch(err){
+      console.error('[createDriveFolder]',err);
+    }finally{
+      setDriveFolderLoading(false);
+    }
+  };
+
   const goNav=async dir=>{
     if(!navList||navLoading)return;
     const newIdx=navIdx+dir;
@@ -1221,6 +1240,22 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
             {copied?'✓ Copied':'⧉ Copy Link'}
           </button>
+          {data.record_type==='work_order'&&(
+            data.drive_folder_id
+              ? <a href={data.drive_folder_url} target="_blank" rel="noopener noreferrer"
+                  style={{display:'inline-flex',alignItems:'center',gap:'4px',background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:'#4285F4',fontSize:F.xs,cursor:'pointer',textDecoration:'none',flexShrink:0}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor='#4285F4'}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{flexShrink:0}}><path d="M12 2L2 19h20L12 2z" fill="#0F9D58" opacity=".9"/><path d="M2 19h8l-4-7-4 7z" fill="#4285F4" opacity=".9"/><path d="M22 19h-8l4-7 4 7z" fill="#FBBC05" opacity=".9"/></svg>
+                  Drive Folder
+                </a>
+              : <button onClick={createDriveFolder} disabled={driveFolderLoading}
+                  style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:T.text2,fontSize:F.xs,cursor:driveFolderLoading?'wait':'pointer',flexShrink:0,display:'inline-flex',alignItems:'center',gap:'4px'}}
+                  onMouseEnter={e=>{if(!driveFolderLoading)e.currentTarget.style.color=T.text0;}}
+                  onMouseLeave={e=>{if(!driveFolderLoading)e.currentTarget.style.color=T.text2;}}>
+                  {driveFolderLoading?'Creating…':'+ Drive Folder'}
+                </button>
+          )}
           {data.podio_id&&<span style={{fontSize:F.xs,color:T.text3}}>Podio ref: {data.podio_id}</span>}
           {navList&&navList.length>1&&(
             <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'3px',flexShrink:0}}>
