@@ -281,45 +281,45 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 ## Next Priorities
 
-**Completed this session (2026-06-06):**
+**Completed this session (2026-06-08):**
 
-Tasks Module Stage 1 — DB:
-- `task_sequences`, `tasks`, `task_contacts` tables created with full RLS and anon SELECT
-- Migrated 2,914 work_orders + 1,234 issues (all as 'task', scope was NULL) + 220 S&G Projects
-- WO statuses corrected from wo_status field: 151 Open, 2,336 Closed, 427 Cancelled
-- S&G Projects seeded via Python script (`~/seed_sg_tasks.py`); xlsx at `/home/scott/S+G Projects - Last view used.xlsx`
-
-Tasks Module Stage 2 — UI (on `preview` branch, commit fbbc5ec):
-- `components/TasksView.jsx`: unified list + detail for all 6 record types
-  - sbFetchAll for >1000 row pagination
-  - Priority sort default (??? → Urgent → High → Medium → Low)
-  - Grouped property headers (alphabetical, null prop_code → "—" group at bottom)
-  - Columns: type icon | # | title | FU Date | prop | priority | stage | status | vendor | tenant | updated/closed | opened
-  - Closed/Updated column swap on status filter
-  - More… date filter dropdown (Opened/Updated/Closed × Week/Month/Year)
-  - ACP pill hardcoded (status='acp-entity', not in active properties query)
-  - Type conversion pills in detail header
-  - WO-specific detail section (stage, vendor, tenant, invoice, etc.)
-  - Mobile: activity panel closed by default, floating "Activity ›" button
-- `components/shared/TasksTable.jsx`: self-fetching shared table, prop/type/vendor/tenant filters
-- `pages/tasks/index.jsx` + `pages/tasks/[id].jsx`: routed pages
-- `AppShell.jsx` + `SedonaCRM.jsx`: Tasks nav item added after Issues (ClipboardText icon)
+Tasks polish + embedding across all detail views (merged to main, commit dbb6ab7):
+- Tasks list: priority pill styling fixed to match other filter pills
+- Tasks list: property pills now multiselect; group headers show for single selection
+- Tasks list: Status pills moved to same row as Priority pills
+- Tasks list: Clear button appears when any filter is active
+- Tasks detail: keyboard ArrowLeft/ArrowRight prev/next navigation
+- Record type colors updated: WO=red, Task=cyan, Note=slate, Project=purple, ACP Task=orange, S&G Task=lime
+- Task icon changed to CheckFat (cyan)
+- Prev/Next record navigation added to ALL detail views: Properties, Tenants, Vendors, Owners, Contacts, KeySafes, WorkOrders, Issues, Suites, RentSchedule
+- Properties detail: Work Orders + Issues tabs replaced with Tasks tab (filtered by prop_code)
+- Tenants detail: Tasks tab added as first tab; Open Issues + Open Work Orders cards removed from Overview
+- Vendors detail: restructured to Tasks + Vendor Info tabs (Tasks filtered by vendor_id)
+- Owners detail: restructured to Tasks + Owner Info tabs (Tasks filtered by prop_code)
+- Contacts detail: restructured to Tasks + Contact Info tabs; Tasks filtered via task_contacts junction (filterContactId); Issues/WO tabs removed
+- Key Safes module built: KeySafesView.jsx, pages/key-safes/index.jsx + [id].jsx; status options (8 values), ID# field, rich text fields, Activity + Comments panel
+- TasksView: embeddedMode, hidePropertyPills, filterVendorId, filterTenantId, filterContactId props added
+- Nav: Legacy section (Work Orders, Issues) moved to bottom, collapsed by default
+- Nav: Operations reordered — Properties, Tasks, Tenants, Vendors, Owners, Contacts, Suites, Key Safes
+- Nav: hover-to-expand when collapsed (desktop only)
+- pages/properties/[id].jsx: filter logic handles prop_code param (alphanumeric) for prev/next goNav
 
 **Completed previous sessions:**
+- Tasks Module Stage 1 — DB: task_sequences, tasks, task_contacts tables; 2,914 WOs + 1,234 issues + 220 S&G Projects migrated
+- Tasks Module Stage 2 — UI: TasksView unified list + detail, sbFetchAll pagination, grouped headers, all 6 record types
 - Phase 3 Stage 1: Gmail OAuth + /settings page
 - LeasingPipelineView, TntCoisView (SPA views)
 - PropertyDetail: all tabs lazy-loaded
-- ContactDetail: full tabbed form, Issues tab wired
+- ContactDetail: full tabbed form
 - All major list views routed with shared table components
 
 **Next:**
-1. Merge preview → main (`git push origin preview:main`) when Scott approves
-2. Property detail — remaining tab groups:
+1. Property detail — remaining tab groups:
    - Financial: CAM, Taxes, PM Fees, Invoices, Insurance
-   - Operations: Work Orders (vendor name), Inspections, Key Safe
+   - Operations: Inspections tab
    - Ownership: Owners, Agreements, Monthly Reports, YR End Reports
-3. Phase 3 Stage 2: Gmail compose/send, thread sync, AI summarize
-4. Populate podio_id for vendors (deferred to go-live Podio API sync)
+2. Phase 3 Stage 2: Gmail compose/send, thread sync, AI summarize
+3. Populate podio_id for vendors (deferred to go-live Podio API sync)
 
 ## Prev/Next Navigation Rule (permanent)
 
