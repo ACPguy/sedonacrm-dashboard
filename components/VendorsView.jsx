@@ -3,10 +3,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Truck, Eye, EyeSlash, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { Truck, Eye, EyeSlash, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
 import { useRouter } from 'next/router';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
+import TasksView from './TasksView';
 
 const SUPABASE_URL    = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -802,6 +803,7 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
   const [navList, setNavList]                 = useState(null);
   const [navIdx, setNavIdx]                   = useState(-1);
   const [navLoading, setNavLoading]           = useState(false);
+  const [vendorTab, setVendorTab]             = useState('tasks');
   const resizingRight = useRef(false);
   const referRef      = useRef(null);
 
@@ -1015,7 +1017,30 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
         </div>
       </div>
 
-      {/* Body */}
+      {/* Tab bar */}
+      <div style={{display:'flex',gap:'2px',padding:'0 16px',borderBottom:`1px solid ${T.border}`,background:T.bg1,flexShrink:0}}>
+        {[['tasks','Tasks'],['info','Vendor Info']].map(([k,label])=>(
+          <button key={k} onClick={()=>setVendorTab(k)} style={{
+            padding:'8px 14px',fontSize:'13px',fontWeight:vendorTab===k?'600':'400',
+            color:vendorTab===k?T.accent:T.text1,background:'none',border:'none',
+            borderBottom:vendorTab===k?`2px solid ${T.accent}`:'2px solid transparent',
+            cursor:'pointer',marginBottom:'-1px',display:'flex',alignItems:'center',gap:'6px'
+          }}>
+            {k==='tasks'&&<ClipboardText size={14}/>}
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tasks tab */}
+      {vendorTab==='tasks'&&(
+        <div style={{flex:1,overflow:'hidden'}}>
+          <TasksView filterVendorId={data.id} hidePropertyPills embeddedMode/>
+        </div>
+      )}
+
+      {/* Vendor Info tab (existing body) */}
+      {vendorTab==='info'&&(
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
         {/* Left: fields */}
         <div style={{flex:1,overflowY:'auto'}}>
@@ -1234,6 +1259,7 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
           onMouseDown={startRightResize}
         />
       </div>
+      )}
     </div>
   );
 };

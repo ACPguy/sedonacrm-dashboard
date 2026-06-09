@@ -9,7 +9,7 @@ import TenantsTable from './shared/TenantsTable';
 import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -503,6 +503,9 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   const [rightCollapsed,setRightCollapsed] = useState(true);
   const [rightWidth,setRightWidth] = useState(280);
   const resizingRight = useRef(false);
+  const [navList,setNavList]     = useState(null);
+  const [navIdx,setNavIdx]       = useState(-1);
+  const [navLoading,setNavLoading] = useState(false);
 
   const startRightResize = useCallback((e) => {
     resizingRight.current = true;
@@ -517,6 +520,56 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
     window.addEventListener('keydown',onKey);
     return ()=>window.removeEventListener('keydown',onKey);
   },[onBack]);
+
+  // Nav list from sessionStorage
+  useEffect(()=>{
+    try{
+      const nl=sessionStorage.getItem('propertiesNavList');
+      const ni=sessionStorage.getItem('propertiesNavIndex');
+      if(nl){setNavList(JSON.parse(nl));setNavIdx(ni!=null?parseInt(ni,10):-1);}
+    }catch{}
+  },[]);
+
+  const goNav = async (dir) => {
+    if(!navList||navLoading) return;
+    const next=navIdx+dir;
+    if(next<0||next>=navList.length) return;
+    setNavLoading(true);
+    const entry=navList[next];
+    try{
+      const rows=await sbFetch('properties',`prop_code=eq.${entry.prop_code}&select=*&limit=1`);
+      if(rows&&rows[0]){
+        const newRec=rows[0];
+        setData(newRec);
+        setNavIdx(next);
+        sessionStorage.setItem('propertiesNavIndex',String(next));
+        window.history.replaceState({},'',`/properties/${newRec.prop_code}`);
+        document.title=`${newRec.property_name||newRec.prop_code} | SedonaCRM`;
+        setTab('dashboard');
+        setRentRows([]); setWorkOrders([]); setIssues([]); setInsurance([]);
+        setMonthlyReports([]); setPropTaxes([]); setAgreement(null);
+        setSuites([]); setPropOwners([]); setPropOwnerContacts([]); setCois([]); setPipeline([]);
+        dashFetched.current=false; insuranceFetched.current=false; monthlyFetched.current=false;
+        taxesFetched.current=false; coisFetched.current=false; pipelineFetched.current=false; listingFetched.current=false;
+      }
+    }catch{}
+    setNavLoading(false);
+  };
+
+  const goNavRef = useRef(goNav);
+  goNavRef.current = goNav;
+
+  useEffect(()=>{
+    const onKey=e=>{
+      if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return;
+      const tag=e.target?.tagName?.toLowerCase();
+      if(tag==='input'||tag==='textarea'||tag==='select') return;
+      if(e.target?.isContentEditable) return;
+      goNavRef.current(e.key==='ArrowLeft'?-1:1);
+    };
+    window.addEventListener('keydown',onKey);
+    return ()=>window.removeEventListener('keydown',onKey);
+  },[]);
 
   // Dashboard lazy fetch — rent-roll occupancy, suites count, open WO/issue counts, agreement for listing card
   useEffect(()=>{
@@ -651,20 +704,37 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
   const openWOs    = workOrders.length;  // server-side filtered to open only
   const openIssues = issues.length;      // server-side filtered to open only
 
-  const TABS = ['Dashboard','Tenants','Suites','Pipeline','Work Orders','Issues','Monthly Reports','Insurance','COIs','Property Taxes','Prop Info','Listing','CAMs','Inspections','Contacts','Documents'];
+  const TABS = ['Dashboard','Tasks','Tenants','Suites','Pipeline','Monthly Reports','Insurance','COIs','Property Taxes','Prop Info','Listing','CAMs','Inspections','Contacts','Documents'];
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
       <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'4px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'4px',flexWrap:'wrap'}}>
           <button onClick={onBack}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer'}}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',flexShrink:0}}
             onMouseEnter={e=>e.currentTarget.style.color=T.text0}
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             ← Properties
           </button>
           <StatusBadge status={data.status}/>
+          {navList&&navList.length>1&&(
+            <div style={{display:'flex',alignItems:'center',gap:'3px',marginLeft:'auto',flexShrink:0}}>
+              <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx<=0?'not-allowed':'pointer',opacity:navIdx<=0?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx>0)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretLeft size={18} weight="bold"/>
+              </button>
+              <span style={{fontSize:F.xs,color:T.text3,padding:'0 6px',whiteSpace:'nowrap'}}>{navLoading?'…':`${navIdx+1} of ${navList.length}`}</span>
+              <button onClick={()=>goNav(1)} disabled={navIdx>=navList.length-1||navLoading}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 6px',cursor:navIdx>=navList.length-1?'not-allowed':'pointer',opacity:navIdx>=navList.length-1?0.3:1,color:T.text1,display:'flex',alignItems:'center'}}
+                onMouseEnter={e=>{if(navIdx<navList.length-1)e.currentTarget.style.borderColor=T.accent;}}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <CaretRight size={18} weight="bold"/>
+              </button>
+            </div>
+          )}
         </div>
         <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{data.property_name||data.prop_code}</div>
         <div style={{fontSize:F.sm,color:T.text2}}>{data.prop_code} · {data.address||''}{data.city?`, ${data.city}`:''}</div>
@@ -684,37 +754,10 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
       {/* Content */}
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
 
-        {/* Work Orders tab — self-fetching shared component */}
-        {tab==='work-orders'&&(
+        {/* Tasks tab — embedded TasksView filtered by prop_code */}
+        {tab==='tasks'&&(
           <div style={{flex:1,overflow:'hidden'}}>
-            <WorkOrdersTable
-              filterPropCode={data.prop_code}
-              hidePropertyFilter={true}
-              onSelect={wo=>{
-                if(typeof window!=='undefined'){
-                  const base = window.location.href.split('?')[0];
-                  sessionStorage.setItem('workOrdersBackUrl', `${base}?tab=work-orders`);
-                }
-                router.push(`/work-orders/${wo.podio_id??'X'+wo.id.slice(-6)}?from=properties`);
-              }}
-            />
-          </div>
-        )}
-
-        {/* Issues tab — self-fetching, Open-only by default */}
-        {tab==='issues'&&(
-          <div style={{flex:1,overflow:'hidden'}}>
-            <IssuesList
-              filterPropCode={data.prop_code}
-              onSelect={iss=>{
-                if(typeof window!=='undefined'){
-                  const base = window.location.href.split('?')[0];
-                  sessionStorage.setItem('issuesBackUrl', `${base}?tab=issues`);
-                }
-                router.push(`/issues/${iss.podio_id??'X'+iss.id.slice(-6)}?from=properties`);
-              }}
-              hidePropertyFilter={true}
-            />
+            <TasksView filterPropCode={data.prop_code} hidePropertyPills embeddedMode/>
           </div>
         )}
 
@@ -733,7 +776,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
         )}
 
         {/* All other tabs — scrollable padded container */}
-        {tab!=='work-orders'&&tab!=='issues'&&tab!=='contacts'&&tab!=='suites'&&(
+        {tab!=='tasks'&&tab!=='contacts'&&tab!=='suites'&&(
           <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
 
             {/* DASHBOARD */}
@@ -751,14 +794,14 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                     <div style={{fontSize:F.xl,fontWeight:'700',color:T.accent}}>{fmtMoney(occupancy.monthly_total)}</div>
                     <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>Current rent roll total</div>
                   </div>
-                  <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('work-orders')}
+                  <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('tasks')}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
                     <div style={css.secTitle}>Work Orders</div>
                     <div style={{fontSize:F.xl,fontWeight:'700',color:openWOs>0?T.warn:T.text3}}>{openWOs}</div>
                     <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>open</div>
                   </div>
-                  <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('issues')}
+                  <div style={{...css.card,cursor:'pointer'}} onClick={()=>setTab('tasks')}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
                     <div style={css.secTitle}>Issues</div>
@@ -1525,7 +1568,12 @@ export const PropertiesView = () => {
                     onClick={e=>{
                       if(e.target.closest('a'))return;
                       if(e.ctrlKey||e.metaKey){window.open(`/properties/${p.podio_id??'X'+p.id.slice(-6)}`, '_blank');}
-                      else handleSelectProp(p);
+                      else{
+                        const navL=filtered.map(r=>({id:r.id,prop_code:r.prop_code}));
+                        sessionStorage.setItem('propertiesNavList',JSON.stringify(navL));
+                        sessionStorage.setItem('propertiesNavIndex',String(filtered.findIndex(r=>r.id===p.id)));
+                        handleSelectProp(p);
+                      }
                     }}
                     style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
                     onMouseEnter={e=>e.currentTarget.style.background=T.bg2}

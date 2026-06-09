@@ -4,9 +4,10 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Storefront, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { Storefront, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
+import TasksView from './TasksView';
 
 const SUPABASE_URL     = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -581,7 +582,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
 // Tenant Detail
 // ─────────────────────────────────────────────────────────────────────────────
 export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
-  const [tab,      setTab]      = useState('overview');
+  const [tab,      setTab]      = useState('tasks');
   const [data,     setData]     = useState(tenant);
   const [property, setProperty] = useState(null);
   const [suite,    setSuite]    = useState(null);
@@ -697,7 +698,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
         sessionStorage.setItem('tenantsNavIndex', String(next));
         window.history.replaceState(null, '', `/tenants/${entry.podio_id}`);
         loaded.current = new Set();
-        setTab('overview');
+        setTab('tasks');
       }
     } catch {}
     setNavLoading(false);
@@ -726,7 +727,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
     onUpdate?.(updated);
   };
 
-  const TABS = ['Overview', 'Info', 'Contacts', 'Rent', 'COIs', 'Activity', 'Communications'];
+  const TABS = ['Tasks', 'Overview', 'Info', 'Contacts', 'Rent', 'COIs', 'Activity', 'Communications'];
   const tk   = t => t.toLowerCase();
 
   const hdrBtnStyle = (active) => ({
@@ -849,6 +850,12 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
       </div>
 
       {/* ── Tab content ── */}
+      {tab==='tasks'&&(
+        <div style={{flex:1,overflow:'hidden'}}>
+          <TasksView filterTenantId={data.id} hidePropertyPills embeddedMode/>
+        </div>
+      )}
+      {tab!=='tasks'&&(
       <div style={{flex:1, overflowY:'auto', padding:'16px'}}>
 
         {/* ── OVERVIEW TAB ── */}
@@ -939,69 +946,6 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
               {/* RIGHT col */}
               <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
-
-                {/* Open Issues */}
-                <div style={css.card}>
-                  <div style={{...css.secTitle, display:'flex', alignItems:'center', gap:'6px', marginBottom:'8px'}}>
-                    Open Issues
-                    {issues !== null && (
-                      <span style={css.badge(issues.length ? T.warn : T.text2, issues.length ? 'rgba(212,146,74,0.15)' : T.bg3)}>{issues.length}</span>
-                    )}
-                  </div>
-                  {issues === null ? (
-                    <div style={{fontSize:F.sm, color:T.text3}}>Loading…</div>
-                  ) : issues.length === 0 ? (
-                    <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic'}}>No open issues</div>
-                  ) : (
-                    <table style={{width:'100%', borderCollapse:'collapse'}}>
-                      <tbody>
-                        {issues.map(iss => (
-                          <tr key={iss.id} style={{borderBottom:`0.5px solid ${T.border}`, cursor:'pointer'}}
-                            onClick={() => window.open(`/issues/${iss.podio_id ?? 'X'+iss.id.slice(-6)}`, '_blank')}
-                            onMouseEnter={e => e.currentTarget.style.background = T.bg3}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                            <td style={{...css.td, whiteSpace:'normal', wordBreak:'break-word', paddingLeft:'0'}}>{iss.issue_name || '—'}</td>
-                            <td style={{...css.td, flexShrink:0}}>
-                              {iss.priority && <span style={css.badge(iss.priority==='High'?T.danger:iss.priority==='Medium'?T.warn:T.text2, 'transparent')}>{iss.priority}</span>}
-                            </td>
-                            <td style={{...css.td, color:T.text2, fontSize:F.xs, textAlign:'right', paddingRight:0}}>{fmtDate(iss.follow_up_date)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-
-                {/* Open Work Orders */}
-                <div style={css.card}>
-                  <div style={{...css.secTitle, display:'flex', alignItems:'center', gap:'6px', marginBottom:'8px'}}>
-                    Open Work Orders
-                    {workOrders !== null && (
-                      <span style={css.badge(workOrders.length ? T.accent : T.text2, workOrders.length ? '#1a2e3a' : T.bg3)}>{workOrders.length}</span>
-                    )}
-                  </div>
-                  {workOrders === null ? (
-                    <div style={{fontSize:F.sm, color:T.text3}}>Loading…</div>
-                  ) : workOrders.length === 0 ? (
-                    <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic'}}>No open work orders</div>
-                  ) : (
-                    <table style={{width:'100%', borderCollapse:'collapse'}}>
-                      <tbody>
-                        {workOrders.map(wo => (
-                          <tr key={wo.id} style={{borderBottom:`0.5px solid ${T.border}`, cursor:'pointer'}}
-                            onClick={() => window.open(`/work-orders/${wo.podio_id ?? 'X'+wo.id.slice(-6)}`, '_blank')}
-                            onMouseEnter={e => e.currentTarget.style.background = T.bg3}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                            <td style={{...css.td, color:T.text2, fontSize:F.xs, paddingLeft:'0', flexShrink:0}}>{wo.wo_num || ''}</td>
-                            <td style={{...css.td, whiteSpace:'normal', wordBreak:'break-word'}}>{wo.short_description || '—'}</td>
-                            <td style={{...css.td, color:T.text2, fontSize:F.xs, flexShrink:0}}>{wo.stage || ''}</td>
-                            <td style={{...css.td, color:T.text2, fontSize:F.xs, textAlign:'right', paddingRight:0}}>{fmtDate(wo.follow_up_date)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
 
                 {/* Quick Links */}
                 <div style={css.card}>
@@ -1391,6 +1335,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

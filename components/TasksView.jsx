@@ -554,7 +554,7 @@ const TaskKanbanView = ({ tasks, vendors, tenants, onCardClick, onPriorityChange
 // ─────────────────────────────────────────────────────────────────────────────
 // TasksList
 // ─────────────────────────────────────────────────────────────────────────────
-const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=0 }) => {
+const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=0, filterVendorId, filterTenantId, filterContactId, hidePropertyPills, embeddedMode }) => {
   const [tasks,setTasks]             = useState([]);
   const [loading,setLoading]         = useState(true);
   const [error,setError]             = useState(null);
@@ -581,34 +581,50 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   useEffect(()=>{
     setLoading(true); setError(null); setTasks([]);
 
-    const shared=[];
-    if (statusFilter==='Open') shared.push('status=not.in.(Closed,Cancelled)');
-    else if (statusFilter==='Closed') shared.push('status=in.(Closed,Cancelled)');
-    else if (statusFilter==='In Progress') shared.push('status=eq.In%20Progress');
-    else if (statusFilter==='On Hold') shared.push('status=eq.On%20Hold');
-    if (filterPropCode) shared.push(`prop_code=eq.${encodeURIComponent(filterPropCode)}`);
-    else if (propFilter.length===1) shared.push(`prop_code=eq.${encodeURIComponent(propFilter[0])}`);
-    else if (propFilter.length>1) shared.push(`prop_code=in.(${propFilter.map(encodeURIComponent).join(',')})`);
-    if (search) {
-      if (/^\d+$/.test(search)) shared.push(`task_num=eq.${parseInt(search,10)}`);
-      else shared.push(`title=ilike.*${encodeURIComponent(search)}*`);
-    }
+    const run = async () => {
+      const shared=[];
+      if (statusFilter==='Open') shared.push('status=not.in.(Closed,Cancelled)');
+      else if (statusFilter==='Closed') shared.push('status=in.(Closed,Cancelled)');
+      else if (statusFilter==='In Progress') shared.push('status=eq.In%20Progress');
+      else if (statusFilter==='On Hold') shared.push('status=eq.On%20Hold');
+      if (filterPropCode) shared.push(`prop_code=eq.${encodeURIComponent(filterPropCode)}`);
+      else if (propFilter.length===1) shared.push(`prop_code=eq.${encodeURIComponent(propFilter[0])}`);
+      else if (propFilter.length>1) shared.push(`prop_code=in.(${propFilter.map(encodeURIComponent).join(',')})`);
+      if (filterVendorId) shared.push(`vendor_id=eq.${filterVendorId}`);
+      if (filterTenantId) shared.push(`tenant_id=eq.${filterTenantId}`);
+      if (filterContactId) {
+        const tcRows = await sbFetch('task_contacts', `contact_id=eq.${filterContactId}&select=task_id`);
+        const taskIds = (tcRows||[]).map(r=>r.task_id);
+        if (!taskIds.length) {
+          setTasks([]);
+          setTypeCounts({work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0});
+          setLoading(false);
+          return;
+        }
+        shared.push(`id=in.(${taskIds.join(',')})`);
+      }
+      if (search) {
+        if (/^\d+$/.test(search)) shared.push(`task_num=eq.${parseInt(search,10)}`);
+        else shared.push(`title=ilike.*${encodeURIComponent(search)}*`);
+      }
 
-    const mainParts=[...shared];
-    if (typeFilter!=='All') mainParts.push(`record_type=eq.${typeFilter}`);
-    mainParts.push('order=updated_at.desc.nullslast');
+      const mainParts=[...shared];
+      if (typeFilter!=='All') mainParts.push(`record_type=eq.${typeFilter}`);
+      mainParts.push('order=updated_at.desc.nullslast');
 
-    Promise.all([
-      sbFetchAll('tasks',`select=*&${mainParts.join('&')}`),
-      sbFetchAll('tasks',`select=record_type&${shared.join('&')}`),
-    ]).then(([data,countData])=>{
+      const [data,countData] = await Promise.all([
+        sbFetchAll('tasks',`select=*&${mainParts.join('&')}`),
+        sbFetchAll('tasks',`select=record_type&${shared.join('&')}`),
+      ]);
       setTasks(data);
       const counts={work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0};
       countData.forEach(r=>{if(counts[r.record_type]!==undefined)counts[r.record_type]++;});
       setTypeCounts(counts);
       setLoading(false);
-    }).catch(e=>{setError(e.message);setLoading(false);});
-  },[statusFilter,typeFilter,propFilter.join(','),filterPropCode,search,refreshKey]);
+    };
+
+    run().catch(e=>{setError(e.message);setLoading(false);});
+  },[statusFilter,typeFilter,propFilter.join(','),filterPropCode,filterVendorId,filterTenantId,filterContactId,search,refreshKey]);
 
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
@@ -621,9 +637,10 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   },[filterPropCode]);
 
   useEffect(()=>{
+    if(embeddedMode) return;
     document.title='Tasks | SedonaCRM';
     return ()=>{document.title='SedonaCRM';};
-  },[]);
+  },[embeddedMode]);
 
   // Client-side sort (priority → updated_at secondary)
   const sorted = useMemo(()=>[...tasks].sort((a,b)=>{
@@ -695,11 +712,14 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   };
 
   const handleKanbanCardClick=task=>{
+    const prefix=TYPE_PREFIX[task.record_type]||'?';
+    const href=`/tasks/${prefix}-${task.task_num}`;
     sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);
     const navL=filtered.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
     sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
     sessionStorage.setItem('tasksNavIndex',String(filtered.findIndex(t=>t.id===task.id)));
-    onSelect(task);
+    if(embeddedMode){window.location.href=href;}
+    else{onSelect(task);}
   };
 
   const TYPE_PILLS=[
@@ -740,7 +760,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         const navL=visualList.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
         sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
         sessionStorage.setItem('tasksNavIndex',String(visualList.findIndex(t=>t.id===task.id)));
-        onSelect(task);
+        if(embeddedMode){window.location.href=href;}
+        else{onSelect(task);}
       }
     };
     return (
@@ -825,7 +846,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           </div>
         </div>
         {/* Property filter pills */}
-        {!filterPropCode&&propCodes.length>0&&(
+        {!filterPropCode&&!hidePropertyPills&&propCodes.length>0&&(
           <div className="crm-tasks-prop-strip" style={{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',paddingBottom:'4px',flexWrap:'nowrap'}}>
             <button onClick={()=>setPropFilter([])} style={propBtn(propFilter.length===0)}>All Props</button>
             <button onClick={()=>setPropFilter(pf=>pf.includes('ACP')?pf.filter(x=>x!=='ACP'):[...pf,'ACP'])} style={propBtn(propFilter.includes('ACP'))}>ACP</button>
@@ -1400,7 +1421,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
 // ─────────────────────────────────────────────────────────────────────────────
 // Default export — list ↔ detail wrapper
 // ─────────────────────────────────────────────────────────────────────────────
-export default function TasksView({ filterPropCode, filterType } = {}) {
+export default function TasksView({ filterPropCode, filterType, filterVendorId, filterTenantId, filterContactId, hidePropertyPills, embeddedMode } = {}) {
   const [selected,setSelected]             = useState(null);
   const [listRefreshKey,setListRefreshKey] = useState(0);
 
@@ -1424,6 +1445,23 @@ export default function TasksView({ filterPropCode, filterType } = {}) {
     window.addEventListener('popstate',onPop);
     return ()=>window.removeEventListener('popstate',onPop);
   },[]);
+
+  if(embeddedMode){
+    return (
+      <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>
+        <TasksList
+          filterPropCode={filterPropCode}
+          filterType={filterType}
+          filterVendorId={filterVendorId}
+          filterTenantId={filterTenantId}
+          filterContactId={filterContactId}
+          hidePropertyPills={hidePropertyPills}
+          embeddedMode={true}
+          refreshKey={listRefreshKey}
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>

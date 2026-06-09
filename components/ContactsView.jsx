@@ -3,7 +3,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { UserCircle, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { UserCircle, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
+import TasksView from './TasksView';
 import RichTextEditor from './RichTextEditor';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -555,7 +556,7 @@ const leaseUrgStyle = d => {
 };
 
 export const ContactDetail = ({ contact, onBack, onUpdate }) => {
-  const [tab,  setTab]  = useState('dashboard');
+  const [tab,  setTab]  = useState('tasks');
   const [data, setData] = useState(contact);
   const [copied, setCopied] = useState(false);
   const [navList, setNavList] = useState(null);
@@ -608,7 +609,7 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
         setNavIdx(next);
         sessionStorage.setItem('contactsNavIndex', String(next));
         window.history.replaceState(null, '', `/contacts/${entry.podio_id}`);
-        setTab('dashboard');
+        setTab('tasks');
         setTenantTab({ rows: null, loading: false });
         setOwnerTab({ rows: null, loading: false });
         setVendorTab({ rows: null, loading: false });
@@ -687,7 +688,7 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
     }).catch(() => {});
   };
 
-  const TABS = ['Dashboard', 'Contact Info', 'Tenant', 'Issues', 'Owner', 'Vendor', 'Work Orders', 'Communications'];
+  const TABS = ['Tasks', 'Contact Info'];
   const tk = t => t.toLowerCase().replace(/ /g, '-');
 
   const tabBtnStyle = active => ({
@@ -789,11 +790,19 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
         </div>
       </div>
 
-      {/* ── Tab Content ── */}
+      {/* ── Tasks tab (full-height, no scroll wrapper) ── */}
+      {tab === 'tasks' && (
+        <div style={{flex:1, overflow:'hidden'}}>
+          <TasksView filterContactId={data.id} hidePropertyPills embeddedMode/>
+        </div>
+      )}
+
+      {/* ── Contact Info tab ── */}
+      {tab === 'contact-info' && (
       <div style={{flex:1, overflowY:'auto', padding:'16px', background:T.bg1}}>
 
-        {/* ── DASHBOARD ── */}
-        {tab === 'dashboard' && (
+        {/* ── DASHBOARD (removed) — kept as dead block for safety ── */}
+        {false && tab === 'dashboard' && (
           <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
 
             {/* Summary card */}
@@ -1046,16 +1055,8 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
           )
         )}
 
-        {/* ── COMMUNICATIONS ── */}
-        {tab === 'communications' && (
-          placeholderPanel(
-            '✉',
-            'Email and SMS thread will appear here — coming in Phase 3',
-            'Gmail sync + Twilio SMS — Phase 3 & 6'
-          )
-        )}
-
       </div>
+      )}
     </div>
   );
 };

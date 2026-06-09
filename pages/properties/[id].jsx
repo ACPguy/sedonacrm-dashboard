@@ -15,7 +15,10 @@ export default function PropertyDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
+    let filter;
+    if (id.includes('-')) filter = `id=eq.${id}`;
+    else if (/^\d+$/.test(id)) filter = `podio_id=eq.${id}`;
+    else filter = `prop_code=eq.${id}`;
     sbFetch('properties', `select=*&${filter}`)
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
