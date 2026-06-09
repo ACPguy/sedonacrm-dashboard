@@ -3,6 +3,7 @@
 // Unified task module: work_order, task, note, project, acp_task, sg_task
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/router';
 import {
   Wrench, CheckFat, NotePencil, FolderOpen, Buildings, House, ClipboardText, ChatCircle,
   CaretLeft, CaretRight,
@@ -1484,32 +1485,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Default export — list ↔ detail wrapper
+// Default export — list view; row clicks navigate to /tasks/[id]
 // ─────────────────────────────────────────────────────────────────────────────
 export default function TasksView({ filterPropCode, filterType, filterVendorId, filterTenantId, filterContactId, hidePropertyPills, embeddedMode } = {}) {
-  const [selected,setSelected]             = useState(null);
-  const [listRefreshKey,setListRefreshKey] = useState(0);
+  const router = useRouter();
 
   const handleSelect = useCallback(task=>{
-    history.pushState({taskId:task.id},'');
-    setSelected(task);
-  },[]);
-
-  const handleBack = useCallback(()=>{
-    if(window.history.state?.taskId) history.replaceState({},'');
-    setSelected(null);
-  },[]);
-
-  const handleUpdate = useCallback(updated=>{
-    setSelected(updated);
-    setListRefreshKey(k=>k+1);
-  },[]);
-
-  useEffect(()=>{
-    const onPop=()=>setSelected(null);
-    window.addEventListener('popstate',onPop);
-    return ()=>window.removeEventListener('popstate',onPop);
-  },[]);
+    router.push(`/tasks/${formatTaskNum(task.record_type, task.task_num)}`);
+  },[router]);
 
   if(embeddedMode){
     return (
@@ -1522,7 +1505,6 @@ export default function TasksView({ filterPropCode, filterType, filterVendorId, 
           filterContactId={filterContactId}
           hidePropertyPills={hidePropertyPills}
           embeddedMode={true}
-          refreshKey={listRefreshKey}
         />
       </div>
     );
@@ -1530,12 +1512,7 @@ export default function TasksView({ filterPropCode, filterType, filterVendorId, 
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>
-      <div style={{display:selected?'none':'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
-        <TasksList onSelect={handleSelect} filterPropCode={filterPropCode} filterType={filterType} refreshKey={listRefreshKey}/>
-      </div>
-      {selected&&(
-        <TaskDetail key={selected.id} task={selected} onBack={handleBack} onUpdate={handleUpdate}/>
-      )}
+      <TasksList onSelect={handleSelect} filterPropCode={filterPropCode} filterType={filterType}/>
     </div>
   );
 }
