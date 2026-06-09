@@ -56,14 +56,19 @@ export default async function handler(req, res) {
       { headers: { Authorization: `Bearer ${tokens.access_token}` } }
     );
     const gmailProfile = await profileRes.json();
-    const profile = { email: gmailProfile.emailAddress, name: gmailProfile.emailAddress };
+    const emailAddress = gmailProfile.emailAddress;
+
+    if (!emailAddress) {
+      console.error('Gmail profile fetch returned no emailAddress:', gmailProfile);
+      return res.redirect('/settings?gmail=error');
+    }
 
     const expiryDate = new Date(Date.now() + (tokens.expires_in || 3600) * 1000);
 
     // Write to gmail_tokens (Stage 1 legacy — keep for backwards compat); use service key to bypass RLS
     await sbFetch('gmail_tokens', {
       user_id: SCOTT_USER_ID,
-      email: profile.email,
+      email: emailAddress,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       token_expiry: expiryDate.toISOString(),
@@ -73,8 +78,8 @@ export default async function handler(req, res) {
 
     // Write to email_accounts (Stage 2 canonical token store)
     await sbFetch('email_accounts', {
-      email: profile.email,
-      display_name: profile.name || profile.email,
+      email: emailAddress,
+      display_name: emailAddress,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       token_expires_at: expiryDate.toISOString(),
