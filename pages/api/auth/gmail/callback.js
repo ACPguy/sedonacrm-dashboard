@@ -4,9 +4,10 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SCOTT_USER_ID = '573b65b5-ba16-437b-9101-d0bff2453dde';
 
-async function sbFetch(table, row, useServiceKey = false) {
+async function sbFetch(table, row, useServiceKey = false, onConflict = null) {
   const key = useServiceKey && SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY : SUPABASE_ANON_KEY;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+  const url = `${SUPABASE_URL}/rest/v1/${table}${onConflict ? `?on_conflict=${onConflict}` : ''}`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'apikey': key,
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
       token_expiry: expiryDate.toISOString(),
       scope: tokens.scope,
       updated_at: new Date().toISOString(),
-    });
+    }, false, 'user_id');
 
     // Write to email_accounts (Stage 2 canonical token store)
     await sbFetch('email_accounts', {
@@ -77,7 +78,7 @@ export default async function handler(req, res) {
       token_expires_at: expiryDate.toISOString(),
       is_active: true,
       updated_at: new Date().toISOString(),
-    }, true);
+    }, true, 'email');
 
     return res.redirect('/settings?gmail=connected');
 
