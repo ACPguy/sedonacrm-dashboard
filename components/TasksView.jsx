@@ -13,6 +13,7 @@ import {
 } from '@dnd-kit/core';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
+import { getTaskPrefix } from '../utils/taskPrefix';
 
 const SUPABASE_URL      = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -451,12 +452,12 @@ const TaskKanbanCardContent = ({ task, vendors, tenants }) => {
   const shortVendor = vendor?.company_dba ? vendor.company_dba.split(' ').slice(0,2).join(' ') : null;
   const fuDate = task.follow_up_date ? fmtDate(task.follow_up_date) : null;
   const fuOverdue = isFuOverdue(task.follow_up_date, task);
-  const prefixed = formatTaskNum(task.record_type, task.task_num);
+  const displayId = getTaskPrefix(task);
   return (
     <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'9px 10px',userSelect:'none'}}>
       <div style={{display:'flex',alignItems:'center',gap:'4px',marginBottom:'4px'}}>
         <TaskTypeIcon recordType={task.record_type} size={12}/>
-        <span style={{fontSize:F.xs,color:T.text2}}>{prefixed}</span>
+        <span style={{fontSize:F.xs,color:T.text2}}>{displayId}</span>
       </div>
       <div style={{fontSize:F.sm,color:T.text0,fontWeight:'500',lineHeight:'1.35',marginBottom:'5px'}}>
         {task.title||'Untitled'}
@@ -746,8 +747,9 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   );
 
   const renderRow=(task,i)=>{
-    const prefixed=formatTaskNum(task.record_type,task.task_num);
-    const href=`/tasks/${prefixed}`;
+    const urlId=formatTaskNum(task.record_type,task.task_num);
+    const displayId=getTaskPrefix(task);
+    const href=`/tasks/${urlId}`;
     const rowBg=i%2===0?'transparent':T.bg0;
     const fuOverdue=isFuOverdue(task.follow_up_date,task);
     const fuDisplay=task.follow_up_date?fmtNumDate(task.follow_up_date):'';
@@ -776,7 +778,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         </td>
         <td style={{...css.td,fontSize:F.xs,color:T.text2,minWidth:'52px'}}>
           <a href={href} onClick={e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&e.button===0){e.preventDefault();openDetail(e);}}} style={{color:T.text2,textDecoration:'none'}}>
-            {prefixed}
+            {displayId}
           </a>
         </td>
         <td style={css.td} title={task.title}>
@@ -998,7 +1000,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           <div className="crm-mobile-cards">
             {filtered.length===0&&<div style={{padding:'32px',textAlign:'center',color:T.text3,fontSize:F.sm}}>No tasks match filters</div>}
             {filtered.map((t,i)=>{
-              const prefixed=formatTaskNum(t.record_type,t.task_num);
+              const displayId=getTaskPrefix(t);
               const fuOverdue=isFuOverdue(t.follow_up_date,t);
               const rowBg=i%2===0?'transparent':T.bg0;
               return (
@@ -1015,7 +1017,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px'}}>
                     <TaskTypeIcon recordType={t.record_type} size={18}/>
-                    <span style={{fontSize:F.xs,color:T.text2}}>{prefixed}</span>
+                    <span style={{fontSize:F.xs,color:T.text2}}>{displayId}</span>
                     <span style={{fontWeight:'600',fontSize:F.base,color:T.text0,lineHeight:'1.3'}}>{t.title||'—'}</span>
                   </div>
                   <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
@@ -1098,7 +1100,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     if(!data)return;
     const raw=data.title||'';
     const trunc=raw.length>30?raw.slice(0,30)+'…':raw;
-    document.title=`${formatTaskNum(data.record_type,data.task_num)} – ${trunc} | SedonaCRM`;
+    document.title=`${getTaskPrefix(data)} – ${trunc} | SedonaCRM`;
     return ()=>{document.title='SedonaCRM';};
   },[data?.title,data?.record_type,data?.task_num]);
 
@@ -1188,6 +1190,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   if(!data) return null;
 
   const prefixed=formatTaskNum(data.record_type,data.task_num);
+  const displayId=getTaskPrefix(data);
   const categoryOpts=CATEGORY_OPTIONS[data.record_type]||[];
   const propInfo=activeProps.find(p=>p.prop_code===data.prop_code);
   const addr2=propInfo?[propInfo.city,propInfo.state,propInfo.zip].filter(Boolean).join(' '):'';
@@ -1208,7 +1211,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             <ClipboardText size={14} weight="bold"/>← Tasks
           </button>
-          <span style={{fontSize:F.xs,background:T.bg3,color:T.text1,padding:'2px 8px',borderRadius:'3px',fontWeight:'600',fontFamily:'monospace',flexShrink:0}}>{prefixed}</span>
+          <span style={{fontSize:F.xs,background:T.bg3,color:T.text1,padding:'2px 8px',borderRadius:'3px',fontWeight:'600',fontFamily:'monospace',flexShrink:0}}>{displayId}</span>
           {data.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'2px 8px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>{data.prop_code}</span>}
           <StatusBadge status={data.priority}/>
           <StatusBadge status={data.status}/>
@@ -1414,7 +1417,13 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           </div>}
           {detailTab==='comms'&&(
             <div style={{flex:1,overflow:'auto',background:T.bg1}}>
-              <CommunicationTimeline recordType="task" recordId={data.id} fromAccount="scott@andersoncp.com"/>
+              <CommunicationTimeline
+                recordType="task"
+                recordId={data.id}
+                fromAccount="scott@andersoncp.com"
+                crmRecordLabel={`${displayId}${data.title ? ` — ${data.title}` : ''}`}
+                crmRecordUrl={`/tasks/${prefixed}`}
+              />
             </div>
           )}
           {/* Desktop: always in flow. Mobile: only when open. */}

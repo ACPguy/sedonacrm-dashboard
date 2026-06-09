@@ -1066,6 +1066,8 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
             recordType="contact"
             recordId={data.id}
             fromAccount="scott@andersoncp.com"
+            crmRecordLabel={data.full_name || data.company_name || 'Contact'}
+            crmRecordUrl={`/contacts/${data.podio_id ?? 'X'+data.id.slice(-6)}`}
           />
         </div>
       )}

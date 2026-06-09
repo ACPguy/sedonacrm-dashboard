@@ -1334,6 +1334,8 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
             recordType="tenant"
             recordId={data.id}
             fromAccount="scott@andersoncp.com"
+            crmRecordLabel={data.tenant_dba || 'Tenant'}
+            crmRecordUrl={`/tenants/${data.podio_id ?? 'X'+data.id.slice(-6)}`}
           />
         </div>
       )}

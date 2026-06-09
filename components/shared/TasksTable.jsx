@@ -8,6 +8,7 @@ import {
   sbFetch, T, F, css, StatusBadge, PriorityDot, fmtDate,
   formatTaskNum, TaskTypeIcon, PRIORITY_ORDER,
 } from '../TasksView';
+import { getTaskPrefix } from '../../utils/taskPrefix';
 
 const fmtNumDate = d => {
   if (!d) return '';
@@ -96,8 +97,9 @@ export default function TasksTable({
             <tr><td colSpan={hidePropertyFilter?6:7} style={{...css.td,textAlign:'center',padding:'20px',color:T.text3}}>No open tasks</td></tr>
           )}
           {filtered.map((task,i)=>{
-            const prefixed=formatTaskNum(task.record_type,task.task_num);
-            const href=`/tasks/${prefixed}`;
+            const urlId=formatTaskNum(task.record_type,task.task_num);
+            const displayId=getTaskPrefix(task);
+            const href=`/tasks/${urlId}`;
             const rowBg=i%2===0?'transparent':T.bg0;
             return (
               <tr key={task.id}
@@ -109,7 +111,7 @@ export default function TasksTable({
                   <TaskTypeIcon recordType={task.record_type} size={13}/>
                 </td>
                 <td style={{...css.td,fontSize:F.xs,color:T.text2}}>
-                  <a href={href} onClick={e=>{if(!e.ctrlKey&&!e.metaKey){e.preventDefault();navigate(task);}}} style={{color:'inherit',textDecoration:'none'}}>{prefixed}</a>
+                  <a href={href} onClick={e=>{if(!e.ctrlKey&&!e.metaKey){e.preventDefault();navigate(task);}}} style={{color:'inherit',textDecoration:'none'}}>{displayId}</a>
                 </td>
                 <td style={css.td} title={task.title}>
                   <a href={href} onClick={e=>{if(!e.ctrlKey&&!e.metaKey){e.preventDefault();navigate(task);}}} style={{color:'inherit',textDecoration:'none'}}>{task.title||''}</a>
@@ -136,17 +138,18 @@ export default function TasksTable({
       {/* Mobile cards */}
       <div className="crm-mobile-cards">
         {filtered.map((task,i)=>{
-          const prefixed=formatTaskNum(task.record_type,task.task_num);
+          const urlId=formatTaskNum(task.record_type,task.task_num);
+          const displayId=getTaskPrefix(task);
           const rowBg=i%2===0?'transparent':T.bg0;
           return (
             <div key={task.id}
               style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-              onClick={()=>router.push(`/tasks/${prefixed}`)}
+              onClick={()=>router.push(`/tasks/${urlId}`)}
               onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
               onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
               <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'3px'}}>
                 <TaskTypeIcon recordType={task.record_type} size={16}/>
-                <span style={{fontSize:F.xs,color:T.text2}}>{prefixed}</span>
+                <span style={{fontSize:F.xs,color:T.text2}}>{displayId}</span>
                 <span style={{fontWeight:'600',fontSize:F.sm,color:T.text0}}>{task.title||'—'}</span>
               </div>
               <div style={{display:'flex',gap:'4px',flexWrap:'wrap',alignItems:'center'}}>
