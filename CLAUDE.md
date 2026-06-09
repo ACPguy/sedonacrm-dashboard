@@ -46,6 +46,7 @@ git push
 - DB connection: `postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-east-1.pooler.supabase.com:5432/postgres`
 - All tables have RLS enabled
 - Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`
+- `SUPABASE_SERVICE_ROLE_KEY` is set in `.env.local` and in Vercel environment variables (used by server-side Gmail/webhook code via `lib/supabaseServer.js`)
 
 ## Core Architecture — Property as Hub
 
@@ -66,20 +67,25 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
 
 ```
 ~/sedonacrm-dashboard/components/
-  AppShell.jsx         — shared sidebar/chrome for all routed pages
-  SedonaCRM.jsx        — main shell, nav, routing, Home dashboard, Properties list
-  IssuesView.jsx       — issues list + detail (routed, accepts prop_code filter)
-  WorkOrdersView.jsx   — work orders list + detail (routed, accepts prop_code filter)
-  TasksView.jsx        — unified tasks list + detail, all 6 record types (routed)
-  TenantsView.jsx      — tenants list + detail (routed, accepts prop_code filter)
-  SuitesView.jsx       — suites list + detail (routed, accepts prop_code filter)
-  RentScheduleView.jsx — rent schedule list + detail (routed, accepts prop_code filter)
-  ContactsView.jsx     — contacts list + detail (routed)
-  VendorsView.jsx      — vendors list + detail (routed)
-  OwnersView.jsx       — property owners list + detail (routed)
+  AppShell.jsx              — shared sidebar/chrome for all routed pages
+  SedonaCRM.jsx             — main shell, nav, routing, Home dashboard, Properties list
+  CommunicationTimeline.jsx — reusable unified comms timeline (email/note/call); used in Tasks, Contacts, Tenants
+  IssuesView.jsx            — issues list + detail (routed, accepts prop_code filter)
+  WorkOrdersView.jsx        — work orders list + detail (routed, accepts prop_code filter)
+  TasksView.jsx             — unified tasks list + detail, all 6 record types (routed); has Details|Comms tabs
+  TenantsView.jsx           — tenants list + detail (routed, accepts prop_code filter); has Communications tab
+  SuitesView.jsx            — suites list + detail (routed, accepts prop_code filter)
+  RentScheduleView.jsx      — rent schedule list + detail (routed, accepts prop_code filter)
+  ContactsView.jsx          — contacts list + detail (routed); has Comms tab
+  VendorsView.jsx           — vendors list + detail (routed)
+  OwnersView.jsx            — property owners list + detail (routed)
   shared/
     TasksTable.jsx     — shared reusable tasks table (self-fetching, filterable)
     WorkOrdersTable.jsx, TenantsTable.jsx, SuitesTable.jsx, IssuesTable.jsx, ContactsTable.jsx
+
+~/sedonacrm-dashboard/lib/
+  gmail.js          — getGmailClient() (OAuth2 + token refresh), setupWatch()
+  supabaseServer.js — createServerClient() using SUPABASE_SERVICE_ROLE_KEY
 
 ~/sedonacrm-dashboard/pages/
   index.jsx            — main SPA entry (SedonaCRM shell)
@@ -92,6 +98,7 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   vendors/index.jsx + [id].jsx
   owners/index.jsx + [id].jsx
   settings/index.jsx
+  api/gmail/webhook.js — Pub/Sub push receiver; processes history, upserts email_threads + email_messages + communication_timeline
 ```
 
 ## Standalone Portfolio Views (routed Next.js pages)
@@ -154,7 +161,30 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - **Phase 0:** Complete
 - **Phase 1:** Complete (26 tables seeded, 3 deferred)
 - **Phase 2:** IN PROGRESS — UI build
-- **Phase 3+:** Pending
+- **Phase 3 Stage 1:** Complete — Gmail OAuth, /settings page
+- **Phase 3 Stage 2A:** Complete — 5 Gmail DB tables, webhook receiver, lib/gmail.js, lib/supabaseServer.js
+- **Phase 3 Stage 2B:** Complete — CommunicationTimeline.jsx wired into Tasks, Contacts, Tenants
+- **Phase 3 Stage 2C:** NEXT — EmailInbox + EmailCompose UI
+- **Phase 4+:** Pending
+
+## Gmail DB Tables (Phase 3 Stage 2A)
+
+Five tables created in Supabase for the Gmail integration:
+
+| Table | Purpose |
+|---|---|
+| `email_accounts` | One row per connected Gmail account; stores OAuth tokens, pubsub watch state |
+| `email_threads` | One row per Gmail thread; linked to a CRM record via `linked_record_type` + `linked_record_id` |
+| `email_messages` | One row per Gmail message; stores headers, body (html/text), direction |
+| `email_thread_links` | Junction: many records can be linked to one thread (primary + reference links) |
+| `communication_timeline` | Unified activity log per record: entry_type = email / note / call / sms |
+
+`communication_timeline` fields used by CommunicationTimeline.jsx:
+- `record_type`, `record_id` — the CRM record this entry belongs to
+- `entry_type` — 'email' | 'note' | 'call' | 'sms'
+- `email_message_id`, `email_thread_id` — FKs for email entries
+- `subject`, `body_preview`, `direction`, `from_address`, `from_name`, `entry_at`
+- `is_reference`, `reference_record_type`, `reference_record_id`, `reference_label`, `reference_url`
 
 ## Session Management
 
@@ -281,45 +311,47 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 ## Next Priorities
 
-**Completed this session (2026-06-08):**
+**Completed this session (2026-06-09):**
 
-Tasks polish + embedding across all detail views (merged to main, commit dbb6ab7):
-- Tasks list: priority pill styling fixed to match other filter pills
-- Tasks list: property pills now multiselect; group headers show for single selection
-- Tasks list: Status pills moved to same row as Priority pills
-- Tasks list: Clear button appears when any filter is active
-- Tasks detail: keyboard ArrowLeft/ArrowRight prev/next navigation
-- Record type colors updated: WO=red, Task=cyan, Note=slate, Project=purple, ACP Task=orange, S&G Task=lime
-- Task icon changed to CheckFat (cyan)
-- Prev/Next record navigation added to ALL detail views: Properties, Tenants, Vendors, Owners, Contacts, KeySafes, WorkOrders, Issues, Suites, RentSchedule
-- Properties detail: Work Orders + Issues tabs replaced with Tasks tab (filtered by prop_code)
-- Tenants detail: Tasks tab added as first tab; Open Issues + Open Work Orders cards removed from Overview
-- Vendors detail: restructured to Tasks + Vendor Info tabs (Tasks filtered by vendor_id)
-- Owners detail: restructured to Tasks + Owner Info tabs (Tasks filtered by prop_code)
-- Contacts detail: restructured to Tasks + Contact Info tabs; Tasks filtered via task_contacts junction (filterContactId); Issues/WO tabs removed
-- Key Safes module built: KeySafesView.jsx, pages/key-safes/index.jsx + [id].jsx; status options (8 values), ID# field, rich text fields, Activity + Comments panel
-- TasksView: embeddedMode, hidePropertyPills, filterVendorId, filterTenantId, filterContactId props added
-- Nav: Legacy section (Work Orders, Issues) moved to bottom, collapsed by default
-- Nav: Operations reordered — Properties, Tasks, Tenants, Vendors, Owners, Contacts, Suites, Key Safes
-- Nav: hover-to-expand when collapsed (desktop only)
-- pages/properties/[id].jsx: filter logic handles prop_code param (alphanumeric) for prev/next goNav
+Gmail Stage 2A + 2B (on preview branch, commits 23210dc + aaf14f2):
+- Stage 2A: 5 Gmail DB tables (email_accounts, email_threads, email_messages, email_thread_links, communication_timeline)
+- Stage 2A: pages/api/gmail/webhook.js — Pub/Sub push receiver; processes Gmail history, upserts threads/messages/timeline
+- Stage 2A: lib/gmail.js — getGmailClient() with OAuth2 token refresh, setupWatch()
+- Stage 2A: lib/supabaseServer.js — server-side Supabase client using SUPABASE_SERVICE_ROLE_KEY
+- Stage 2A: OAuth token migrated from Stage 1 settings page to email_accounts table
+- Stage 2B: CommunicationTimeline.jsx — unified timeline component (email/note/call); action bar, filter pills, thread grouping, "View in Gmail →" links, note compose, call log form
+- Stage 2B: TasksView — Details|Comms tab bar added to task detail; Comms tab shows CommunicationTimeline
+- Stage 2B: ContactsView — Comms tab added; shows CommunicationTimeline for the contact
+- Stage 2B: TenantsView — Communications tab replaced with CommunicationTimeline
 
 **Completed previous sessions:**
-- Tasks Module Stage 1 — DB: task_sequences, tasks, task_contacts tables; 2,914 WOs + 1,234 issues + 220 S&G Projects migrated
-- Tasks Module Stage 2 — UI: TasksView unified list + detail, sbFetchAll pagination, grouped headers, all 6 record types
+- Tasks polish + embedding: priority pills, multiselect property filter, prev/next nav on all 10 detail views
+- Key Safes module built
+- Tasks embedded in Properties, Tenants, Vendors, Owners, Contacts detail views
+- Tasks Module Stage 1 + 2 — DB tables + unified TasksView UI
 - Phase 3 Stage 1: Gmail OAuth + /settings page
 - LeasingPipelineView, TntCoisView (SPA views)
-- PropertyDetail: all tabs lazy-loaded
-- ContactDetail: full tabbed form
+- PropertyDetail: all tabs lazy-loaded; ContactDetail: full tabbed form
 - All major list views routed with shared table components
 
-**Next:**
-1. Property detail — remaining tab groups:
-   - Financial: CAM, Taxes, PM Fees, Invoices, Insurance
-   - Operations: Inspections tab
-   - Ownership: Owners, Agreements, Monthly Reports, YR End Reports
-2. Phase 3 Stage 2: Gmail compose/send, thread sync, AI summarize
-3. Populate podio_id for vendors (deferred to go-live Podio API sync)
+**Next — Gmail Stage 2C:**
+1. **EmailInbox.jsx** — routed inbox view at `/inbox`
+   - Tabs: Unread | Linked | Flagged (unlinked senders needing attention)
+   - Thread list: subject, snippet, from, timestamp, unread badge
+   - Thread detail: full message list, "Link to record" action, reply button
+   - AI summarize button → calls Claude API to summarize thread
+2. **EmailCompose.jsx** — modal compose window
+   - TO / CC / BCC fields with contact autocomplete
+   - TipTap rich text body
+   - `X-SedonaCRM-Record: {type}:{id}` header injection for auto-linking
+   - File attachments (Google Drive picker)
+   - "Send & link to this record" from any detail view Comms tab
+3. **Unread badge** in AppShell nav — red dot on Inbox nav item when unread_count > 0
+4. Wire EmailCompose into CommunicationTimeline ✉ Email button (currently console.log placeholder)
+
+**After Stage 2C:**
+- Property detail remaining tab groups: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
+- Populate podio_id for vendors (deferred to go-live Podio API sync)
 
 ## Prev/Next Navigation Rule (permanent)
 
