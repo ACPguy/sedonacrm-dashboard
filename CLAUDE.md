@@ -84,12 +84,18 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
     WorkOrdersTable.jsx, TenantsTable.jsx, SuitesTable.jsx, IssuesTable.jsx, ContactsTable.jsx
 
 ~/sedonacrm-dashboard/lib/
-  gmail.js          — getGmailClient() (OAuth2 + token refresh), setupWatch()
-  supabaseServer.js — createServerClient() using SUPABASE_SERVICE_ROLE_KEY
+  gmail.js               — getGmailClient() (OAuth2 + token refresh), setupWatch()
+  drive.js               — getDriveClient(), getOrCreateWorkHistoryFolder(), createTaskFolder(), createIndexPdf()
+  drivePropertyFolders.js — hardcoded prop_code → Google Drive root folder ID map (14 active properties)
+  supabaseServer.js      — createServerClient() using SUPABASE_SERVICE_ROLE_KEY
+
+~/sedonacrm-dashboard/utils/
+  taskPrefix.js   — getTaskPrefix(task): prop_code-based display ID (CR1-3685); display-only, never in URLs
+  formatDate.js   — formatDate(val): MM-DD-YYYY UTC formatter
 
 ~/sedonacrm-dashboard/pages/
   index.jsx            — main SPA entry (SedonaCRM shell)
-  tasks/index.jsx + [id].jsx   — /tasks, /tasks/WO-3737 (prefixed task_num URLs)
+  tasks/index.jsx + [id].jsx   — /tasks, /tasks/3737 (bare task_num URLs)
   issues/index.jsx + [id].jsx
   work-orders/index.jsx + [id].jsx
   tenants/index.jsx + [id].jsx
@@ -98,12 +104,19 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   vendors/index.jsx + [id].jsx
   owners/index.jsx + [id].jsx
   settings/index.jsx
-  api/gmail/webhook.js — Pub/Sub push receiver; processes history, upserts email_threads + email_messages + communication_timeline
+  inbox/index.jsx      — /inbox — EmailInbox in AppShell
+  api/gmail/webhook.js      — Pub/Sub push receiver; processes history, upserts email_threads + email_messages + communication_timeline
+  api/gmail/send.js         — POST: send email via Gmail API; injects CRM header + footer; writes timeline
+  api/gmail/thread-update.js — POST: mark-read / archive via service-role PATCH
+  api/ai/summarize.js        — POST {threadText} → Anthropic API → {summary}
+  api/ai/draft-reply.js      — POST {threadText} → Anthropic API → {draft}
+  api/tasks/create-drive-folder.js — POST {taskId}: creates Work History subfolder + 000_CR1-N_Info.pdf
 ```
 
 ## Standalone Portfolio Views (routed Next.js pages)
 
-- Tasks — fully routed (`/tasks`, `/tasks/[prefixed_id]` e.g. `/tasks/WO-3737`)
+- Tasks — fully routed (`/tasks`, `/tasks/[task_num]` e.g. `/tasks/3737` — bare task_num, no prefix)
+- Inbox — fully routed (`/inbox`) — EmailInbox two-panel view
 - Issues — fully routed (`/issues`, `/issues/[id]`)
 - Work Orders — fully routed (`/work-orders`, `/work-orders/[id]`)
 - Tenants — fully routed (`/tenants`, `/tenants/[id]`)
@@ -164,7 +177,9 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - **Phase 3 Stage 1:** Complete — Gmail OAuth, /settings page
 - **Phase 3 Stage 2A:** Complete — 5 Gmail DB tables, webhook receiver, lib/gmail.js, lib/supabaseServer.js
 - **Phase 3 Stage 2B:** Complete — CommunicationTimeline.jsx wired into Tasks, Contacts, Tenants
-- **Phase 3 Stage 2C:** Complete — EmailInbox + EmailCompose + AppShell Inbox nav + unread badge
+- **Phase 3 Stage 2C:** Complete — EmailInbox + EmailCompose + AppShell Inbox nav + unread badge + AI summarize/draft
+- **Drive folder auto-creation:** Complete — lib/drive.js, drivePropertyFolders.js, /api/tasks/create-drive-folder; + Drive scope in OAuth
+- **Drive index PDF:** Deferred — createIndexPdf() implemented, folder creation works, PDF media upload silently failing; investigate next session
 - **Phase 4+:** Pending
 
 ## Gmail DB Tables (Phase 3 Stage 2A)
@@ -301,9 +316,13 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - record_type: work_order (2,914), task (1,234), sg_task (220), note/project/acp_task (0 — ready for new records)
 - UNIQUE index: `(record_type, task_num)` — global unique on task_num alone is impossible because WO and issue Podio IDs overlap in 1,046 values across apps
 - task_num is the Podio ID for work_orders and tasks; sequential (1–220) for sg_tasks
-- URL prefix: WO-N, TSK-N, SG-N, NOTE-N, PRJ-N, ACP-N
+- **Display IDs:** `getTaskPrefix(task)` → prop_code-based e.g. `CR1-3685`, `ACP-1816`, or bare `3685` if no prop_code — display only, never in URLs
+- **URL format:** `/tasks/3685` — bare task_num only. `parsePrefixedId` handles both bare numbers and legacy `WO-N` format (backwards-compatible)
+- **Lookup:** bare task_num queries without record_type filter, `order=record_type.desc` so work_order wins on conflicts
+- Internal type prefixes (WO-, TSK-) — used only in `formatTaskNum()` export; not used in URLs or display
 - Sequences: work_order=3717, task=1846, acp_task=518, note=1, sg_task=220
 - wo_status mapping applied: work_order status = Open (151), Closed (2,336), Cancelled (427)
+- Added columns (2026-06-09): `drive_folder_id TEXT`, `drive_folder_url TEXT`, `drive_index_pdf_id TEXT`
 
 **task_sequences table**: tracks next task_num per record_type. Trigger `trg_tasks_assign_num` fires BEFORE INSERT, auto-increments and assigns task_num.
 
@@ -311,45 +330,56 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 ## Next Priorities
 
-**Completed this session (2026-06-09):**
+**Completed sessions up to 2026-06-09:**
 
-Gmail Stage 2A + 2B (on preview branch, commits 23210dc + aaf14f2):
-- Stage 2A: 5 Gmail DB tables (email_accounts, email_threads, email_messages, email_thread_links, communication_timeline)
-- Stage 2A: pages/api/gmail/webhook.js — Pub/Sub push receiver; processes Gmail history, upserts threads/messages/timeline
-- Stage 2A: lib/gmail.js — getGmailClient() with OAuth2 token refresh, setupWatch()
-- Stage 2A: lib/supabaseServer.js — server-side Supabase client using SUPABASE_SERVICE_ROLE_KEY
-- Stage 2A: OAuth token migrated from Stage 1 settings page to email_accounts table
-- Stage 2B: CommunicationTimeline.jsx — unified timeline component (email/note/call); action bar, filter pills, thread grouping, "View in Gmail →" links, note compose, call log form
-- Stage 2B: TasksView — Details|Comms tab bar added to task detail; Comms tab shows CommunicationTimeline
-- Stage 2B: ContactsView — Comms tab added; shows CommunicationTimeline for the contact
-- Stage 2B: TenantsView — Communications tab replaced with CommunicationTimeline
-
-**Completed previous sessions:**
-- Tasks polish + embedding: priority pills, multiselect property filter, prev/next nav on all 10 detail views
-- Key Safes module built
-- Tasks embedded in Properties, Tenants, Vendors, Owners, Contacts detail views
-- Tasks Module Stage 1 + 2 — DB tables + unified TasksView UI
 - Phase 3 Stage 1: Gmail OAuth + /settings page
-- LeasingPipelineView, TntCoisView (SPA views)
-- PropertyDetail: all tabs lazy-loaded; ContactDetail: full tabbed form
-- All major list views routed with shared table components
+- Phase 3 Stage 2A: 5 Gmail DB tables + webhook receiver + lib/gmail.js + lib/supabaseServer.js
+- Phase 3 Stage 2B: CommunicationTimeline.jsx wired into TasksView, ContactsView, TenantsView
+- Phase 3 Stage 2C: EmailInbox + EmailCompose + /inbox route + AppShell unread badge + AI summarize/draft-reply
+- Tasks: prop_code-based display IDs (CR1-3685), bare task_num URLs (/tasks/3685), router.push navigation
+- Drive folder auto-creation for WOs: lib/drive.js + drivePropertyFolders.js + /api/tasks/create-drive-folder
+- OAuth scope fix: added Drive scope, fixed callback (Gmail profile endpoint, emailAddress field, service key for both upserts)
+- Index PDF: createIndexPdf() implemented in lib/drive.js; PDF media upload silently failing — deferred
+- All changes merged to main
 
-**Completed this session (2026-06-09) — Gmail Stage 2C:**
-1. **pages/api/gmail/send.js** — Gmail send via googleapis; injects X-SedonaCRM-Record header + CRM footer; upserts email_threads, email_messages, communication_timeline
-2. **pages/api/ai/summarize.js** + **pages/api/ai/draft-reply.js** — Anthropic API routes (claude-sonnet-4-20250514, 500 tokens)
-3. **pages/api/gmail/thread-update.js** — service-role PATCH for mark-read / archive
-4. **components/EmailCompose.jsx** — modal compose (TO/CC/BCC tag input, TipTap body, drag-and-drop attachments, CRM footer injection, task contact pre-fill)
-5. **components/EmailInbox.jsx** — two-panel inbox at /inbox (Unread/All/Linked/Flagged tabs, thread list, thread detail with expand/collapse messages, AI Summarize + AI Draft Reply, Reply opens EmailCompose)
-6. **pages/inbox/index.jsx** — inbox page wrapping EmailInbox in AppShell
-7. **AppShell.jsx** — Inbox nav item at top with red unread badge (polls every 60s), badge prop added to NavBtn
-8. **SedonaCRM.jsx** — Inbox nav item added (handleNav('/inbox'))
-9. **CommunicationTimeline.jsx** — ✉ Email button now opens EmailCompose modal; accepts crmRecordLabel + crmRecordUrl props
+**Deferred / known gaps:**
+- Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload in next session
+- "Link to record" button in EmailInbox thread detail — console.log placeholder
+- File attachments in EmailCompose — drag/drop UI exists, actual send not wired
+- Drive folder map missing: LPN, WNT, OLY, SSP — deferred until folders are created in Drive
+- Gmail backfill (/api/gmail/backfill) — not yet triggered
+- Populate podio_id for vendors — deferred to go-live Podio API sync
+- Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 
-**Next — Stage 2D / polish:**
-- Pass `crmRecordLabel` + `crmRecordUrl` into CommunicationTimeline from TasksView, ContactsView, TenantsView (currently those props are undefined — link appears in compose but label shows blank)
-- "Link to record" button in EmailInbox thread detail (currently console.log placeholder)
-- Property detail remaining tab groups: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
-- Populate podio_id for vendors (deferred to go-live Podio API sync)
+**Next priorities:**
+1. Debug index PDF upload (pdf-lib Readable stream issue — start fresh session)
+2. Phase 4: Workflow automations + Agents 1/3/4/7/9
+3. "Link to record" in Inbox thread detail
+4. Property detail Financial + Ownership tab groups
+
+## Task ID Display vs URL Rule (permanent)
+
+- **Display:** `getTaskPrefix(task)` from `utils/taskPrefix.js` → prop_code prefix e.g. `CR1-3685`, `ACP-1816`, or bare `3685` if no prop_code. Used in table `#` column, page title, badge, CRM email footer label.
+- **URL:** Always bare `task_num` — `/tasks/3685`. Never use `formatTaskNum()` (WO-prefix) in URLs.
+- **`formatTaskNum()`** is a named export still available but used only internally for legacy `parsePrefixedId` reverse-lookup. Do not use in new URL construction.
+- **Lookup on cold load:** `parsePrefixedId` handles both bare integers AND legacy `WO-N` format. Bare number queries `task_num=eq.N&order=record_type.desc` — `work_order` wins on conflicts.
+
+## OAuth / Google API Rules (permanent)
+
+- **Token store:** `email_accounts` table is the canonical OAuth token store. Never read from `gmail_tokens` for API calls — `gmail_tokens` is Stage 1 legacy only.
+- **Callback profile fetch:** Use `https://gmail.googleapis.com/gmail/v1/users/me/profile` (not the userinfo endpoint) — requires only `gmail.modify` scope. Field is `emailAddress` not `email`.
+- **Re-auth must be done on production URL:** `GOOGLE_REDIRECT_URI` is set to `crm.andersoncp.com`. OAuth re-auth will not work from preview/localhost — always do it at crm.andersoncp.com/settings.
+- **Scopes (current):** `gmail.modify`, `gmail.send`, `drive` — do not add `userinfo.email`; use Gmail profile endpoint instead.
+- **Drive client:** `getDriveClient(emailAccountId)` in `lib/drive.js` — reuses same OAuth2 token + refresh pattern as `getGmailClient()`.
+
+## Drive Folder Architecture (permanent)
+
+- **Trigger:** Manual `+ Drive Folder` button in work_order task detail header. Fire-and-forget POST to `/api/tasks/create-drive-folder`.
+- **Structure:** `[Property Root]/Work History/[displayId] — [title] — [YYYY-MM-DD]/`
+- **Property root folders:** Hardcoded in `lib/drivePropertyFolders.js` (14 active properties). Missing properties return 400.
+- **Index PDF:** `000_[propCode]-[taskNum]_Info.pdf` created inside the task folder — best-effort, never blocks folder creation.
+- **Error handling:** PDF errors logged only, never surfaced to user. Folder creation success is returned immediately.
+- **DB columns:** `tasks.drive_folder_id`, `tasks.drive_folder_url`, `tasks.drive_index_pdf_id`
 
 ## Prev/Next Navigation Rule (permanent)
 
@@ -373,7 +403,7 @@ sessionStorage.setItem('{module}NavIndex', String(items.findIndex(r => r.id === 
 **Per-module keys and identifiers:**
 | Module | NavList key | NavIndex key | Identifier | goNav query | URL |
 |---|---|---|---|---|---|
-| Tasks | tasksNavList | tasksNavIndex | `{task_num,record_type}` | by prefix+num | `/tasks/WO-N` etc |
+| Tasks | tasksNavList | tasksNavIndex | `{task_num,record_type}` | task_num=eq.N (+ record_type if known) | `/tasks/N` |
 | WorkOrders | workOrdersNavList | workOrdersNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/work-orders/N` |
 | Issues | issuesNavList | issuesNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/issues/N` |
 | Tenants | tenantsNavList | tenantsNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/tenants/N` |
