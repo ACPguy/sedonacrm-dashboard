@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
   sbFetch, T, F, css, StatusBadge, PriorityDot, fmtDate,
-  formatTaskNum, TaskTypeIcon, PRIORITY_ORDER,
+  TaskTypeIcon, PRIORITY_ORDER,
 } from '../TasksView';
 import { getTaskPrefix } from '../../utils/taskPrefix';
 
@@ -56,8 +56,7 @@ export default function TasksTable({
   }, [tasks, search]);
 
   const navigate = task => {
-    const prefixed = formatTaskNum(task.record_type, task.task_num);
-    router.push(`/tasks/${prefixed}`);
+    router.push(`/tasks/${task.task_num}`);
   };
 
   if (loading) return <div style={{padding:'20px',textAlign:'center',color:T.text3,fontSize:F.sm}}>Loading…</div>;
@@ -97,9 +96,8 @@ export default function TasksTable({
             <tr><td colSpan={hidePropertyFilter?6:7} style={{...css.td,textAlign:'center',padding:'20px',color:T.text3}}>No open tasks</td></tr>
           )}
           {filtered.map((task,i)=>{
-            const urlId=formatTaskNum(task.record_type,task.task_num);
             const displayId=getTaskPrefix(task);
-            const href=`/tasks/${urlId}`;
+            const href=`/tasks/${task.task_num}`;
             const rowBg=i%2===0?'transparent':T.bg0;
             return (
               <tr key={task.id}
@@ -138,13 +136,12 @@ export default function TasksTable({
       {/* Mobile cards */}
       <div className="crm-mobile-cards">
         {filtered.map((task,i)=>{
-          const urlId=formatTaskNum(task.record_type,task.task_num);
           const displayId=getTaskPrefix(task);
           const rowBg=i%2===0?'transparent':T.bg0;
           return (
             <div key={task.id}
               style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-              onClick={()=>router.push(`/tasks/${urlId}`)}
+              onClick={()=>router.push(`/tasks/${task.task_num}`)}
               onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
               onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
               <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'3px'}}>

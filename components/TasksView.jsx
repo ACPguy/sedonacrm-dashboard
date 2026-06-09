@@ -110,12 +110,17 @@ export function formatTaskNum(recordType, taskNum) {
 function parsePrefixedId(str) {
   if (!str) return null;
   const dash = str.indexOf('-');
-  if (dash < 0) return null;
-  const prefix = str.slice(0, dash);
-  const num = parseInt(str.slice(dash + 1), 10);
-  const recordType = REVERSE_PREFIX[prefix];
-  if (!recordType || isNaN(num)) return null;
-  return { recordType, taskNum: num };
+  if (dash >= 0) {
+    const prefix = str.slice(0, dash);
+    const num = parseInt(str.slice(dash + 1), 10);
+    const recordType = REVERSE_PREFIX[prefix];
+    if (!recordType || isNaN(num)) return null;
+    return { recordType, taskNum: num };
+  }
+  // Bare task_num — no record_type known
+  const num = parseInt(str, 10);
+  if (isNaN(num)) return null;
+  return { recordType: null, taskNum: num };
 }
 
 export const TaskTypeIcon = ({ recordType, size = 16 }) => {
@@ -715,8 +720,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   };
 
   const handleKanbanCardClick=task=>{
-    const prefix=TYPE_PREFIX[task.record_type]||'?';
-    const href=`/tasks/${prefix}-${task.task_num}`;
+    const href=`/tasks/${task.task_num}`;
     sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);
     const navL=filtered.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
     sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
@@ -748,9 +752,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   );
 
   const renderRow=(task,i)=>{
-    const urlId=formatTaskNum(task.record_type,task.task_num);
     const displayId=getTaskPrefix(task);
-    const href=`/tasks/${urlId}`;
+    const href=`/tasks/${task.task_num}`;
     const rowBg=i%2===0?'transparent':T.bg0;
     const fuOverdue=isFuOverdue(task.follow_up_date,task);
     const fuDisplay=task.follow_up_date?fmtNumDate(task.follow_up_date):'';
@@ -1064,7 +1067,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     if (!prefixedId) return;
     const parsed=parsePrefixedId(prefixedId);
     if (!parsed){setNotFound(true);setLoading(false);return;}
-    sbFetch('tasks',`task_num=eq.${parsed.taskNum}&record_type=eq.${parsed.recordType}&select=*&limit=1`)
+    const params=parsed.recordType
+      ?`task_num=eq.${parsed.taskNum}&record_type=eq.${parsed.recordType}&select=*&limit=1`
+      :`task_num=eq.${parsed.taskNum}&select=*&order=record_type.desc&limit=1`;
+    sbFetch('tasks',params)
       .then(rows=>{
         if(!rows.length){setNotFound(true);setLoading(false);return;}
         setData(rows[0]);setLoading(false);
@@ -1148,7 +1154,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
 
   const copyLink=()=>{
     if(!data)return;
-    const url=`${window.location.origin}/tasks/${formatTaskNum(data.record_type,data.task_num)}`;
+    const url=`${window.location.origin}/tasks/${data.task_num}`;
     navigator.clipboard.writeText(url).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);});
   };
 
@@ -1183,7 +1189,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
       setData(newTask);
       setNavIdx(newIdx);
       sessionStorage.setItem('tasksNavIndex',String(newIdx));
-      window.history.replaceState({taskId:newTask.id},'',`/tasks/${formatTaskNum(newTask.record_type,newTask.task_num)}`);
+      window.history.replaceState({taskId:newTask.id},'',`/tasks/${newTask.task_num}`);
     }catch{}
     finally{setNavLoading(false);}
   };
@@ -1209,7 +1215,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   if(notFound) return <div style={{padding:'40px',textAlign:'center',color:T.danger}}>Task not found.</div>;
   if(!data) return null;
 
-  const prefixed=formatTaskNum(data.record_type,data.task_num);
   const displayId=getTaskPrefix(data);
   const categoryOpts=CATEGORY_OPTIONS[data.record_type]||[];
   const propInfo=activeProps.find(p=>p.prop_code===data.prop_code);
@@ -1458,7 +1463,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 recordId={data.id}
                 fromAccount="scott@andersoncp.com"
                 crmRecordLabel={`${displayId}${data.title ? ` — ${data.title}` : ''}`}
-                crmRecordUrl={`/tasks/${prefixed}`}
+                crmRecordUrl={`/tasks/${data.task_num}`}
               />
             </div>
           )}
@@ -1491,7 +1496,7 @@ export default function TasksView({ filterPropCode, filterType, filterVendorId, 
   const router = useRouter();
 
   const handleSelect = useCallback(task=>{
-    router.push(`/tasks/${formatTaskNum(task.record_type, task.task_num)}`);
+    router.push(`/tasks/${task.task_num}`);
   },[router]);
 
   if(embeddedMode){
