@@ -581,6 +581,30 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const [priorityFilter,setPriorityFilter] = useState('All');
   const [viewMode,setViewMode]       = useState('table');
   const moreAnchorRef                = useRef(null);
+  const hasMounted                   = useRef(false);
+
+  // Restore filter state from URL query params on mount (standalone list only)
+  useEffect(()=>{
+    if(embeddedMode||filterPropCode)return;
+    const params=new URLSearchParams(window.location.search);
+    if(params.get('prop'))setPropFilter([params.get('prop')]);
+    if(params.get('type'))setTypeFilter(params.get('type'));
+    if(params.get('priority'))setPriorityFilter(params.get('priority'));
+    if(params.get('status'))setStatusFilter(params.get('status'));
+  },[]);// eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync active filters to URL query params (after first mount)
+  useEffect(()=>{
+    if(!hasMounted.current){hasMounted.current=true;return;}
+    if(embeddedMode||filterPropCode)return;
+    const params=new URLSearchParams();
+    if(propFilter.length===1)params.set('prop',propFilter[0]);
+    if(typeFilter!=='All')params.set('type',typeFilter);
+    if(priorityFilter!=='All')params.set('priority',priorityFilter);
+    if(statusFilter!=='Open')params.set('status',statusFilter);
+    const qs=params.toString();
+    window.history.replaceState({},'',qs?`/tasks?${qs}`:'/tasks');
+  },[propFilter.join(','),typeFilter,priorityFilter,statusFilter]);// eslint-disable-line react-hooks/exhaustive-deps
 
   const showClosed  = statusFilter === 'Closed';
   const showUpdated = !showClosed;
@@ -721,8 +745,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
 
   const handleKanbanCardClick=task=>{
     const href=`/tasks/${task.task_num}`;
-    sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);
-    const navL=filtered.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
+    sessionStorage.setItem('tasksBackUrl',window.location.href);
+    const navL=filtered.map(t=>({task_num:t.task_num,record_type:t.record_type}));
     sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
     sessionStorage.setItem('tasksNavIndex',String(filtered.findIndex(t=>t.id===task.id)));
     if(embeddedMode){window.location.href=href;}
@@ -762,9 +786,9 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     const openDetail=e=>{
       if(e.ctrlKey||e.metaKey){window.open(href,'_blank');}
       else{
-        sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);
+        sessionStorage.setItem('tasksBackUrl',window.location.href);
         const visualList=grouped?grouped.flatMap(g=>g.rows):filtered;
-        const navL=visualList.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
+        const navL=visualList.map(t=>({task_num:t.task_num,record_type:t.record_type}));
         sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
         sessionStorage.setItem('tasksNavIndex',String(visualList.findIndex(t=>t.id===task.id)));
         if(embeddedMode){window.location.href=href;}
@@ -1011,8 +1035,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
                 <div key={t.id}
                   style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
                   onClick={()=>{
-                    sessionStorage.setItem('tasksBackUrl',window.location.pathname);
-                    const navL=filtered.map(x=>({id:x.id,task_num:x.task_num,record_type:x.record_type}));
+                    sessionStorage.setItem('tasksBackUrl',window.location.href);
+                    const navL=filtered.map(x=>({task_num:x.task_num,record_type:x.record_type}));
                     sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
                     sessionStorage.setItem('tasksNavIndex',String(i));
                     if(embeddedMode){window.location.href=`/tasks/${t.task_num}`;}

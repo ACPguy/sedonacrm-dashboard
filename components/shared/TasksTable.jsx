@@ -44,7 +44,13 @@ export default function TasksTable({
       if (filterTenantId)  parts.push(`tenant_id=eq.${filterTenantId}`);
 
       if (filterContactId) {
-        const tcRows = await sbFetch('task_contacts', `contact_id=eq.${filterContactId}&select=task_id`);
+        let tcRows = [];
+        try {
+          tcRows = await sbFetch('task_contacts', `contact_id=eq.${filterContactId}&select=task_id`);
+        } catch (jErr) {
+          console.log('[TasksTable] task_contacts fetch error:', filterContactId, jErr);
+        }
+        console.log('[TasksTable] task_contacts fetch:', filterContactId, tcRows);
         const taskIds = (tcRows || []).map(r => r.task_id);
         if (!taskIds.length) {
           if (!cancelled) { setTasks([]); setLoading(false); }
@@ -54,6 +60,7 @@ export default function TasksTable({
       }
 
       const data = await sbFetch('tasks', `select=id,task_num,record_type,title,prop_code,priority,status,assigned_to,updated_at,created_at&${parts.join('&')}`);
+      console.log('[TasksTable] tasks fetch:', { filterTenantId, filterVendorId, filterContactId, count: data.length });
       if (!cancelled) { setTasks(data); setLoading(false); }
     };
 
@@ -71,12 +78,12 @@ export default function TasksTable({
   }, [tasks, search]);
 
   const navigate = task => {
-    const navL = filtered.map(t => ({ id: t.id, task_num: t.task_num, record_type: t.record_type }));
+    const navL = filtered.map(t => ({ task_num: t.task_num, record_type: t.record_type }));
     const idx  = filtered.findIndex(t => t.task_num === task.task_num && t.record_type === task.record_type);
     try {
       sessionStorage.setItem('tasksNavList',  JSON.stringify(navL));
       sessionStorage.setItem('tasksNavIndex', String(idx));
-      sessionStorage.setItem('tasksBackUrl',  backUrl || (window.location.pathname + window.location.search));
+      sessionStorage.setItem('tasksBackUrl',  backUrl || window.location.href);
     } catch {}
     router.push(`/tasks/${task.task_num}`);
   };
@@ -115,7 +122,7 @@ export default function TasksTable({
         </thead>
         <tbody>
           {filtered.length===0&&(
-            <tr><td colSpan={hidePropertyFilter?6:7} style={{...css.td,textAlign:'center',padding:'20px',color:T.text3}}>No open tasks</td></tr>
+            <tr><td colSpan={99} style={{textAlign:'center',padding:'24px',opacity:0.5,fontSize:'13px',color:T.text3}}>No tasks found</td></tr>
           )}
           {filtered.map((task,i)=>{
             const displayId=getTaskPrefix(task);

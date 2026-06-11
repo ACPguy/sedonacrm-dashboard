@@ -227,18 +227,31 @@ At the end of every session, CC must complete ALL of the following steps in orde
 
 3. Write build log to `~/[YYYY-MM-DD]_SedonaCRM_Build_Log_[Topic].md`
 
-4. Upload build log to Google Drive using Drive MCP:
-   - parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA`
+PERMANENT RULES — CLAUDE.md Drive archive:
+- The repo file is always CLAUDE.md (never rename — CC auto-reads it by this exact filename)
+- Drive archive copies are named with a date prefix: CLAUDE_YYYY-MM-DD.md (e.g. CLAUDE_2026-06-11.md)
+- Never overwrite a previous Drive archive copy — always create a new dated file
+- After uploading the new dated copy, move the previous dated copy to the Archive folder
+- Keep all dated copies in Archive indefinitely — never delete them
+
+4. Upload build log to Google Drive:
+   - parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA` (2 - Build Log folder)
    - contentMimeType: `text/plain`
    - disableConversionToGoogleType: `true`
-   - Title: exact filename (e.g. `06-09-2026_SedonaCRM_Build_Log_Topic.md`)
+   - Title: `YYYY-MM-DD_SedonaCRM_Build_Log_Topic.md` (exact filename)
 
-5. Upload updated CLAUDE.md to Google Drive (overwrite existing):
-   - fileId (overwrite): `1F1-xi1068jUSacOZQC_6Ux0xBQGmsQON`
+5. Upload updated CLAUDE.md to Google Drive as a new dated file:
+   - Title: `CLAUDE_YYYY-MM-DD.md` (e.g. `CLAUDE_2026-06-12.md`)
+   - parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA` (2 - Build Log folder — keep current copy here)
    - contentMimeType: `text/plain`
    - disableConversionToGoogleType: `true`
 
-6. Report both Drive file IDs to confirm successful upload.
+6. Move the PREVIOUS session's CLAUDE_YYYY-MM-DD.md to the Archive folder:
+   - Archive folder ID: `1I1kBuVZd7jbLh_WYzFtEBzrtmKcvazfb`
+   - Use Drive MCP move or copy+delete to relocate the old dated file
+   - Never delete old copies — archive only
+
+7. Report both Drive file IDs to confirm successful upload.
 
 NEVER skip any of these steps. NEVER upload `.md` files without
 `disableConversionToGoogleType: true` — they will convert to Google Docs.
@@ -300,6 +313,10 @@ echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
    For all other operations (file reads, file writes, git, npm, SELECT queries), proceed without asking.
 
 8. **High-volume list views default to Open only — never fetch all records on mount** — Work Orders and Issues list views load only Open (non-closed) records by default. Closed records are NOT fetched until the user explicitly selects a Closed or All filter pill. Each filter pill click triggers a new Supabase query — do NOT filter a pre-loaded full dataset client-side. This applies everywhere these tables render: standalone list views, Property detail tabs, Tenant detail tabs, Contact detail tabs, and any other embedded context.
+
+9. **Mobile stat summary rows are always pill-style horizontal scroll** — Any row of summary statistics rendered above a table (occupancy stats, financial totals, portfolio counts, or any other KPI summary) must use the `.stats-pill-row` + `.stat-pill` CSS pattern on mobile (< 768px). Desktop layout is unrestricted. Never render a multi-row grid of stat cards on mobile — it consumes too much vertical space. Use `.md-hidden` on the mobile pill row (shows on mobile, hidden on desktop) and `.mobile-hidden` on the desktop grid (hidden on mobile, shows on desktop). This applies to all existing and future list views: Tenants, Properties, Work Orders, Issues, Contacts, Vendors, Owners, and any new module added in future phases.
+
+10. **Filter state is always encoded in URL query params** — Every list view with filter pills (prop_code, type, priority, status, or any other filter dimension) must encode the active filter state into the URL via `window.history.replaceState` on every filter change, and restore state from URL params on mount. Use a `hasMounted` ref to skip the initial sync so the restore effect runs first. This ensures the browser back button and the detail-view back button always return to the exact filtered state the user was in. Apply to all existing modules (Tasks, Work Orders, Issues, Tenants, Contacts, Vendors, Owners, Properties) and all future list views added in Phases 3 through 10.
 
 ## URL Routing Rules (permanent)
 
@@ -388,13 +405,22 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - UI: `.filter-row` applied to property strip in WorkOrdersView, IssuesView, TenantsView, ContactsView; and outer filter bar in VendorsView, OwnersView
 - Commit: `1e8b3ad` on `preview` branch
 
+**Completed session 2026-06-11 — Group 1-3 bug fixes (preview branch):**
+
+- BUG FIX: `pages/tasks/[id].jsx` — reads `tasksNavList[navIdx]` from sessionStorage before rendering `TaskDetail`; builds prefixed ID (e.g. `TSK-3685`) so `parsePrefixedId` gets the correct `record_type`, fixing wrong-record opens for task records that share a task_num with a work_order
+- BUG FIX: `TasksTable.jsx` — navL now stores `{ task_num, record_type }` (no `id`); `navigate()` finds idx by both fields; empty state changed to "No tasks found" (colSpan=99); added `console.log` for junction/fetch debugging; `backUrl` stores `window.location.href`
+- BUG FIX: `TasksView.jsx` — mobile cards navL uses `{ task_num, record_type }`; `tasksBackUrl` stores `window.location.href` (not just pathname); added `hasMounted` ref + URL restore effect (reads `?prop/type/priority/status` on mount) + URL sync effect (writes on filter change)
+- BUG FIX: `VendorsView.jsx`, `TenantsView.jsx`, `ContactsView.jsx` — switched embedded tasks tab from `<TasksView embeddedMode/>` to `<TasksTable/>` (shared component); each passes `backUrl={window.location.href}` and `hidePropertyFilter`
+- UI: `WorkOrdersView.jsx` + `IssuesView.jsx` — Row 2 filter div (priority/status) now has `filter-row` class for mobile horizontal scroll
+- UI: `TenantsView.jsx` — mobile stats bar replaced with `.stats-pill-row` / `.md-hidden` pills; desktop card grid now has `.mobile-hidden`; both in same wrapper div
+- CSS: `styles/globals.css` — added `.stats-pill-row`, `.stat-pill`, `.stat-label`, `.stat-value`, `.mobile-hidden`, `.md-hidden` per Rule 9
+- `CLAUDE.md` — Development Rules 9 and 10 added; Session Close Procedure updated (Steps 4-7 with dated archive pattern)
+- Commit on `preview` branch
+
 **Known gaps / still open (next session):**
-- BUG: DCM task opens wrong item — `{task_num, record_type}` navList fix deployed but not yet confirmed working in production
-- BUG: Tenant/Contact/Vendor Tasks tabs show header but no task data — root cause not yet confirmed (task_contacts has 0 rows; may need seed data or UI fallback message)
-- BUG: Back button does not restore filter state — URL query param encoding for filter state persistence not yet implemented
-- BUG: Vendor nav stuck in detail after filtering — investigate sessionStorage backUrl not updating on filter change
-- PENDING: TenantsView mobile stats pill row — not yet built
-- PENDING: Development Rules 9 and 10 not yet added to CLAUDE.md
+- PENDING: Confirm DCM task fix works in production (open Tasks filtered to DCM, click task record — should now open correct record)
+- PENDING: Tenant/Contact/Vendor Tasks tabs will show "No tasks found" (correct empty state) until Podio sync populates tenant_id / vendor_id FKs and task_contacts rows
+- PENDING: Filter state URL encoding not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views (only Tasks done this session)
 - PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
 - PENDING: "Link to record" button in EmailInbox thread detail — console.log placeholder
 - PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired
@@ -404,12 +430,10 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 
 **Next priorities (start here next session):**
-1. Confirm DCM task navList fix works in production (open Tasks list filtered to DCM, click a task, verify correct task opens)
-2. Fix Tenant/Contact/Vendor Tasks tab data — investigate why filterContactId/filterTenantId/filterVendorId shows no rows
-3. Fix back button filter state restoration
-4. Fix Vendor detail nav stuck issue
-5. Debug index PDF upload (pdf-lib Readable stream issue)
-6. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Confirm DCM task fix in production — open /tasks filtered to DCM, click a task record (not WO), verify correct item opens
+2. Apply URL filter encoding (Rule 10) to remaining list views: Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+3. Debug index PDF upload (pdf-lib Readable stream issue)
+4. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 

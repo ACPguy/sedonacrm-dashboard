@@ -726,7 +726,7 @@ export const WorkOrdersList = ({ onSelect, hidePropStrip = false, hidePropertyFi
         )}
 
         {/* Row 2: Priority | Status | More... | Clear | Search */}
-        <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0}}>
+        <div className="filter-row" style={{gap:'6px',alignItems:'center'}}>
 
           {/* Priority filter with counts */}
           <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>

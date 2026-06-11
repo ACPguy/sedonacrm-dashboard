@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { UserCircle, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
-import TasksView from './TasksView';
+import TasksTable from './shared/TasksTable';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
 
@@ -794,7 +794,7 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
       {/* ── Tasks tab (full-height, no scroll wrapper) ── */}
       {tab === 'tasks' && (
         <div style={{flex:1, overflow:'hidden'}}>
-          <TasksView filterContactId={data.id} hidePropertyPills embeddedMode/>
+          <TasksTable filterContactId={data.id} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>
         </div>
       )}
 
