@@ -582,15 +582,18 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const [viewMode,setViewMode]       = useState('table');
   const moreAnchorRef                = useRef(null);
   const hasMounted                   = useRef(false);
+  const [filtersReady, setFiltersReady] = useState(false);
 
   // Restore filter state from URL query params on mount (standalone list only)
+  // Sets filtersReady=true to unblock the fetch effect once state is applied.
   useEffect(()=>{
-    if(embeddedMode||filterPropCode)return;
+    if(embeddedMode||filterPropCode){setFiltersReady(true);return;}
     const params=new URLSearchParams(window.location.search);
     if(params.get('prop'))setPropFilter([params.get('prop')]);
     if(params.get('type'))setTypeFilter(params.get('type'));
     if(params.get('priority'))setPriorityFilter(params.get('priority'));
     if(params.get('status'))setStatusFilter(params.get('status'));
+    setFiltersReady(true);
   },[]);// eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync active filters to URL query params (after first mount)
@@ -611,6 +614,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const NCOLS = 12; // type|#|title|fudate|prop|priority|stage|status|vendor|tenant|updated-or-closed|opened
 
   useEffect(()=>{
+    if(!filtersReady) return;
     setLoading(true); setError(null); setTasks([]);
 
     const run = async () => {
@@ -656,7 +660,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     };
 
     run().catch(e=>{setError(e.message);setLoading(false);});
-  },[statusFilter,typeFilter,propFilter.join(','),filterPropCode,filterVendorId,filterTenantId,filterContactId,search,refreshKey]);
+  },[filtersReady,statusFilter,typeFilter,propFilter.join(','),filterPropCode,filterVendorId,filterTenantId,filterContactId,search,refreshKey]);
 
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
@@ -879,6 +883,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         {/* Property filter pills */}
         {!filterPropCode&&!hidePropertyPills&&propCodes.length>0&&(
           <div className="crm-tasks-prop-strip" style={{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',paddingBottom:'4px',flexWrap:'nowrap'}}>
+            {hasActiveFilters&&<button onClick={clearFilters} className="pill-clear" style={{position:'sticky',left:0,zIndex:2}}>× Clear</button>}
             <button onClick={()=>setPropFilter([])} style={propBtn(propFilter.length===0)}>All Props</button>
             <button onClick={()=>setPropFilter(pf=>pf.includes('ACP')?pf.filter(x=>x!=='ACP'):[...pf,'ACP'])} style={propBtn(propFilter.includes('ACP'))}>ACP</button>
             {propCodes.map(pc=>(
@@ -888,6 +893,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         )}
         {/* Type pills — own row */}
         <div className="crm-tasks-type-strip filter-row" style={{gap:'4px',marginBottom:'5px'}}>
+          {hasActiveFilters&&<button onClick={clearFilters} className="pill-clear" style={{position:'sticky',left:0,zIndex:2}}>× Clear</button>}
           {TYPE_PILLS.map(({key,label})=>{
             const active=typeFilter===key;
             const color=TYPE_COLOR[key]||T.accent;

@@ -853,7 +853,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
       {/* ── Tab content ── */}
       {tab==='tasks'&&(
         <div style={{flex:1,overflow:'hidden'}}>
-          <TasksTable filterTenantId={data.id} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>
+          {data?.id&&<TasksTable filterTenantId={data.id} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>}
         </div>
       )}
       {tab!=='tasks'&&(

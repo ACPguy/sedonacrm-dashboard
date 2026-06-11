@@ -26,12 +26,16 @@ export default function TasksTable({
   hideTypeFilter = false,
 }) {
   const router = useRouter();
-  const [tasks, setTasks]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
-  const [search, setSearch]   = useState('');
+  const [tasks, setTasks]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [search, setSearch]       = useState('');
+  const [filtersReady, setFiltersReady] = useState(false);
+
+  useEffect(() => { setFiltersReady(true); }, []);
 
   useEffect(() => {
+    if (!filtersReady) return;
     let cancelled = false;
     setLoading(true); setError(null);
 
@@ -66,7 +70,7 @@ export default function TasksTable({
 
     run().catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [filterPropCode, filterProjectId, filterType, filterVendorId, filterTenantId, filterContactId]);
+  }, [filtersReady, filterPropCode, filterProjectId, filterType, filterVendorId, filterTenantId, filterContactId]);
 
   const filtered = useMemo(() => {
     if (!search) return tasks;

@@ -794,7 +794,7 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
       {/* ── Tasks tab (full-height, no scroll wrapper) ── */}
       {tab === 'tasks' && (
         <div style={{flex:1, overflow:'hidden'}}>
-          <TasksTable filterContactId={data.id} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>
+          {data?.id&&<TasksTable filterContactId={data.id} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>}
         </div>
       )}
 
