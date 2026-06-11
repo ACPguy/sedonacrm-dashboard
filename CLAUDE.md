@@ -375,20 +375,41 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - Index PDF: createIndexPdf() implemented in lib/drive.js; PDF media upload silently failing — deferred
 - All changes merged to main
 
-**Deferred / known gaps:**
-- Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload in next session
-- "Link to record" button in EmailInbox thread detail — console.log placeholder
-- File attachments in EmailCompose — drag/drop UI exists, actual send not wired
-- Drive folder map missing: LPN, WNT, OLY, SSP — deferred until folders are created in Drive
-- Gmail backfill (/api/gmail/backfill) — not yet triggered
-- Populate podio_id for vendors — deferred to go-live Podio API sync
-- Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
+**Completed session 2026-06-11 — Tasks module bug fixes (preview branch):**
 
-**Next priorities:**
-1. Debug index PDF upload (pdf-lib Readable stream issue — start fresh session)
-2. Phase 4: Workflow automations + Agents 1/3/4/7/9
-3. "Link to record" in Inbox thread detail
-4. Property detail Financial + Ownership tab groups
+- BUG FIX: `TasksTable.jsx` — `navigate()` now writes `tasksNavList` (stores `{id, task_num, record_type}` tuples), `tasksNavIndex`, `tasksBackUrl` to sessionStorage before `router.push`; fixes wrong task opening when multiple record_types share the same task_num integer
+- BUG FIX: `TasksTable.jsx` — added `filterContactId` prop with async `task_contacts` junction fetch; empty result guard returns `[]` immediately
+- BUG FIX: `TasksTable.jsx` — added `backUrl` prop (written to `tasksBackUrl` on navigate); mobile cards unified to call `navigate(task)` instead of raw `router.push`
+- BUG FIX: `TasksView.jsx` — mobile cards `onClick` now checks `embeddedMode` before calling `onSelect`; uses `window.location.href` when embedded so Property/Owners detail task rows navigate correctly
+- UI: TYPE_PILLS reordered and relabeled → All, WO, TSK, Proj., ACP, S&G, Note
+- UI: TasksView type strip and priority+status row get `.filter-row` class (always scrollable, nowrap)
+- UI: Mobile FAB updated — 56px diameter, `ChatCircle size=26 weight="fill"`, `#E8630A` orange; `isMobile` converted to `useState` + resize listener (was one-time `window.innerWidth` check at mount)
+- UI: `.filter-row` CSS class added to `styles/globals.css` — `flex-wrap:nowrap`, `overflow-x:auto`, `-webkit-overflow-scrolling:touch`, `scrollbar-width:none`, `padding-bottom:4px`; `.filter-row > *` sets `flex-shrink:0`
+- UI: `.filter-row` applied to property strip in WorkOrdersView, IssuesView, TenantsView, ContactsView; and outer filter bar in VendorsView, OwnersView
+- Commit: `1e8b3ad` on `preview` branch
+
+**Known gaps / still open (next session):**
+- BUG: DCM task opens wrong item — `{task_num, record_type}` navList fix deployed but not yet confirmed working in production
+- BUG: Tenant/Contact/Vendor Tasks tabs show header but no task data — root cause not yet confirmed (task_contacts has 0 rows; may need seed data or UI fallback message)
+- BUG: Back button does not restore filter state — URL query param encoding for filter state persistence not yet implemented
+- BUG: Vendor nav stuck in detail after filtering — investigate sessionStorage backUrl not updating on filter change
+- PENDING: TenantsView mobile stats pill row — not yet built
+- PENDING: Development Rules 9 and 10 not yet added to CLAUDE.md
+- PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
+- PENDING: "Link to record" button in EmailInbox thread detail — console.log placeholder
+- PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired
+- PENDING: Drive folder map missing: LPN, WNT, OLY, SSP — deferred until folders are created in Drive
+- PENDING: Gmail backfill (/api/gmail/backfill) — not yet triggered
+- PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
+- PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
+
+**Next priorities (start here next session):**
+1. Confirm DCM task navList fix works in production (open Tasks list filtered to DCM, click a task, verify correct task opens)
+2. Fix Tenant/Contact/Vendor Tasks tab data — investigate why filterContactId/filterTenantId/filterVendorId shows no rows
+3. Fix back button filter state restoration
+4. Fix Vendor detail nav stuck issue
+5. Debug index PDF upload (pdf-lib Readable stream issue)
+6. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
