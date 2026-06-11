@@ -211,6 +211,39 @@ Five tables created in Supabase for the Gmail integration:
 
 4. **Update Next Priorities after every session** — After completing work, update the "Next Priorities" section below with what was finished and what comes next, so the next session picks up exactly where this one left off.
 
+## Session Close Procedure (mandatory — every session)
+
+At the end of every session, CC must complete ALL of the following steps in order:
+
+1. Update CLAUDE.md with everything built this session (new files, schema changes,
+   architecture rules, known gaps, next priorities)
+
+2. Commit CLAUDE.md to main:
+   ```
+   git add CLAUDE.md
+   git commit -m "CLAUDE.md: update after [session topic]"
+   git push origin main
+   ```
+
+3. Write build log to `~/[YYYY-MM-DD]_SedonaCRM_Build_Log_[Topic].md`
+
+4. Upload build log to Google Drive using Drive MCP:
+   - parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA`
+   - contentMimeType: `text/plain`
+   - disableConversionToGoogleType: `true`
+   - Title: exact filename (e.g. `06-09-2026_SedonaCRM_Build_Log_Topic.md`)
+
+5. Upload updated CLAUDE.md to Google Drive (overwrite existing):
+   - fileId (overwrite): `1F1-xi1068jUSacOZQC_6Ux0xBQGmsQON`
+   - contentMimeType: `text/plain`
+   - disableConversionToGoogleType: `true`
+
+6. Report both Drive file IDs to confirm successful upload.
+
+NEVER skip any of these steps. NEVER upload `.md` files without
+`disableConversionToGoogleType: true` — they will convert to Google Docs.
+NEVER upload to the wrong folder.
+
 ## Permanent Terminology Notes
 
 - **`property_agreements` table** (14 rows) = ACP's management agreement with property owners. Contains: commission structures, management fees, agreement start/end/expiration dates, and terms of ACP's contract to manage and lease the property. This is **NOT** the leasing pipeline. Never confuse these.
