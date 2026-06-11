@@ -717,7 +717,7 @@ export const WorkOrdersList = ({ onSelect, hidePropStrip = false, hidePropertyFi
 
         {/* Row 1: Property buttons — scrollable */}
         {!_hidePropStrip && (
-          <div style={{display:'flex',gap:'4px',overflowX:'auto',scrollbarWidth:'none',marginBottom:'5px'}}>
+          <div className="filter-row" style={{gap:'4px',marginBottom:'5px'}}>
             <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
             {activeProps.map(pc => (
               <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>

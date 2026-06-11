@@ -107,3 +107,8 @@ input[type="date"]::-moz-calendar-picker-indicator    { display: none; }
   .crm-task-type-pills { flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .crm-task-type-pills::-webkit-scrollbar { display: none; }
 }
+
+/* ── Horizontal-scrollable filter-row pill strip (all views, all breakpoints) ── */
+.filter-row { display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
+.filter-row::-webkit-scrollbar { display: none; }
+.filter-row > * { flex-shrink: 0; }

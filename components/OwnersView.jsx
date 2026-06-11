@@ -272,7 +272,7 @@ const OwnersList = ({ owners, loading, error, onSelect }) => {
         </div>
 
         {/* Filter bar: Category pills | More… | Clear | Search */}
-        <div style={{display:'flex',gap:'6px',alignItems:'center',minWidth:0}}>
+        <div className="filter-row" style={{gap:'6px',alignItems:'center',minWidth:0}}>
 
           {/* Category pills */}
           <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>

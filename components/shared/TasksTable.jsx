@@ -1,12 +1,8 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// TasksTable.jsx — shared reusable tasks table
-// Used everywhere a task list is embedded (property detail, tenant detail, etc.)
-// ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
-  sbFetch, T, F, css, StatusBadge, PriorityDot, fmtDate,
-  TaskTypeIcon, PRIORITY_ORDER,
+  sbFetch, T, F, css, StatusBadge, PriorityDot,
+  TaskTypeIcon,
 } from '../TasksView';
 import { getTaskPrefix } from '../../utils/taskPrefix';
 
@@ -23,28 +19,47 @@ export default function TasksTable({
   filterType,
   filterVendorId,
   filterTenantId,
+  filterContactId,
+  backUrl,
   hidePropertyFilter = false,
   hideSearch = false,
   hideTypeFilter = false,
 }) {
   const router = useRouter();
-  const [tasks, setTasks]   = useState([]);
+  const [tasks, setTasks]     = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState(null);
-  const [search, setSearch] = useState('');
+  const [error, setError]     = useState(null);
+  const [search, setSearch]   = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true); setError(null);
-    const parts = ['status=not.in.(Closed,Cancelled)', 'order=updated_at.desc.nullslast'];
-    if (filterPropCode)  parts.push(`prop_code=eq.${encodeURIComponent(filterPropCode)}`);
-    if (filterProjectId) parts.push(`project_id=eq.${filterProjectId}`);
-    if (filterType)      parts.push(`record_type=eq.${filterType}`);
-    if (filterVendorId)  parts.push(`vendor_id=eq.${filterVendorId}`);
-    if (filterTenantId)  parts.push(`tenant_id=eq.${filterTenantId}`);
-    sbFetch('tasks', `select=id,task_num,record_type,title,prop_code,priority,status,assigned_to,updated_at,created_at&${parts.join('&')}`)
-      .then(d => { setTasks(d); setLoading(false); })
-      .catch(e => { setError(e.message); setLoading(false); });
-  }, [filterPropCode, filterProjectId, filterType, filterVendorId, filterTenantId]);
+
+    const run = async () => {
+      const parts = ['status=not.in.(Closed,Cancelled)', 'order=updated_at.desc.nullslast'];
+      if (filterPropCode)  parts.push(`prop_code=eq.${encodeURIComponent(filterPropCode)}`);
+      if (filterProjectId) parts.push(`project_id=eq.${filterProjectId}`);
+      if (filterType)      parts.push(`record_type=eq.${filterType}`);
+      if (filterVendorId)  parts.push(`vendor_id=eq.${filterVendorId}`);
+      if (filterTenantId)  parts.push(`tenant_id=eq.${filterTenantId}`);
+
+      if (filterContactId) {
+        const tcRows = await sbFetch('task_contacts', `contact_id=eq.${filterContactId}&select=task_id`);
+        const taskIds = (tcRows || []).map(r => r.task_id);
+        if (!taskIds.length) {
+          if (!cancelled) { setTasks([]); setLoading(false); }
+          return;
+        }
+        parts.push(`id=in.(${taskIds.join(',')})`);
+      }
+
+      const data = await sbFetch('tasks', `select=id,task_num,record_type,title,prop_code,priority,status,assigned_to,updated_at,created_at&${parts.join('&')}`);
+      if (!cancelled) { setTasks(data); setLoading(false); }
+    };
+
+    run().catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [filterPropCode, filterProjectId, filterType, filterVendorId, filterTenantId, filterContactId]);
 
   const filtered = useMemo(() => {
     if (!search) return tasks;
@@ -56,6 +71,13 @@ export default function TasksTable({
   }, [tasks, search]);
 
   const navigate = task => {
+    const navL = filtered.map(t => ({ id: t.id, task_num: t.task_num, record_type: t.record_type }));
+    const idx  = filtered.findIndex(t => t.task_num === task.task_num && t.record_type === task.record_type);
+    try {
+      sessionStorage.setItem('tasksNavList',  JSON.stringify(navL));
+      sessionStorage.setItem('tasksNavIndex', String(idx));
+      sessionStorage.setItem('tasksBackUrl',  backUrl || (window.location.pathname + window.location.search));
+    } catch {}
     router.push(`/tasks/${task.task_num}`);
   };
 
@@ -141,7 +163,7 @@ export default function TasksTable({
           return (
             <div key={task.id}
               style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
-              onClick={()=>router.push(`/tasks/${task.task_num}`)}
+              onClick={()=>navigate(task)}
               onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
               onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
               <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'3px'}}>

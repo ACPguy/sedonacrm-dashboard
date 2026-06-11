@@ -730,13 +730,13 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   };
 
   const TYPE_PILLS=[
-    {key:'All',label:'All'},
-    {key:'work_order',label:'Work Orders'},
-    {key:'task',label:'Tasks'},
-    {key:'note',label:'Notes'},
-    {key:'project',label:'Projects'},
-    {key:'acp_task',label:'ACP Tasks'},
-    {key:'sg_task',label:'S&G Tasks'},
+    {key:'All',       label:'All'},
+    {key:'work_order',label:'WO'},
+    {key:'task',      label:'TSK'},
+    {key:'project',   label:'Proj.'},
+    {key:'acp_task',  label:'ACP'},
+    {key:'sg_task',   label:'S&G'},
+    {key:'note',      label:'Note'},
   ];
 
   const propBtn=active=>({
@@ -863,7 +863,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           </div>
         )}
         {/* Type pills — own row */}
-        <div className="crm-tasks-type-strip" style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'5px'}}>
+        <div className="crm-tasks-type-strip filter-row" style={{gap:'4px',marginBottom:'5px'}}>
           {TYPE_PILLS.map(({key,label})=>{
             const active=typeFilter===key;
             const color=TYPE_COLOR[key]||T.accent;
@@ -881,7 +881,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           })}
         </div>
         {/* Priority + Status pills on same row */}
-        <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'4px',flexWrap:'wrap'}}>
+        <div className="filter-row" style={{alignItems:'center',gap:'6px',marginBottom:'4px'}}>
           {/* Priority left */}
           <div className="crm-tasks-priority-strip" style={{display:'flex',gap:'4px',flexShrink:0}}>
             {['All','???','Urgent','High','Medium','Low'].map(p=>{
@@ -1015,7 +1015,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
                     const navL=filtered.map(x=>({id:x.id,task_num:x.task_num,record_type:x.record_type}));
                     sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
                     sessionStorage.setItem('tasksNavIndex',String(i));
-                    onSelect(t);
+                    if(embeddedMode){window.location.href=`/tasks/${t.task_num}`;}
+                    else{onSelect(t);}
                   }}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
@@ -1051,8 +1052,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [activeProps,setActiveProps] = useState([]);
   const [vendors,setVendors]     = useState([]);
   const [tenants,setTenants]     = useState([]);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
-  const [rightCollapsed,setRightCollapsed] = useState(isMobile);
+  const [isMobile,setIsMobile] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
+  const [rightCollapsed,setRightCollapsed] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   const [rightWidth,setRightWidth] = useState(300);
   const [copied,setCopied]       = useState(false);
   const [detailTab,setDetailTab] = useState('details');
@@ -1103,6 +1104,12 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     window.addEventListener('keydown',onKey);
     return ()=>window.removeEventListener('keydown',onKey);
   },[onBack]);
+
+  useEffect(()=>{
+    const onResize=()=>setIsMobile(window.innerWidth<640);
+    window.addEventListener('resize',onResize);
+    return ()=>window.removeEventListener('resize',onResize);
+  },[]);
 
   useEffect(()=>{
     if(!data)return;
@@ -1481,8 +1488,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
       {/* Mobile: floating button when panel is closed */}
       {isMobile && rightCollapsed && (
         <button onClick={()=>setRightCollapsed(false)}
-          style={{position:'fixed',bottom:'16px',right:'16px',zIndex:50,background:'#E8630A',color:'#fff',border:'none',borderRadius:'50%',width:'48px',height:'48px',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.4)'}}>
-          <ChatCircle size={22} weight="bold" color="white"/>
+          style={{position:'fixed',bottom:'16px',right:'16px',zIndex:50,background:'#E8630A',color:'#fff',border:'none',borderRadius:'50%',width:'56px',height:'56px',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.4)'}}>
+          <ChatCircle size={26} weight="fill" color="white"/>
         </button>
       )}
     </div>
