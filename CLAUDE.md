@@ -417,20 +417,26 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - `CLAUDE.md` — Development Rules 9 and 10 added; Session Close Procedure updated (Steps 4-7 with dated archive pattern)
 - Commit on `preview` branch
 
-**Tasks navigation — 3 rounds attempted, still unresolved (as of 2026-06-11):**
+**Tasks navigation — resolved session 2026-06-12 (preview branch):**
 
-Current state of preview branch (commit dad6f89 — round 3 reverted at 21e3ea0):
-- ✅ Sticky "✕ Clear" filter pill — working, confirmed
-- ✅ Property/Owner Tasks tab — clicking a task opens the CORRECT task (record_type+task_num disambiguation from round 2 holds)
-- ❌ Back navigation (on-screen button, Escape, browser back, keyboard back) does NOT consistently return to the prior filtered view across Tasks list, Property Tasks tab, Owner Tasks tab. On-screen button sometimes works; other triggers go to the parent list instead.
-- ❌ Tenant/Contact/Vendor Tasks tabs — STILL completely empty (no table, no filter rows) after 3 rounds. Root cause not yet identified.
+**Root cause (identified in post-session addendum 2026-06-11):**
+`be19e0c` introduced bare `/tasks/3685` URLs with a `order=record_type.desc&limit=1` fallback. The tasks table has 1,046 task_num values that collide between work_order and task records. `work_order` sorts last in desc order → always wins the tiebreak → clicking a TSK record opened a WO with the same task_num.
 
-**Round 3 attempt (reverted at commit 21e3ea0):** Converted filter state + tab state to router.query + router.replace(shallow:true), unified all back-triggers via router.back(). This broke filter-row rendering in the Properties/Tasks tab entirely (regression) and did not resolve the underlying issues. Reverted.
+**Fix 1 — correct record lookup (commit `5b9d011`):**
+`TaskDetail`'s fetch useEffect now reads `tasksNavList[tasksNavIndex]` from sessionStorage before querying Supabase. For in-app navigation (navigate() always writes navList before router.push), uses `task_num=eq.X&record_type=eq.Y` (unambiguous). Falls back to `order=record_type.desc` only for true cold loads (no navList match).
+`pages/tasks/[id].jsx` simplified: removed RT_PREFIX string-encoding roundtrip (prior attempt from 2026-06-11 sessions); now passes bare `id` directly as `prefixedId`.
 
-**Recommendation for next session — change approach:**
-1. Start with a DIAGNOSTIC-ONLY pass: read TasksView.jsx, TasksTable.jsx, pages/tasks/[id].jsx, PropertyDetail, OwnerDetail, TenantsView.jsx, ContactsView.jsx, VendorsView.jsx top to bottom. Map out — in writing, NO code changes — exactly how tab state, filter state, and navigation currently work in each context (standalone /tasks, embedded in Property, Owner, Tenant, Contact, Vendor). Report this map back before writing any fix.
-2. Fix ONE bug at a time. Build + report expected vs actual before moving to the next. Do not bundle multiple architectural changes into one commit.
-3. For Tenant/Contact/Vendor: re-add a debug line FIRST, in isolation, push, and have Scott report what it shows BEFORE attempting any further fix — confirm whether the component renders at all in that context before guessing why data is empty.
+**Fix 2 — browser back history stack (commit `fb3c3b0`):**
+`onBack` in `pages/tasks/[id].jsx` was calling `router.push(back)` which ADDED a new /tasks entry to the history stack on every back-press. Each push left the prior detail page sitting behind it — browser back cycled through all accumulated entries.
+Fix: when `tasksBackUrl` is set in sessionStorage (arrived via in-app click), call `router.back()` instead — consumes the entry created by navigate()'s router.push. Cold loads (no sessionStorage entry) fall back to `router.push('/tasks')`.
+`goNav` replaceState is unchanged — it was already correct.
+
+**Current state — awaiting Scott's test on preview deploy:**
+- ✅ Correct record opens on click (record_type disambiguation)
+- ✅ On-screen back / Escape → router.back() → should return to filtered list
+- ✅ Browser back from list → goes to page before /tasks (no more cycling)
+- ❓ Test required in fresh incognito tab (existing tabs have stale history from prior sessions)
+- ❌ Tenant/Contact/Vendor Tasks tabs — still empty, separate diagnostic session needed
 
 **Known gaps / still open (non-navigation):**
 - PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views (only Tasks done)
@@ -442,11 +448,18 @@ Current state of preview branch (commit dad6f89 — round 3 reverted at 21e3ea0)
 - PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 
+**Completed session 2026-06-12 — Tasks navigation root cause fixed (preview branch):**
+
+- BUG FIX: `TasksView.jsx` TaskDetail fetch useEffect — reads `tasksNavList[tasksNavIndex]` from sessionStorage; uses `record_type=eq.X` for in-app navigations, falls back to `order=record_type.desc` for cold loads only (commit `5b9d011`)
+- BUG FIX: `pages/tasks/[id].jsx` — `onBack` uses `router.back()` when arrived in-app (tasksBackUrl set), `router.push('/tasks')` for cold loads — eliminates history stack accumulation (commit `fb3c3b0`)
+- CLEANUP: `pages/tasks/[id].jsx` — removed RT_PREFIX string-encoding roundtrip from prior session; passes bare `id` directly as `prefixedId`
+- NOTE: main branch still has the root-cause bug (from `be19e0c`). Needs a follow-up merge after Scott confirms preview is working.
+
 **Next priorities (start here next session):**
-1. Tasks navigation diagnostic — read all relevant files top to bottom, produce written map of navigation flow in each context BEFORE writing any code
-2. Fix back navigation ONE trigger at a time, build + verify between each
-3. Debug Tenant/Contact/Vendor Tasks tab with isolated debug line first
-4. Debug index PDF upload (pdf-lib Readable stream issue)
+1. Confirm Tasks navigation fix on preview (fresh incognito tab) — if passes, merge preview → main
+2. Debug Tenant/Contact/Vendor Tasks tab: add isolated debug line showing filterTenantId/filterContactId/filterVendorId + items.length + loading; push and have Scott report what it shows BEFORE attempting any fix
+3. Debug index PDF upload (pdf-lib Readable stream issue)
+4. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
 5. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
@@ -454,7 +467,8 @@ Current state of preview branch (commit dad6f89 — round 3 reverted at 21e3ea0)
 - **Display:** `getTaskPrefix(task)` from `utils/taskPrefix.js` → prop_code prefix e.g. `CR1-3685`, `ACP-1816`, or bare `3685` if no prop_code. Used in table `#` column, page title, badge, CRM email footer label.
 - **URL:** Always bare `task_num` — `/tasks/3685`. Never use `formatTaskNum()` (WO-prefix) in URLs.
 - **`formatTaskNum()`** is a named export still available but used only internally for legacy `parsePrefixedId` reverse-lookup. Do not use in new URL construction.
-- **Lookup on cold load:** `parsePrefixedId` handles both bare integers AND legacy `WO-N` format. Bare number queries `task_num=eq.N&order=record_type.desc` — `work_order` wins on conflicts.
+- **Lookup (in-app):** `TaskDetail` fetch useEffect reads `tasksNavList[tasksNavIndex]` from sessionStorage; uses `task_num=eq.N&record_type=eq.X` — unambiguous, correct record always opens.
+- **Lookup (cold load / no navList match):** `task_num=eq.N&order=record_type.desc` fallback — `work_order` wins on collisions. Acceptable for bare bookmarked/shared URLs.
 
 ## OAuth / Google API Rules (permanent)
 
