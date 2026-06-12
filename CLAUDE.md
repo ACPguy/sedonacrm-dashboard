@@ -417,25 +417,33 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - `CLAUDE.md` — Development Rules 9 and 10 added; Session Close Procedure updated (Steps 4-7 with dated archive pattern)
 - Commit on `preview` branch
 
-**Tasks navigation — resolved session 2026-06-12 (preview branch):**
+**Tasks navigation — partial resolution, Backspace still open (as of 2026-06-12 session 2):**
 
-**Root cause (identified in post-session addendum 2026-06-11):**
-`be19e0c` introduced bare `/tasks/3685` URLs with a `order=record_type.desc&limit=1` fallback. The tasks table has 1,046 task_num values that collide between work_order and task records. `work_order` sorts last in desc order → always wins the tiebreak → clicking a TSK record opened a WO with the same task_num.
+**Record lookup fix (commit `5b9d011`) — CONFIRMED WORKING:**
+`TaskDetail`'s fetch useEffect reads `tasksNavList[tasksNavIndex]` from sessionStorage; uses `task_num=eq.X&record_type=eq.Y` for in-app navigation. Falls back to `order=record_type.desc` for cold loads only. Correct record opens on every click.
 
-**Fix 1 — correct record lookup (commit `5b9d011`):**
-`TaskDetail`'s fetch useEffect now reads `tasksNavList[tasksNavIndex]` from sessionStorage before querying Supabase. For in-app navigation (navigate() always writes navList before router.push), uses `task_num=eq.X&record_type=eq.Y` (unambiguous). Falls back to `order=record_type.desc` only for true cold loads (no navList match).
-`pages/tasks/[id].jsx` simplified: removed RT_PREFIX string-encoding roundtrip (prior attempt from 2026-06-11 sessions); now passes bare `id` directly as `prefixedId`.
+**router.back() attempt (commit `fb3c3b0`) — REVERTED (commit `8af6e2e`):**
+Fresh-incognito testing showed `router.back()` broke ALL THREE triggers (on-screen Back, Escape, Backspace). Reverted. On-screen Back and Escape are confirmed working with `router.push(tasksBackUrl || '/tasks')`.
 
-**Fix 2 — browser back history stack (commit `fb3c3b0`):**
-`onBack` in `pages/tasks/[id].jsx` was calling `router.push(back)` which ADDED a new /tasks entry to the history stack on every back-press. Each push left the prior detail page sitting behind it — browser back cycled through all accumulated entries.
-Fix: when `tasksBackUrl` is set in sessionStorage (arrived via in-app click), call `router.back()` instead — consumes the entry created by navigate()'s router.push. Cold loads (no sessionStorage entry) fall back to `router.push('/tasks')`.
-`goNav` replaceState is unchanged — it was already correct.
+**Current onBack mechanism (after revert, commit `e225d5c`):**
+`router.push(sessionStorage.tasksBackUrl || '/tasks')` — on-screen Back + Escape work. Backspace still cycles through history.
 
-**Current state — awaiting Scott's test on preview deploy:**
-- ✅ Correct record opens on click (record_type disambiguation)
-- ✅ On-screen back / Escape → router.back() → should return to filtered list
-- ✅ Browser back from list → goes to page before /tasks (no more cycling)
-- ❓ Test required in fresh incognito tab (existing tabs have stale history from prior sessions)
+**Debug overlay added (commit `e225d5c`):**
+`pages/tasks/[id].jsx` now includes `<NavDebugOverlay>` gated by `NEXT_PUBLIC_DEBUG_NAV=1` (Preview env only).
+Shows live: `history.length`, `router.asPath`, `window.location`, last 3 router events, raw `popstate` firings.
+**Scott must add `NEXT_PUBLIC_DEBUG_NAV=1` to Vercel → Settings → Environment Variables → Preview scope, then redeploy.**
+
+**Test protocol for next session (Scott reports these values):**
+1. Fresh incognito → /tasks → LEEN/Tasks filter → click task. Note overlay.
+2. Click prev/next arrow once. Note overlay (history.length should NOT increase — replaceState).
+3. Press Backspace ONCE. Note overlay — did popstate fire? What does router.asPath show?
+4. Press Backspace again if step 3 didn't return to list. Note overlay again.
+
+**Current state:**
+- ✅ Correct record opens on click (5b9d011 intact)
+- ✅ On-screen Back → router.push(tasksBackUrl) → returns to filtered list
+- ✅ Escape → same as on-screen Back
+- ❌ Backspace (browser back) — still cycling; root cause unknown pending overlay data
 - ❌ Tenant/Contact/Vendor Tasks tabs — still empty, separate diagnostic session needed
 
 **Known gaps / still open (non-navigation):**
@@ -448,19 +456,23 @@ Fix: when `tasksBackUrl` is set in sessionStorage (arrived via in-app click), ca
 - PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 
-**Completed session 2026-06-12 — Tasks navigation root cause fixed (preview branch):**
+**Completed session 2026-06-12 session 1 — Tasks navigation record lookup fixed (preview branch):**
+- BUG FIX: `TasksView.jsx` TaskDetail fetch useEffect — unambiguous record_type lookup (commit `5b9d011`)
+- CLEANUP: `pages/tasks/[id].jsx` — removed RT_PREFIX roundtrip, passes bare `id` as `prefixedId`
 
-- BUG FIX: `TasksView.jsx` TaskDetail fetch useEffect — reads `tasksNavList[tasksNavIndex]` from sessionStorage; uses `record_type=eq.X` for in-app navigations, falls back to `order=record_type.desc` for cold loads only (commit `5b9d011`)
-- BUG FIX: `pages/tasks/[id].jsx` — `onBack` uses `router.back()` when arrived in-app (tasksBackUrl set), `router.push('/tasks')` for cold loads — eliminates history stack accumulation (commit `fb3c3b0`)
-- CLEANUP: `pages/tasks/[id].jsx` — removed RT_PREFIX string-encoding roundtrip from prior session; passes bare `id` directly as `prefixedId`
-- NOTE: main branch still has the root-cause bug (from `be19e0c`). Needs a follow-up merge after Scott confirms preview is working.
+**Completed session 2026-06-12 session 2 — revert + instrument (preview branch):**
+- REVERT: `fb3c3b0` reverted via `8af6e2e` — router.back() broke all triggers
+- ADDED: NavDebugOverlay in `pages/tasks/[id].jsx` gated by `NEXT_PUBLIC_DEBUG_NAV=1` (commit `e225d5c`)
+- NOTE: main branch still has record lookup bug (from `be19e0c`). Do not merge until Backspace is also resolved.
 
 **Next priorities (start here next session):**
-1. Confirm Tasks navigation fix on preview (fresh incognito tab) — if passes, merge preview → main
-2. Debug Tenant/Contact/Vendor Tasks tab: add isolated debug line showing filterTenantId/filterContactId/filterVendorId + items.length + loading; push and have Scott report what it shows BEFORE attempting any fix
-3. Debug index PDF upload (pdf-lib Readable stream issue)
-4. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
-5. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Scott runs test protocol above, reports overlay data for Backspace presses
+2. Write Backspace fix based on actual overlay data — NO guess-fixing
+3. Once all three back triggers pass, merge preview → main
+4. Debug Tenant/Contact/Vendor Tasks tab (separate session, Prompt 2)
+5. Debug index PDF upload (pdf-lib Readable stream issue)
+6. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+7. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
