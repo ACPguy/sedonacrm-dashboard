@@ -388,13 +388,23 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - UI: `.filter-row` applied to property strip in WorkOrdersView, IssuesView, TenantsView, ContactsView; and outer filter bar in VendorsView, OwnersView
 - Commit: `1e8b3ad` on `preview` branch
 
-**Known gaps / still open (next session):**
-- BUG: DCM task opens wrong item — `{task_num, record_type}` navList fix deployed but not yet confirmed working in production
-- BUG: Tenant/Contact/Vendor Tasks tabs show header but no task data — root cause not yet confirmed (task_contacts has 0 rows; may need seed data or UI fallback message)
-- BUG: Back button does not restore filter state — URL query param encoding for filter state persistence not yet implemented
-- BUG: Vendor nav stuck in detail after filtering — investigate sessionStorage backUrl not updating on filter change
-- PENDING: TenantsView mobile stats pill row — not yet built
-- PENDING: Development Rules 9 and 10 not yet added to CLAUDE.md
+**Tasks navigation — 3 rounds attempted, still unresolved (as of 2026-06-11):**
+
+Current state of preview branch (commit dad6f89 — round 3 reverted at 21e3ea0):
+- ✅ Sticky "✕ Clear" filter pill — working, confirmed
+- ✅ Property/Owner Tasks tab — clicking a task opens the CORRECT task (record_type+task_num disambiguation from round 2 holds)
+- ❌ Back navigation (on-screen button, Escape, browser back, keyboard back) does NOT consistently return to the prior filtered view across Tasks list, Property Tasks tab, Owner Tasks tab. On-screen button sometimes works; other triggers go to the parent list instead.
+- ❌ Tenant/Contact/Vendor Tasks tabs — STILL completely empty (no table, no filter rows) after 3 rounds. Root cause not yet identified.
+
+**Round 3 attempt (reverted at commit 21e3ea0):** Converted filter state + tab state to router.query + router.replace(shallow:true), unified all back-triggers via router.back(). This broke filter-row rendering in the Properties/Tasks tab entirely (regression) and did not resolve the underlying issues. Reverted.
+
+**Recommendation for next session — change approach:**
+1. Start with a DIAGNOSTIC-ONLY pass: read TasksView.jsx, TasksTable.jsx, pages/tasks/[id].jsx, PropertyDetail, OwnerDetail, TenantsView.jsx, ContactsView.jsx, VendorsView.jsx top to bottom. Map out — in writing, NO code changes — exactly how tab state, filter state, and navigation currently work in each context (standalone /tasks, embedded in Property, Owner, Tenant, Contact, Vendor). Report this map back before writing any fix.
+2. Fix ONE bug at a time. Build + report expected vs actual before moving to the next. Do not bundle multiple architectural changes into one commit.
+3. For Tenant/Contact/Vendor: re-add a debug line FIRST, in isolation, push, and have Scott report what it shows BEFORE attempting any further fix — confirm whether the component renders at all in that context before guessing why data is empty.
+
+**Known gaps / still open (non-navigation):**
+- PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views (only Tasks done)
 - PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
 - PENDING: "Link to record" button in EmailInbox thread detail — console.log placeholder
 - PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired
@@ -404,12 +414,11 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 
 **Next priorities (start here next session):**
-1. Confirm DCM task navList fix works in production (open Tasks list filtered to DCM, click a task, verify correct task opens)
-2. Fix Tenant/Contact/Vendor Tasks tab data — investigate why filterContactId/filterTenantId/filterVendorId shows no rows
-3. Fix back button filter state restoration
-4. Fix Vendor detail nav stuck issue
-5. Debug index PDF upload (pdf-lib Readable stream issue)
-6. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Tasks navigation diagnostic — read all relevant files top to bottom, produce written map of navigation flow in each context BEFORE writing any code
+2. Fix back navigation ONE trigger at a time, build + verify between each
+3. Debug Tenant/Contact/Vendor Tasks tab with isolated debug line first
+4. Debug index PDF upload (pdf-lib Readable stream issue)
+5. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
