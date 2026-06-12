@@ -11,10 +11,10 @@ export default function TaskDetailPage() {
       <TaskDetail
         prefixedId={id}
         onBack={() => {
-          const back = typeof sessionStorage !== 'undefined'
-            ? sessionStorage.getItem('tasksBackUrl')
-            : null;
-          router.push(back || '/tasks');
+          const arrived = typeof sessionStorage !== 'undefined'
+            && !!sessionStorage.getItem('tasksBackUrl');
+          if (arrived) router.back();
+          else router.push('/tasks');
         }}
       />
     </AppShell>
