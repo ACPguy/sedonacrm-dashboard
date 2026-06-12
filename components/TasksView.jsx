@@ -1098,8 +1098,19 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     if (!prefixedId) return;
     const parsed=parsePrefixedId(prefixedId);
     if (!parsed){setNotFound(true);setLoading(false);return;}
-    const params=parsed.recordType
-      ?`task_num=eq.${parsed.taskNum}&record_type=eq.${parsed.recordType}&select=*&limit=1`
+    // For in-app navigation, record_type is stored in sessionStorage navList.
+    // Bare task_num cold loads (no navList match) fall back to work_order-wins ordering.
+    let recordType=parsed.recordType;
+    if (!recordType) {
+      try {
+        const navL=JSON.parse(sessionStorage.getItem('tasksNavList')||'[]');
+        const navI=parseInt(sessionStorage.getItem('tasksNavIndex')||'-1',10);
+        const e=navI>=0?navL[navI]:null;
+        if (e&&e.task_num===parsed.taskNum&&e.record_type) recordType=e.record_type;
+      } catch {}
+    }
+    const params=recordType
+      ?`task_num=eq.${parsed.taskNum}&record_type=eq.${recordType}&select=*&limit=1`
       :`task_num=eq.${parsed.taskNum}&select=*&order=record_type.desc&limit=1`;
     sbFetch('tasks',params)
       .then(rows=>{
