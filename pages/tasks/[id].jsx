@@ -31,10 +31,11 @@ export default function TaskDetailPage() {
       <TaskDetail
         prefixedId={resolvedId}
         onBack={() => {
-          const back = typeof sessionStorage !== 'undefined'
-            ? sessionStorage.getItem('tasksBackUrl')
+          const origin = typeof sessionStorage !== 'undefined'
+            ? sessionStorage.getItem('taskNavOrigin')
             : null;
-          router.push(back || '/tasks');
+          if (origin === 'app') router.back();
+          else router.push('/tasks');
         }}
       />
     </AppShell>

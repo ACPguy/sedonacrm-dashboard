@@ -87,16 +87,21 @@ export default function TasksTable({
     try {
       sessionStorage.setItem('tasksNavList',  JSON.stringify(navL));
       sessionStorage.setItem('tasksNavIndex', String(idx));
-      sessionStorage.setItem('tasksBackUrl',  backUrl || window.location.href);
+      sessionStorage.setItem('taskNavOrigin', 'app');
     } catch {}
     router.push(`/tasks/${task.task_num}`);
   };
 
-  if (loading) return <div style={{padding:'20px',textAlign:'center',color:T.text3,fontSize:F.sm}}>Loading…</div>;
-  if (error)   return <div style={{padding:'20px',textAlign:'center',color:T.danger,fontSize:F.sm}}>Error: {error}</div>;
-
   return (
     <div>
+      {process.env.NODE_ENV !== 'production' && (
+        <div style={{fontSize:'10px',color:'#888',padding:'2px 8px'}}>
+          DBG: tenant={String(filterTenantId)} contact={String(filterContactId)} vendor={String(filterVendorId)} items={filtered.length} loading={String(loading)}
+        </div>
+      )}
+      {loading && <div style={{padding:'20px',textAlign:'center',color:T.text3,fontSize:F.sm}}>Loading…</div>}
+      {error && <div style={{padding:'20px',textAlign:'center',color:T.danger,fontSize:F.sm}}>Error: {error}</div>}
+      {!loading && !error && <>
       {!hideSearch && (
         <div style={{marginBottom:'8px'}}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tasks…"
@@ -191,6 +196,7 @@ export default function TasksTable({
           );
         })}
       </div>
+      </>}
     </div>
   );
 }

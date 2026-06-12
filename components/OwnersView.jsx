@@ -591,7 +591,7 @@ export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
   const [navList, setNavList]                 = useState(null);
   const [navIdx, setNavIdx]                   = useState(-1);
   const [navLoading, setNavLoading]           = useState(false);
-  const [ownerTopTab, setOwnerTopTab]         = useState('tasks');
+  const [ownerTopTab, setOwnerTopTab]         = useState(router.query.tab || 'tasks');
   const agmtFetched = useRef(false);
   const resizingRight = useRef(false);
 
@@ -773,7 +773,7 @@ export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
       {/* Tab bar */}
       <div style={{display:'flex',gap:'2px',padding:'0 16px',borderBottom:`1px solid ${T.border}`,background:T.bg1,flexShrink:0}}>
         {[['tasks','Tasks'],['info','Owner Info']].map(([k,label])=>(
-          <button key={k} onClick={()=>setOwnerTopTab(k)} style={{
+          <button key={k} onClick={()=>{setOwnerTopTab(k);router.replace(`/owners/${router.query.id}?tab=${k}`,undefined,{shallow:true});}} style={{
             padding:'8px 14px',fontSize:'13px',fontWeight:ownerTopTab===k?'600':'400',
             color:ownerTopTab===k?T.accent:T.text1,background:'none',border:'none',
             borderBottom:ownerTopTab===k?`2px solid ${T.accent}`:'2px solid transparent',
