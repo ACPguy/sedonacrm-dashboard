@@ -457,10 +457,25 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - REMOVED: `NavDebugOverlay` from `pages/tasks/[id].jsx` (no longer needed)
 - MERGED: preview → main; deployed to crm.andersoncp.com
 
+**Completed session 2026-06-12 session 4 — embedded Tasks tabs layout fixed (preview branch):**
+
+Diagnostic (Drive file `1cp2Wz5b_KjH2JUrwlrtwUTl-rDe8YR5S`) confirmed all 5 contexts used identical `<TasksTable hidePropertyFilter backUrl=.../>` pattern with the same 3 layout bugs. One change to `TasksTable.jsx` fixed all 5:
+
+- BUG FIX: `TasksTable.jsx` — `#` column widened from 68px → 90px; usable text space 74px; fits "CR1-3685" (8 chars) without truncation
+- FEATURE: `TasksTable.jsx` — added 38px `Type` column (WO/TSK/Proj./ACP/S&G/Note) between icon col and # col; `TYPE_LABEL` module-level constant; mobile cards updated with type label
+- BUG FIX: `TasksTable.jsx` — outer div now `height:'100%', overflowY:'auto'`; component self-scrolls within its wrapper in all 5 embedded contexts; wrappers (`overflow:'hidden'`) unchanged
+- CLEANUP: `TasksTable.jsx` — removed 3 debug `console.log` statements from diagnostic session
+- Commit: `872f12b` on `preview` branch
+
+**Known data gaps (not code bugs — populate at go-live / via data entry):**
+- `tasks.vendor_id`: 0/4368 rows populated → Vendor Tasks tab always "No tasks found" until tasks linked to vendors
+- `task_contacts` junction: 0 rows → Contact Tasks tab always "No tasks found" until task-contact links created
+- `tasks.tenant_id`: 135/4368 rows populated → Tenant Tasks tab sparse until populated
+
 **Next priorities (start here next session):**
-1. Debug embedded Tasks tabs — Property/Owner/Tenant/Vendor/Contact detail all 5 report broken header/missing columns/truncated Task # (separate session, Prompt 2)
-2. Debug index PDF upload (pdf-lib Readable stream issue)
-3. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+1. Merge preview → main (Scott approves after verifying embedded Tasks tabs in all 5 contexts)
+2. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+3. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
 4. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
