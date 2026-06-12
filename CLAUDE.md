@@ -417,34 +417,20 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - `CLAUDE.md` — Development Rules 9 and 10 added; Session Close Procedure updated (Steps 4-7 with dated archive pattern)
 - Commit on `preview` branch
 
-**Tasks navigation — partial resolution, Backspace still open (as of 2026-06-12 session 2):**
+**Tasks navigation — RESOLVED (2026-06-12 session 3):**
 
-**Record lookup fix (commit `5b9d011`) — CONFIRMED WORKING:**
-`TaskDetail`'s fetch useEffect reads `tasksNavList[tasksNavIndex]` from sessionStorage; uses `task_num=eq.X&record_type=eq.Y` for in-app navigation. Falls back to `order=record_type.desc` for cold loads only. Correct record opens on every click.
+**Root cause (commit `8800fc7`):** `TasksView.jsx`'s filter-URL sync (Rule 10) and `goNav` prev/next were calling `history.replaceState({}, '', url)` with a bare empty object. This stripped Next.js's internal `__N` marker from `event.state`. When Backspace fired a `popstate`, Next's router checked `event.state.__N`, found it absent, and did nothing — leaving the page frozen on the first press. Second Backspace hit a stale history entry, cycling instead of returning.
 
-**router.back() attempt (commit `fb3c3b0`) — REVERTED (commit `8af6e2e`):**
-Fresh-incognito testing showed `router.back()` broke ALL THREE triggers (on-screen Back, Escape, Backspace). Reverted. On-screen Back and Escape are confirmed working with `router.push(tasksBackUrl || '/tasks')`.
+**Fix:** spread the existing state: `replaceState({...window.history.state, url, as: url}, '', url)`. `__N` is preserved on every replaceState call. Next's popstate handler sees it and performs the route transition normally.
 
-**Current onBack mechanism (after revert, commit `e225d5c`):**
-`router.push(sessionStorage.tasksBackUrl || '/tasks')` — on-screen Back + Escape work. Backspace still cycles through history.
+**Confirmed PASS (fresh incognito, commit `8800fc7`):**
+1. ✅ Overlay values agree (history.length, asPath, location)
+2. ✅ Backspace once → filtered list re-renders correctly (asPath + location = /tasks?prop=LEEN&type=task)
+3. ✅ Backspace again → goes to actual prior page (confirmed correct on truly fresh session)
+4. ✅ Escape, on-screen Back, prev/next all still work
+5. ✅ history.length stable across prev/next
 
-**Debug overlay added (commit `e225d5c`):**
-`pages/tasks/[id].jsx` now includes `<NavDebugOverlay>` gated by `NEXT_PUBLIC_DEBUG_NAV=1` (Preview env only).
-Shows live: `history.length`, `router.asPath`, `window.location`, last 3 router events, raw `popstate` firings.
-**Scott must add `NEXT_PUBLIC_DEBUG_NAV=1` to Vercel → Settings → Environment Variables → Preview scope, then redeploy.**
-
-**Test protocol for next session (Scott reports these values):**
-1. Fresh incognito → /tasks → LEEN/Tasks filter → click task. Note overlay.
-2. Click prev/next arrow once. Note overlay (history.length should NOT increase — replaceState).
-3. Press Backspace ONCE. Note overlay — did popstate fire? What does router.asPath show?
-4. Press Backspace again if step 3 didn't return to list. Note overlay again.
-
-**Current state:**
-- ✅ Correct record opens on click (5b9d011 intact)
-- ✅ On-screen Back → router.push(tasksBackUrl) → returns to filtered list
-- ✅ Escape → same as on-screen Back
-- ❌ Backspace (browser back) — still cycling; root cause unknown pending overlay data
-- ❌ Tenant/Contact/Vendor Tasks tabs — still empty, separate diagnostic session needed
+**NavDebugOverlay removed (same session):** Component deleted from `pages/tasks/[id].jsx` — no longer needed.
 
 **Known gaps / still open (non-navigation):**
 - PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views (only Tasks done)
@@ -465,14 +451,17 @@ Shows live: `history.length`, `router.asPath`, `window.location`, last 3 router 
 - ADDED: NavDebugOverlay in `pages/tasks/[id].jsx` gated by `NEXT_PUBLIC_DEBUG_NAV=1` (commit `e225d5c`)
 - NOTE: main branch still has record lookup bug (from `be19e0c`). Do not merge until Backspace is also resolved.
 
+**Completed session 2026-06-12 session 3 — Tasks navigation RESOLVED, merged to main:**
+- ROOT CAUSE FOUND: bare `{}` in `history.replaceState` stripped Next.js `__N` marker → popstate handler no-op on first Backspace
+- FIX: `{...window.history.state, url, as: url}` spread in both `TasksView.jsx` (filter URL sync) and wherever `goNav` calls replaceState (commit `8800fc7`)
+- REMOVED: `NavDebugOverlay` from `pages/tasks/[id].jsx` (no longer needed)
+- MERGED: preview → main; deployed to crm.andersoncp.com
+
 **Next priorities (start here next session):**
-1. Scott runs test protocol above, reports overlay data for Backspace presses
-2. Write Backspace fix based on actual overlay data — NO guess-fixing
-3. Once all three back triggers pass, merge preview → main
-4. Debug Tenant/Contact/Vendor Tasks tab (separate session, Prompt 2)
-5. Debug index PDF upload (pdf-lib Readable stream issue)
-6. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
-7. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Debug embedded Tasks tabs — Property/Owner/Tenant/Vendor/Contact detail all 5 report broken header/missing columns/truncated Task # (separate session, Prompt 2)
+2. Debug index PDF upload (pdf-lib Readable stream issue)
+3. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+4. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
@@ -499,6 +488,23 @@ Shows live: `history.length`, `router.asPath`, `window.location`, last 3 router 
 - **Error handling:** PDF errors logged only, never surfaced to user. Folder creation success is returned immediately.
 - **DB columns:** `tasks.drive_folder_id`, `tasks.drive_folder_url`, `tasks.drive_index_pdf_id`
 
+## History API Rules (permanent)
+
+**ALWAYS spread existing state in replaceState/pushState calls:**
+```js
+// CORRECT — preserves Next.js __N marker
+window.history.replaceState({ ...window.history.state, url: newUrl, as: newUrl }, '', newUrl);
+
+// WRONG — strips __N, breaks popstate/Backspace in Next.js router
+window.history.replaceState({}, '', newUrl);
+```
+
+**Why:** Next.js's popstate handler checks `event.state.__N` to decide whether to perform a client-side route transition. A bare `{}` wipes this marker. On first Backspace the router sees no `__N` and does nothing — page freezes. Second Backspace hits an older stale entry, causing cycling rather than returning to the list.
+
+**Scope note:** Other modules (WorkOrders, Issues, Tenants, etc.) also call `replaceState` for filter-URL sync but use SPA-style popstate listeners rather than relying on Next's router for Back — different architecture, not necessarily broken today. Flag and fix if any future module routes through Next's router-based back navigation.
+
+**Applies to:** any `window.history.replaceState` or `window.history.pushState` call in this codebase. No exceptions.
+
 ## Prev/Next Navigation Rule (permanent)
 
 All detail views support keyboard (ArrowLeft/ArrowRight) and button (‹ ›) navigation across the list that opened them.
@@ -513,7 +519,7 @@ sessionStorage.setItem('{module}NavIndex', String(items.findIndex(r => r.id === 
 **Detail view pattern:**
 - State: `const [navList,setNavList]=useState(null); const [navIdx,setNavIdx]=useState(-1); const [navLoading,setNavLoading]=useState(false);`
 - Mount useEffect reads `{module}NavList` / `{module}NavIndex` from sessionStorage (empty dep array)
-- `goNav(dir)` fetches adjacent record, calls `setData(newRec)`, updates `navIdx`, writes new index to sessionStorage, calls `window.history.replaceState({}, '', newUrl)`
+- `goNav(dir)` fetches adjacent record, calls `setData(newRec)`, updates `navIdx`, writes new index to sessionStorage, calls `window.history.replaceState({...window.history.state, url: newUrl, as: newUrl}, '', newUrl)`
 - `goNavRef` pattern: `const goNavRef=useRef(goNav); goNavRef.current=goNav;` placed after `goNav` definition, before early returns — arrow key useEffect uses `goNavRef.current` with empty dep array
 - Arrow key useEffect skips when `e.target.tagName` is input/textarea/select or `e.target.isContentEditable`
 - Nav UI: shown only when `navList && navList.length > 1`; right-aligned in header first flex div via `marginLeft:'auto'`; CaretLeft/CaretRight size=18 weight="bold" from @phosphor-icons/react
