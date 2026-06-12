@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import AppShell from '../../components/AppShell';
 import { TaskDetail } from '../../components/TasksView';
 
@@ -81,10 +81,9 @@ export default function TaskDetailPage() {
   const router = useRouter();
   const { id } = router.query;
   if (!id) return null;
-  const debug = process.env.NEXT_PUBLIC_DEBUG_NAV === '1';
   return (
     <AppShell activeView="tasks">
-      {debug && <NavDebugOverlay />}
+      <NavDebugOverlay />
       <TaskDetail
         prefixedId={id}
         onBack={() => {
