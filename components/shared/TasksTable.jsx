@@ -13,6 +13,8 @@ const fmtNumDate = d => {
   return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
 };
 
+const TYPE_LABEL = { work_order:'WO', task:'TSK', project:'Proj.', acp_task:'ACP', sg_task:'S&G', note:'Note' };
+
 export default function TasksTable({
   filterPropCode,
   filterProjectId,
@@ -52,9 +54,8 @@ export default function TasksTable({
         try {
           tcRows = await sbFetch('task_contacts', `contact_id=eq.${filterContactId}&select=task_id`);
         } catch (jErr) {
-          console.log('[TasksTable] task_contacts fetch error:', filterContactId, jErr);
+          setError(jErr.message); setLoading(false); return;
         }
-        console.log('[TasksTable] task_contacts fetch:', filterContactId, tcRows);
         const taskIds = (tcRows || []).map(r => r.task_id);
         if (!taskIds.length) {
           if (!cancelled) { setTasks([]); setLoading(false); }
@@ -64,7 +65,6 @@ export default function TasksTable({
       }
 
       const data = await sbFetch('tasks', `select=id,task_num,record_type,title,prop_code,priority,status,assigned_to,updated_at,created_at&${parts.join('&')}`);
-      console.log('[TasksTable] tasks fetch:', { filterTenantId, filterVendorId, filterContactId, count: data.length });
       if (!cancelled) { setTasks(data); setLoading(false); }
     };
 
@@ -96,7 +96,7 @@ export default function TasksTable({
   if (error)   return <div style={{padding:'20px',textAlign:'center',color:T.danger,fontSize:F.sm}}>Error: {error}</div>;
 
   return (
-    <div>
+    <div style={{height:'100%',overflowY:'auto'}}>
       {!hideSearch && (
         <div style={{marginBottom:'8px'}}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tasks…"
@@ -106,7 +106,8 @@ export default function TasksTable({
       <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
         <colgroup>
           <col style={{width:'28px'}}/>
-          <col style={{width:'68px'}}/>
+          <col style={{width:'38px'}}/>
+          <col style={{width:'90px'}}/>
           <col/>
           {!hidePropertyFilter&&<col style={{width:'56px'}}/>}
           <col style={{width:'70px'}}/>
@@ -116,6 +117,7 @@ export default function TasksTable({
         <thead>
           <tr>
             <th style={{...css.th,cursor:'default'}}></th>
+            <th style={css.th}>Type</th>
             <th style={css.th}>#</th>
             <th style={css.th}>Title</th>
             {!hidePropertyFilter&&<th style={css.th}>Prop</th>}
@@ -140,6 +142,9 @@ export default function TasksTable({
                 onClick={e=>{if(e.ctrlKey||e.metaKey){window.open(href,'_blank');}else{navigate(task);}}}>
                 <td style={{...css.td,width:'28px',textAlign:'center',overflow:'visible',padding:'4px'}}>
                   <TaskTypeIcon recordType={task.record_type} size={13}/>
+                </td>
+                <td style={{...css.td,fontSize:F.xs,color:T.text3,fontWeight:'600'}}>
+                  {TYPE_LABEL[task.record_type]||task.record_type}
                 </td>
                 <td style={{...css.td,fontSize:F.xs,color:T.text2}}>
                   <a href={href} onClick={e=>{if(!e.ctrlKey&&!e.metaKey){e.preventDefault();navigate(task);}}} style={{color:'inherit',textDecoration:'none'}}>{displayId}</a>
@@ -179,6 +184,7 @@ export default function TasksTable({
               onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
               <div style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'3px'}}>
                 <TaskTypeIcon recordType={task.record_type} size={16}/>
+                <span style={{fontSize:F.xs,color:T.text3,fontWeight:'600'}}>{TYPE_LABEL[task.record_type]||task.record_type}</span>
                 <span style={{fontSize:F.xs,color:T.text2}}>{displayId}</span>
                 <span style={{fontWeight:'600',fontSize:F.sm,color:T.text0}}>{task.title||'—'}</span>
               </div>
