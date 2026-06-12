@@ -606,7 +606,11 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     if(priorityFilter!=='All')params.set('priority',priorityFilter);
     if(statusFilter!=='Open')params.set('status',statusFilter);
     const qs=params.toString();
-    window.history.replaceState({},'',qs?`/tasks?${qs}`:'/tasks');
+    const url=qs?`/tasks?${qs}`:'/tasks';
+    // Preserve Next.js's history-state markers (__N/idx/key) — replacing them with
+    // a bare object makes Next ignore the popstate when the user later hits Back,
+    // desyncing router.asPath from window.location. Only the URL is changed here.
+    window.history.replaceState({...window.history.state,url,as:url},'',url);
   },[propFilter.join(','),typeFilter,priorityFilter,statusFilter]);// eslint-disable-line react-hooks/exhaustive-deps
 
   const showClosed  = statusFilter === 'Closed';
@@ -1237,7 +1241,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
       setData(newTask);
       setNavIdx(newIdx);
       sessionStorage.setItem('tasksNavIndex',String(newIdx));
-      window.history.replaceState({taskId:newTask.id},'',`/tasks/${newTask.task_num}`);
+      // Preserve Next.js's history-state markers (see filter-sync effect above) so
+      // that pressing Back after using prev/next still triggers a real route change.
+      const url=`/tasks/${newTask.task_num}`;
+      window.history.replaceState({...window.history.state,url,as:url},'',url);
     }catch{}
     finally{setNavLoading(false);}
   };
