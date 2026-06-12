@@ -4,7 +4,7 @@ import { TaskDetail } from '../../components/TasksView';
 
 export default function TaskDetailPage() {
   const router = useRouter();
-  const { id } = router.query; // e.g. "WO-3737"
+  const { id } = router.query;
   if (!id) return null;
   return (
     <AppShell activeView="tasks">

@@ -227,18 +227,31 @@ At the end of every session, CC must complete ALL of the following steps in orde
 
 3. Write build log to `~/[YYYY-MM-DD]_SedonaCRM_Build_Log_[Topic].md`
 
-4. Upload build log to Google Drive using Drive MCP:
-   - parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA`
+PERMANENT RULES — CLAUDE.md Drive archive:
+- The repo file is always CLAUDE.md (never rename — CC auto-reads it by this exact filename)
+- Drive archive copies are named with a date prefix: CLAUDE_YYYY-MM-DD.md (e.g. CLAUDE_2026-06-11.md)
+- Never overwrite a previous Drive archive copy — always create a new dated file
+- After uploading the new dated copy, move the previous dated copy to the Archive folder
+- Keep all dated copies in Archive indefinitely — never delete them
+
+4. Upload build log to Google Drive:
+   - parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA` (2 - Build Log folder)
    - contentMimeType: `text/plain`
    - disableConversionToGoogleType: `true`
-   - Title: exact filename (e.g. `06-09-2026_SedonaCRM_Build_Log_Topic.md`)
+   - Title: `YYYY-MM-DD_SedonaCRM_Build_Log_Topic.md` (exact filename)
 
-5. Upload updated CLAUDE.md to Google Drive (overwrite existing):
-   - fileId (overwrite): `1F1-xi1068jUSacOZQC_6Ux0xBQGmsQON`
+5. Upload updated CLAUDE.md to Google Drive as a new dated file:
+   - Title: `CLAUDE_YYYY-MM-DD.md` (e.g. `CLAUDE_2026-06-12.md`)
+   - parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA` (2 - Build Log folder — keep current copy here)
    - contentMimeType: `text/plain`
    - disableConversionToGoogleType: `true`
 
-6. Report both Drive file IDs to confirm successful upload.
+6. Move the PREVIOUS session's CLAUDE_YYYY-MM-DD.md to the Archive folder:
+   - Archive folder ID: `1I1kBuVZd7jbLh_WYzFtEBzrtmKcvazfb`
+   - Use Drive MCP move or copy+delete to relocate the old dated file
+   - Never delete old copies — archive only
+
+7. Report both Drive file IDs to confirm successful upload.
 
 NEVER skip any of these steps. NEVER upload `.md` files without
 `disableConversionToGoogleType: true` — they will convert to Google Docs.
@@ -300,6 +313,10 @@ echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
    For all other operations (file reads, file writes, git, npm, SELECT queries), proceed without asking.
 
 8. **High-volume list views default to Open only — never fetch all records on mount** — Work Orders and Issues list views load only Open (non-closed) records by default. Closed records are NOT fetched until the user explicitly selects a Closed or All filter pill. Each filter pill click triggers a new Supabase query — do NOT filter a pre-loaded full dataset client-side. This applies everywhere these tables render: standalone list views, Property detail tabs, Tenant detail tabs, Contact detail tabs, and any other embedded context.
+
+9. **Mobile stat summary rows are always pill-style horizontal scroll** — Any row of summary statistics rendered above a table (occupancy stats, financial totals, portfolio counts, or any other KPI summary) must use the `.stats-pill-row` + `.stat-pill` CSS pattern on mobile (< 768px). Desktop layout is unrestricted. Never render a multi-row grid of stat cards on mobile — it consumes too much vertical space. Use `.md-hidden` on the mobile pill row (shows on mobile, hidden on desktop) and `.mobile-hidden` on the desktop grid (hidden on mobile, shows on desktop). This applies to all existing and future list views: Tenants, Properties, Work Orders, Issues, Contacts, Vendors, Owners, and any new module added in future phases.
+
+10. **Filter state is always encoded in URL query params** — Every list view with filter pills (prop_code, type, priority, status, or any other filter dimension) must encode the active filter state into the URL via `window.history.replaceState` on every filter change, and restore state from URL params on mount. Use a `hasMounted` ref to skip the initial sync so the restore effect runs first. This ensures the browser back button and the detail-view back button always return to the exact filtered state the user was in. Apply to all existing modules (Tasks, Work Orders, Issues, Tenants, Contacts, Vendors, Owners, Properties) and all future list views added in Phases 3 through 10.
 
 ## URL Routing Rules (permanent)
 
@@ -388,20 +405,32 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - UI: `.filter-row` applied to property strip in WorkOrdersView, IssuesView, TenantsView, ContactsView; and outer filter bar in VendorsView, OwnersView
 - Commit: `1e8b3ad` on `preview` branch
 
-**Tasks navigation — 3 rounds attempted, still unresolved (as of 2026-06-11):**
+**Completed session 2026-06-11 — Group 1-3 bug fixes (preview branch):**
 
-Current state of preview branch (commit dad6f89 — round 3 reverted at 21e3ea0):
-- ✅ Sticky "✕ Clear" filter pill — working, confirmed
-- ✅ Property/Owner Tasks tab — clicking a task opens the CORRECT task (record_type+task_num disambiguation from round 2 holds)
-- ❌ Back navigation (on-screen button, Escape, browser back, keyboard back) does NOT consistently return to the prior filtered view across Tasks list, Property Tasks tab, Owner Tasks tab. On-screen button sometimes works; other triggers go to the parent list instead.
-- ❌ Tenant/Contact/Vendor Tasks tabs — STILL completely empty (no table, no filter rows) after 3 rounds. Root cause not yet identified.
+- BUG FIX: `pages/tasks/[id].jsx` — reads `tasksNavList[navIdx]` from sessionStorage before rendering `TaskDetail`; builds prefixed ID (e.g. `TSK-3685`) so `parsePrefixedId` gets the correct `record_type`, fixing wrong-record opens for task records that share a task_num with a work_order
+- BUG FIX: `TasksTable.jsx` — navL now stores `{ task_num, record_type }` (no `id`); `navigate()` finds idx by both fields; empty state changed to "No tasks found" (colSpan=99); added `console.log` for junction/fetch debugging; `backUrl` stores `window.location.href`
+- BUG FIX: `TasksView.jsx` — mobile cards navL uses `{ task_num, record_type }`; `tasksBackUrl` stores `window.location.href` (not just pathname); added `hasMounted` ref + URL restore effect (reads `?prop/type/priority/status` on mount) + URL sync effect (writes on filter change)
+- BUG FIX: `VendorsView.jsx`, `TenantsView.jsx`, `ContactsView.jsx` — switched embedded tasks tab from `<TasksView embeddedMode/>` to `<TasksTable/>` (shared component); each passes `backUrl={window.location.href}` and `hidePropertyFilter`
+- UI: `WorkOrdersView.jsx` + `IssuesView.jsx` — Row 2 filter div (priority/status) now has `filter-row` class for mobile horizontal scroll
+- UI: `TenantsView.jsx` — mobile stats bar replaced with `.stats-pill-row` / `.md-hidden` pills; desktop card grid now has `.mobile-hidden`; both in same wrapper div
+- CSS: `styles/globals.css` — added `.stats-pill-row`, `.stat-pill`, `.stat-label`, `.stat-value`, `.mobile-hidden`, `.md-hidden` per Rule 9
+- `CLAUDE.md` — Development Rules 9 and 10 added; Session Close Procedure updated (Steps 4-7 with dated archive pattern)
+- Commit on `preview` branch
 
-**Round 3 attempt (reverted at commit 21e3ea0):** Converted filter state + tab state to router.query + router.replace(shallow:true), unified all back-triggers via router.back(). This broke filter-row rendering in the Properties/Tasks tab entirely (regression) and did not resolve the underlying issues. Reverted.
+**Tasks navigation — RESOLVED (2026-06-12 session 3):**
 
-**Recommendation for next session — change approach:**
-1. Start with a DIAGNOSTIC-ONLY pass: read TasksView.jsx, TasksTable.jsx, pages/tasks/[id].jsx, PropertyDetail, OwnerDetail, TenantsView.jsx, ContactsView.jsx, VendorsView.jsx top to bottom. Map out — in writing, NO code changes — exactly how tab state, filter state, and navigation currently work in each context (standalone /tasks, embedded in Property, Owner, Tenant, Contact, Vendor). Report this map back before writing any fix.
-2. Fix ONE bug at a time. Build + report expected vs actual before moving to the next. Do not bundle multiple architectural changes into one commit.
-3. For Tenant/Contact/Vendor: re-add a debug line FIRST, in isolation, push, and have Scott report what it shows BEFORE attempting any further fix — confirm whether the component renders at all in that context before guessing why data is empty.
+**Root cause (commit `8800fc7`):** `TasksView.jsx`'s filter-URL sync (Rule 10) and `goNav` prev/next were calling `history.replaceState({}, '', url)` with a bare empty object. This stripped Next.js's internal `__N` marker from `event.state`. When Backspace fired a `popstate`, Next's router checked `event.state.__N`, found it absent, and did nothing — leaving the page frozen on the first press. Second Backspace hit a stale history entry, cycling instead of returning.
+
+**Fix:** spread the existing state: `replaceState({...window.history.state, url, as: url}, '', url)`. `__N` is preserved on every replaceState call. Next's popstate handler sees it and performs the route transition normally.
+
+**Confirmed PASS (fresh incognito, commit `8800fc7`):**
+1. ✅ Overlay values agree (history.length, asPath, location)
+2. ✅ Backspace once → filtered list re-renders correctly (asPath + location = /tasks?prop=LEEN&type=task)
+3. ✅ Backspace again → goes to actual prior page (confirmed correct on truly fresh session)
+4. ✅ Escape, on-screen Back, prev/next all still work
+5. ✅ history.length stable across prev/next
+
+**NavDebugOverlay removed (same session):** Component deleted from `pages/tasks/[id].jsx` — no longer needed.
 
 **Known gaps / still open (non-navigation):**
 - PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views (only Tasks done)
@@ -413,19 +442,34 @@ Current state of preview branch (commit dad6f89 — round 3 reverted at 21e3ea0)
 - PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 
+**Completed session 2026-06-12 session 1 — Tasks navigation record lookup fixed (preview branch):**
+- BUG FIX: `TasksView.jsx` TaskDetail fetch useEffect — unambiguous record_type lookup (commit `5b9d011`)
+- CLEANUP: `pages/tasks/[id].jsx` — removed RT_PREFIX roundtrip, passes bare `id` as `prefixedId`
+
+**Completed session 2026-06-12 session 2 — revert + instrument (preview branch):**
+- REVERT: `fb3c3b0` reverted via `8af6e2e` — router.back() broke all triggers
+- ADDED: NavDebugOverlay in `pages/tasks/[id].jsx` gated by `NEXT_PUBLIC_DEBUG_NAV=1` (commit `e225d5c`)
+- NOTE: main branch still has record lookup bug (from `be19e0c`). Do not merge until Backspace is also resolved.
+
+**Completed session 2026-06-12 session 3 — Tasks navigation RESOLVED, merged to main:**
+- ROOT CAUSE FOUND: bare `{}` in `history.replaceState` stripped Next.js `__N` marker → popstate handler no-op on first Backspace
+- FIX: `{...window.history.state, url, as: url}` spread in both `TasksView.jsx` (filter URL sync) and wherever `goNav` calls replaceState (commit `8800fc7`)
+- REMOVED: `NavDebugOverlay` from `pages/tasks/[id].jsx` (no longer needed)
+- MERGED: preview → main; deployed to crm.andersoncp.com
+
 **Next priorities (start here next session):**
-1. Tasks navigation diagnostic — read all relevant files top to bottom, produce written map of navigation flow in each context BEFORE writing any code
-2. Fix back navigation ONE trigger at a time, build + verify between each
-3. Debug Tenant/Contact/Vendor Tasks tab with isolated debug line first
-4. Debug index PDF upload (pdf-lib Readable stream issue)
-5. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Debug embedded Tasks tabs — Property/Owner/Tenant/Vendor/Contact detail all 5 report broken header/missing columns/truncated Task # (separate session, Prompt 2)
+2. Debug index PDF upload (pdf-lib Readable stream issue)
+3. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+4. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
 - **Display:** `getTaskPrefix(task)` from `utils/taskPrefix.js` → prop_code prefix e.g. `CR1-3685`, `ACP-1816`, or bare `3685` if no prop_code. Used in table `#` column, page title, badge, CRM email footer label.
 - **URL:** Always bare `task_num` — `/tasks/3685`. Never use `formatTaskNum()` (WO-prefix) in URLs.
 - **`formatTaskNum()`** is a named export still available but used only internally for legacy `parsePrefixedId` reverse-lookup. Do not use in new URL construction.
-- **Lookup on cold load:** `parsePrefixedId` handles both bare integers AND legacy `WO-N` format. Bare number queries `task_num=eq.N&order=record_type.desc` — `work_order` wins on conflicts.
+- **Lookup (in-app):** `TaskDetail` fetch useEffect reads `tasksNavList[tasksNavIndex]` from sessionStorage; uses `task_num=eq.N&record_type=eq.X` — unambiguous, correct record always opens.
+- **Lookup (cold load / no navList match):** `task_num=eq.N&order=record_type.desc` fallback — `work_order` wins on collisions. Acceptable for bare bookmarked/shared URLs.
 
 ## OAuth / Google API Rules (permanent)
 
@@ -444,6 +488,23 @@ Current state of preview branch (commit dad6f89 — round 3 reverted at 21e3ea0)
 - **Error handling:** PDF errors logged only, never surfaced to user. Folder creation success is returned immediately.
 - **DB columns:** `tasks.drive_folder_id`, `tasks.drive_folder_url`, `tasks.drive_index_pdf_id`
 
+## History API Rules (permanent)
+
+**ALWAYS spread existing state in replaceState/pushState calls:**
+```js
+// CORRECT — preserves Next.js __N marker
+window.history.replaceState({ ...window.history.state, url: newUrl, as: newUrl }, '', newUrl);
+
+// WRONG — strips __N, breaks popstate/Backspace in Next.js router
+window.history.replaceState({}, '', newUrl);
+```
+
+**Why:** Next.js's popstate handler checks `event.state.__N` to decide whether to perform a client-side route transition. A bare `{}` wipes this marker. On first Backspace the router sees no `__N` and does nothing — page freezes. Second Backspace hits an older stale entry, causing cycling rather than returning to the list.
+
+**Scope note:** Other modules (WorkOrders, Issues, Tenants, etc.) also call `replaceState` for filter-URL sync but use SPA-style popstate listeners rather than relying on Next's router for Back — different architecture, not necessarily broken today. Flag and fix if any future module routes through Next's router-based back navigation.
+
+**Applies to:** any `window.history.replaceState` or `window.history.pushState` call in this codebase. No exceptions.
+
 ## Prev/Next Navigation Rule (permanent)
 
 All detail views support keyboard (ArrowLeft/ArrowRight) and button (‹ ›) navigation across the list that opened them.
@@ -458,7 +519,7 @@ sessionStorage.setItem('{module}NavIndex', String(items.findIndex(r => r.id === 
 **Detail view pattern:**
 - State: `const [navList,setNavList]=useState(null); const [navIdx,setNavIdx]=useState(-1); const [navLoading,setNavLoading]=useState(false);`
 - Mount useEffect reads `{module}NavList` / `{module}NavIndex` from sessionStorage (empty dep array)
-- `goNav(dir)` fetches adjacent record, calls `setData(newRec)`, updates `navIdx`, writes new index to sessionStorage, calls `window.history.replaceState({}, '', newUrl)`
+- `goNav(dir)` fetches adjacent record, calls `setData(newRec)`, updates `navIdx`, writes new index to sessionStorage, calls `window.history.replaceState({...window.history.state, url: newUrl, as: newUrl}, '', newUrl)`
 - `goNavRef` pattern: `const goNavRef=useRef(goNav); goNavRef.current=goNav;` placed after `goNav` definition, before early returns — arrow key useEffect uses `goNavRef.current` with empty dep array
 - Arrow key useEffect skips when `e.target.tagName` is input/textarea/select or `e.target.isContentEditable`
 - Nav UI: shown only when `navList && navList.length > 1`; right-aligned in header first flex div via `marginLeft:'auto'`; CaretLeft/CaretRight size=18 weight="bold" from @phosphor-icons/react

@@ -7,7 +7,7 @@ import { Briefcase, Eye, EyeSlash, CaretLeft, CaretRight, ClipboardText } from '
 import { useRouter } from 'next/router';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
-import TasksView from './TasksView';
+import TasksTable from './shared/TasksTable';
 
 const SUPABASE_URL    = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -788,7 +788,7 @@ export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
       {/* Tasks tab */}
       {ownerTopTab==='tasks'&&(
         <div style={{flex:1,overflow:'hidden'}}>
-          <TasksView filterPropCode={data.prop_code} hidePropertyPills embeddedMode/>
+          <TasksTable filterPropCode={data.prop_code} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>
         </div>
       )}
 

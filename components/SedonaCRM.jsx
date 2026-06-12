@@ -4,6 +4,7 @@ import SuitesView from './SuitesView';
 import SuitesTable from './shared/SuitesTable';
 import IssuesView, { IssuesList } from './IssuesView';
 import TasksView from './TasksView';
+import TasksTable from './shared/TasksTable';
 import ContactsTable from './shared/ContactsTable';
 import TenantsTable from './shared/TenantsTable';
 import RichTextEditor from './RichTextEditor';
@@ -754,10 +755,10 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
       {/* Content */}
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
 
-        {/* Tasks tab — embedded TasksView filtered by prop_code */}
+        {/* Tasks tab — shared TasksTable filtered by prop_code */}
         {tab==='tasks'&&(
           <div style={{flex:1,overflow:'hidden'}}>
-            <TasksView filterPropCode={data.prop_code} hidePropertyPills embeddedMode/>
+            <TasksTable filterPropCode={data.prop_code} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>
           </div>
         )}
 

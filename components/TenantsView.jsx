@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { Storefront, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
-import TasksView from './TasksView';
+import TasksTable from './shared/TasksTable';
 import CommunicationTimeline from './CommunicationTimeline';
 
 const SUPABASE_URL     = 'https://edxcvyleielzevpappui.supabase.co';
@@ -853,7 +853,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
       {/* ── Tab content ── */}
       {tab==='tasks'&&(
         <div style={{flex:1,overflow:'hidden'}}>
-          <TasksView filterTenantId={data.id} hidePropertyPills embeddedMode/>
+          {data?.id&&<TasksTable filterTenantId={data.id} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>}
         </div>
       )}
       {tab!=='tasks'&&(
@@ -1602,29 +1602,59 @@ export const TenantRentList = ({
 
       {/* Summary bar */}
       {!loading && !error && (
-        <div style={{display:'flex',alignItems:'center',gap:'8px',padding:'8px 14px',borderBottom:`0.5px solid ${T.border}`,background:T.bg1,flexShrink:0,flexWrap:'wrap'}}>
-          {[
-            ['Occupied',     `${fmtNum(occupancy.occupied_sf)} sf`,   T.success],
-            ['Vacant',       `${fmtNum(occupancy.vacant_sf)} sf`,     T.text2],
-            ['Gross',        `${fmtNum(occupancy.gross_sf)} sf`,      T.text1],
-            ['Occupancy',    `${occupancy.occ_pct}%`,                 occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger],
-            ['Vacancy',      `${occupancy.vacancy_pct}%`,             T.text2],
-            ['Monthly Total', fmtCurrency(occupancy.monthly_total),   T.accent],
-          ].map(([label,val,color]) => (
-            <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'6px 12px',minWidth:'90px'}}>
-              <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
-              <div style={{fontSize:F.md,fontWeight:'600',color,marginTop:'2px'}}>{val}</div>
+        <div style={{borderBottom:`0.5px solid ${T.border}`,background:T.bg1,flexShrink:0}}>
+          {/* Mobile: horizontal-scrolling pill row */}
+          <div className="stats-pill-row md-hidden" style={{padding:'6px 14px 2px'}}>
+            <div className="stat-pill">
+              <span className="stat-label">Occupied</span>
+              <span className="stat-value" style={{color:T.success}}>{fmtNum(occupancy.occupied_sf)} sf</span>
             </div>
-          ))}
-          <button
-            onClick={() => onGeneratePDF ? onGeneratePDF() : generatePortfolioPDF(filtered, occupancy)}
-            style={{marginLeft:'auto',background:T.accent,border:'none',borderRadius:'5px',
-              padding:'6px 14px',color:'#fff',fontSize:F.sm,cursor:'pointer',flexShrink:0,
-              transition:'filter 0.15s'}}
-            onMouseEnter={e=>{e.currentTarget.style.filter='brightness(0.9)';}}
-            onMouseLeave={e=>{e.currentTarget.style.filter='none';}}>
-            Rent Roll PDF
-          </button>
+            <div className="stat-pill">
+              <span className="stat-label">Vacant</span>
+              <span className="stat-value">{fmtNum(occupancy.vacant_sf)} sf</span>
+            </div>
+            <div className="stat-pill">
+              <span className="stat-label">Gross</span>
+              <span className="stat-value">{fmtNum(occupancy.gross_sf)} sf</span>
+            </div>
+            <div className="stat-pill">
+              <span className="stat-label">Occupancy</span>
+              <span className="stat-value" style={{color:occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger}}>{occupancy.occ_pct}%</span>
+            </div>
+            <div className="stat-pill">
+              <span className="stat-label">Vacancy</span>
+              <span className="stat-value">{occupancy.vacancy_pct}%</span>
+            </div>
+            <div className="stat-pill">
+              <span className="stat-label">Mo. Total</span>
+              <span className="stat-value" style={{color:T.accent}}>{fmtCurrency(occupancy.monthly_total)}</span>
+            </div>
+          </div>
+          {/* Desktop: existing card grid */}
+          <div className="mobile-hidden" style={{display:'flex',alignItems:'center',gap:'8px',padding:'8px 14px',flexWrap:'wrap'}}>
+            {[
+              ['Occupied',     `${fmtNum(occupancy.occupied_sf)} sf`,   T.success],
+              ['Vacant',       `${fmtNum(occupancy.vacant_sf)} sf`,     T.text2],
+              ['Gross',        `${fmtNum(occupancy.gross_sf)} sf`,      T.text1],
+              ['Occupancy',    `${occupancy.occ_pct}%`,                 occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger],
+              ['Vacancy',      `${occupancy.vacancy_pct}%`,             T.text2],
+              ['Monthly Total', fmtCurrency(occupancy.monthly_total),   T.accent],
+            ].map(([label,val,color]) => (
+              <div key={label} style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'6px 12px',minWidth:'90px'}}>
+                <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
+                <div style={{fontSize:F.md,fontWeight:'600',color,marginTop:'2px'}}>{val}</div>
+              </div>
+            ))}
+            <button
+              onClick={() => onGeneratePDF ? onGeneratePDF() : generatePortfolioPDF(filtered, occupancy)}
+              style={{marginLeft:'auto',background:T.accent,border:'none',borderRadius:'5px',
+                padding:'6px 14px',color:'#fff',fontSize:F.sm,cursor:'pointer',flexShrink:0,
+                transition:'filter 0.15s'}}
+              onMouseEnter={e=>{e.currentTarget.style.filter='brightness(0.9)';}}
+              onMouseLeave={e=>{e.currentTarget.style.filter='none';}}>
+              Rent Roll PDF
+            </button>
+          </div>
         </div>
       )}
 

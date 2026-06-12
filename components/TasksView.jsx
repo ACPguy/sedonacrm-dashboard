@@ -581,12 +581,44 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const [priorityFilter,setPriorityFilter] = useState('All');
   const [viewMode,setViewMode]       = useState('table');
   const moreAnchorRef                = useRef(null);
+  const hasMounted                   = useRef(false);
+  const [filtersReady, setFiltersReady] = useState(false);
+
+  // Restore filter state from URL query params on mount (standalone list only)
+  // Sets filtersReady=true to unblock the fetch effect once state is applied.
+  useEffect(()=>{
+    if(embeddedMode||filterPropCode){setFiltersReady(true);return;}
+    const params=new URLSearchParams(window.location.search);
+    if(params.get('prop'))setPropFilter([params.get('prop')]);
+    if(params.get('type'))setTypeFilter(params.get('type'));
+    if(params.get('priority'))setPriorityFilter(params.get('priority'));
+    if(params.get('status'))setStatusFilter(params.get('status'));
+    setFiltersReady(true);
+  },[]);// eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync active filters to URL query params (after first mount)
+  useEffect(()=>{
+    if(!hasMounted.current){hasMounted.current=true;return;}
+    if(embeddedMode||filterPropCode)return;
+    const params=new URLSearchParams();
+    if(propFilter.length===1)params.set('prop',propFilter[0]);
+    if(typeFilter!=='All')params.set('type',typeFilter);
+    if(priorityFilter!=='All')params.set('priority',priorityFilter);
+    if(statusFilter!=='Open')params.set('status',statusFilter);
+    const qs=params.toString();
+    const url=qs?`/tasks?${qs}`:'/tasks';
+    // Preserve Next.js's history-state markers (__N/idx/key) — replacing them with
+    // a bare object makes Next ignore the popstate when the user later hits Back,
+    // desyncing router.asPath from window.location. Only the URL is changed here.
+    window.history.replaceState({...window.history.state,url,as:url},'',url);
+  },[propFilter.join(','),typeFilter,priorityFilter,statusFilter]);// eslint-disable-line react-hooks/exhaustive-deps
 
   const showClosed  = statusFilter === 'Closed';
   const showUpdated = !showClosed;
   const NCOLS = 12; // type|#|title|fudate|prop|priority|stage|status|vendor|tenant|updated-or-closed|opened
 
   useEffect(()=>{
+    if(!filtersReady) return;
     setLoading(true); setError(null); setTasks([]);
 
     const run = async () => {
@@ -632,7 +664,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     };
 
     run().catch(e=>{setError(e.message);setLoading(false);});
-  },[statusFilter,typeFilter,propFilter.join(','),filterPropCode,filterVendorId,filterTenantId,filterContactId,search,refreshKey]);
+  },[filtersReady,statusFilter,typeFilter,propFilter.join(','),filterPropCode,filterVendorId,filterTenantId,filterContactId,search,refreshKey]);
 
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
@@ -721,8 +753,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
 
   const handleKanbanCardClick=task=>{
     const href=`/tasks/${task.task_num}`;
-    sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);
-    const navL=filtered.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
+    sessionStorage.setItem('tasksBackUrl',window.location.href);
+    const navL=filtered.map(t=>({task_num:t.task_num,record_type:t.record_type}));
     sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
     sessionStorage.setItem('tasksNavIndex',String(filtered.findIndex(t=>t.id===task.id)));
     if(embeddedMode){window.location.href=href;}
@@ -762,9 +794,9 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     const openDetail=e=>{
       if(e.ctrlKey||e.metaKey){window.open(href,'_blank');}
       else{
-        sessionStorage.setItem('tasksBackUrl',window.location.pathname+window.location.search);
+        sessionStorage.setItem('tasksBackUrl',window.location.href);
         const visualList=grouped?grouped.flatMap(g=>g.rows):filtered;
-        const navL=visualList.map(t=>({id:t.id,task_num:t.task_num,record_type:t.record_type}));
+        const navL=visualList.map(t=>({task_num:t.task_num,record_type:t.record_type}));
         sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
         sessionStorage.setItem('tasksNavIndex',String(visualList.findIndex(t=>t.id===task.id)));
         if(embeddedMode){window.location.href=href;}
@@ -855,6 +887,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         {/* Property filter pills */}
         {!filterPropCode&&!hidePropertyPills&&propCodes.length>0&&(
           <div className="crm-tasks-prop-strip" style={{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',paddingBottom:'4px',flexWrap:'nowrap'}}>
+            {hasActiveFilters&&<button onClick={clearFilters} className="pill-clear" style={{position:'sticky',left:0,zIndex:2}}>× Clear</button>}
             <button onClick={()=>setPropFilter([])} style={propBtn(propFilter.length===0)}>All Props</button>
             <button onClick={()=>setPropFilter(pf=>pf.includes('ACP')?pf.filter(x=>x!=='ACP'):[...pf,'ACP'])} style={propBtn(propFilter.includes('ACP'))}>ACP</button>
             {propCodes.map(pc=>(
@@ -864,6 +897,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         )}
         {/* Type pills — own row */}
         <div className="crm-tasks-type-strip filter-row" style={{gap:'4px',marginBottom:'5px'}}>
+          {hasActiveFilters&&<button onClick={clearFilters} className="pill-clear" style={{position:'sticky',left:0,zIndex:2}}>× Clear</button>}
           {TYPE_PILLS.map(({key,label})=>{
             const active=typeFilter===key;
             const color=TYPE_COLOR[key]||T.accent;
@@ -1011,8 +1045,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
                 <div key={t.id}
                   style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
                   onClick={()=>{
-                    sessionStorage.setItem('tasksBackUrl',window.location.pathname);
-                    const navL=filtered.map(x=>({id:x.id,task_num:x.task_num,record_type:x.record_type}));
+                    sessionStorage.setItem('tasksBackUrl',window.location.href);
+                    const navL=filtered.map(x=>({task_num:x.task_num,record_type:x.record_type}));
                     sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
                     sessionStorage.setItem('tasksNavIndex',String(i));
                     if(embeddedMode){window.location.href=`/tasks/${t.task_num}`;}
@@ -1068,8 +1102,19 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     if (!prefixedId) return;
     const parsed=parsePrefixedId(prefixedId);
     if (!parsed){setNotFound(true);setLoading(false);return;}
-    const params=parsed.recordType
-      ?`task_num=eq.${parsed.taskNum}&record_type=eq.${parsed.recordType}&select=*&limit=1`
+    // For in-app navigation, record_type is stored in sessionStorage navList.
+    // Bare task_num cold loads (no navList match) fall back to work_order-wins ordering.
+    let recordType=parsed.recordType;
+    if (!recordType) {
+      try {
+        const navL=JSON.parse(sessionStorage.getItem('tasksNavList')||'[]');
+        const navI=parseInt(sessionStorage.getItem('tasksNavIndex')||'-1',10);
+        const e=navI>=0?navL[navI]:null;
+        if (e&&e.task_num===parsed.taskNum&&e.record_type) recordType=e.record_type;
+      } catch {}
+    }
+    const params=recordType
+      ?`task_num=eq.${parsed.taskNum}&record_type=eq.${recordType}&select=*&limit=1`
       :`task_num=eq.${parsed.taskNum}&select=*&order=record_type.desc&limit=1`;
     sbFetch('tasks',params)
       .then(rows=>{
@@ -1196,7 +1241,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
       setData(newTask);
       setNavIdx(newIdx);
       sessionStorage.setItem('tasksNavIndex',String(newIdx));
-      window.history.replaceState({taskId:newTask.id},'',`/tasks/${newTask.task_num}`);
+      // Preserve Next.js's history-state markers (see filter-sync effect above) so
+      // that pressing Back after using prev/next still triggers a real route change.
+      const url=`/tasks/${newTask.task_num}`;
+      window.history.replaceState({...window.history.state,url,as:url},'',url);
     }catch{}
     finally{setNavLoading(false);}
   };
