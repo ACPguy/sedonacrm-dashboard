@@ -583,7 +583,6 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const moreAnchorRef                = useRef(null);
   const hasMounted                   = useRef(false);
   const [filtersReady, setFiltersReady] = useState(false);
-  const router                       = useRouter();
 
   // Restore filter state from URL query params on mount (standalone list only)
   // Sets filtersReady=true to unblock the fetch effect once state is applied.
@@ -607,7 +606,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     if(priorityFilter!=='All')params.set('priority',priorityFilter);
     if(statusFilter!=='Open')params.set('status',statusFilter);
     const qs=params.toString();
-    router.replace(qs?`/tasks?${qs}`:'/tasks', undefined, {shallow:true});
+    window.history.replaceState({},'',qs?`/tasks?${qs}`:'/tasks');
   },[propFilter.join(','),typeFilter,priorityFilter,statusFilter]);// eslint-disable-line react-hooks/exhaustive-deps
 
   const showClosed  = statusFilter === 'Closed';
@@ -750,7 +749,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
 
   const handleKanbanCardClick=task=>{
     const href=`/tasks/${task.task_num}`;
-    sessionStorage.setItem('taskNavOrigin','app');
+    sessionStorage.setItem('tasksBackUrl',window.location.href);
     const navL=filtered.map(t=>({task_num:t.task_num,record_type:t.record_type}));
     sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
     sessionStorage.setItem('tasksNavIndex',String(filtered.findIndex(t=>t.id===task.id)));
@@ -791,7 +790,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     const openDetail=e=>{
       if(e.ctrlKey||e.metaKey){window.open(href,'_blank');}
       else{
-        sessionStorage.setItem('taskNavOrigin','app');
+        sessionStorage.setItem('tasksBackUrl',window.location.href);
         const visualList=grouped?grouped.flatMap(g=>g.rows):filtered;
         const navL=visualList.map(t=>({task_num:t.task_num,record_type:t.record_type}));
         sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
@@ -1042,7 +1041,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
                 <div key={t.id}
                   style={{padding:'12px 14px',borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:rowBg,minHeight:'44px'}}
                   onClick={()=>{
-                    sessionStorage.setItem('taskNavOrigin','app');
+                    sessionStorage.setItem('tasksBackUrl',window.location.href);
                     const navL=filtered.map(x=>({task_num:x.task_num,record_type:x.record_type}));
                     sessionStorage.setItem('tasksNavList',JSON.stringify(navL));
                     sessionStorage.setItem('tasksNavIndex',String(i));

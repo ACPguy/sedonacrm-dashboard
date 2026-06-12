@@ -743,7 +743,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
       {/* Tab bar */}
       <div style={{display:'flex',gap:'2px',padding:'6px 16px 0',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,flexShrink:0,overflowX:'auto'}}>
         {TABS.map(t=>(
-          <button key={t} onClick={()=>{const nt=t.toLowerCase().replace(/ /g,'-');setTab(nt);if(router.pathname==='/properties/[id]'){const rid=router.query.id;router.replace(nt==='dashboard'?`/properties/${rid}`:`/properties/${rid}?tab=${nt}`,undefined,{shallow:true});}}}
+          <button key={t} onClick={()=>setTab(t.toLowerCase().replace(/ /g,'-'))}
             style={{background:'transparent',border:'none',padding:'6px 10px',fontSize:F.xs,cursor:'pointer',borderRadius:'4px 4px 0 0',whiteSpace:'nowrap',
               color:tab===t.toLowerCase().replace(/ /g,'-')?T.accent:T.text1,
               borderBottom:tab===t.toLowerCase().replace(/ /g,'-')?`2px solid ${T.accent}`:'2px solid transparent',
