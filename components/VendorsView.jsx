@@ -1035,7 +1035,7 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
       {/* Tasks tab */}
       {vendorTab==='tasks'&&(
         <div style={{flex:1,overflow:'hidden'}}>
-          {data?.id&&<TasksTable filterVendorId={data.id} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>}
+          {data?.id&&<TasksTable filterVendorId={data.id} hideVendorCol backUrl={typeof window!=='undefined'?window.location.href:''}/>}
         </div>
       )}
 
