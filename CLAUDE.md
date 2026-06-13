@@ -472,11 +472,39 @@ Diagnostic (Drive file `1cp2Wz5b_KjH2JUrwlrtwUTl-rDe8YR5S`) confirmed all 5 cont
 - `task_contacts` junction: 0 rows → Contact Tasks tab always "No tasks found" until task-contact links created
 - `tasks.tenant_id`: 135/4368 rows populated → Tenant Tasks tab sparse until populated
 
+**Completed session 2026-06-12 session 5 — embedded Tasks tabs column parity (preview branch):**
+
+Parity diagnostic (Drive `1C1dZSobGi4BE3P28rY-u8e9db45HRbqk`) identified 5 missing columns + header overlap bug.
+
+- BUG FIX: `TasksTable.jsx` — added local `thStyle = {...css.th, overflow:'hidden', textOverflow:'ellipsis'}` applied to all `<th>`; fixes "TYPE"/"PRIORITY" header text bleeding into adjacent cells in empty-state rows (does NOT modify shared `css.th` export)
+- FEATURE: `TasksTable.jsx` — 5 new columns: FU Date (follow_up_date + ⚠ overdue indicator), Stage (purple badge via `css.badge`), Vendor (name lookup), Tenant (name lookup), Opened (created_at)
+- DATA: `TasksTable.jsx` — select query extended; vendor/tenant name lookup arrays loaded on mount (same pattern as standalone TasksView)
+- FEATURE: `TasksTable.jsx` — `hideVendorCol` / `hideTenantCol` props (default false) for per-context redundant column hiding
+- LAYOUT: `TasksTable.jsx` — outer div changed from `overflowY:'auto'` to `overflow:'auto'` (enables horizontal scroll when all columns exceed container width)
+- Call sites: `TenantsView.jsx` — `hidePropertyFilter` removed, `hideTenantCol` added (show Prop col; hide redundant Tenant col)
+- Call sites: `VendorsView.jsx` — `hidePropertyFilter` removed, `hideVendorCol` added (show Prop col; hide redundant Vendor col)
+- Call sites: `ContactsView.jsx` — `hidePropertyFilter` removed (show Prop col; all other cols visible)
+- Call sites: `SedonaCRM.jsx` (Property) + `OwnersView.jsx` — unchanged; `hidePropertyFilter` correct here
+- Commit: `40eafe1` on `preview` branch
+
+## Embedded Tasks Tabs — Per-Context Column Reference (permanent)
+
+| Context | Filter prop | Prop col | Vendor col | Tenant col | FU Date | Stage | Opened |
+|---|---|---|---|---|---|---|---|
+| Property detail | filterPropCode | HIDDEN (hidePropertyFilter) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Owner detail | filterPropCode | HIDDEN (hidePropertyFilter) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Tenant detail | filterTenantId | ✅ show | ✅ | HIDDEN (hideTenantCol) | ✅ | ✅ | ✅ |
+| Vendor detail | filterVendorId | ✅ show | HIDDEN (hideVendorCol) | ✅ | ✅ | ✅ | ✅ |
+| Contact detail | filterContactId | ✅ show | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+**Phase 2 (filter pills) queued:** Add type/priority/status pills to TasksTable via `showFilters` prop. Type pills require a second concurrent Supabase query for per-type counts. Priority pills are client-side (no extra query). Status pills replace the hardcoded Open filter.
+
 **Next priorities (start here next session):**
-1. Merge preview → main (Scott approves after verifying embedded Tasks tabs in all 5 contexts)
-2. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
-3. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
-4. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Merge preview → main (Scott approves after verifying all 5 contexts on preview)
+2. Embedded Tasks tabs Phase 2: filter pills (type/priority/status) via `showFilters` prop
+3. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+4. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
+5. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
