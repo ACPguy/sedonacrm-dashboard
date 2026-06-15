@@ -544,7 +544,8 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
         setData(newRec);
         setNavIdx(next);
         sessionStorage.setItem('propertiesNavIndex',String(next));
-        window.history.replaceState({},'',`/properties/${newRec.prop_code}`);
+        const newUrl=`/properties/${newRec.prop_code}`;
+        window.history.replaceState({...window.history.state,url:newUrl,as:newUrl},'',newUrl);
         document.title=`${newRec.property_name||newRec.prop_code} | SedonaCRM`;
         setTab('dashboard');
         setRentRows([]); setWorkOrders([]); setIssues([]); setInsurance([]);
@@ -758,7 +759,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
         {/* Tasks tab — shared TasksTable filtered by prop_code */}
         {tab==='tasks'&&(
           <div style={{flex:1,overflow:'hidden'}}>
-            <TasksTable filterPropCode={data.prop_code} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>
+            <TasksTable filterPropCode={data.prop_code} hidePropertyFilter backUrl={`/properties/${data.prop_code}`}/>
           </div>
         )}
 
@@ -1453,7 +1454,7 @@ export const PropertiesView = () => {
   const [search,setSearch] = useState('');
 
   const handleSelectProp = useCallback((p) => {
-    history.pushState({ propId: p.id }, '');
+    window.history.pushState({ propId: p.id }, '', `/properties/${p.prop_code}`);
     setSelected(p);
   }, []);
 
