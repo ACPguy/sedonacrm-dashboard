@@ -7,7 +7,7 @@ import { Truck, Eye, EyeSlash, CaretLeft, CaretRight, ClipboardText } from '@pho
 import { useRouter } from 'next/router';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
-import TasksTable from './shared/TasksTable';
+import TasksView from './TasksView';
 
 const SUPABASE_URL    = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -1035,7 +1035,7 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
       {/* Tasks tab */}
       {vendorTab==='tasks'&&(
         <div style={{flex:1,overflow:'hidden'}}>
-          {data?.id&&<TasksTable filterVendorId={data.id} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>}
+          {data?.id&&<TasksView filterVendorId={data.id} hidePropertyPills embeddedMode/>}
         </div>
       )}
 

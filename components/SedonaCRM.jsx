@@ -4,13 +4,12 @@ import SuitesView from './SuitesView';
 import SuitesTable from './shared/SuitesTable';
 import IssuesView, { IssuesList } from './IssuesView';
 import TasksView from './TasksView';
-import TasksTable from './shared/TasksTable';
 import ContactsTable from './shared/ContactsTable';
 import TenantsTable from './shared/TenantsTable';
 import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Buildings, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -531,6 +530,14 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
     }catch{}
   },[]);
 
+  // Sync active tab to URL so window.location.href is /properties/LPP?tab=tasks
+  // when TasksView (embeddedMode) writes tasksBackUrl on row click
+  useEffect(()=>{
+    if(typeof window==='undefined') return;
+    const url=`/properties/${data.prop_code}?tab=${tab}`;
+    window.history.replaceState({...window.history.state,url,as:url},'',url);
+  },[tab,data.prop_code]);
+
   const goNav = async (dir) => {
     if(!navList||navLoading) return;
     const next=navIdx+dir;
@@ -544,7 +551,8 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
         setData(newRec);
         setNavIdx(next);
         sessionStorage.setItem('propertiesNavIndex',String(next));
-        window.history.replaceState({},'',`/properties/${newRec.prop_code}`);
+        const newUrl=`/properties/${newRec.prop_code}`;
+        window.history.replaceState({...window.history.state,url:newUrl,as:newUrl},'',newUrl);
         document.title=`${newRec.property_name||newRec.prop_code} | SedonaCRM`;
         setTab('dashboard');
         setRentRows([]); setWorkOrders([]); setIssues([]); setInsurance([]);
@@ -737,8 +745,13 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
             </div>
           )}
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{data.property_name||data.prop_code}</div>
-        <div style={{fontSize:F.sm,color:T.text2}}>{data.prop_code} · {data.address||''}{data.city?`, ${data.city}`:''}</div>
+        <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+          <Buildings size={20} weight="bold" color="#E8630A"/>
+          <div>
+            <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{data.property_name||data.prop_code}</div>
+            <div style={{fontSize:F.sm,color:T.text2}}>{data.prop_code} · {data.address||''}{data.city?`, ${data.city}`:''}</div>
+          </div>
+        </div>
       </div>
       {/* Tab bar */}
       <div style={{display:'flex',gap:'2px',padding:'6px 16px 0',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,flexShrink:0,overflowX:'auto'}}>
@@ -758,7 +771,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
         {/* Tasks tab — shared TasksTable filtered by prop_code */}
         {tab==='tasks'&&(
           <div style={{flex:1,overflow:'hidden'}}>
-            <TasksTable filterPropCode={data.prop_code} hidePropertyFilter backUrl={typeof window!=='undefined'?window.location.href:''}/>
+            <TasksView filterPropCode={data.prop_code} hidePropertyPills embeddedMode/>
           </div>
         )}
 
@@ -1453,7 +1466,7 @@ export const PropertiesView = () => {
   const [search,setSearch] = useState('');
 
   const handleSelectProp = useCallback((p) => {
-    history.pushState({ propId: p.id }, '');
+    window.history.pushState({ propId: p.id }, '', `/properties/${p.prop_code}`);
     setSelected(p);
   }, []);
 
@@ -1516,7 +1529,7 @@ export const PropertiesView = () => {
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       <div style={{padding:'12px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
           <BuildingOffice size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Properties</span>
           <span style={{fontSize:F.sm,color:T.text2}}>{filtered.length} shown</span>

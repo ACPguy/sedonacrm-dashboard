@@ -645,7 +645,20 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
       }
       if (search) {
         if (/^\d+$/.test(search)) shared.push(`task_num=eq.${parseInt(search,10)}`);
-        else shared.push(`title=ilike.*${encodeURIComponent(search)}*`);
+        else {
+          const enc = encodeURIComponent(search);
+          const [vRows, tRows] = await Promise.all([
+            sbFetch('vendors', `company_dba=ilike.*${enc}*&select=id&limit=50`).catch(()=>[]),
+            sbFetch('tenants', `tenant_dba=ilike.*${enc}*&select=id&limit=50`).catch(()=>[]),
+          ]);
+          const vIds = (Array.isArray(vRows)?vRows:[]).map(r=>r.id);
+          const tIds = (Array.isArray(tRows)?tRows:[]).map(r=>r.id);
+          const orParts = [`title.ilike.*${enc}*`];
+          if (vIds.length) orParts.push(`vendor_id.in.(${vIds.join(',')})`);
+          if (tIds.length) orParts.push(`tenant_id.in.(${tIds.join(',')})`);
+          if (orParts.length === 1) shared.push(`title=ilike.*${enc}*`);
+          else shared.push(`or=(${orParts.join(',')})`);
+        }
       }
 
       const mainParts=[...shared];
@@ -888,7 +901,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         {!filterPropCode&&!hidePropertyPills&&propCodes.length>0&&(
           <div className="crm-tasks-prop-strip" style={{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',paddingBottom:'4px',flexWrap:'nowrap'}}>
             {hasActiveFilters&&<button onClick={clearFilters} className="pill-clear" style={{position:'sticky',left:0,zIndex:2}}>× Clear</button>}
-            <button onClick={()=>setPropFilter([])} style={propBtn(propFilter.length===0)}>All Props</button>
+            <button onClick={()=>setPropFilter([])} style={propBtn(propFilter.length===0)}>All</button>
             <button onClick={()=>setPropFilter(pf=>pf.includes('ACP')?pf.filter(x=>x!=='ACP'):[...pf,'ACP'])} style={propBtn(propFilter.includes('ACP'))}>ACP</button>
             {propCodes.map(pc=>(
               <button key={pc} onClick={()=>setPropFilter(pf=>pf.includes(pc)?pf.filter(x=>x!==pc):[...pf,pc])} style={propBtn(propFilter.includes(pc))}>{pc}</button>
@@ -905,11 +918,9 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             const cnt=key==='All'?allTotal:(typeCounts[key]??0);
             return (
               <button key={key} onClick={()=>setTypeFilter(key)}
-                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${key==='All'?T.accent:color}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':(key==='All'?T.accent:color),transition:'background 0.15s ease',flexShrink:0}}
-                onMouseEnter={e=>{if(!active)e.currentTarget.style.background=key==='All'?'rgba(110,159,216,0.20)':`${color}33`;}}
-                onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:active?'600':'400',cursor:active?'default':'pointer',border:`0.5px solid ${active?(key==='All'?T.accent:color):T.border}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':T.text2,flexShrink:0}}>
                 {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
-                {label} <span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>
+                {label}{key!=='All'&&<span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>}
               </button>
             );
           })}
@@ -925,9 +936,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
               const color=p==='All'?T.accent:(PCOL[p]||T.text3);
               return (
                 <button key={p} onClick={()=>setPriorityFilter(p)}
-                  style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${color}`,background:active?color:'transparent',color:active?'#fff':color,transition:'background 0.15s ease',flexShrink:0}}
-                  onMouseEnter={e=>{if(!active)e.currentTarget.style.background=`${color}33`;}}
-                  onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+                  style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:active?'600':'400',cursor:active?'default':'pointer',border:`0.5px solid ${active?color:T.border}`,background:active?color:'transparent',color:active?'#fff':T.text2,flexShrink:0}}>
                   {p!=='All'&&<PriorityDot priority={p}/>}
                   {p}{cnt!==null&&<span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>}
                 </button>
@@ -936,12 +945,12 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           </div>
           {/* Status + More + Clear right */}
           <div className="crm-tasks-status-strip" style={{display:'flex',gap:'4px',alignItems:'center',marginLeft:'auto',flexShrink:0}}>
-            <div style={{display:'flex',gap:'1px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`,flexShrink:0}}>
+            <div style={{display:'flex',gap:'4px',flexShrink:0}}>
               {['Open','In Progress','On Hold','Closed','All'].map(s=>{
                 const active=statusFilter===s;
                 return (
                   <button key={s} onClick={()=>setStatusFilter(s)}
-                    style={{padding:'3px 8px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.xs,background:active?T.bg3:'transparent',color:active?T.text0:T.text2,fontWeight:active?'600':'400',display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
+                    style={{padding:'3px 8px',borderRadius:'4px',cursor:'pointer',fontSize:F.xs,fontWeight:active?'600':'400',border:`0.5px solid ${active?T.bg3:T.border}`,background:active?T.bg3:'transparent',color:active?T.text0:T.text2,display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
                     {s}
                     {active&&!loading&&<span style={{color:T.text3,fontSize:'10px'}}>·{tasks.length}</span>}
                   </button>
