@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { Storefront, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
-import TasksTable from './shared/TasksTable';
+import TasksView from './TasksView';
 import CommunicationTimeline from './CommunicationTimeline';
 
 const SUPABASE_URL     = 'https://edxcvyleielzevpappui.supabase.co';
@@ -853,7 +853,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
       {/* ── Tab content ── */}
       {tab==='tasks'&&(
         <div style={{flex:1,overflow:'hidden'}}>
-          {data?.id&&<TasksTable filterTenantId={data.id} hideTenantCol backUrl={typeof window!=='undefined'?window.location.href:''}/>}
+          {data?.id&&<TasksView filterTenantId={data.id} hidePropertyPills embeddedMode/>}
         </div>
       )}
       {tab!=='tasks'&&(
