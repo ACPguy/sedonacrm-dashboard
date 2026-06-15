@@ -530,6 +530,14 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
     }catch{}
   },[]);
 
+  // Sync active tab to URL so window.location.href is /properties/LPP?tab=tasks
+  // when TasksView (embeddedMode) writes tasksBackUrl on row click
+  useEffect(()=>{
+    if(typeof window==='undefined') return;
+    const url=`/properties/${data.prop_code}?tab=${tab}`;
+    window.history.replaceState({...window.history.state,url,as:url},'',url);
+  },[tab,data.prop_code]);
+
   const goNav = async (dir) => {
     if(!navList||navLoading) return;
     const next=navIdx+dir;
