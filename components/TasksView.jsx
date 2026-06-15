@@ -901,7 +901,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         {!filterPropCode&&!hidePropertyPills&&propCodes.length>0&&(
           <div className="crm-tasks-prop-strip" style={{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',paddingBottom:'4px',flexWrap:'nowrap'}}>
             {hasActiveFilters&&<button onClick={clearFilters} className="pill-clear" style={{position:'sticky',left:0,zIndex:2}}>× Clear</button>}
-            <button onClick={()=>setPropFilter([])} style={propBtn(propFilter.length===0)}>All Props</button>
+            <button onClick={()=>setPropFilter([])} style={propBtn(propFilter.length===0)}>All</button>
             <button onClick={()=>setPropFilter(pf=>pf.includes('ACP')?pf.filter(x=>x!=='ACP'):[...pf,'ACP'])} style={propBtn(propFilter.includes('ACP'))}>ACP</button>
             {propCodes.map(pc=>(
               <button key={pc} onClick={()=>setPropFilter(pf=>pf.includes(pc)?pf.filter(x=>x!==pc):[...pf,pc])} style={propBtn(propFilter.includes(pc))}>{pc}</button>
