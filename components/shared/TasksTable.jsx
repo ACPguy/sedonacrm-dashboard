@@ -22,6 +22,60 @@ const isFuOverdue = (d, task) => {
 
 const TYPE_LABEL = { work_order:'WO', task:'TSK', project:'Proj.', acp_task:'ACP', sg_task:'S&G', note:'Note' };
 
+const TYPE_COLOR = {
+  work_order:'#EF4444', task:'#06B6D4', note:'#64748B',
+  project:'#8B5CF6', acp_task:'#E8630A', sg_task:'#84CC16',
+};
+
+// Priority pill styles — mirrors TasksView.jsx PRI_STYLES
+const PRI_STYLES = {
+  '???':  { activeBg:T.bg3,     activeColor:T.text0, border:T.text2,   hover:'rgba(107,114,128,0.25)' },
+  Urgent: { activeBg:T.danger,  activeColor:'#fff',   border:T.danger,  hover:'rgba(239,68,68,0.20)' },
+  High:   { activeBg:T.warn,    activeColor:'#fff',   border:T.warn,    hover:'rgba(212,146,74,0.20)' },
+  Medium: { activeBg:T.success, activeColor:'#fff',   border:T.success, hover:'rgba(106,176,106,0.20)' },
+  Low:    { activeBg:T.accent,  activeColor:'#fff',   border:T.accent,  hover:'rgba(110,159,216,0.20)' },
+};
+
+// Status pill styles — mirrors TasksView.jsx STA_STYLES
+const STA_STYLES = {
+  Open:          { activeBg:T.accent,  activeColor:'#fff', border:T.accent,  hover:'rgba(110,159,216,0.20)' },
+  'In Progress': { activeBg:T.purple,  activeColor:'#fff', border:T.purple,  hover:'rgba(154,122,212,0.20)' },
+  'On Hold':     { activeBg:T.warn,    activeColor:T.bg0,  border:T.warn,    hover:'rgba(212,146,74,0.20)' },
+  Closed:        { activeBg:T.text2,   activeColor:'#fff', border:T.text2,   hover:'rgba(90,98,114,0.20)' },
+  Cancelled:     { activeBg:T.danger,  activeColor:'#fff', border:T.danger,  hover:'rgba(224,112,112,0.20)' },
+};
+
+// null key = All types
+const TYPE_PILLS = [
+  { key: null,         label: 'All' },
+  { key: 'work_order', label: 'WO' },
+  { key: 'task',       label: 'TSK' },
+  { key: 'project',    label: 'Proj.' },
+  { key: 'acp_task',   label: 'ACP' },
+  { key: 'sg_task',    label: 'S&G' },
+  { key: 'note',       label: 'Note' },
+];
+
+// null key = All priorities
+const PRIORITY_PILLS = [
+  { key: null,     label: 'All' },
+  { key: '???',    label: '???' },
+  { key: 'Urgent', label: 'Urgent' },
+  { key: 'High',   label: 'High' },
+  { key: 'Medium', label: 'Medium' },
+  { key: 'Low',    label: 'Low' },
+];
+
+// null key = Open default (status=not.in.(Closed,Cancelled)); 'All' = no filter; others = eq.[value]
+const STATUS_PILLS = [
+  { key: null,          label: 'Open' },
+  { key: 'In Progress', label: 'In Progress' },
+  { key: 'On Hold',     label: 'On Hold' },
+  { key: 'Closed',      label: 'Closed' },
+  { key: 'Cancelled',   label: 'Cancelled' },
+  { key: 'All',         label: 'All' },
+];
+
 export default function TasksTable({
   filterPropCode,
   filterProjectId,
@@ -44,6 +98,9 @@ export default function TasksTable({
   const [filtersReady, setFiltersReady] = useState(false);
   const [vendors, setVendors]     = useState([]);
   const [tenants, setTenants]     = useState([]);
+  const [typeFilter, setTypeFilter]         = useState(null);
+  const [priorityFilter, setPriorityFilter] = useState(null);
+  const [statusFilter, setStatusFilter]     = useState(null);
 
   useEffect(() => { setFiltersReady(true); }, []);
 
@@ -58,12 +115,23 @@ export default function TasksTable({
     setLoading(true); setError(null);
 
     const run = async () => {
-      const parts = ['status=not.in.(Closed,Cancelled)', 'order=updated_at.desc.nullslast'];
+      const parts = ['order=updated_at.desc.nullslast'];
+
+      // Status: null = Open (not Closed/Cancelled), 'All' = no filter, else exact match
+      if (statusFilter === null) {
+        parts.push('status=not.in.(Closed,Cancelled)');
+      } else if (statusFilter !== 'All') {
+        parts.push(`status=eq.${encodeURIComponent(statusFilter)}`);
+      }
+
       if (filterPropCode)  parts.push(`prop_code=eq.${encodeURIComponent(filterPropCode)}`);
       if (filterProjectId) parts.push(`project_id=eq.${filterProjectId}`);
+      // External filterType prop takes precedence over local type pill
       if (filterType)      parts.push(`record_type=eq.${filterType}`);
+      else if (typeFilter)  parts.push(`record_type=eq.${typeFilter}`);
       if (filterVendorId)  parts.push(`vendor_id=eq.${filterVendorId}`);
       if (filterTenantId)  parts.push(`tenant_id=eq.${filterTenantId}`);
+      if (priorityFilter)  parts.push(`priority=eq.${encodeURIComponent(priorityFilter)}`);
 
       if (filterContactId) {
         let tcRows = [];
@@ -88,7 +156,7 @@ export default function TasksTable({
 
     run().catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [filtersReady, filterPropCode, filterProjectId, filterType, filterVendorId, filterTenantId, filterContactId]);
+  }, [filtersReady, filterPropCode, filterProjectId, filterType, filterVendorId, filterTenantId, filterContactId, typeFilter, priorityFilter, statusFilter]);
 
   const filtered = useMemo(() => {
     if (!search) return tasks;
@@ -113,18 +181,94 @@ export default function TasksTable({
   if (loading) return <div style={{padding:'20px',textAlign:'center',color:T.text3,fontSize:F.sm}}>Loading…</div>;
   if (error)   return <div style={{padding:'20px',textAlign:'center',color:T.danger,fontSize:F.sm}}>Error: {error}</div>;
 
-  // Local th style — adds overflow:hidden to prevent narrow headers bleeding into adjacent cells.
-  // Does NOT modify the shared css.th export used by other components.
+  // Local th style — overflow:hidden prevents narrow headers bleeding into adjacent cells
   const thStyle = {...css.th, overflow:'hidden', textOverflow:'ellipsis'};
 
   return (
     <div style={{height:'100%', overflow:'auto'}}>
       {!hideSearch && (
-        <div style={{marginBottom:'8px'}}>
+        <div style={{marginBottom:'6px'}}>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tasks…"
             style={{width:'200px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'4px 10px',color:T.text0,fontSize:F.xs,outline:'none'}}/>
         </div>
       )}
+
+      {/* Filter pills — Type | Priority | Status in one scrollable row */}
+      <div className="filter-row" style={{gap:'4px',marginBottom:'6px'}}>
+
+        {/* Type pills */}
+        {!hideTypeFilter && <>
+          {TYPE_PILLS.map(({key, label}) => {
+            const active = typeFilter === key;
+            const color = key ? TYPE_COLOR[key] : T.accent;
+            const hoverBg = key ? `${TYPE_COLOR[key]}33` : 'rgba(110,159,216,0.20)';
+            return (
+              <button key={String(key)} onClick={()=>setTypeFilter(key)}
+                style={{padding:'2px 8px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',
+                  cursor:active?'default':'pointer',border:`1px solid ${color}`,
+                  background:active?color:'transparent',color:active?'#fff':color,
+                  transition:'background 0.15s ease',flexShrink:0,whiteSpace:'nowrap'}}
+                onMouseEnter={e=>{if(!active)e.currentTarget.style.background=hoverBg;}}
+                onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+                {label}
+              </button>
+            );
+          })}
+          <span style={{color:T.border,flexShrink:0,alignSelf:'center',padding:'0 2px',userSelect:'none'}}>|</span>
+        </>}
+
+        {/* Priority pills */}
+        {PRIORITY_PILLS.map(({key, label}) => {
+          const active = priorityFilter === key;
+          let activeBg, activeFg, border, hoverBg;
+          if (key === null) {
+            activeBg = T.accent; activeFg = '#fff'; border = T.accent; hoverBg = 'rgba(110,159,216,0.20)';
+          } else {
+            const s = PRI_STYLES[key] || PRI_STYLES['???'];
+            activeBg = s.activeBg; activeFg = s.activeColor; border = s.border; hoverBg = s.hover;
+          }
+          return (
+            <button key={String(key)} onClick={()=>setPriorityFilter(key)}
+              style={{padding:'2px 8px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',
+                cursor:active?'default':'pointer',border:`1px solid ${border}`,
+                background:active?activeBg:'transparent',color:active?activeFg:border,
+                transition:'background 0.15s ease',flexShrink:0,whiteSpace:'nowrap'}}
+              onMouseEnter={e=>{if(!active)e.currentTarget.style.background=hoverBg;}}
+              onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+              {label}
+            </button>
+          );
+        })}
+        <span style={{color:T.border,flexShrink:0,alignSelf:'center',padding:'0 2px',userSelect:'none'}}>|</span>
+
+        {/* Status pills */}
+        {STATUS_PILLS.map(({key, label}) => {
+          const active = statusFilter === key;
+          let activeBg, activeFg, border, hoverBg;
+          if (key === null) {
+            // Default "Open" — same visual as Open status badge
+            activeBg = T.accent; activeFg = '#fff'; border = T.accent; hoverBg = 'rgba(110,159,216,0.20)';
+          } else if (key === 'All') {
+            activeBg = T.bg3; activeFg = T.text0; border = T.text2; hoverBg = 'rgba(90,98,114,0.20)';
+          } else {
+            const s = STA_STYLES[key] || STA_STYLES.Open;
+            activeBg = s.activeBg; activeFg = s.activeColor; border = s.border; hoverBg = s.hover;
+          }
+          return (
+            <button key={String(key)} onClick={()=>setStatusFilter(key)}
+              style={{padding:'2px 8px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',
+                cursor:active?'default':'pointer',border:`1px solid ${border}`,
+                background:active?activeBg:'transparent',color:active?activeFg:border,
+                transition:'background 0.15s ease',flexShrink:0,whiteSpace:'nowrap'}}
+              onMouseEnter={e=>{if(!active)e.currentTarget.style.background=hoverBg;}}
+              onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+              {label}
+            </button>
+          );
+        })}
+
+      </div>
+
       <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
         <colgroup>
           <col style={{width:'28px'}}/>
@@ -219,6 +363,7 @@ export default function TasksTable({
           })}
         </tbody>
       </table>
+
       {/* Mobile cards */}
       <div className="crm-mobile-cards">
         {filtered.map((task,i)=>{
