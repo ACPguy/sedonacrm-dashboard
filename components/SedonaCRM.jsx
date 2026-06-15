@@ -1524,7 +1524,7 @@ export const PropertiesView = () => {
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       <div style={{padding:'12px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
           <BuildingOffice size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Properties</span>
           <span style={{fontSize:F.sm,color:T.text2}}>{filtered.length} shown</span>
