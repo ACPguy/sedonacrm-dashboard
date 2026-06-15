@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { EnvelopeSimple, ArrowCounterClockwise, CheckCircle, Circle, Spinner, Robot, Archive } from '@phosphor-icons/react';
 import EmailCompose from './EmailCompose';
 
@@ -208,7 +208,7 @@ const MessageRow = ({ msg, defaultExpanded }) => {
 };
 
 // ── Thread Detail Panel ────────────────────────────────────────────────────────
-const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThreadUpdate }) => {
+const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThreadUpdate, onLink }) => {
   const [messages,     setMessages]     = useState([]);
   const [loadingMsgs,  setLoadingMsgs]  = useState(true);
   const [aiSummary,    setAiSummary]    = useState('');
@@ -220,6 +220,14 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThrea
   const [composeTo,    setComposeTo]    = useState([]);
   const [composeSubj,  setComposeSubj]  = useState('');
   const [composeBody,  setComposeBody]  = useState('');
+  const [showLinkPanel,  setShowLinkPanel]  = useState(false);
+  const [linkType,       setLinkType]       = useState('work_order');
+  const [linkSearch,     setLinkSearch]     = useState('');
+  const [linkResults,    setLinkResults]    = useState([]);
+  const [linkSearching,  setLinkSearching]  = useState(false);
+  const [linkFlash,      setLinkFlash]      = useState(false);
+  const [linkSuccess,    setLinkSuccess]    = useState(null);
+  const linkDebounceRef = useRef(null);
 
   useEffect(() => {
     if (!thread) return;
@@ -227,6 +235,12 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThrea
     setAiSummary('');
     setAiDraft('');
     setAiMode(null);
+    setShowLinkPanel(false);
+    setLinkSearch('');
+    setLinkResults([]);
+    setLinkFlash(false);
+    setLinkSuccess(null);
+    setLinkType('work_order');
     setLoadingMsgs(true);
 
     sbFetch('email_messages', `thread_id=eq.${thread.id}&order=sent_at.asc.nullslast&select=*`)
@@ -287,6 +301,68 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThrea
     setShowCompose(true);
   };
 
+  const doSearch = useCallback(async (query, type) => {
+    if (!query.trim()) { setLinkResults([]); return; }
+    setLinkSearching(true);
+    try {
+      let table, params, toResult;
+      const q = encodeURIComponent(query.trim());
+      if (type === 'work_order') {
+        table = 'tasks';
+        params = `title=ilike.*${q}*&record_type=eq.work_order&limit=6&order=title.asc&select=id,task_num,prop_code,title`;
+        toResult = r => ({ id: r.id, label: `${r.prop_code ? r.prop_code + '-' : ''}${r.task_num} — ${r.title}`, url: `/tasks/${r.task_num}` });
+      } else if (type === 'issue') {
+        table = 'issues';
+        params = `title=ilike.*${q}*&limit=6&order=title.asc&select=id,podio_id,title`;
+        toResult = r => ({ id: r.id, label: `${r.podio_id} — ${r.title}`, url: `/issues/${r.podio_id}` });
+      } else if (type === 'tenant') {
+        table = 'tenants';
+        params = `tenant_dba=ilike.*${q}*&limit=6&order=tenant_dba.asc&select=id,podio_id,tenant_dba`;
+        toResult = r => ({ id: r.id, label: r.tenant_dba, url: `/tenants/${r.podio_id}` });
+      } else if (type === 'contact') {
+        table = 'contacts';
+        params = `full_name=ilike.*${q}*&limit=6&order=full_name.asc&select=id,podio_id,full_name`;
+        toResult = r => ({ id: r.id, label: r.full_name, url: `/contacts/${r.podio_id}` });
+      } else {
+        table = 'tasks';
+        params = `title=ilike.*${q}*&record_type=neq.work_order&limit=6&order=title.asc&select=id,task_num,prop_code,title`;
+        toResult = r => ({ id: r.id, label: `${r.prop_code ? r.prop_code + '-' : ''}${r.task_num} — ${r.title}`, url: `/tasks/${r.task_num}` });
+      }
+      const data = await sbFetch(table, params);
+      setLinkResults(Array.isArray(data) ? data.map(toResult) : []);
+    } catch {
+      setLinkResults([]);
+    } finally {
+      setLinkSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    clearTimeout(linkDebounceRef.current);
+    if (!linkSearch.trim()) { setLinkResults([]); return; }
+    linkDebounceRef.current = setTimeout(() => doSearch(linkSearch, linkType), 300);
+    return () => clearTimeout(linkDebounceRef.current);
+  }, [linkSearch, linkType, doSearch]);
+
+  const handleLinkRecord = async (result) => {
+    setShowLinkPanel(false);
+    setLinkSearch('');
+    setLinkResults([]);
+    try {
+      await fetch('/api/gmail/link-thread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: thread.id, recordType: linkType, recordId: result.id }),
+      });
+    } catch {
+      // fail silently — optimistic update still applied
+    }
+    onLink?.({ linked_record_type: linkType, linked_record_id: result.id, link_status: 'manually_linked' });
+    setLinkFlash(true);
+    setLinkSuccess({ label: result.label, url: result.url });
+    setTimeout(() => setLinkFlash(false), 2000);
+  };
+
   const latestMsgId = messages.length > 0 ? messages[messages.length - 1]?.gmail_message_id : null;
 
   if (!thread) return null;
@@ -306,7 +382,18 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThrea
             icon={thread.is_read ? <Circle size={13}/> : <CheckCircle size={13}/>}
             onClick={() => onMarkRead(thread.id, !thread.is_read)}
           />
-          <ActionBtn label="Link to record" onClick={() => console.log('[EmailInbox] link-to-record', thread.id)} disabled={false}/>
+          {linkFlash ? (
+            <span style={{ fontSize:F.xs, color:T.success, fontWeight:'600', padding:'5px 10px', border:`0.5px solid ${T.success}`, borderRadius:'4px' }}>✓ Linked</span>
+          ) : linkSuccess ? (
+            <a href={linkSuccess.url} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize:F.xs, color:T.warn, fontWeight:'500', padding:'5px 10px', border:`0.5px solid ${T.warn}`, borderRadius:'4px', textDecoration:'none', whiteSpace:'nowrap' }}
+              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
+              Linked: {linkSuccess.label} →
+            </a>
+          ) : (
+            <ActionBtn label="Link to record" onClick={() => setShowLinkPanel(p => !p)}/>
+          )}
           {thread.gmail_thread_id && (
             <a href={`https://mail.google.com/mail/u/0/#all/${thread.gmail_thread_id}`}
               target="_blank" rel="noopener noreferrer"
@@ -317,6 +404,54 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThrea
             </a>
           )}
         </div>
+
+        {showLinkPanel && (
+          <div style={{ marginTop:'10px', width:'280px', background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'5px', padding:'10px' }}>
+            <div style={{ marginBottom:'7px' }}>
+              <select value={linkType} onChange={e => { setLinkType(e.target.value); setLinkSearch(''); setLinkResults([]); }}
+                style={{ width:'100%', background:T.bg3, border:`0.5px solid ${T.border}`, borderRadius:'4px', color:T.text0, fontSize:F.xs, padding:'4px 6px', cursor:'pointer', outline:'none' }}>
+                <option value="work_order">Work Order</option>
+                <option value="issue">Issue</option>
+                <option value="tenant">Tenant</option>
+                <option value="contact">Contact</option>
+                <option value="task">Task</option>
+              </select>
+            </div>
+            <input
+              type="text"
+              value={linkSearch}
+              onChange={e => setLinkSearch(e.target.value)}
+              placeholder="Search by title or ID…"
+              autoFocus
+              style={{ width:'100%', boxSizing:'border-box', background:T.bg3, border:`0.5px solid ${T.border}`, borderRadius:'4px', color:T.text0, fontSize:F.xs, padding:'5px 8px', outline:'none', marginBottom:'6px' }}
+            />
+            {linkSearching && (
+              <div style={{ fontSize:F.xs, color:T.text3, padding:'3px 0' }}>Searching…</div>
+            )}
+            {!linkSearching && linkResults.length > 0 && (
+              <div style={{ display:'flex', flexDirection:'column', gap:'1px' }}>
+                {linkResults.map(r => (
+                  <div key={r.id} onClick={() => handleLinkRecord(r)}
+                    style={{ fontSize:F.xs, color:T.text0, padding:'5px 7px', borderRadius:'3px', cursor:'pointer', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', transition:'background 0.1s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = T.bg3}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    {r.label}
+                  </div>
+                ))}
+              </div>
+            )}
+            {!linkSearching && linkSearch.trim() && linkResults.length === 0 && (
+              <div style={{ fontSize:F.xs, color:T.text2, padding:'3px 0' }}>No results.</div>
+            )}
+            <div style={{ marginTop:'8px', textAlign:'right' }}>
+              <button type="button"
+                onClick={() => { setShowLinkPanel(false); setLinkSearch(''); setLinkResults([]); }}
+                style={{ fontSize:F.xs, color:T.accent, background:'transparent', border:'none', cursor:'pointer', textDecoration:'underline', padding:0 }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -422,6 +557,12 @@ export default function EmailInbox() {
     }).catch(() => {});
   };
 
+  const handleLink = (updates) => {
+    if (!selectedThread) return;
+    setSelectedThread(t => ({ ...t, ...updates }));
+    setThreads(ts => ts.map(t => t.id === selectedThread.id ? { ...t, ...updates } : t));
+  };
+
   const handleSelectThread = async (thread) => {
     setSelectedThread(thread);
     if (!thread.is_read) {
@@ -495,6 +636,7 @@ export default function EmailInbox() {
             onArchive={handleArchive}
             onReply={() => {}}
             onThreadUpdate={() => setRefreshKey(k => k + 1)}
+            onLink={handleLink}
           />
         ) : (
           <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:'12px' }}>
