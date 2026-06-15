@@ -80,7 +80,7 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   VendorsView.jsx           — vendors list + detail (routed)
   OwnersView.jsx            — property owners list + detail (routed)
   shared/
-    TasksTable.jsx     — shared reusable tasks table (self-fetching, filterable)
+    TasksTable.jsx     — standalone tasks table with filter pills (NOT used in embedded contexts — kept for reference)
     WorkOrdersTable.jsx, TenantsTable.jsx, SuitesTable.jsx, IssuesTable.jsx, ContactsTable.jsx
 
 ~/sedonacrm-dashboard/lib/
@@ -318,6 +318,8 @@ echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
 
 10. **Filter state is always encoded in URL query params** — Every list view with filter pills (prop_code, type, priority, status, or any other filter dimension) must encode the active filter state into the URL via `window.history.replaceState` on every filter change, and restore state from URL params on mount. Use a `hasMounted` ref to skip the initial sync so the restore effect runs first. This ensures the browser back button and the detail-view back button always return to the exact filtered state the user was in. Apply to all existing modules (Tasks, Work Orders, Issues, Tenants, Contacts, Vendors, Owners, Properties) and all future list views added in Phases 3 through 10.
 
+11. **No guessing — ever** — Before answering any question, writing any code, or producing any prompt: if the answer requires knowing what's in a file, what a prop is named, what a query returns, or how any existing code behaves — read the file or run the query first. Never assume, never infer from memory. This applies to Claude.ai and Claude Code equally.
+
 ## URL Routing Rules (permanent)
 
 - All detail page routes use `podio_id`, NOT UUID
@@ -380,10 +382,19 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 ## Next Priorities
 
-**Tasks navigation — RESOLVED (2026-06-12):** Root cause was `history.replaceState({}, '', url)` stripping Next.js's `__N` marker from `event.state`, causing the popstate handler to no-op on first Backspace. Fix: spread existing state — `replaceState({...window.history.state, url, as: url}, '', url)`. Merged to main and deployed. (Commits `5b9d011`, `8800fc7` on preview; `NavDebugOverlay` removed; merged → main.)
+**Completed session 2026-06-15 — TasksView as primary embedded component + back-nav + UI polish (preview branch):**
+- `handleSelectProp` now sets URL to `/properties/${p.prop_code}` on property open; `goNav` replaceState spreads `{...window.history.state}` (History API __N fix)
+- `PropertyDetail` useEffect syncs active tab to URL on every tab switch — ensures `window.location.href` is always `/properties/LPP?tab=tasks` on Tasks tab
+- Replaced `<TasksTable>` with `<TasksView embeddedMode hidePropertyPills>` in all 5 embedded contexts (Property, Owner, Tenant, Vendor, Contact detail tabs) — single canonical task component everywhere; back-nav from task detail returns to correct tab
+- TasksView filter pills restyled — inactive pills now match property pill style: `transparent` bg, `T.text2` color, `0.5px solid T.border`, no hover handlers
+- Search extended to vendor+tenant names via parallel `sbFetch` + PostgREST `or=(title.ilike.*X*,vendor_id.in.(...),tenant_id.in.(...))`
+- Properties and Suites list headings left-aligned (removed `justifyContent:space-between`, added `gap:10px`)
+- Property detail header: `Buildings` icon added (#E8630A, size 20), vertically inline with property name
+- "All Props" label → "All" on property pills row; Type "All" pill count badge removed
+- Preview commits pending merge: 2d0d7ca, 3ff4f54, eb4f13d, d93dbec, d09e64f, c19db6e, c0a053e, 4adff23
 
-**Known gaps / still open (non-navigation):**
-- PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views (only Tasks done)
+**Known gaps / still open:**
+- PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
 - PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
 - PENDING: "Link to record" button in EmailInbox thread detail — console.log placeholder
 - PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired
@@ -392,33 +403,31 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 
-**Completed session 2026-06-12 session 4 — embedded Tasks tabs layout fixed (preview branch):** All 5 embedded contexts had the same 3 bugs; fixed in one `TasksTable.jsx` change: `#` column widened 68px → 90px; added 38px `Type` column (WO/TSK/Proj./ACP/S&G/Note); outer div set to `height:'100%', overflowY:'auto'` for self-scroll. Commit `872f12b` on preview branch.
-
 **Known data gaps (not code bugs — populate at go-live / via data entry):**
 - `tasks.vendor_id`: 0/4368 rows populated → Vendor Tasks tab always "No tasks found" until tasks linked to vendors
 - `task_contacts` junction: 0 rows → Contact Tasks tab always "No tasks found" until task-contact links created
 - `tasks.tenant_id`: 135/4368 rows populated → Tenant Tasks tab sparse until populated
 
-**Completed session 2026-06-12 session 5 — embedded Tasks tabs column parity (preview branch):** Added 5 missing columns to `TasksTable.jsx`: FU Date (⚠ overdue indicator), Stage (purple badge), Vendor name, Tenant name, Opened (created_at). Fixed header text overflow with local `thStyle` (ellipsis). Added `hideVendorCol`/`hideTenantCol` props; enabled horizontal scroll (`overflow:'auto'`). Updated call sites: TenantsView (hideTenantCol), VendorsView (hideVendorCol), ContactsView (all cols visible). Commit `40eafe1` on preview branch.
+## Embedded Tasks Tabs — Architecture (permanent)
 
-## Embedded Tasks Tabs — Per-Context Column Reference (permanent)
+All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills filterXxx={...}/>` — the same canonical component as the standalone /tasks list view. `TasksTable.jsx` is kept in `components/shared/` for reference but is no longer used in any embedded context.
 
-| Context | Filter prop | Prop col | Vendor col | Tenant col | FU Date | Stage | Opened |
-|---|---|---|---|---|---|---|---|
-| Property detail | filterPropCode | HIDDEN (hidePropertyFilter) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Owner detail | filterPropCode | HIDDEN (hidePropertyFilter) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Tenant detail | filterTenantId | ✅ show | ✅ | HIDDEN (hideTenantCol) | ✅ | ✅ | ✅ |
-| Vendor detail | filterVendorId | ✅ show | HIDDEN (hideVendorCol) | ✅ | ✅ | ✅ | ✅ |
-| Contact detail | filterContactId | ✅ show | ✅ | ✅ | ✅ | ✅ | ✅ |
+**Embedded call sites:**
+| Context | Component file | Props |
+|---|---|---|
+| Property detail | SedonaCRM.jsx | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
+| Owner detail | OwnersView.jsx | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
+| Tenant detail | TenantsView.jsx | `filterTenantId={data.id} hidePropertyPills embeddedMode` |
+| Vendor detail | VendorsView.jsx | `filterVendorId={data.id} hidePropertyPills embeddedMode` |
+| Contact detail | ContactsView.jsx | `filterContactId={data.id} hidePropertyPills embeddedMode` |
 
-**Phase 2 (filter pills) queued:** Add type/priority/status pills to TasksTable via `showFilters` prop. Type pills require a second concurrent Supabase query for per-type counts. Priority pills are client-side (no extra query). Status pills replace the hardcoded Open filter.
+**Back navigation from embedded task click:** `embeddedMode` row click writes `tasksBackUrl = window.location.href` to sessionStorage then does `window.location.href = /tasks/[task_num]`. The property detail URL is kept current via a `useEffect` in `PropertyDetail` that calls `replaceState({...window.history.state, url, as:url}, '', url)` on every tab change — so `window.location.href` is always `/properties/LPP?tab=tasks` when on the Tasks tab, and Back from task detail returns to the correct tab.
 
 **Next priorities (start here next session):**
-1. Merge preview → main (Scott approves after verifying all 5 contexts on preview)
-2. Embedded Tasks tabs Phase 2: filter pills (type/priority/status) via `showFilters` prop
-3. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
-4. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
-5. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Merge preview → main (preview commits: 2d0d7ca, 3ff4f54, eb4f13d, d93dbec, d09e64f, c19db6e, c0a053e, 4adff23)
+2. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+3. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
+4. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
