@@ -380,57 +380,7 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 ## Next Priorities
 
-**Completed sessions up to 2026-06-09:**
-
-- Phase 3 Stage 1: Gmail OAuth + /settings page
-- Phase 3 Stage 2A: 5 Gmail DB tables + webhook receiver + lib/gmail.js + lib/supabaseServer.js
-- Phase 3 Stage 2B: CommunicationTimeline.jsx wired into TasksView, ContactsView, TenantsView
-- Phase 3 Stage 2C: EmailInbox + EmailCompose + /inbox route + AppShell unread badge + AI summarize/draft-reply
-- Tasks: prop_code-based display IDs (CR1-3685), bare task_num URLs (/tasks/3685), router.push navigation
-- Drive folder auto-creation for WOs: lib/drive.js + drivePropertyFolders.js + /api/tasks/create-drive-folder
-- OAuth scope fix: added Drive scope, fixed callback (Gmail profile endpoint, emailAddress field, service key for both upserts)
-- Index PDF: createIndexPdf() implemented in lib/drive.js; PDF media upload silently failing — deferred
-- All changes merged to main
-
-**Completed session 2026-06-11 — Tasks module bug fixes (preview branch):**
-
-- BUG FIX: `TasksTable.jsx` — `navigate()` now writes `tasksNavList` (stores `{id, task_num, record_type}` tuples), `tasksNavIndex`, `tasksBackUrl` to sessionStorage before `router.push`; fixes wrong task opening when multiple record_types share the same task_num integer
-- BUG FIX: `TasksTable.jsx` — added `filterContactId` prop with async `task_contacts` junction fetch; empty result guard returns `[]` immediately
-- BUG FIX: `TasksTable.jsx` — added `backUrl` prop (written to `tasksBackUrl` on navigate); mobile cards unified to call `navigate(task)` instead of raw `router.push`
-- BUG FIX: `TasksView.jsx` — mobile cards `onClick` now checks `embeddedMode` before calling `onSelect`; uses `window.location.href` when embedded so Property/Owners detail task rows navigate correctly
-- UI: TYPE_PILLS reordered and relabeled → All, WO, TSK, Proj., ACP, S&G, Note
-- UI: TasksView type strip and priority+status row get `.filter-row` class (always scrollable, nowrap)
-- UI: Mobile FAB updated — 56px diameter, `ChatCircle size=26 weight="fill"`, `#E8630A` orange; `isMobile` converted to `useState` + resize listener (was one-time `window.innerWidth` check at mount)
-- UI: `.filter-row` CSS class added to `styles/globals.css` — `flex-wrap:nowrap`, `overflow-x:auto`, `-webkit-overflow-scrolling:touch`, `scrollbar-width:none`, `padding-bottom:4px`; `.filter-row > *` sets `flex-shrink:0`
-- UI: `.filter-row` applied to property strip in WorkOrdersView, IssuesView, TenantsView, ContactsView; and outer filter bar in VendorsView, OwnersView
-- Commit: `1e8b3ad` on `preview` branch
-
-**Completed session 2026-06-11 — Group 1-3 bug fixes (preview branch):**
-
-- BUG FIX: `pages/tasks/[id].jsx` — reads `tasksNavList[navIdx]` from sessionStorage before rendering `TaskDetail`; builds prefixed ID (e.g. `TSK-3685`) so `parsePrefixedId` gets the correct `record_type`, fixing wrong-record opens for task records that share a task_num with a work_order
-- BUG FIX: `TasksTable.jsx` — navL now stores `{ task_num, record_type }` (no `id`); `navigate()` finds idx by both fields; empty state changed to "No tasks found" (colSpan=99); added `console.log` for junction/fetch debugging; `backUrl` stores `window.location.href`
-- BUG FIX: `TasksView.jsx` — mobile cards navL uses `{ task_num, record_type }`; `tasksBackUrl` stores `window.location.href` (not just pathname); added `hasMounted` ref + URL restore effect (reads `?prop/type/priority/status` on mount) + URL sync effect (writes on filter change)
-- BUG FIX: `VendorsView.jsx`, `TenantsView.jsx`, `ContactsView.jsx` — switched embedded tasks tab from `<TasksView embeddedMode/>` to `<TasksTable/>` (shared component); each passes `backUrl={window.location.href}` and `hidePropertyFilter`
-- UI: `WorkOrdersView.jsx` + `IssuesView.jsx` — Row 2 filter div (priority/status) now has `filter-row` class for mobile horizontal scroll
-- UI: `TenantsView.jsx` — mobile stats bar replaced with `.stats-pill-row` / `.md-hidden` pills; desktop card grid now has `.mobile-hidden`; both in same wrapper div
-- CSS: `styles/globals.css` — added `.stats-pill-row`, `.stat-pill`, `.stat-label`, `.stat-value`, `.mobile-hidden`, `.md-hidden` per Rule 9
-- `CLAUDE.md` — Development Rules 9 and 10 added; Session Close Procedure updated (Steps 4-7 with dated archive pattern)
-- Commit on `preview` branch
-
-**Tasks navigation — RESOLVED (2026-06-12 session 3):**
-
-**Root cause (commit `8800fc7`):** `TasksView.jsx`'s filter-URL sync (Rule 10) and `goNav` prev/next were calling `history.replaceState({}, '', url)` with a bare empty object. This stripped Next.js's internal `__N` marker from `event.state`. When Backspace fired a `popstate`, Next's router checked `event.state.__N`, found it absent, and did nothing — leaving the page frozen on the first press. Second Backspace hit a stale history entry, cycling instead of returning.
-
-**Fix:** spread the existing state: `replaceState({...window.history.state, url, as: url}, '', url)`. `__N` is preserved on every replaceState call. Next's popstate handler sees it and performs the route transition normally.
-
-**Confirmed PASS (fresh incognito, commit `8800fc7`):**
-1. ✅ Overlay values agree (history.length, asPath, location)
-2. ✅ Backspace once → filtered list re-renders correctly (asPath + location = /tasks?prop=LEEN&type=task)
-3. ✅ Backspace again → goes to actual prior page (confirmed correct on truly fresh session)
-4. ✅ Escape, on-screen Back, prev/next all still work
-5. ✅ history.length stable across prev/next
-
-**NavDebugOverlay removed (same session):** Component deleted from `pages/tasks/[id].jsx` — no longer needed.
+**Tasks navigation — RESOLVED (2026-06-12):** Root cause was `history.replaceState({}, '', url)` stripping Next.js's `__N` marker from `event.state`, causing the popstate handler to no-op on first Backspace. Fix: spread existing state — `replaceState({...window.history.state, url, as: url}, '', url)`. Merged to main and deployed. (Commits `5b9d011`, `8800fc7` on preview; `NavDebugOverlay` removed; merged → main.)
 
 **Known gaps / still open (non-navigation):**
 - PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views (only Tasks done)
@@ -442,50 +392,14 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 
-**Completed session 2026-06-12 session 1 — Tasks navigation record lookup fixed (preview branch):**
-- BUG FIX: `TasksView.jsx` TaskDetail fetch useEffect — unambiguous record_type lookup (commit `5b9d011`)
-- CLEANUP: `pages/tasks/[id].jsx` — removed RT_PREFIX roundtrip, passes bare `id` as `prefixedId`
-
-**Completed session 2026-06-12 session 2 — revert + instrument (preview branch):**
-- REVERT: `fb3c3b0` reverted via `8af6e2e` — router.back() broke all triggers
-- ADDED: NavDebugOverlay in `pages/tasks/[id].jsx` gated by `NEXT_PUBLIC_DEBUG_NAV=1` (commit `e225d5c`)
-- NOTE: main branch still has record lookup bug (from `be19e0c`). Do not merge until Backspace is also resolved.
-
-**Completed session 2026-06-12 session 3 — Tasks navigation RESOLVED, merged to main:**
-- ROOT CAUSE FOUND: bare `{}` in `history.replaceState` stripped Next.js `__N` marker → popstate handler no-op on first Backspace
-- FIX: `{...window.history.state, url, as: url}` spread in both `TasksView.jsx` (filter URL sync) and wherever `goNav` calls replaceState (commit `8800fc7`)
-- REMOVED: `NavDebugOverlay` from `pages/tasks/[id].jsx` (no longer needed)
-- MERGED: preview → main; deployed to crm.andersoncp.com
-
-**Completed session 2026-06-12 session 4 — embedded Tasks tabs layout fixed (preview branch):**
-
-Diagnostic (Drive file `1cp2Wz5b_KjH2JUrwlrtwUTl-rDe8YR5S`) confirmed all 5 contexts used identical `<TasksTable hidePropertyFilter backUrl=.../>` pattern with the same 3 layout bugs. One change to `TasksTable.jsx` fixed all 5:
-
-- BUG FIX: `TasksTable.jsx` — `#` column widened from 68px → 90px; usable text space 74px; fits "CR1-3685" (8 chars) without truncation
-- FEATURE: `TasksTable.jsx` — added 38px `Type` column (WO/TSK/Proj./ACP/S&G/Note) between icon col and # col; `TYPE_LABEL` module-level constant; mobile cards updated with type label
-- BUG FIX: `TasksTable.jsx` — outer div now `height:'100%', overflowY:'auto'`; component self-scrolls within its wrapper in all 5 embedded contexts; wrappers (`overflow:'hidden'`) unchanged
-- CLEANUP: `TasksTable.jsx` — removed 3 debug `console.log` statements from diagnostic session
-- Commit: `872f12b` on `preview` branch
+**Completed session 2026-06-12 session 4 — embedded Tasks tabs layout fixed (preview branch):** All 5 embedded contexts had the same 3 bugs; fixed in one `TasksTable.jsx` change: `#` column widened 68px → 90px; added 38px `Type` column (WO/TSK/Proj./ACP/S&G/Note); outer div set to `height:'100%', overflowY:'auto'` for self-scroll. Commit `872f12b` on preview branch.
 
 **Known data gaps (not code bugs — populate at go-live / via data entry):**
 - `tasks.vendor_id`: 0/4368 rows populated → Vendor Tasks tab always "No tasks found" until tasks linked to vendors
 - `task_contacts` junction: 0 rows → Contact Tasks tab always "No tasks found" until task-contact links created
 - `tasks.tenant_id`: 135/4368 rows populated → Tenant Tasks tab sparse until populated
 
-**Completed session 2026-06-12 session 5 — embedded Tasks tabs column parity (preview branch):**
-
-Parity diagnostic (Drive `1C1dZSobGi4BE3P28rY-u8e9db45HRbqk`) identified 5 missing columns + header overlap bug.
-
-- BUG FIX: `TasksTable.jsx` — added local `thStyle = {...css.th, overflow:'hidden', textOverflow:'ellipsis'}` applied to all `<th>`; fixes "TYPE"/"PRIORITY" header text bleeding into adjacent cells in empty-state rows (does NOT modify shared `css.th` export)
-- FEATURE: `TasksTable.jsx` — 5 new columns: FU Date (follow_up_date + ⚠ overdue indicator), Stage (purple badge via `css.badge`), Vendor (name lookup), Tenant (name lookup), Opened (created_at)
-- DATA: `TasksTable.jsx` — select query extended; vendor/tenant name lookup arrays loaded on mount (same pattern as standalone TasksView)
-- FEATURE: `TasksTable.jsx` — `hideVendorCol` / `hideTenantCol` props (default false) for per-context redundant column hiding
-- LAYOUT: `TasksTable.jsx` — outer div changed from `overflowY:'auto'` to `overflow:'auto'` (enables horizontal scroll when all columns exceed container width)
-- Call sites: `TenantsView.jsx` — `hidePropertyFilter` removed, `hideTenantCol` added (show Prop col; hide redundant Tenant col)
-- Call sites: `VendorsView.jsx` — `hidePropertyFilter` removed, `hideVendorCol` added (show Prop col; hide redundant Vendor col)
-- Call sites: `ContactsView.jsx` — `hidePropertyFilter` removed (show Prop col; all other cols visible)
-- Call sites: `SedonaCRM.jsx` (Property) + `OwnersView.jsx` — unchanged; `hidePropertyFilter` correct here
-- Commit: `40eafe1` on `preview` branch
+**Completed session 2026-06-12 session 5 — embedded Tasks tabs column parity (preview branch):** Added 5 missing columns to `TasksTable.jsx`: FU Date (⚠ overdue indicator), Stage (purple badge), Vendor name, Tenant name, Opened (created_at). Fixed header text overflow with local `thStyle` (ellipsis). Added `hideVendorCol`/`hideTenantCol` props; enabled horizontal scroll (`overflow:'auto'`). Updated call sites: TenantsView (hideTenantCol), VendorsView (hideVendorCol), ContactsView (all cols visible). Commit `40eafe1` on preview branch.
 
 ## Embedded Tasks Tabs — Per-Context Column Reference (permanent)
 
