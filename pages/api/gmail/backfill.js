@@ -1,4 +1,4 @@
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 300 };
 
 import { createServerClient } from '../../../lib/supabaseServer';
 import { getGmailClient } from '../../../lib/gmail';
@@ -46,15 +46,24 @@ export default async function handler(req, res) {
 
     for (let i = 0; i < allThreadIds.length; i += 10) {
       const batch = allThreadIds.slice(i, i + 10);
-      const results = await Promise.allSettled(
-        batch.map(threadId => processThread(gmail, sb, account, threadId))
+
+      // Step 1: fetch 10 threads from Gmail API in parallel
+      const fetched = await Promise.allSettled(
+        batch.map(threadId => fetchThreadData(gmail, threadId))
       );
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value) {
+
+      // Step 2: flush each fulfilled result to DB immediately before next batch
+      for (const result of fetched) {
+        if (result.status === 'rejected') {
+          console.error('[backfill] fetch error:', result.reason?.message || result.reason);
+          continue;
+        }
+        try {
+          const { msgCount } = await writeThread(sb, account, result.value);
           threadsProcessed++;
-          messagesProcessed += result.value.msgCount;
-        } else if (result.status === 'rejected') {
-          console.error('[backfill] thread error:', result.reason?.message || result.reason);
+          messagesProcessed += msgCount;
+        } catch (err) {
+          console.error('[backfill] write error:', err.message);
         }
       }
     }
@@ -66,15 +75,17 @@ export default async function handler(req, res) {
   }
 }
 
-async function processThread(gmail, sb, account, threadId) {
+async function fetchThreadData(gmail, threadId) {
   const threadRes = await gmail.users.threads.get({
     userId: 'me',
     id: threadId,
     format: 'metadata',
     metadataHeaders: ['From', 'To', 'Cc', 'Subject', 'Date'],
   });
+  return threadRes.data;
+}
 
-  const thread = threadRes.data;
+async function writeThread(sb, account, thread) {
   const messages = thread.messages || [];
   if (messages.length === 0) return { msgCount: 0 };
 
@@ -92,7 +103,7 @@ async function processThread(gmail, sb, account, threadId) {
   const { data: threadRow, error: threadErr } = await sb
     .from('email_threads')
     .upsert({
-      gmail_thread_id: threadId,
+      gmail_thread_id: thread.id,
       email_account_id: account.id,
       subject,
       snippet,
