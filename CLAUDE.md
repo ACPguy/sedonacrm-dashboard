@@ -108,6 +108,8 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   api/gmail/webhook.js      — Pub/Sub push receiver; processes history, upserts email_threads + email_messages + communication_timeline
   api/gmail/send.js         — POST: send email via Gmail API; injects CRM header + footer; writes timeline
   api/gmail/thread-update.js — POST: mark-read / archive via service-role PATCH
+  api/gmail/backfill.js      — GET/POST: one-time 90-day thread+message backfill (cap 2000 threads, batches of 10)
+  api/gmail/link-thread.js   — POST {threadId,recordType,recordId}: links email_threads + upserts email_thread_links
   api/ai/summarize.js        — POST {threadText} → Anthropic API → {summary}
   api/ai/draft-reply.js      — POST {threadText} → Anthropic API → {draft}
   api/tasks/create-drive-folder.js — POST {taskId}: creates Work History subfolder + 000_CR1-N_Info.pdf
@@ -178,6 +180,8 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - **Phase 3 Stage 2A:** Complete — 5 Gmail DB tables, webhook receiver, lib/gmail.js, lib/supabaseServer.js
 - **Phase 3 Stage 2B:** Complete — CommunicationTimeline.jsx wired into Tasks, Contacts, Tenants
 - **Phase 3 Stage 2C:** Complete — EmailInbox + EmailCompose + AppShell Inbox nav + unread badge + AI summarize/draft
+- **Gmail Backfill:** Complete — /api/gmail/backfill built (preview d359a6c); trigger once on production to load 90 days of history
+- **Link to Record:** Complete — /api/gmail/link-thread + inline 280px search panel in EmailInbox (preview d359a6c)
 - **Drive folder auto-creation:** Complete — lib/drive.js, drivePropertyFolders.js, /api/tasks/create-drive-folder; + Drive scope in OAuth
 - **Drive index PDF:** Deferred — createIndexPdf() implemented, folder creation works, PDF media upload silently failing; investigate next session
 - **Phase 4+:** Pending
@@ -380,42 +384,54 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 ## Next Priorities
 
-**Tasks navigation — RESOLVED (2026-06-12):** Root cause was `history.replaceState({}, '', url)` stripping Next.js's `__N` marker from `event.state`, causing the popstate handler to no-op on first Backspace. Fix: spread existing state — `replaceState({...window.history.state, url, as: url}, '', url)`. Merged to main and deployed. (Commits `5b9d011`, `8800fc7` on preview; `NavDebugOverlay` removed; merged → main.)
+**Completed session 2026-06-15 (session 1) — TasksView as primary embedded component + back-nav + UI polish (merged to main):**
+- handleSelectProp sets URL to /properties/${p.prop_code}; goNav replaceState spreads {...window.history.state} (History API __N fix)
+- PropertyDetail useEffect syncs active tab to URL on every tab switch
+- Replaced TasksTable with TasksView embeddedMode in all 5 embedded contexts (Property, Owner, Tenant, Vendor, Contact)
+- TasksView filter pills restyled — inactive pills: transparent bg, T.text2 color, 0.5px solid T.border
+- Search extended to vendor+tenant names via parallel sbFetch + PostgREST or= syntax
+- Properties and Suites list headings left-aligned; property detail header Buildings icon added
+- "All Props" → "All" on property pills; Type "All" pill count badge removed
+- Commits merged to main: 2d0d7ca, 3ff4f54, eb4f13d, d93dbec, d09e64f, c19db6e, c0a053e, 4adff23
 
-**Known gaps / still open (non-navigation):**
-- PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views (only Tasks done)
+**Completed session 2026-06-15 (session 2) — Gmail Backfill + Link to Record (preview branch):**
+- /api/gmail/backfill: GET/POST, 90-day history, paginates to cap 2000 threads, batches of 10 via Promise.allSettled
+- /api/gmail/link-thread: POST {threadId,recordType,recordId} → UPDATE email_threads link_status='manually_linked' + upsert email_thread_links
+- EmailInbox.jsx: "Link to record" button → inline 280px search panel (Work Order/Issue/Tenant/Contact/Task), 300ms debounce, live results, 2s flash → persistent "Linked: [label] →" link
+- Commit: d359a6c (preview branch — pending Scott's approval to merge)
+
+**Known gaps / still open:**
+- PENDING: Trigger Gmail backfill once on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
+- PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
 - PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
-- PENDING: "Link to record" button in EmailInbox thread detail — console.log placeholder
 - PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired
 - PENDING: Drive folder map missing: LPN, WNT, OLY, SSP — deferred until folders are created in Drive
-- PENDING: Gmail backfill (/api/gmail/backfill) — not yet triggered
 - PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
-
-**Completed session 2026-06-12 session 4 — embedded Tasks tabs layout fixed (preview branch):** All 5 embedded contexts had the same 3 bugs; fixed in one `TasksTable.jsx` change: `#` column widened 68px → 90px; added 38px `Type` column (WO/TSK/Proj./ACP/S&G/Note); outer div set to `height:'100%', overflowY:'auto'` for self-scroll. Commit `872f12b` on preview branch.
 
 **Known data gaps (not code bugs — populate at go-live / via data entry):**
 - `tasks.vendor_id`: 0/4368 rows populated → Vendor Tasks tab always "No tasks found" until tasks linked to vendors
 - `task_contacts` junction: 0 rows → Contact Tasks tab always "No tasks found" until task-contact links created
 - `tasks.tenant_id`: 135/4368 rows populated → Tenant Tasks tab sparse until populated
 
-**Completed session 2026-06-12 session 5 — embedded Tasks tabs column parity (preview branch):** Added 5 missing columns to `TasksTable.jsx`: FU Date (⚠ overdue indicator), Stage (purple badge), Vendor name, Tenant name, Opened (created_at). Fixed header text overflow with local `thStyle` (ellipsis). Added `hideVendorCol`/`hideTenantCol` props; enabled horizontal scroll (`overflow:'auto'`). Updated call sites: TenantsView (hideTenantCol), VendorsView (hideVendorCol), ContactsView (all cols visible). Commit `40eafe1` on preview branch.
+## Embedded Tasks Tabs — Architecture (permanent)
 
-## Embedded Tasks Tabs — Per-Context Column Reference (permanent)
+All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills filterXxx={...}/>` — the same canonical component as the standalone /tasks list view. `TasksTable.jsx` is kept in `components/shared/` for reference but is no longer used in any embedded context.
 
-| Context | Filter prop | Prop col | Vendor col | Tenant col | FU Date | Stage | Opened |
-|---|---|---|---|---|---|---|---|
-| Property detail | filterPropCode | HIDDEN (hidePropertyFilter) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Owner detail | filterPropCode | HIDDEN (hidePropertyFilter) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Tenant detail | filterTenantId | ✅ show | ✅ | HIDDEN (hideTenantCol) | ✅ | ✅ | ✅ |
-| Vendor detail | filterVendorId | ✅ show | HIDDEN (hideVendorCol) | ✅ | ✅ | ✅ | ✅ |
-| Contact detail | filterContactId | ✅ show | ✅ | ✅ | ✅ | ✅ | ✅ |
+**Embedded call sites:**
+| Context | Component file | Props |
+|---|---|---|
+| Property detail | SedonaCRM.jsx | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
+| Owner detail | OwnersView.jsx | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
+| Tenant detail | TenantsView.jsx | `filterTenantId={data.id} hidePropertyPills embeddedMode` |
+| Vendor detail | VendorsView.jsx | `filterVendorId={data.id} hidePropertyPills embeddedMode` |
+| Contact detail | ContactsView.jsx | `filterContactId={data.id} hidePropertyPills embeddedMode` |
 
-**Phase 2 (filter pills) queued:** Add type/priority/status pills to TasksTable via `showFilters` prop. Type pills require a second concurrent Supabase query for per-type counts. Priority pills are client-side (no extra query). Status pills replace the hardcoded Open filter.
+**Back navigation from embedded task click:** `embeddedMode` row click writes `tasksBackUrl = window.location.href` to sessionStorage then does `window.location.href = /tasks/[task_num]`. The property detail URL is kept current via a `useEffect` in `PropertyDetail` that calls `replaceState({...window.history.state, url, as:url}, '', url)` on every tab change.
 
 **Next priorities (start here next session):**
-1. Merge preview → main (Scott approves after verifying all 5 contexts on preview)
-2. Embedded Tasks tabs Phase 2: filter pills (type/priority/status) via `showFilters` prop
+1. Merge preview → main (Scott approves: d359a6c)
+2. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
 3. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
 4. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
 5. Phase 4: Workflow automations + Agents 1/3/4/7/9
