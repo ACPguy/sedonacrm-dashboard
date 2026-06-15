@@ -647,17 +647,16 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         if (/^\d+$/.test(search)) shared.push(`task_num=eq.${parseInt(search,10)}`);
         else {
           const enc = encodeURIComponent(search);
-          const titleClause = `title=ilike.*${enc}*`;
           const [vRows, tRows] = await Promise.all([
             sbFetch('vendors', `company_dba=ilike.*${enc}*&select=id&limit=50`).catch(()=>[]),
             sbFetch('tenants', `tenant_dba=ilike.*${enc}*&select=id&limit=50`).catch(()=>[]),
           ]);
           const vIds = (Array.isArray(vRows)?vRows:[]).map(r=>r.id);
           const tIds = (Array.isArray(tRows)?tRows:[]).map(r=>r.id);
-          const orParts = [titleClause];
-          if (vIds.length) orParts.push(`vendor_id=in.(${vIds.join(',')})`);
-          if (tIds.length) orParts.push(`tenant_id=in.(${tIds.join(',')})`);
-          if (orParts.length === 1) shared.push(titleClause);
+          const orParts = [`title.ilike.*${enc}*`];
+          if (vIds.length) orParts.push(`vendor_id.in.(${vIds.join(',')})`);
+          if (tIds.length) orParts.push(`tenant_id.in.(${tIds.join(',')})`);
+          if (orParts.length === 1) shared.push(`title=ilike.*${enc}*`);
           else shared.push(`or=(${orParts.join(',')})`);
         }
       }
