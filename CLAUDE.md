@@ -80,7 +80,7 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   VendorsView.jsx           — vendors list + detail (routed)
   OwnersView.jsx            — property owners list + detail (routed)
   shared/
-    TasksTable.jsx     — standalone tasks table with filter pills (NOT used in embedded contexts — kept for reference)
+    TasksTable.jsx     — shared reusable tasks table (self-fetching, filterable)
     WorkOrdersTable.jsx, TenantsTable.jsx, SuitesTable.jsx, IssuesTable.jsx, ContactsTable.jsx
 
 ~/sedonacrm-dashboard/lib/
@@ -108,6 +108,8 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   api/gmail/webhook.js      — Pub/Sub push receiver; processes history, upserts email_threads + email_messages + communication_timeline
   api/gmail/send.js         — POST: send email via Gmail API; injects CRM header + footer; writes timeline
   api/gmail/thread-update.js — POST: mark-read / archive via service-role PATCH
+  api/gmail/backfill.js      — GET/POST: one-time 90-day thread+message backfill (cap 2000 threads, batches of 10)
+  api/gmail/link-thread.js   — POST {threadId,recordType,recordId}: links email_threads + upserts email_thread_links
   api/ai/summarize.js        — POST {threadText} → Anthropic API → {summary}
   api/ai/draft-reply.js      — POST {threadText} → Anthropic API → {draft}
   api/tasks/create-drive-folder.js — POST {taskId}: creates Work History subfolder + 000_CR1-N_Info.pdf
@@ -178,6 +180,8 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - **Phase 3 Stage 2A:** Complete — 5 Gmail DB tables, webhook receiver, lib/gmail.js, lib/supabaseServer.js
 - **Phase 3 Stage 2B:** Complete — CommunicationTimeline.jsx wired into Tasks, Contacts, Tenants
 - **Phase 3 Stage 2C:** Complete — EmailInbox + EmailCompose + AppShell Inbox nav + unread badge + AI summarize/draft
+- **Gmail Backfill:** Complete — /api/gmail/backfill built (preview d359a6c); trigger once on production to load 90 days of history
+- **Link to Record:** Complete — /api/gmail/link-thread + inline 280px search panel in EmailInbox (preview d359a6c)
 - **Drive folder auto-creation:** Complete — lib/drive.js, drivePropertyFolders.js, /api/tasks/create-drive-folder; + Drive scope in OAuth
 - **Drive index PDF:** Deferred — createIndexPdf() implemented, folder creation works, PDF media upload silently failing; investigate next session
 - **Phase 4+:** Pending
@@ -318,8 +322,6 @@ echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
 
 10. **Filter state is always encoded in URL query params** — Every list view with filter pills (prop_code, type, priority, status, or any other filter dimension) must encode the active filter state into the URL via `window.history.replaceState` on every filter change, and restore state from URL params on mount. Use a `hasMounted` ref to skip the initial sync so the restore effect runs first. This ensures the browser back button and the detail-view back button always return to the exact filtered state the user was in. Apply to all existing modules (Tasks, Work Orders, Issues, Tenants, Contacts, Vendors, Owners, Properties) and all future list views added in Phases 3 through 10.
 
-11. **No guessing — ever** — Before answering any question, writing any code, or producing any prompt: if the answer requires knowing what's in a file, what a prop is named, what a query returns, or how any existing code behaves — read the file or run the query first. Never assume, never infer from memory. This applies to Claude.ai and Claude Code equally.
-
 ## URL Routing Rules (permanent)
 
 - All detail page routes use `podio_id`, NOT UUID
@@ -382,24 +384,28 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 ## Next Priorities
 
-**Completed session 2026-06-15 — TasksView as primary embedded component + back-nav + UI polish (preview branch):**
-- `handleSelectProp` now sets URL to `/properties/${p.prop_code}` on property open; `goNav` replaceState spreads `{...window.history.state}` (History API __N fix)
-- `PropertyDetail` useEffect syncs active tab to URL on every tab switch — ensures `window.location.href` is always `/properties/LPP?tab=tasks` on Tasks tab
-- Replaced `<TasksTable>` with `<TasksView embeddedMode hidePropertyPills>` in all 5 embedded contexts (Property, Owner, Tenant, Vendor, Contact detail tabs) — single canonical task component everywhere; back-nav from task detail returns to correct tab
-- TasksView filter pills restyled — inactive pills now match property pill style: `transparent` bg, `T.text2` color, `0.5px solid T.border`, no hover handlers
-- Search extended to vendor+tenant names via parallel `sbFetch` + PostgREST `or=(title.ilike.*X*,vendor_id.in.(...),tenant_id.in.(...))`
-- Properties and Suites list headings left-aligned (removed `justifyContent:space-between`, added `gap:10px`)
-- Property detail header: `Buildings` icon added (#E8630A, size 20), vertically inline with property name
-- "All Props" label → "All" on property pills row; Type "All" pill count badge removed
-- Preview commits pending merge: 2d0d7ca, 3ff4f54, eb4f13d, d93dbec, d09e64f, c19db6e, c0a053e, 4adff23
+**Completed session 2026-06-15 (session 1) — TasksView as primary embedded component + back-nav + UI polish (merged to main):**
+- handleSelectProp sets URL to /properties/${p.prop_code}; goNav replaceState spreads {...window.history.state} (History API __N fix)
+- PropertyDetail useEffect syncs active tab to URL on every tab switch
+- Replaced TasksTable with TasksView embeddedMode in all 5 embedded contexts (Property, Owner, Tenant, Vendor, Contact)
+- TasksView filter pills restyled — inactive pills: transparent bg, T.text2 color, 0.5px solid T.border
+- Search extended to vendor+tenant names via parallel sbFetch + PostgREST or= syntax
+- Properties and Suites list headings left-aligned; property detail header Buildings icon added
+- "All Props" → "All" on property pills; Type "All" pill count badge removed
+- Commits merged to main: 2d0d7ca, 3ff4f54, eb4f13d, d93dbec, d09e64f, c19db6e, c0a053e, 4adff23
+
+**Completed session 2026-06-15 (session 2) — Gmail Backfill + Link to Record (preview branch):**
+- /api/gmail/backfill: GET/POST, 90-day history, paginates to cap 2000 threads, batches of 10 via Promise.allSettled
+- /api/gmail/link-thread: POST {threadId,recordType,recordId} → UPDATE email_threads link_status='manually_linked' + upsert email_thread_links
+- EmailInbox.jsx: "Link to record" button → inline 280px search panel (Work Order/Issue/Tenant/Contact/Task), 300ms debounce, live results, 2s flash → persistent "Linked: [label] →" link
+- Commit: d359a6c (preview branch — pending Scott's approval to merge)
 
 **Known gaps / still open:**
+- PENDING: Trigger Gmail backfill once on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
 - PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
 - PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
-- PENDING: "Link to record" button in EmailInbox thread detail — console.log placeholder
 - PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired
 - PENDING: Drive folder map missing: LPN, WNT, OLY, SSP — deferred until folders are created in Drive
-- PENDING: Gmail backfill (/api/gmail/backfill) — not yet triggered
 - PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
 
@@ -421,13 +427,14 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 | Vendor detail | VendorsView.jsx | `filterVendorId={data.id} hidePropertyPills embeddedMode` |
 | Contact detail | ContactsView.jsx | `filterContactId={data.id} hidePropertyPills embeddedMode` |
 
-**Back navigation from embedded task click:** `embeddedMode` row click writes `tasksBackUrl = window.location.href` to sessionStorage then does `window.location.href = /tasks/[task_num]`. The property detail URL is kept current via a `useEffect` in `PropertyDetail` that calls `replaceState({...window.history.state, url, as:url}, '', url)` on every tab change — so `window.location.href` is always `/properties/LPP?tab=tasks` when on the Tasks tab, and Back from task detail returns to the correct tab.
+**Back navigation from embedded task click:** `embeddedMode` row click writes `tasksBackUrl = window.location.href` to sessionStorage then does `window.location.href = /tasks/[task_num]`. The property detail URL is kept current via a `useEffect` in `PropertyDetail` that calls `replaceState({...window.history.state, url, as:url}, '', url)` on every tab change.
 
 **Next priorities (start here next session):**
-1. Merge preview → main (preview commits: 2d0d7ca, 3ff4f54, eb4f13d, d93dbec, d09e64f, c19db6e, c0a053e, 4adff23)
-2. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
-3. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
-4. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Merge preview → main (Scott approves: d359a6c)
+2. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
+3. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+4. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
+5. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
