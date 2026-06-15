@@ -746,7 +746,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
           )}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-          <Buildings size={20} weight="bold" color={T.accent}/>
+          <Buildings size={20} weight="bold" color="#E8630A"/>
           <div>
             <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{data.property_name||data.prop_code}</div>
             <div style={{fontSize:F.sm,color:T.text2}}>{data.prop_code} · {data.address||''}{data.city?`, ${data.city}`:''}</div>

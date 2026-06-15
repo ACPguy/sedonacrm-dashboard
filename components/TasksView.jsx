@@ -920,7 +920,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
               <button key={key} onClick={()=>setTypeFilter(key)}
                 style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:active?'600':'400',cursor:active?'default':'pointer',border:`0.5px solid ${active?(key==='All'?T.accent:color):T.border}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':T.text2,flexShrink:0}}>
                 {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
-                {label} <span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>
+                {label}{key!=='All'&&<span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>}
               </button>
             );
           })}
