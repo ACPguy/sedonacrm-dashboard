@@ -9,7 +9,7 @@ import TenantsTable from './shared/TenantsTable';
 import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Buildings, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -745,8 +745,13 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
             </div>
           )}
         </div>
-        <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{data.property_name||data.prop_code}</div>
-        <div style={{fontSize:F.sm,color:T.text2}}>{data.prop_code} · {data.address||''}{data.city?`, ${data.city}`:''}</div>
+        <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+          <Buildings size={22} weight="bold" color={T.accent}/>
+          <div>
+            <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{data.property_name||data.prop_code}</div>
+            <div style={{fontSize:F.sm,color:T.text2}}>{data.prop_code} · {data.address||''}{data.city?`, ${data.city}`:''}</div>
+          </div>
+        </div>
       </div>
       {/* Tab bar */}
       <div style={{display:'flex',gap:'2px',padding:'6px 16px 0',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,flexShrink:0,overflowX:'auto'}}>
