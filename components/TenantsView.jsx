@@ -437,7 +437,6 @@ export const TenantsList = ({ tenants = [], loading = false, error = null, onSel
   const generateRentRoll = async () => {
     if (rentRollLoading) return;
     setRentRollLoading(true);
-    const win = window.open('', '_blank');
     try {
       const today = new Date().toISOString().slice(0, 10);
       let params = `rent_status=eq.Current&rent_starts=lte.${today}&rent_ends=gte.${today}&select=*&order=prop_code.asc,suite_num.asc`;
@@ -451,10 +450,10 @@ export const TenantsList = ({ tenants = [], loading = false, error = null, onSel
       const occupied_sf = rows.reduce((s, r) => s + (Number(r.sqft) || 0), 0);
       const monthly_total = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
       const occupancy = { occupied_sf, vacant_sf: 0, gross_sf: 0, occ_pct: 0, monthly_total };
-      generatePortfolioPDF(win, rows, occupancy, filterPropCode, vacantRows);
+      generatePortfolioPDF(rows, occupancy, filterPropCode, vacantRows);
     } catch (e) {
       console.error('Rent roll error:', e);
-      if (win) win.close();
+      alert('Could not generate rent roll. Check console for details.');
     }
     setRentRollLoading(false);
   };
@@ -1404,7 +1403,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 // Props: rows (rent_schedule+tenants join), loading, error, properties,
 //        hidePropertyFilter, grossSqft, onRowClick(row)
 // ─────────────────────────────────────────────────────────────────────────────
-const generatePortfolioPDF = (win, rows, occupancy, propCode, vacantRows = []) => {
+const generatePortfolioPDF = (rows, occupancy, propCode, vacantRows = []) => {
   const fmt = n => n != null ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }) : '—';
   const fmtD = d => fmtDate(d);
   const fmtN = n => n != null && n !== '' ? Number(n).toLocaleString() : '—';
@@ -1445,7 +1444,7 @@ const generatePortfolioPDF = (win, rows, occupancy, propCode, vacantRows = []) =
         <td style="text-align:right">${r.asking_nnn_per_sf?'$'+Number(r.asking_nnn_per_sf).toFixed(2):'—'}</td>
       </tr>`).join('')}
     </tbody></table>` : '';
-  win.document.write(`<!DOCTYPE html><html><head><title>${propCode?propCode+' — Rent Roll':'Portfolio Rent Roll'}</title>
+  const html = `<!DOCTYPE html><html><head><title>${propCode?propCode+' — Rent Roll':'Portfolio Rent Roll'}</title>
   <style>
     @page{size:landscape;margin:12mm}
     body{font-family:Arial,sans-serif;font-size:11px;margin:0}
@@ -1474,8 +1473,10 @@ const generatePortfolioPDF = (win, rows, occupancy, propCode, vacantRows = []) =
     <td colspan="2"></td>
   </tr></tfoot></table>
   ${vacantSection}
-  <script>window.onload=()=>window.print();</script></body></html>`);
-  win.document.close();
+  </body></html>`;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
 };
 
 export const TenantRentList = ({
