@@ -189,7 +189,7 @@ const MessageRow = ({ msg, defaultExpanded }) => {
         <div style={{ padding:'12px 16px 16px 54px', background:T.bg2 }}>
           {msg.body_html ? (
             <div
-              style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', maxWidth:'560px' }}
+              style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', maxWidth:'100%', overflowX:'auto', wordBreak:'break-word' }}
               dangerouslySetInnerHTML={{ __html: msg.body_html }}
             />
           ) : msg.body_text ? (

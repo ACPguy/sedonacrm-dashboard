@@ -315,11 +315,11 @@ const InlineSelect = ({ value, options, onSave }) => (
 
 // ── PriorityPills ─────────────────────────────────────────────────────────────
 const PRI_STYLES = {
-  '???':  {activeBg:T.bg3,     activeColor:T.text0, border:T.text2,   hover:'rgba(107,114,128,0.25)'},
-  Urgent: {activeBg:T.danger,  activeColor:'#fff',   border:T.danger,  hover:'rgba(239,68,68,0.20)'},
-  High:   {activeBg:T.warn,    activeColor:'#fff',   border:T.warn,    hover:'rgba(212,146,74,0.20)'},
-  Medium: {activeBg:T.success, activeColor:'#fff',   border:T.success, hover:'rgba(106,176,106,0.20)'},
-  Low:    {activeBg:T.accent,  activeColor:'#fff',   border:T.accent,  hover:'rgba(110,159,216,0.20)'},
+  '???':  {activeBg:T.bg3,     activeColor:T.text0, activeBorder:T.text2,   hover:'rgba(107,114,128,0.15)'},
+  Urgent: {activeBg:T.danger,  activeColor:'#fff',   activeBorder:T.danger,  hover:`${T.danger}22`},
+  High:   {activeBg:T.warn,    activeColor:'#fff',   activeBorder:T.warn,    hover:`${T.warn}22`},
+  Medium: {activeBg:T.success, activeColor:'#fff',   activeBorder:T.success, hover:`${T.success}22`},
+  Low:    {activeBg:T.accent,  activeColor:'#fff',   activeBorder:T.accent,  hover:`${T.accent}22`},
 };
 const PriorityPills = ({ value, onSave }) => (
   <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
@@ -328,9 +328,9 @@ const PriorityPills = ({ value, onSave }) => (
       const s=PRI_STYLES[opt]||PRI_STYLES['???'];
       return (
         <button key={opt} onClick={()=>!active&&onSave(opt)}
-          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${s.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:s.border,transition:'background 0.15s ease'}}
-          onMouseEnter={e=>{if(!active)e.currentTarget.style.background=s.hover;}}
-          onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`0.5px solid ${active?s.activeBorder:T.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:T.text2,transition:'background 0.15s ease'}}
+          onMouseEnter={e=>{if(!active){e.currentTarget.style.background=s.hover;e.currentTarget.style.borderColor=s.activeBorder;}}}
+          onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
           {opt}
         </button>
       );
@@ -340,11 +340,11 @@ const PriorityPills = ({ value, onSave }) => (
 
 // ── StatusPills ───────────────────────────────────────────────────────────────
 const STA_STYLES = {
-  Open:          {activeBg:T.accent,  activeColor:'#fff',  border:T.accent,  hover:'rgba(110,159,216,0.20)'},
-  'In Progress': {activeBg:T.purple,  activeColor:'#fff',  border:T.purple,  hover:'rgba(154,122,212,0.20)'},
-  'On Hold':     {activeBg:T.warn,    activeColor:T.bg0,   border:T.warn,    hover:'rgba(212,146,74,0.20)'},
-  Closed:        {activeBg:T.text2,   activeColor:'#fff',  border:T.text2,   hover:'rgba(90,98,114,0.20)'},
-  Cancelled:     {activeBg:T.danger,  activeColor:'#fff',  border:T.danger,  hover:'rgba(224,112,112,0.20)'},
+  Open:          {activeBg:T.accent,  activeColor:'#fff',  activeBorder:T.accent,  hover:`${T.accent}22`},
+  'In Progress': {activeBg:T.purple,  activeColor:'#fff',  activeBorder:T.purple,  hover:`${T.purple}22`},
+  'On Hold':     {activeBg:T.warn,    activeColor:T.bg0,   activeBorder:T.warn,    hover:`${T.warn}22`},
+  Closed:        {activeBg:T.text2,   activeColor:'#fff',  activeBorder:T.text2,   hover:'rgba(90,98,114,0.15)'},
+  Cancelled:     {activeBg:T.danger,  activeColor:'#fff',  activeBorder:T.danger,  hover:`${T.danger}22`},
 };
 const StatusPills = ({ value, onSave }) => (
   <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
@@ -353,9 +353,9 @@ const StatusPills = ({ value, onSave }) => (
       const s=STA_STYLES[opt]||STA_STYLES.Open;
       return (
         <button key={opt} onClick={()=>!active&&onSave(opt)}
-          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${s.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:s.border,transition:'background 0.15s ease'}}
-          onMouseEnter={e=>{if(!active)e.currentTarget.style.background=s.hover;}}
-          onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
+          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`0.5px solid ${active?s.activeBorder:T.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:T.text2,transition:'background 0.15s ease'}}
+          onMouseEnter={e=>{if(!active){e.currentTarget.style.background=s.hover;e.currentTarget.style.borderColor=s.activeBorder;}}}
+          onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
           {opt}
         </button>
       );
