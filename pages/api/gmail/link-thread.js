@@ -11,10 +11,6 @@ export default async function handler(req, res) {
   try {
     const sb = createServerClient();
 
-    // Known constraint on email_thread_links from webhook.js: (thread_id, record_type, record_id)
-    // Logging for verification at runtime:
-    console.log('[link-thread] constraint: thread_id,record_type,record_id (verified from webhook.js upsert)');
-
     const { error: updateErr } = await sb
       .from('email_threads')
       .update({
@@ -39,8 +35,41 @@ export default async function handler(req, res) {
         link_source: 'manual',
       }, { onConflict: 'thread_id,record_type,record_id' });
     } catch (linkErr) {
-      // Skip on duplicate key — thread update already succeeded
-      console.log('[link-thread] email_thread_links skip (duplicate or schema):', linkErr?.message);
+      console.log('[link-thread] email_thread_links skip:', linkErr?.message);
+    }
+
+    // Backfill communication_timeline for all messages in this thread.
+    // communication_timeline has no unique constraint on (record_type, record_id, email_message_id)
+    // so each message is plain-inserted; errors per message are caught and skipped individually.
+    const { data: messages, error: msgsErr } = await sb
+      .from('email_messages')
+      .select('id, subject, snippet, is_outbound, from_address, from_name, sent_at, received_at')
+      .eq('thread_id', threadId)
+      .order('sent_at', { ascending: true, nullsFirst: false });
+
+    if (msgsErr) {
+      console.error('[link-thread] messages fetch error:', msgsErr.message);
+    } else if (messages?.length) {
+      for (const msg of messages) {
+        try {
+          await sb.from('communication_timeline').insert({
+            record_type:      recordType,
+            record_id:        recordId,
+            entry_type:       'email',
+            email_message_id: msg.id,
+            email_thread_id:  threadId,
+            subject:          msg.subject,
+            body_preview:     msg.snippet,
+            direction:        msg.is_outbound ? 'outbound' : 'inbound',
+            from_address:     msg.from_address,
+            from_name:        msg.from_name,
+            entry_at:         msg.sent_at || msg.received_at || new Date().toISOString(),
+          });
+        } catch (err) {
+          console.log(`[link-thread] timeline skip for message ${msg.id}:`, err?.message);
+        }
+      }
+      console.log(`[link-thread] wrote ${messages.length} timeline entries for thread ${threadId} → ${recordType}:${recordId}`);
     }
 
     return res.status(200).json({ ok: true });
