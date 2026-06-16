@@ -42,10 +42,10 @@ git push
 ## Supabase
 
 - URL: `https://edxcvyleielzevpappui.supabase.co`
-- Anon key: *(Scott to paste anon key here)*
+- Anon key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw`
 - DB connection: `postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-east-1.pooler.supabase.com:5432/postgres`
 - All tables have RLS enabled
-- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`
+- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`, `email_threads`, `email_messages`, `email_thread_links`
 - `SUPABASE_SERVICE_ROLE_KEY` is set in `.env.local` and in Vercel environment variables (used by server-side Gmail/webhook code via `lib/supabaseServer.js`)
 
 ## Core Architecture — Property as Hub
@@ -180,8 +180,8 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - **Phase 3 Stage 2A:** Complete — 5 Gmail DB tables, webhook receiver, lib/gmail.js, lib/supabaseServer.js
 - **Phase 3 Stage 2B:** Complete — CommunicationTimeline.jsx wired into Tasks, Contacts, Tenants
 - **Phase 3 Stage 2C:** Complete — EmailInbox + EmailCompose + AppShell Inbox nav + unread badge + AI summarize/draft
-- **Gmail Backfill:** Complete — /api/gmail/backfill built (preview d359a6c); trigger once on production to load 90 days of history
-- **Link to Record:** Complete — /api/gmail/link-thread + inline 280px search panel in EmailInbox (preview d359a6c)
+- **Gmail Backfill:** Complete — /api/gmail/backfill built + local script scripts/backfill-gmail.js; 2,218 threads + 2,751 messages loaded via local Node.js script (no Vercel timeout constraint)
+- **Link to Record:** Complete — /api/gmail/link-thread + inline 280px search panel in EmailInbox; writes communication_timeline entries on link (ff0213a, merged to main)
 - **Drive folder auto-creation:** Complete — lib/drive.js, drivePropertyFolders.js, /api/tasks/create-drive-folder; + Drive scope in OAuth
 - **Drive index PDF:** Deferred — createIndexPdf() implemented, folder creation works, PDF media upload silently failing; investigate next session
 - **Phase 4+:** Pending
@@ -394,17 +394,19 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - "All Props" → "All" on property pills; Type "All" pill count badge removed
 - Commits merged to main: 2d0d7ca, 3ff4f54, eb4f13d, d93dbec, d09e64f, c19db6e, c0a053e, 4adff23
 
-**Completed session 2026-06-15 (session 2) — Gmail Backfill + Link to Record (preview branch):**
-- /api/gmail/backfill: GET/POST, 90-day history, paginates to cap 2000 threads, batches of 10 via Promise.allSettled
-- /api/gmail/link-thread: POST {threadId,recordType,recordId} → UPDATE email_threads link_status='manually_linked' + upsert email_thread_links
+**Completed session 2026-06-15 (session 2) — Gmail Finalization (merged to main):**
+- /api/gmail/backfill: GET/POST, 90-day history, paginates to cap 2000 threads, batches of 10 via Promise.allSettled. maxDuration=300. Local script scripts/backfill-gmail.js used for actual run (2,218 threads, 2,751 messages)
+- /api/gmail/link-thread: POST {threadId,recordType,recordId} → UPDATE email_threads + upsert email_thread_links + INSERT communication_timeline per message (ff0213a)
 - EmailInbox.jsx: "Link to record" button → inline 280px search panel (Work Order/Issue/Tenant/Contact/Task), 300ms debounce, live results, 2s flash → persistent "Linked: [label] →" link
-- Commit: d359a6c (preview branch — pending Scott's approval to merge)
+- RLS: anon SELECT policies added to email_threads, email_messages, email_thread_links; authenticated SELECT policies also added
+- .env.local: fixed from bare JWT to proper key=value format with all 7 required vars
+- Commits: d359a6c (backfill + link-to-record UI), 14e9059 (CLAUDE.md), 5fbccda (backfill maxDuration+write fix), ff0213a (timeline write on link)
 
 **Known gaps / still open:**
-- PENDING: Trigger Gmail backfill once on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
+- PENDING: Comms tab on task/WO detail does not show emails linked via Link-to-record button — communication_timeline entries are written by link-thread.js (ff0213a) but not appearing; suspect RLS or anon SELECT missing on communication_timeline for email entries
+- PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired (deferred)
 - PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
 - PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
-- PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired
 - PENDING: Drive folder map missing: LPN, WNT, OLY, SSP — deferred until folders are created in Drive
 - PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
@@ -430,11 +432,10 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 **Back navigation from embedded task click:** `embeddedMode` row click writes `tasksBackUrl = window.location.href` to sessionStorage then does `window.location.href = /tasks/[task_num]`. The property detail URL is kept current via a `useEffect` in `PropertyDetail` that calls `replaceState({...window.history.state, url, as:url}, '', url)` on every tab change.
 
 **Next priorities (start here next session):**
-1. Merge preview → main (Scott approves: d359a6c)
-2. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
-3. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
-4. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
-5. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Debug Comms tab not showing linked emails (check RLS on communication_timeline for anon reads, check CommunicationTimeline.jsx fetch query)
+2. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+3. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
+4. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
@@ -451,6 +452,12 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 - **Re-auth must be done on production URL:** `GOOGLE_REDIRECT_URI` is set to `crm.andersoncp.com`. OAuth re-auth will not work from preview/localhost — always do it at crm.andersoncp.com/settings.
 - **Scopes (current):** `gmail.modify`, `gmail.send`, `drive` — do not add `userinfo.email`; use Gmail profile endpoint instead.
 - **Drive client:** `getDriveClient(emailAccountId)` in `lib/drive.js` — reuses same OAuth2 token + refresh pattern as `getGmailClient()`.
+- **Local .env.local must be manually maintained** — `vercel env pull` strips Supabase keys and adds only Vercel/Google vars. Do NOT overwrite .env.local with `vercel env pull`. Current local .env.local has all required keys: `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_PUBSUB_TOPIC`. If Vercel CLI overwrites it, re-add the Supabase keys manually.
+
+## Local Scripts (not committed to git — scripts/ is in .gitignore)
+
+- **`scripts/backfill-gmail.js`** — one-time 90-day Gmail backfill. Reads `.env.local` manually (no dotenv). No Vercel timeout constraint. Supports `TEST_MODE=true` for a 10-thread test run. Run with: `cd ~/sedonacrm-dashboard && node scripts/backfill-gmail.js`
+- **`scripts/test-supabase.mjs`** — Supabase REST connection test (inserts a test row into email_threads). Run with: `node scripts/test-supabase.mjs`
 
 ## Drive Folder Architecture (permanent)
 
