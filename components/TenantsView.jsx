@@ -441,7 +441,7 @@ export const TenantsList = ({ tenants = [], loading = false, error = null, onSel
       const today = new Date().toISOString().slice(0, 10);
       let params = `rent_status=eq.Current&rent_starts=lte.${today}&rent_ends=gte.${today}&select=*&order=prop_code.asc,suite_num.asc`;
       if (filterPropCode) params += `&prop_code=eq.${encodeURIComponent(filterPropCode)}`;
-      let vParams = `select=suite_num,sqft,asking_base_per_sf,asking_nnn_per_sf&suite_status=eq.Vacant&order=prop_code.asc,suite_num.asc`;
+      let vParams = `select=suite_num,sqft,asking_base_per_sf,asking_nnn_per_sf,prop_code&status=eq.Vacant&order=prop_code.asc,suite_num.asc`;
       if (filterPropCode) vParams += `&prop_code=eq.${encodeURIComponent(filterPropCode)}`;
       const [rows, vacantRows] = await Promise.all([
         sbFetch('rent_schedule', params),
