@@ -185,3 +185,6 @@ input[type="date"]::-moz-calendar-picker-indicator    { display: none; }
 .pill-clear:hover {
   background: rgba(217,119,6,0.25);
 }
+
+/* Detail view tab bars — hide webkit scrollbar */
+.crm-detail-tab-bar::-webkit-scrollbar { display: none; }

@@ -247,7 +247,7 @@ const TenantsMorePopover = ({ open, onClose, anchorRef, dateFilters, setDateFilt
 // ─────────────────────────────────────────────────────────────────────────────
 // Tenants List
 // ─────────────────────────────────────────────────────────────────────────────
-const TenantsList = ({ tenants, loading, error, onSelect }) => {
+export const TenantsList = ({ tenants = [], loading = false, error = null, onSelect, filterPropCode, hidePropertyPills }) => {
   const saved = useMemo(() => loadSaved(), []);
 
   const [statusFilter, setStatusFilter] = useState(saved?.statusFilter ?? 'Active');
@@ -259,6 +259,10 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
   const [activeProps,  setActiveProps]  = useState([]);
   const [moreOpen,     setMoreOpen]     = useState(false);
   const moreAnchorRef = useRef(null);
+  const [selfTenants, setSelfTenants] = useState(null);
+  const [selfLoading, setSelfLoading] = useState(false);
+  const [selfError,   setSelfError]   = useState(null);
+  const [rentRollLoading, setRentRollLoading] = useState(false);
 
   useEffect(() => {
     document.title = 'Tenants | SedonaCRM';
@@ -277,12 +281,24 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
     } catch {}
   }, [statusFilter, search, sortCol, sortDir, dateFilters, propFilter]);
 
+  useEffect(() => {
+    if (!filterPropCode) return;
+    setSelfLoading(true); setSelfError(null);
+    sbFetch('tenants', `select=*&prop_code=eq.${encodeURIComponent(filterPropCode)}&order=tenant_dba.asc`)
+      .then(d => { setSelfTenants(d); setSelfLoading(false); })
+      .catch(e => { setSelfError(e.message); setSelfLoading(false); });
+  }, [filterPropCode]);
+
+  const effectiveTenants = filterPropCode ? (selfTenants || []) : tenants;
+  const effectiveLoading = filterPropCode ? selfLoading : loading;
+  const effectiveError   = filterPropCode ? selfError   : error;
+
   const toggleSort = c => {
     if (c === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortCol(c); setSortDir('asc'); }
   };
 
-  const sorted = useMemo(() => [...tenants].sort((a, b) => {
+  const sorted = useMemo(() => [...effectiveTenants].sort((a, b) => {
     if (sortCol === 'sqft' || sortCol === 'lease_ends') {
       const av = a[sortCol] ?? '';
       const bv = b[sortCol] ?? '';
@@ -291,7 +307,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
     }
     const cmp = String(a[sortCol] ?? '').localeCompare(String(b[sortCol] ?? ''));
     return sortDir === 'asc' ? cmp : -cmp;
-  }), [tenants, sortCol, sortDir]);
+  }), [effectiveTenants, sortCol, sortDir]);
 
   const toggleProp = code => {
     if (code === 'All') { setPropFilter([]); return; }
@@ -307,6 +323,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
   });
 
   const filtered = useMemo(() => sorted.filter(t => {
+    if (filterPropCode && t.prop_code !== filterPropCode) return false;
     if (propFilter.length > 0 && !propFilter.includes(t.prop_code)) return false;
     if (statusFilter !== 'All' && (t.tenant_status || '') !== statusFilter) return false;
     if (dateFilters.updated && !isInRange(t.updated_at, dateFilters.updated)) return false;
@@ -324,6 +341,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
 
   const statusCounts = useMemo(() => {
     const base = sorted.filter(t => {
+      if (filterPropCode && t.prop_code !== filterPropCode) return false;
       if (propFilter.length > 0 && !propFilter.includes(t.prop_code)) return false;
       if (dateFilters.updated && !isInRange(t.updated_at, dateFilters.updated)) return false;
       if (search) {
@@ -400,7 +418,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
             {t.tenant_dba || ''}
           </a>
         </td>
-        <td style={{...css.td, color:T.accent, fontWeight:'500', fontSize:F.xs}}>{t.prop_code || ''}</td>
+        {!hidePropertyPills && <td style={{...css.td, color:T.accent, fontWeight:'500', fontSize:F.xs}}>{t.prop_code || ''}</td>}
         <td style={{...css.td, color:T.text1}}>{t.suite_num || '—'}</td>
         <td style={{...css.td, color:T.text2, textAlign:'right'}}>{t.sqft ? Number(t.sqft).toLocaleString() : '—'}</td>
         <td style={{...css.td, color:T.text2}}>{t.lease_type || '—'}</td>
@@ -416,6 +434,30 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
     );
   };
 
+  const generateRentRoll = async () => {
+    if (rentRollLoading) return;
+    setRentRollLoading(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      let params = `rent_status=eq.Current&rent_starts=lte.${today}&rent_ends=gte.${today}&select=*&order=prop_code.asc,suite_num.asc`;
+      if (filterPropCode) params += `&prop_code=eq.${encodeURIComponent(filterPropCode)}`;
+      let vParams = `select=suite_num,sqft,asking_base_per_sf,asking_nnn_per_sf,prop_code&status=eq.Vacant&order=prop_code.asc,suite_num.asc`;
+      if (filterPropCode) vParams += `&prop_code=eq.${encodeURIComponent(filterPropCode)}`;
+      const [rows, vacantRows] = await Promise.all([
+        sbFetch('rent_schedule', params),
+        sbFetch('suites', vParams),
+      ]);
+      const occupied_sf = rows.reduce((s, r) => s + (Number(r.sqft) || 0), 0);
+      const monthly_total = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
+      const occupancy = { occupied_sf, vacant_sf: 0, gross_sf: 0, occ_pct: 0, monthly_total };
+      generatePortfolioPDF(rows, occupancy, filterPropCode, vacantRows);
+    } catch (e) {
+      console.error('Rent roll error:', e);
+      alert('Could not generate rent roll. Check console for details.');
+    }
+    setRentRollLoading(false);
+  };
+
   return (
     <div style={{display:'flex', flexDirection:'column', height:'100%', overflow:'hidden'}}>
       {/* Header */}
@@ -424,15 +466,24 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
           <Storefront size={22} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
           <span style={{fontSize:F.lg, fontWeight:'600', color:T.text0}}>Tenants</span>
           <span style={{fontSize:F.xs, color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
+          <button onClick={generateRentRoll} disabled={rentRollLoading}
+            style={{padding:'3px 10px', borderRadius:'4px', fontSize:F.xs, cursor:'pointer',
+              border:`0.5px solid ${T.accent}`, background:'transparent', color:T.accent,
+              display:'inline-flex', alignItems:'center', gap:'5px', opacity: rentRollLoading ? 0.5 : 1,
+              marginLeft:'auto'}}>
+            {rentRollLoading ? 'Loading…' : 'Rent Roll PDF'}
+          </button>
         </div>
 
         {/* Row 1: Property strip */}
+        {!filterPropCode && !hidePropertyPills && (
         <div className="filter-row" style={{gap:'4px',marginBottom:'5px'}}>
           <button onClick={() => toggleProp('All')} style={propBtnStyle(propFilter.length === 0)}>All</button>
           {activeProps.map(pc => (
             <button key={pc} onClick={() => toggleProp(pc)} style={propBtnStyle(propFilter.includes(pc))}>{pc}</button>
           ))}
         </div>
+        )}
 
         {/* Row 2: Filter bar */}
         <div style={{display:'flex', gap:'6px', alignItems:'center', minWidth:0}}>
@@ -501,15 +552,15 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
       </div>
 
       {/* Body */}
-      {loading && <div style={{padding:'32px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading tenants…</div>}
-      {error   && <div style={{padding:'32px', textAlign:'center', color:T.danger, fontSize:F.sm}}>Error: {error}</div>}
+      {effectiveLoading && <div style={{padding:'32px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading tenants…</div>}
+      {effectiveError   && <div style={{padding:'32px', textAlign:'center', color:T.danger, fontSize:F.sm}}>Error: {effectiveError}</div>}
 
-      {!loading && !error && (
+      {!effectiveLoading && !effectiveError && (
         <div style={{flex:1, overflowY:'auto'}}>
           <table className="crm-list-table" style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
             <colgroup>
               <col style={{width:'22%'}}/>
-              <col style={{width:'6%'}}/>
+              {!hidePropertyPills && <col style={{width:'6%'}}/>}
               <col style={{width:'6%'}}/>
               <col style={{width:'7%'}}/>
               <col style={{width:'7%'}}/>
@@ -521,7 +572,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
             <thead style={{position:'sticky', top:0, zIndex:2}}>
               <tr>
                 {renderTh('tenant_dba', 'Tenant')}
-                {renderTh('prop_code',  'Prop')}
+                {!hidePropertyPills && renderTh('prop_code',  'Prop')}
                 {renderTh('suite_num',  'Suite')}
                 {renderTh('sqft',       'Sq Ft',  {textAlign:'right'})}
                 {renderTh('lease_type', 'Type')}
@@ -533,13 +584,13 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={9} style={{...css.td, textAlign:'center', padding:'32px', color:T.text3}}>No tenants match filters</td></tr>
+                <tr><td colSpan={hidePropertyPills ? 8 : 9} style={{...css.td, textAlign:'center', padding:'32px', color:T.text3}}>No tenants match filters</td></tr>
               )}
               {groups
                 ? groups.map(g => (
                     <React.Fragment key={g.prop_code}>
                       <tr style={{background:T.bg3, position:'sticky', top:'28px', zIndex:1}}>
-                        <td colSpan={9} style={{...css.td, color:T.accent, fontWeight:'600', padding:'4px 10px', fontSize:F.xs, textTransform:'uppercase', letterSpacing:'0.07em'}}>
+                        <td colSpan={hidePropertyPills ? 8 : 9} style={{...css.td, color:T.accent, fontWeight:'600', padding:'4px 10px', fontSize:F.xs, textTransform:'uppercase', letterSpacing:'0.07em'}}>
                           {g.prop_code} <span style={{color:T.text3, fontWeight:'400'}}>({g.rows.length})</span>
                         </td>
                       </tr>
@@ -564,7 +615,7 @@ const TenantsList = ({ tenants, loading, error, onSelect }) => {
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
                   <div style={{fontWeight:'600',fontSize:F.base,color:T.text0,marginBottom:'4px'}}>{t.tenant_dba||'—'}</div>
                   <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
-                    {t.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{t.prop_code}</span>}
+                    {!hidePropertyPills && t.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{t.prop_code}</span>}
                     {t.suite_num&&<span style={{fontSize:F.xs,color:T.text2}}>Suite {t.suite_num}</span>}
                     <TenantStatusBadge status={t.tenant_status}/>
                     {t.lease_ends&&<span style={{fontSize:F.xs,color:expColor}}>{fmtNumDate(t.lease_ends)}</span>}
@@ -748,7 +799,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
       {/* ── Header ── */}
       <div style={{padding:'10px 16px 0', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0}}>
         {/* Row 1: Back button + action buttons */}
-        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px'}}>
+        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px', flexWrap:'wrap', rowGap:'6px'}}>
           <button onClick={onBack}
             style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0, display:'inline-flex', alignItems:'center', gap:'5px'}}
             onMouseEnter={e => e.currentTarget.style.color = T.text0}
@@ -806,7 +857,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
         <div style={{marginBottom:'5px'}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <Storefront size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
-            <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
+            <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3', minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
               {data.tenant_dba || 'Untitled Tenant'}
             </div>
           </div>
@@ -837,10 +888,10 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
         </div>
 
         {/* Tab bar */}
-        <div style={{display:'flex', gap:'2px', marginTop:'4px'}}>
+        <div className="crm-detail-tab-bar" style={{display:'flex', gap:'2px', marginTop:'4px', overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch'}}>
           {TABS.map(t => (
             <button key={t} onClick={() => setTab(tk(t))}
-              style={{background:'transparent', border:'none', padding:'6px 12px', fontSize:F.sm, cursor:'pointer', borderRadius:'4px 4px 0 0',
+              style={{background:'transparent', border:'none', padding:'6px 12px', fontSize:F.sm, cursor:'pointer', borderRadius:'4px 4px 0 0', whiteSpace:'nowrap',
                 color: tab === tk(t) ? T.accent : T.text1,
                 borderBottom: tab === tk(t) ? `2px solid ${T.accent}` : '2px solid transparent',
                 fontWeight: tab === tk(t) ? '600' : '400'}}>
@@ -875,7 +926,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
           const sqft  = suite?.sqft || data.sqft;
 
           return (
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px'}}>
 
               {/* LEFT col */}
               <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
@@ -890,7 +941,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                     </div>
                     {data.lease_type && <span style={css.badge(T.text1, T.bg3)}>{data.lease_type}</span>}
                   </div>
-                  <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px 16px', marginBottom:'10px'}}>
+                  <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'8px 16px', marginBottom:'10px'}}>
                     <div>
                       <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>Rent Start</div>
                       <div style={{fontSize:F.sm, color:T.text1}}>{fmtDate(activeRent?.rent_starts ?? data.lease_starts) || '—'}</div>
@@ -923,7 +974,8 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                   ) : cois.length === 0 ? (
                     <div style={{fontSize:F.sm, color:T.warn}}>⚠ No certificates of insurance on record</div>
                   ) : (
-                    <table style={{width:'100%', borderCollapse:'collapse'}}>
+                    <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',width:'100%'}}>
+                    <table style={{width:'100%', borderCollapse:'collapse', minWidth:'480px'}}>
                       <tbody>
                         {cois.map(c => {
                           const cd = daysUntil(c.expiry_date);
@@ -941,6 +993,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                         })}
                       </tbody>
                     </table>
+                    </div>
                   )}
                 </div>
               </div>
@@ -977,12 +1030,12 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
         {/* ── INFO TAB ── */}
         {tab === 'info' && (
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px'}}>
 
             {/* Entity Info — full width at top */}
             <div style={{...css.card, gridColumn:'1 / -1'}}>
               <div style={css.secTitle}>Entity Info</div>
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'16px'}}>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:'16px'}}>
                 <ReadonlyField label="Entity Name"  value={data.entity_name}/>
                 <ReadonlyField label="Entity Type"  value={data.entity_type}/>
                 <ReadonlyField label="Entity State" value={data.entity_state}/>
@@ -1085,7 +1138,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
             {contacts === null ? (
               <div style={{padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading contacts…</div>
             ) : (
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'16px'}}>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px', marginBottom:'16px'}}>
                 {/* Primary Contact */}
                 <div style={css.card}>
                   <div style={css.secTitle}>Primary Contact</div>
@@ -1179,7 +1232,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                   );
                 })}
               </div>
-              <div style={{overflowX:'auto'}}>
+              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',width:'100%'}}>
                 <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'900px'}}>
                   <colgroup>
                     <col style={{width:'7%'}}/>
@@ -1258,7 +1311,8 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
             </div>
           ) : (
             <div>
-              <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
+              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',width:'100%'}}>
+              <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'480px'}}>
                 <colgroup>
                   <col style={{width:'25%'}}/>
                   <col style={{width:'10%'}}/>
@@ -1300,13 +1354,14 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )
         )}
 
         {/* ── ACTIVITY TAB ── */}
         {tab === 'activity' && (
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px'}}>
             <div style={css.card}>
               <div style={css.secTitle}>Work Orders</div>
               <div style={{padding:'20px 0', textAlign:'center'}}>
@@ -1348,8 +1403,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 // Props: rows (rent_schedule+tenants join), loading, error, properties,
 //        hidePropertyFilter, grossSqft, onRowClick(row)
 // ─────────────────────────────────────────────────────────────────────────────
-const generatePortfolioPDF = (rows, occupancy) => {
-  const win = window.open('', '_blank');
+const generatePortfolioPDF = (rows, occupancy, propCode, vacantRows = []) => {
   const fmt = n => n != null ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }) : '—';
   const fmtD = d => fmtDate(d);
   const fmtN = n => n != null && n !== '' ? Number(n).toLocaleString() : '—';
@@ -1365,31 +1419,51 @@ const generatePortfolioPDF = (rows, occupancy) => {
       <td style="text-align:right">${fmt(r.cam_impound)}</td>
       <td style="text-align:right">${fmt(r.tpt_tax)}</td>
       <td style="text-align:right">${fmt(r.total)}</td>
-      <td style="text-align:right">${r.base_per_sf ? Number(r.base_per_sf).toFixed(2) : '—'}</td>
-      <td style="text-align:right">${r.nnn_per_sf  ? Number(r.nnn_per_sf).toFixed(2)  : '—'}</td>
+      <td style="text-align:right">${r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
+      <td style="text-align:right">${r.nnn_per_sf?Number(r.nnn_per_sf).toFixed(2):'—'}</td>
     </tr>`).join('');
-  const today = new Date();
-  const todayStr = `${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}-${today.getFullYear()}`;
-  win.document.write(`<!DOCTYPE html><html><head><title>Portfolio Rent Roll</title>
-  <style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}h2{font-size:14px;margin-bottom:4px}
-  table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#f0f0f0;border:1px solid #ccc;padding:4px 6px;font-size:10px}
-  td{border:1px solid #ddd;padding:4px 6px}tfoot td{background:#f0f0f0;font-weight:bold}
-  .summary{margin-bottom:12px;font-size:11px}.summary span{margin-right:20px}</style></head><body>
-  <h2>Portfolio Rent Roll — All Properties</h2>
-  <div style="font-size:11px;color:#666;margin-bottom:8px">As of ${todayStr}</div>
-  <div class="summary">
-    <span>Occupied: ${fmtN(occupancy.occupied_sf)} sf</span>
-    <span>Vacant: ${fmtN(occupancy.vacant_sf)} sf</span>
-    <span>Gross: ${fmtN(occupancy.gross_sf)} sf</span>
-    <span>Occupancy: ${occupancy.occ_pct}%</span>
-    <span>Monthly Total: ${fmt(occupancy.monthly_total)}</span>
-  </div>
+  const summaryParts = [
+    `<span>Occupied: ${fmtN(occupancy.occupied_sf)} sf</span>`,
+    occupancy.gross_sf>0 ? `<span>Vacant: ${fmtN(occupancy.vacant_sf)} sf</span>` : '',
+    occupancy.gross_sf>0 ? `<span>Gross: ${fmtN(occupancy.gross_sf)} sf</span>` : '',
+    occupancy.gross_sf>0 ? `<span>Occupancy: ${occupancy.occ_pct}%</span>` : '',
+    `<span>Monthly Total: ${fmt(occupancy.monthly_total)}</span>`,
+  ].filter(Boolean).join('');
+  const vacantSection = vacantRows.length>0 ? `
+    <h2 style="color:#E8630A;margin-top:24px;margin-bottom:6px;font-size:13px">${vacantRows.length} Vacant Suite${vacantRows.length===1?'':'s'} — ${fmtN(vacantRows.reduce((s,r)=>s+(Number(r.sqft)||0),0))} sf</h2>
+    <table><thead><tr>
+      <th style="text-align:left">Suite</th>
+      <th style="text-align:right">Sq Ft</th>
+      <th style="text-align:right">Asking Base/sf</th>
+      <th style="text-align:right">Asking NNN/sf</th>
+    </tr></thead><tbody>
+      ${vacantRows.map(r=>`<tr>
+        <td>${r.suite_num||'—'}</td>
+        <td style="text-align:right">${fmtN(r.sqft)}</td>
+        <td style="text-align:right">${r.asking_base_per_sf?'$'+Number(r.asking_base_per_sf).toFixed(2):'—'}</td>
+        <td style="text-align:right">${r.asking_nnn_per_sf?'$'+Number(r.asking_nnn_per_sf).toFixed(2):'—'}</td>
+      </tr>`).join('')}
+    </tbody></table>` : '';
+  const html = `<!DOCTYPE html><html><head><title>${propCode?propCode+' — Rent Roll':'Portfolio Rent Roll'}</title>
+  <style>
+    @page{size:landscape;margin:12mm}
+    body{font-family:Arial,sans-serif;font-size:11px;margin:0}
+    h2{font-size:15px;font-weight:700;color:#E8630A;margin:0 0 8px 0}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th{background:#f7f0ea;padding:4px 8px;font-size:10px;text-align:left;border-bottom:1.5px solid #E8630A;white-space:nowrap}
+    td{padding:4px 8px;border-bottom:0.5px solid #eee}
+    tfoot td{background:#f7f0ea;font-weight:bold;border-top:1.5px solid #E8630A}
+    .summary{margin-bottom:10px;font-size:11px;color:#E8630A;font-weight:600}
+    .summary span{margin-right:20px}
+  </style></head><body>
+  <h2>${propCode?propCode+' — Rent Roll':'Portfolio Rent Roll — All Properties'}</h2>
+  <div class="summary">${summaryParts}</div>
   <table><thead><tr>
-    <th>Tenant DBA</th><th>Prop</th><th>Suite</th><th>Sq Ft</th><th>Security</th><th>Lease Ends</th>
-    <th>Base Rent</th><th>NNN</th><th>Other</th><th>CAMi</th><th>TPT Tax</th><th>Total</th><th>Base/sf</th><th>NNN/sf</th>
+    <th>Tenant DBA</th><th>Prop</th><th>Suite</th><th style="text-align:right">Sq Ft</th><th style="text-align:right">Security</th><th>Lease Ends</th>
+    <th style="text-align:right">Base Rent</th><th style="text-align:right">NNN</th><th style="text-align:right">Other</th><th style="text-align:right">CAMi</th><th style="text-align:right">TPT Tax</th><th style="text-align:right">Total</th><th style="text-align:right">Base/sf</th><th style="text-align:right">NNN/sf</th>
   </tr></thead><tbody>${tableRows}</tbody>
   <tfoot><tr>
-    <td colspan="6">TOTALS</td>
+    <td colspan="6">TOTALS (${rows.length} tenants)</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
@@ -1398,8 +1472,11 @@ const generatePortfolioPDF = (rows, occupancy) => {
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
     <td colspan="2"></td>
   </tr></tfoot></table>
-  <script>window.onload=()=>window.print();</script></body></html>`);
-  win.document.close();
+  ${vacantSection}
+  </body></html>`;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
 };
 
 export const TenantRentList = ({
@@ -1726,42 +1803,32 @@ export const TenantRentList = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main export — SPA (list + detail)
+// Main export — routed /tenants page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function TenantsView() {
   const router = useRouter();
-  const [rows,       setRows]       = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState(null);
-  const [properties, setProperties] = useState([]);
+  const [tenants, setTenants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
 
   useEffect(() => {
-    document.title = 'Tenants | SedonaCRM';
-    return () => { document.title = 'SedonaCRM'; };
-  }, []);
-
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
     setLoading(true); setError(null);
-    Promise.all([
-      sbFetch('rent_schedule', `rent_status=eq.Current&rent_starts=lte.${today}&rent_ends=gte.${today}&select=*,tenants!rent_schedule_tenant_id_fkey(id,podio_id,tenant_status)&order=suite_num.asc`),
-      sbFetch('properties', 'select=prop_code,property_name,gross_sqft&status=eq.active&order=prop_code.asc'),
-    ]).then(([rentRows, props]) => {
-      setRows(rentRows); setProperties(props); setLoading(false);
-    }).catch(e => { setError(e.message); setLoading(false); });
+    sbFetch('tenants', 'select=*&order=tenant_dba.asc')
+      .then(d => { setTenants(d); setLoading(false); })
+      .catch(e => { setError(e.message); setLoading(false); });
   }, []);
+
+  const handleSelect = t => {
+    try { sessionStorage.setItem('tenantsBackUrl', window.location.href); } catch {}
+    router.push('/tenants/' + (t.podio_id ?? 'X' + t.id.slice(-6)));
+  };
 
   return (
-    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden',background:T.bg1}}>
-      <TenantRentList
-        rows={rows} loading={loading} error={error} properties={properties}
-        onRowClick={r => {
-          const pid = r.tenants?.podio_id;
-          if (!pid) return;
-          try { sessionStorage.setItem('tenantsBackUrl', window.location.href); } catch {}
-          router.push('/tenants/' + pid);
-        }}
-      />
-    </div>
+    <TenantsList
+      tenants={tenants}
+      loading={loading}
+      error={error}
+      onSelect={handleSelect}
+    />
   );
 }

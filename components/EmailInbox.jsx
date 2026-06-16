@@ -189,7 +189,7 @@ const MessageRow = ({ msg, defaultExpanded }) => {
         <div style={{ padding:'12px 16px 16px 54px', background:T.bg2 }}>
           {msg.body_html ? (
             <div
-              style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', maxWidth:'560px' }}
+              style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', maxWidth:'100%', overflowX:'auto', wordBreak:'break-word' }}
               dangerouslySetInnerHTML={{ __html: msg.body_html }}
             />
           ) : msg.body_text ? (
@@ -512,8 +512,22 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThrea
   );
 };
 
+// ── Responsive hook ────────────────────────────────────────────────────────────
+function useWindowWidth() {
+  const [width, setWidth] = React.useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1024));
+  React.useEffect(() => {
+    const handler = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return width;
+}
+
 // ── Main Export ────────────────────────────────────────────────────────────────
 export default function EmailInbox() {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 640;
+
   const [filter,         setFilter]         = useState('unread');
   const [threads,        setThreads]        = useState([]);
   const [loading,        setLoading]        = useState(true);
@@ -579,7 +593,7 @@ export default function EmailInbox() {
     <div style={{ display:'flex', height:'100%', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden' }}>
 
       {/* Left panel — thread list */}
-      <div style={{ width:'340px', flexShrink:0, display:'flex', flexDirection:'column', borderRight:`0.5px solid ${T.border}`, overflow:'hidden' }}>
+      <div style={{ width:isMobile?'100%':'340px', flexShrink:0, display:isMobile&&selectedThread?'none':'flex', flexDirection:'column', borderRight:`0.5px solid ${T.border}`, overflow:'hidden' }}>
         {/* Header */}
         <div style={{ padding:'12px 16px', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
@@ -628,16 +642,25 @@ export default function EmailInbox() {
       </div>
 
       {/* Right panel — thread detail */}
-      <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+      <div style={{ flex:1, overflow:'hidden', display:isMobile&&!selectedThread?'none':'flex', flexDirection:'column' }}>
         {selectedThread ? (
-          <ThreadDetail
-            thread={selectedThread}
-            onMarkRead={handleMarkRead}
-            onArchive={handleArchive}
-            onReply={() => {}}
-            onThreadUpdate={() => setRefreshKey(k => k + 1)}
-            onLink={handleLink}
-          />
+          <>
+            {isMobile && (
+              <button
+                onClick={() => setSelectedThread(null)}
+                style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 14px', background:T.bg0, border:'none', borderBottom:`0.5px solid ${T.border}`, color:T.accent, fontSize:F.sm, fontWeight:'600', cursor:'pointer', flexShrink:0 }}>
+                ← Inbox
+              </button>
+            )}
+            <ThreadDetail
+              thread={selectedThread}
+              onMarkRead={handleMarkRead}
+              onArchive={handleArchive}
+              onReply={() => {}}
+              onThreadUpdate={() => setRefreshKey(k => k + 1)}
+              onLink={handleLink}
+            />
+          </>
         ) : (
           <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:'12px' }}>
             <EnvelopeSimple size={48} color={T.bg3} weight="bold"/>
