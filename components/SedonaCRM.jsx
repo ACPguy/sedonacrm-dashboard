@@ -1456,7 +1456,9 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
 
           </div>
         )}
-        <ActivityPanel collapsed={rightCollapsed} onCollapse={()=>setRightCollapsed(c=>!c)} width={rightWidth} onMouseDown={startRightResize}/>
+        <div className="mobile-hidden" style={{display:'flex',height:'100%'}}>
+          <ActivityPanel collapsed={rightCollapsed} onCollapse={()=>setRightCollapsed(c=>!c)} width={rightWidth} onMouseDown={startRightResize}/>
+        </div>
       </div>
     </div>
   );
@@ -1557,8 +1559,8 @@ export const PropertiesView = () => {
       </div>
       <div style={{flex:1,overflowY:'auto'}}>
         {loading&&<div style={{padding:'32px',textAlign:'center',color:T.text3}}>Loading…</div>}
-        {!loading&&(
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+        {!loading&&(<>
+          <table className="crm-list-table" style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
             <colgroup>
               <col style={{width:'7%'}}/>
               <col style={{width:'26%'}}/>
@@ -1620,7 +1622,38 @@ export const PropertiesView = () => {
               })}
             </tbody>
           </table>
-        )}
+          <div className="crm-mobile-cards">
+            {filtered.map((p,i) => (
+              <div key={p.id}
+                onClick={e => {
+                  if(e.target.closest('a')) return;
+                  const navL = filtered.map(r => ({id:r.id, prop_code:r.prop_code}));
+                  sessionStorage.setItem('propertiesNavList', JSON.stringify(navL));
+                  sessionStorage.setItem('propertiesNavIndex', String(filtered.findIndex(r => r.id === p.id)));
+                  handleSelectProp(p);
+                }}
+                style={{padding:'12px 16px', borderBottom:`0.5px solid ${T.border}`, cursor:'pointer', background:'transparent'}}
+                onTouchStart={e => e.currentTarget.style.background = T.bg2}
+                onTouchEnd={e => e.currentTarget.style.background = 'transparent'}>
+                <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px'}}>
+                  <span style={{fontSize:F.sm, fontWeight:'700', color:T.accent}}>{p.prop_code}</span>
+                  <StatusBadge status={p.status}/>
+                  {p._expires && (
+                    <span style={{...expiryStyle(p._expires), fontSize:F.xs, marginLeft:'auto'}}>{fmtDate(p._expires)}</span>
+                  )}
+                </div>
+                <div style={{fontSize:F.base, fontWeight:'600', color:T.text0, marginBottom:'2px'}}>{p.property_name||'—'}</div>
+                <div style={{fontSize:F.xs, color:T.text2}}>{[p.address, p.city].filter(Boolean).join(', ')||'—'}</div>
+                {p.gross_sqft && (
+                  <div style={{fontSize:F.xs, color:T.text3, marginTop:'2px'}}>{fmtNum(p.gross_sqft)} sf</div>
+                )}
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div style={{padding:'32px', textAlign:'center', color:T.text3}}>No properties match</div>
+            )}
+          </div>
+        </>)}
       </div>
     </div>
   );
@@ -1779,7 +1812,9 @@ const TenantDetail = ({ tenant, onBack, onUpdate }) => {
           )}
 
         </div>
-        <ActivityPanel collapsed={rightCollapsed} onCollapse={()=>setRightCollapsed(c=>!c)} width={rightWidth} onMouseDown={startRightResize}/>
+        <div className="mobile-hidden" style={{display:'flex',height:'100%'}}>
+          <ActivityPanel collapsed={rightCollapsed} onCollapse={()=>setRightCollapsed(c=>!c)} width={rightWidth} onMouseDown={startRightResize}/>
+        </div>
       </div>
     </div>
   );
