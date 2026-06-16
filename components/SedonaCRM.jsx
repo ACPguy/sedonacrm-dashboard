@@ -747,14 +747,14 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
         </div>
         <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
           <Buildings size={20} weight="bold" color="#E8630A"/>
-          <div>
-            <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>{data.property_name||data.prop_code}</div>
-            <div style={{fontSize:F.sm,color:T.text2}}>{data.prop_code} · {data.address||''}{data.city?`, ${data.city}`:''}</div>
+          <div style={{minWidth:0,overflow:'hidden'}}>
+            <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{data.property_name||data.prop_code}</div>
+            <div style={{fontSize:F.sm,color:T.text2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{data.prop_code} · {data.address||''}{data.city?`, ${data.city}`:''}</div>
           </div>
         </div>
       </div>
       {/* Tab bar */}
-      <div style={{display:'flex',gap:'2px',padding:'6px 16px 0',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,flexShrink:0,overflowX:'auto'}}>
+      <div className="crm-detail-tab-bar" style={{display:'flex',gap:'2px',padding:'6px 16px 0',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,flexShrink:0,overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
         {TABS.map(t=>(
           <button key={t} onClick={()=>setTab(t.toLowerCase().replace(/ /g,'-'))}
             style={{background:'transparent',border:'none',padding:'6px 10px',fontSize:F.xs,cursor:'pointer',borderRadius:'4px 4px 0 0',whiteSpace:'nowrap',
@@ -979,7 +979,8 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                 </tr>
               );
               return (
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',width:'100%'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',minWidth:'560px'}}>
                   <thead><tr>
                     <th style={css.th}>Insurance Co</th>
                     <th style={css.th}>Status</th>
@@ -1001,6 +1002,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                     {archivedIns.map((ins,i)=>insRow(ins,i,true))}
                   </tbody>
                 </table>
+                </div>
               );
             })()}
 
@@ -1028,7 +1030,8 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                 return {};
               };
               return (
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',width:'100%'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',minWidth:'620px'}}>
                   <thead><tr>
                     <th style={css.th}>Tenant</th>
                     <th style={css.th}>COI Status</th>
@@ -1065,6 +1068,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                     })}
                   </tbody>
                 </table>
+                </div>
               );
             })()}
 
@@ -1079,14 +1083,15 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                     const fullYr=rows.reduce((s,t)=>s+(Number(t.annual_amt)||0),0);
                     return (
                       <div key={year} style={{marginBottom:'24px'}}>
-                        <div style={{display:'flex',gap:'20px',alignItems:'baseline',marginTop:'16px',marginBottom:'6px',padding:'7px 10px 7px 12px',background:'#3a3f4b',borderLeft:`4px solid ${T.accent}`,borderRadius:'0 4px 4px 0'}}>
+                        <div style={{display:'flex',gap:'12px',alignItems:'baseline',flexWrap:'wrap',marginTop:'16px',marginBottom:'6px',padding:'7px 10px 7px 12px',background:'#3a3f4b',borderLeft:`4px solid ${T.accent}`,borderRadius:'0 4px 4px 0'}}>
                           <span style={{fontSize:F.sm,fontWeight:'700',color:T.text0}}>{year}</span>
                           <span style={{fontSize:F.xs,color:T.text1}}>{rows.length} parcel{rows.length!==1?'s':''}</span>
                           <span style={{fontSize:F.xs,color:T.text1}}>Full Year <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr)}</span></span>
                           <span style={{fontSize:F.xs,color:T.text1}}>Half Yr <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr/2)}</span></span>
                           <span style={{fontSize:F.xs,color:T.text1}}>Mo. <span style={{color:T.text0,fontWeight:'600'}}>{fmtMoney(fullYr/12)}</span></span>
                         </div>
-                        <table style={{width:'100%',borderCollapse:'collapse'}}>
+                        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',width:'100%'}}>
+                        <table style={{width:'100%',borderCollapse:'collapse',minWidth:'500px'}}>
                           <thead><tr>
                             <th style={css.th}>Parcel #</th>
                             <th style={css.th}>Who Pays</th>
@@ -1108,6 +1113,7 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                             ))}
                           </tbody>
                         </table>
+                        </div>
                       </div>
                     );
                   });

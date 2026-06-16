@@ -748,7 +748,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
       {/* ── Header ── */}
       <div style={{padding:'10px 16px 0', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0}}>
         {/* Row 1: Back button + action buttons */}
-        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px'}}>
+        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px', flexWrap:'wrap', rowGap:'6px'}}>
           <button onClick={onBack}
             style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0, display:'inline-flex', alignItems:'center', gap:'5px'}}
             onMouseEnter={e => e.currentTarget.style.color = T.text0}
@@ -806,7 +806,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
         <div style={{marginBottom:'5px'}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <Storefront size={20} weight="bold" style={{color:'#E8630A',flexShrink:0}}/>
-            <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3'}}>
+            <div style={{fontSize:F.lg, fontWeight:'600', color:T.text0, lineHeight:'1.3', minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
               {data.tenant_dba || 'Untitled Tenant'}
             </div>
           </div>
@@ -837,10 +837,10 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
         </div>
 
         {/* Tab bar */}
-        <div style={{display:'flex', gap:'2px', marginTop:'4px'}}>
+        <div className="crm-detail-tab-bar" style={{display:'flex', gap:'2px', marginTop:'4px', overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch'}}>
           {TABS.map(t => (
             <button key={t} onClick={() => setTab(tk(t))}
-              style={{background:'transparent', border:'none', padding:'6px 12px', fontSize:F.sm, cursor:'pointer', borderRadius:'4px 4px 0 0',
+              style={{background:'transparent', border:'none', padding:'6px 12px', fontSize:F.sm, cursor:'pointer', borderRadius:'4px 4px 0 0', whiteSpace:'nowrap',
                 color: tab === tk(t) ? T.accent : T.text1,
                 borderBottom: tab === tk(t) ? `2px solid ${T.accent}` : '2px solid transparent',
                 fontWeight: tab === tk(t) ? '600' : '400'}}>
@@ -875,7 +875,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
           const sqft  = suite?.sqft || data.sqft;
 
           return (
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px'}}>
 
               {/* LEFT col */}
               <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
@@ -890,7 +890,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                     </div>
                     {data.lease_type && <span style={css.badge(T.text1, T.bg3)}>{data.lease_type}</span>}
                   </div>
-                  <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px 16px', marginBottom:'10px'}}>
+                  <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'8px 16px', marginBottom:'10px'}}>
                     <div>
                       <div style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:'2px'}}>Rent Start</div>
                       <div style={{fontSize:F.sm, color:T.text1}}>{fmtDate(activeRent?.rent_starts ?? data.lease_starts) || '—'}</div>
@@ -923,7 +923,8 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                   ) : cois.length === 0 ? (
                     <div style={{fontSize:F.sm, color:T.warn}}>⚠ No certificates of insurance on record</div>
                   ) : (
-                    <table style={{width:'100%', borderCollapse:'collapse'}}>
+                    <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',width:'100%'}}>
+                    <table style={{width:'100%', borderCollapse:'collapse', minWidth:'480px'}}>
                       <tbody>
                         {cois.map(c => {
                           const cd = daysUntil(c.expiry_date);
@@ -941,6 +942,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                         })}
                       </tbody>
                     </table>
+                    </div>
                   )}
                 </div>
               </div>
@@ -977,12 +979,12 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
         {/* ── INFO TAB ── */}
         {tab === 'info' && (
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px'}}>
 
             {/* Entity Info — full width at top */}
             <div style={{...css.card, gridColumn:'1 / -1'}}>
               <div style={css.secTitle}>Entity Info</div>
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'16px'}}>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:'16px'}}>
                 <ReadonlyField label="Entity Name"  value={data.entity_name}/>
                 <ReadonlyField label="Entity Type"  value={data.entity_type}/>
                 <ReadonlyField label="Entity State" value={data.entity_state}/>
@@ -1085,7 +1087,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
             {contacts === null ? (
               <div style={{padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading contacts…</div>
             ) : (
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom:'16px'}}>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px', marginBottom:'16px'}}>
                 {/* Primary Contact */}
                 <div style={css.card}>
                   <div style={css.secTitle}>Primary Contact</div>
@@ -1179,7 +1181,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                   );
                 })}
               </div>
-              <div style={{overflowX:'auto'}}>
+              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',width:'100%'}}>
                 <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'900px'}}>
                   <colgroup>
                     <col style={{width:'7%'}}/>
@@ -1258,7 +1260,8 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
             </div>
           ) : (
             <div>
-              <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
+              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',width:'100%'}}>
+              <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'480px'}}>
                 <colgroup>
                   <col style={{width:'25%'}}/>
                   <col style={{width:'10%'}}/>
@@ -1300,13 +1303,14 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )
         )}
 
         {/* ── ACTIVITY TAB ── */}
         {tab === 'activity' && (
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px'}}>
             <div style={css.card}>
               <div style={css.secTitle}>Work Orders</div>
               <div style={{padding:'20px 0', textAlign:'center'}}>
