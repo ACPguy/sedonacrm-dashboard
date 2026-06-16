@@ -402,8 +402,22 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - .env.local: fixed from bare JWT to proper key=value format with all 7 required vars
 - Commits: d359a6c (backfill + link-to-record UI), 14e9059 (CLAUDE.md), 5fbccda (backfill maxDuration+write fix), ff0213a (timeline write on link)
 
+**Completed session 2026-06-16 — Mobile Pass + Tenant Consolidation + Rent Roll PDF (merged to main, commit 2cedfa9):**
+- pages/_document.jsx CREATED — viewport meta tag; was root cause of ALL mobile CSS being inactive on real devices (iOS rendering at 980px)
+- Mobile pass: PropertyDetail + TenantDetail tab bars (overflowX scroll, crm-detail-tab-bar class), headers (flexWrap wrap, name ellipsis), tables (overflow containers), grids (repeat(auto-fill,minmax(280px,1fr))), ActivityPanel wrapped in mobile-hidden div
+- globals.css: .crm-detail-tab-bar::-webkit-scrollbar { display:none }
+- Properties list: crm-list-table + crm-mobile-cards card block
+- TenantsList refactor: export const TenantsList, filterPropCode + hidePropertyPills props, self-fetch pattern, prop column/pills hidden when appropriate, Rent Roll PDF button added
+- generatePortfolioPDF: Blob URL approach (URL.createObjectURL) — no popup blocker, no AirPrint flash; landscape @page, orange accents, no grid lines, vacant suites section; window.print() removed; suites column confirmed as `status` not `suite_status`
+- TenantsView default export replaced — wraps TenantsList directly; PropertyDetail Tenants tab uses TenantsList + filterPropCode
+- EmailInbox: useWindowWidth hook, isMobile=width<640, single-panel mobile mode (list hides when thread open, ← Inbox back button), email body maxWidth 100% + wordBreak:break-word
+- TaskDetail type/priority/status pills: TYPE_SHORT labels (WO/TSK/Note/Proj./ACP/S&G), PRI_STYLES + STA_STYLES use activeBorder, inactive=grey border+text, active=filled color, hover=color22 tint
+
 **Known gaps / still open:**
-- PENDING: Comms tab on task/WO detail does not show emails linked via Link-to-record button — communication_timeline entries are written by link-thread.js (ff0213a) but not appearing; suspect RLS or anon SELECT missing on communication_timeline for email entries
+- PENDING: Rent Roll PDF UTF-8 fix — em dashes rendering as â€" in blob URL approach; add `<meta charset="utf-8">` to generatePortfolioPDF HTML head (one-line fix)
+- PENDING: Comms tab on task/WO detail does not show emails linked via Link-to-record button — communication_timeline entries written by link-thread.js but not appearing; suspect missing anon SELECT policy on communication_timeline
+- PENDING: Inbox refresh button not fully wired — resets local state but does not re-fetch from Supabase
+- PENDING: Gmail Pub/Sub watch expiry — watch expires every 7 days; needs periodic renewal
 - PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired (deferred)
 - PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
 - PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
@@ -432,10 +446,9 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 **Back navigation from embedded task click:** `embeddedMode` row click writes `tasksBackUrl = window.location.href` to sessionStorage then does `window.location.href = /tasks/[task_num]`. The property detail URL is kept current via a `useEffect` in `PropertyDetail` that calls `replaceState({...window.history.state, url, as:url}, '', url)` on every tab change.
 
 **Next priorities (start here next session):**
-1. Debug Comms tab not showing linked emails (check RLS on communication_timeline for anon reads, check CommunicationTimeline.jsx fetch query)
-2. Filter state URL encoding (Rule 10) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
-3. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
-4. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Rent Roll PDF UTF-8 fix — add `<meta charset="utf-8">` inside `<head>` in generatePortfolioPDF HTML string (TenantsView.jsx, one line)
+2. Debug Comms tab not showing linked emails — check anon SELECT RLS on `communication_timeline`, check CommunicationTimeline.jsx fetch query
+3. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
