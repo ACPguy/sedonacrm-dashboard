@@ -441,11 +441,16 @@ export const TenantsList = ({ tenants = [], loading = false, error = null, onSel
       const today = new Date().toISOString().slice(0, 10);
       let params = `rent_status=eq.Current&rent_starts=lte.${today}&rent_ends=gte.${today}&select=*&order=prop_code.asc,suite_num.asc`;
       if (filterPropCode) params += `&prop_code=eq.${encodeURIComponent(filterPropCode)}`;
-      const rows = await sbFetch('rent_schedule', params);
+      let vParams = `select=suite_num,sqft,asking_base_per_sf,asking_nnn_per_sf&suite_status=eq.Vacant&order=prop_code.asc,suite_num.asc`;
+      if (filterPropCode) vParams += `&prop_code=eq.${encodeURIComponent(filterPropCode)}`;
+      const [rows, vacantRows] = await Promise.all([
+        sbFetch('rent_schedule', params),
+        sbFetch('suites', vParams),
+      ]);
       const occupied_sf = rows.reduce((s, r) => s + (Number(r.sqft) || 0), 0);
       const monthly_total = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
       const occupancy = { occupied_sf, vacant_sf: 0, gross_sf: 0, occ_pct: 0, monthly_total };
-      generatePortfolioPDF(rows, occupancy, filterPropCode);
+      generatePortfolioPDF(rows, occupancy, filterPropCode, vacantRows);
     } catch (e) {
       console.error('Rent roll error:', e);
     }
@@ -1397,7 +1402,7 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 // Props: rows (rent_schedule+tenants join), loading, error, properties,
 //        hidePropertyFilter, grossSqft, onRowClick(row)
 // ─────────────────────────────────────────────────────────────────────────────
-const generatePortfolioPDF = (rows, occupancy, propCode) => {
+const generatePortfolioPDF = (rows, occupancy, propCode, vacantRows = []) => {
   const win = window.open('', '_blank');
   const fmt = n => n != null ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }) : '—';
   const fmtD = d => fmtDate(d);
@@ -1414,31 +1419,51 @@ const generatePortfolioPDF = (rows, occupancy, propCode) => {
       <td style="text-align:right">${fmt(r.cam_impound)}</td>
       <td style="text-align:right">${fmt(r.tpt_tax)}</td>
       <td style="text-align:right">${fmt(r.total)}</td>
-      <td style="text-align:right">${r.base_per_sf ? Number(r.base_per_sf).toFixed(2) : '—'}</td>
-      <td style="text-align:right">${r.nnn_per_sf  ? Number(r.nnn_per_sf).toFixed(2)  : '—'}</td>
+      <td style="text-align:right">${r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
+      <td style="text-align:right">${r.nnn_per_sf?Number(r.nnn_per_sf).toFixed(2):'—'}</td>
     </tr>`).join('');
-  const today = new Date();
-  const todayStr = `${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}-${today.getFullYear()}`;
-  win.document.write(`<!DOCTYPE html><html><head><title>Portfolio Rent Roll</title>
-  <style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}h2{font-size:14px;margin-bottom:4px}
-  table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#f0f0f0;border:1px solid #ccc;padding:4px 6px;font-size:10px}
-  td{border:1px solid #ddd;padding:4px 6px}tfoot td{background:#f0f0f0;font-weight:bold}
-  .summary{margin-bottom:12px;font-size:11px}.summary span{margin-right:20px}</style></head><body>
-  <h2>${propCode ? propCode + ' — Rent Roll' : 'Portfolio Rent Roll — All Properties'}</h2>
-  <div style="font-size:11px;color:#666;margin-bottom:8px">As of ${todayStr}</div>
-  <div class="summary">
-    <span>Occupied: ${fmtN(occupancy.occupied_sf)} sf</span>
-    <span>Vacant: ${fmtN(occupancy.vacant_sf)} sf</span>
-    <span>Gross: ${fmtN(occupancy.gross_sf)} sf</span>
-    <span>Occupancy: ${occupancy.occ_pct}%</span>
-    <span>Monthly Total: ${fmt(occupancy.monthly_total)}</span>
-  </div>
+  const summaryParts = [
+    `<span>Occupied: ${fmtN(occupancy.occupied_sf)} sf</span>`,
+    occupancy.gross_sf>0 ? `<span>Vacant: ${fmtN(occupancy.vacant_sf)} sf</span>` : '',
+    occupancy.gross_sf>0 ? `<span>Gross: ${fmtN(occupancy.gross_sf)} sf</span>` : '',
+    occupancy.gross_sf>0 ? `<span>Occupancy: ${occupancy.occ_pct}%</span>` : '',
+    `<span>Monthly Total: ${fmt(occupancy.monthly_total)}</span>`,
+  ].filter(Boolean).join('');
+  const vacantSection = vacantRows.length>0 ? `
+    <h2 style="color:#E8630A;margin-top:24px;margin-bottom:6px;font-size:13px">${vacantRows.length} Vacant Suite${vacantRows.length===1?'':'s'} — ${fmtN(vacantRows.reduce((s,r)=>s+(Number(r.sqft)||0),0))} sf</h2>
+    <table><thead><tr>
+      <th style="text-align:left">Suite</th>
+      <th style="text-align:right">Sq Ft</th>
+      <th style="text-align:right">Asking Base/sf</th>
+      <th style="text-align:right">Asking NNN/sf</th>
+    </tr></thead><tbody>
+      ${vacantRows.map(r=>`<tr>
+        <td>${r.suite_num||'—'}</td>
+        <td style="text-align:right">${fmtN(r.sqft)}</td>
+        <td style="text-align:right">${r.asking_base_per_sf?'$'+Number(r.asking_base_per_sf).toFixed(2):'—'}</td>
+        <td style="text-align:right">${r.asking_nnn_per_sf?'$'+Number(r.asking_nnn_per_sf).toFixed(2):'—'}</td>
+      </tr>`).join('')}
+    </tbody></table>` : '';
+  win.document.write(`<!DOCTYPE html><html><head><title>${propCode?propCode+' — Rent Roll':'Portfolio Rent Roll'}</title>
+  <style>
+    @page{size:landscape;margin:12mm}
+    body{font-family:Arial,sans-serif;font-size:11px;margin:0}
+    h2{font-size:15px;font-weight:700;color:#E8630A;margin:0 0 8px 0}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th{background:#f7f0ea;padding:4px 8px;font-size:10px;text-align:left;border-bottom:1.5px solid #E8630A;white-space:nowrap}
+    td{padding:4px 8px;border-bottom:0.5px solid #eee}
+    tfoot td{background:#f7f0ea;font-weight:bold;border-top:1.5px solid #E8630A}
+    .summary{margin-bottom:10px;font-size:11px;color:#E8630A;font-weight:600}
+    .summary span{margin-right:20px}
+  </style></head><body>
+  <h2>${propCode?propCode+' — Rent Roll':'Portfolio Rent Roll — All Properties'}</h2>
+  <div class="summary">${summaryParts}</div>
   <table><thead><tr>
-    <th>Tenant DBA</th><th>Prop</th><th>Suite</th><th>Sq Ft</th><th>Security</th><th>Lease Ends</th>
-    <th>Base Rent</th><th>NNN</th><th>Other</th><th>CAMi</th><th>TPT Tax</th><th>Total</th><th>Base/sf</th><th>NNN/sf</th>
+    <th>Tenant DBA</th><th>Prop</th><th>Suite</th><th style="text-align:right">Sq Ft</th><th style="text-align:right">Security</th><th>Lease Ends</th>
+    <th style="text-align:right">Base Rent</th><th style="text-align:right">NNN</th><th style="text-align:right">Other</th><th style="text-align:right">CAMi</th><th style="text-align:right">TPT Tax</th><th style="text-align:right">Total</th><th style="text-align:right">Base/sf</th><th style="text-align:right">NNN/sf</th>
   </tr></thead><tbody>${tableRows}</tbody>
   <tfoot><tr>
-    <td colspan="6">TOTALS</td>
+    <td colspan="6">TOTALS (${rows.length} tenants)</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.base_rent)||0),0))}</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.nnn)||0),0))}</td>
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.other_amt)||0),0))}</td>
@@ -1447,6 +1472,7 @@ const generatePortfolioPDF = (rows, occupancy, propCode) => {
     <td style="text-align:right">${fmt(rows.reduce((s,r)=>s+(Number(r.total)||0),0))}</td>
     <td colspan="2"></td>
   </tr></tfoot></table>
+  ${vacantSection}
   <script>window.onload=()=>window.print();</script></body></html>`);
   win.document.close();
 };

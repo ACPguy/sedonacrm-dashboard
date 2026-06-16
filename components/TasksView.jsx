@@ -1346,23 +1346,28 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           )}
         </div>
         {/* Type conversion pills */}
+        {(()=>{const TYPE_SHORT={work_order:'WO',task:'TSK',note:'Note',project:'Proj.',acp_task:'ACP',sg_task:'S&G'};return(
         <div className="crm-task-type-pills" style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
           <span style={{fontSize:F.xs,color:T.text3,fontWeight:'600'}}>Type:</span>
           {Object.keys(TYPE_PREFIX).map(key=>{
             const active=data.record_type===key;
             const color=TYPE_COLOR[key];
-            const Icon=TYPE_ICON_MAP[key];
             return (
               <button key={key} onClick={()=>handleTypeChange(key)}
-                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${color}`,background:active?color:'transparent',color:active?'#fff':color,transition:'background 0.15s ease'}}
-                onMouseEnter={e=>{if(!active)e.currentTarget.style.background=`${color}33`;}}
-                onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
-                {Icon&&<Icon size={12} weight="bold"/>}
-                {TYPE_LABEL[key]}
+                style={{padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,cursor:active?'default':'pointer',
+                  border:active?`0.5px solid ${color}`:`0.5px solid ${T.border}`,
+                  background:active?color:'transparent',
+                  color:active?'#fff':T.text2,
+                  fontWeight:active?'600':'400',
+                  transition:'background 0.15s ease,border-color 0.15s ease,color 0.15s ease'}}
+                onMouseEnter={e=>{if(!active){e.currentTarget.style.background=`${color}22`;e.currentTarget.style.borderColor=color;}}}
+                onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
+                {TYPE_SHORT[key]||key}
               </button>
             );
           })}
         </div>
+        );})()}
       </div>
 
       {/* Body */}
