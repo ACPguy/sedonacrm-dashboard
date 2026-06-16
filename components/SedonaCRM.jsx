@@ -6,6 +6,7 @@ import IssuesView, { IssuesList } from './IssuesView';
 import TasksView from './TasksView';
 import ContactsTable from './shared/ContactsTable';
 import TenantsTable from './shared/TenantsTable';
+import { TenantsList } from './TenantsView';
 import RichTextEditor from './RichTextEditor';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
@@ -853,12 +854,14 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
 
             {/* TENANTS / RENT ROLL */}
             {tab==='tenants'&&(
-              <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
-                <TenantsTable
+              <div style={{flex:1,overflow:'hidden'}}>
+                <TenantsList
                   filterPropCode={data.prop_code}
-                  hidePropertyFilter={true}
-                  grossSqft={data.gross_sqft}
-                  onGeneratePDF={()=>generateRentRollPDF(data,rentRows,occupancy)}
+                  hidePropertyPills={true}
+                  onSelect={t => {
+                    try { sessionStorage.setItem('tenantsBackUrl', window.location.href); } catch {}
+                    window.location.href = '/tenants/' + (t.podio_id ?? 'X' + t.id.slice(-6));
+                  }}
                 />
               </div>
             )}
@@ -1822,102 +1825,26 @@ const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
 // ── Tenants View ──────────────────────────────────────────────────────────────
 const TenantsView = () => {
-  const [tenants,setTenants] = useState([]);
-  const [loading,setLoading] = useState(true);
-  const [selected,setSelected] = useState(null);
-  const [filter,setFilter] = useState('Active');
-  const [search,setSearch] = useState('');
-  const { sorted, Th } = useSortable(tenants,'tenant_dba');
+  const [tenants, setTenants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
 
-  useEffect(()=>{
+  useEffect(() => {
     setLoading(true);
-    let params='select=*';
-    if(filter!=='All') params+=`&tenant_status=eq.${filter}`;
-    params+='&order=tenant_dba.asc';
-    sbFetch('tenants',params).then(d=>{setTenants(d);setLoading(false);}).catch(()=>setLoading(false));
-  },[filter]);
+    sbFetch('tenants', 'select=*&order=tenant_dba.asc')
+      .then(d => { setTenants(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
 
-  const filtered = sorted.filter(t=>{
-    if(!search)return true;
-    const q=search.toLowerCase();
-    return (t.tenant_dba||'').toLowerCase().includes(q)||(t.prop_code||'').toLowerCase().includes(q)||(t.suite_num||'').toLowerCase().includes(q);
-  });
-
-  const daysUntil = d => d?Math.round((new Date(d)-today)/(1000*60*60*24)):null;
-
-  if(selected) return <TenantDetail tenant={selected} onBack={()=>setSelected(null)} onUpdate={u=>setSelected(u)}/>;
+  if (selected) return <TenantDetail tenant={selected} onBack={() => setSelected(null)} onUpdate={u => setSelected(u)}/>;
 
   return (
-    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
-      <div style={{padding:'12px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
-          <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Tenants</span>
-          <span style={{fontSize:F.sm,color:T.text2}}>{filtered.length} shown</span>
-        </div>
-        <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
-          <div style={{display:'flex',gap:'2px',background:T.bg2,borderRadius:'5px',padding:'2px',border:`0.5px solid ${T.border}`}}>
-            {['Active','Archived','All'].map(s=>(
-              <button key={s} onClick={()=>setFilter(s)}
-                style={{padding:'4px 12px',borderRadius:'4px',border:'none',cursor:'pointer',fontSize:F.sm,
-                  background:filter===s?T.bg3:'transparent',color:filter===s?T.text0:T.text2,fontWeight:filter===s?'600':'400'}}>
-                {s}
-              </button>
-            ))}
-          </div>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tenants…"
-            style={{flex:1,background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 10px',color:T.text0,fontSize:F.sm,outline:'none'}}/>
-        </div>
-      </div>
-      <div style={{flex:1,overflowY:'auto'}}>
-        {loading&&<div style={{padding:'32px',textAlign:'center',color:T.text3}}>Loading…</div>}
-        {!loading&&(
-          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
-            <colgroup>
-              <col style={{width:'auto'}}/><col style={{width:'70px'}}/><col style={{width:'70px'}}/>
-              <col style={{width:'80px'}}/><col style={{width:'100px'}}/><col style={{width:'100px'}}/><col style={{width:'90px'}}/>
-            </colgroup>
-            <thead style={{position:'sticky',top:0,zIndex:1}}>
-              <tr>
-                <Th c="tenant_dba" label="Tenant DBA"/>
-                <Th c="prop_code" label="Prop"/>
-                <Th c="suite_num" label="Suite"/>
-                <Th c="sqft" label="Sq Ft" align="right"/>
-                <Th c="lease_ends" label="Lease Ends"/>
-                <Th c="tenant_status" label="Status"/>
-                <Th c="lease_ends" label="Expires In"/>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length===0&&<tr><td colSpan={7} style={{...css.td,textAlign:'center',padding:'32px',color:T.text3}}>No tenants match</td></tr>}
-              {filtered.map((t,i)=>{
-                const exp=daysUntil(t.lease_ends);
-                return (
-                  <tr key={t.id} onClick={()=>setSelected(t)} style={{borderBottom:`0.5px solid ${T.border}`,cursor:'pointer',background:i%2===0?'transparent':T.bg0}}
-                    onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
-                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?'transparent':T.bg0}>
-                    <td style={css.td}>{t.tenant_dba}</td>
-                    <td style={{...css.td,color:T.accent,fontWeight:'500'}}>{t.prop_code}</td>
-                    <td style={{...css.td,color:T.text2}}>{t.suite_num||'—'}</td>
-                    <td style={css.tdNum}>{fmtNum(t.sqft)}</td>
-                    <td style={css.td}>{fmtDate(t.lease_ends)}</td>
-                    <td style={css.td}><StatusBadge status={t.tenant_status}/></td>
-                    <td style={css.td}>
-                      {exp!==null?(
-                        <span style={{fontSize:F.xs,padding:'2px 6px',borderRadius:'3px',
-                          background:exp<60?'#3d1f1f':exp<180?'#3d2e1a':'transparent',
-                          color:exp<60?T.danger:exp<180?T.warn:T.text2}}>
-                          {exp<0?`${Math.abs(exp)}d over`:`${exp}d`}
-                        </span>
-                      ):'—'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
+    <TenantsList
+      tenants={tenants}
+      loading={loading}
+      error={null}
+      onSelect={t => setSelected(t)}
+    />
   );
 };
 
