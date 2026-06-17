@@ -167,6 +167,16 @@ export const PriorityDot = ({ priority }) => {
   );
 };
 
+// ── Hardcoded assignees ───────────────────────────────────────────────────────
+const ASSIGNEES = [
+  { id: '573b65b5-ba16-437b-9101-d0bff2453dde', name: 'Scott Anderson' },
+  { id: '9e79f9cd-4415-40d3-b1ce-5c50b35dbf5e', name: 'Gabrielle Anderson' },
+];
+
+// ── Pill color maps ───────────────────────────────────────────────────────────
+const PRI_COLORS = { '???':'#6b7280', Urgent:'#ef4444', High:'#f97316', Medium:'#f59e0b', Low:'#22c55e' };
+const STA_COLORS = { Open:'#3b82f6', 'In Progress':'#f59e0b', 'On Hold':'#6b7280', Closed:'#22c55e', Cancelled:'#ef4444' };
+
 // ── Category options (from actual DB data) ────────────────────────────────────
 export const PRIORITY_ORDER = { '???':0, Urgent:1, High:2, Medium:3, Low:4 };
 const PRIORITY_OPTIONS = ['???','Urgent','High','Medium','Low'];
@@ -314,89 +324,103 @@ const InlineSelect = ({ value, options, onSave }) => (
 );
 
 // ── PriorityPills ─────────────────────────────────────────────────────────────
-const PRI_STYLES = {
-  '???':  {activeBg:T.bg3,     activeColor:T.text0, activeBorder:T.text2,   hover:'rgba(107,114,128,0.15)'},
-  Urgent: {activeBg:T.danger,  activeColor:'#fff',   activeBorder:T.danger,  hover:`${T.danger}22`},
-  High:   {activeBg:T.warn,    activeColor:'#fff',   activeBorder:T.warn,    hover:`${T.warn}22`},
-  Medium: {activeBg:T.success, activeColor:'#fff',   activeBorder:T.success, hover:`${T.success}22`},
-  Low:    {activeBg:T.accent,  activeColor:'#fff',   activeBorder:T.accent,  hover:`${T.accent}22`},
+const PriorityPills = ({ value, onSave }) => {
+  const [hov,setHov] = useState(null);
+  return (
+    <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+      {PRIORITY_OPTIONS.map(opt=>{
+        const active=(value||'???')===opt;
+        const c=PRI_COLORS[opt]||'#6b7280';
+        const isHov=!active&&hov===opt;
+        return (
+          <button key={opt} onClick={()=>!active&&onSave(opt)}
+            onMouseEnter={()=>!active&&setHov(opt)}
+            onMouseLeave={()=>setHov(null)}
+            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',transition:'all 0.15s ease',
+              border:`1px solid ${active||isHov?c:T.border}`,
+              background:active?c:'transparent',
+              color:active?'#fff':(isHov?c:T.text2),
+              fontWeight:active?600:'normal'}}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
 };
-const PriorityPills = ({ value, onSave }) => (
-  <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-    {PRIORITY_OPTIONS.map(opt=>{
-      const active=(value||'???')===opt;
-      const s=PRI_STYLES[opt]||PRI_STYLES['???'];
-      return (
-        <button key={opt} onClick={()=>!active&&onSave(opt)}
-          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`0.5px solid ${active?s.activeBorder:T.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:T.text2,transition:'background 0.15s ease'}}
-          onMouseEnter={e=>{if(!active){e.currentTarget.style.background=s.hover;e.currentTarget.style.borderColor=s.activeBorder;}}}
-          onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
-          {opt}
-        </button>
-      );
-    })}
-  </div>
-);
 
 // ── StatusPills ───────────────────────────────────────────────────────────────
-const STA_STYLES = {
-  Open:          {activeBg:T.accent,  activeColor:'#fff',  activeBorder:T.accent,  hover:`${T.accent}22`},
-  'In Progress': {activeBg:T.purple,  activeColor:'#fff',  activeBorder:T.purple,  hover:`${T.purple}22`},
-  'On Hold':     {activeBg:T.warn,    activeColor:T.bg0,   activeBorder:T.warn,    hover:`${T.warn}22`},
-  Closed:        {activeBg:T.text2,   activeColor:'#fff',  activeBorder:T.text2,   hover:'rgba(90,98,114,0.15)'},
-  Cancelled:     {activeBg:T.danger,  activeColor:'#fff',  activeBorder:T.danger,  hover:`${T.danger}22`},
+const StatusPills = ({ value, onSave }) => {
+  const [hov,setHov] = useState(null);
+  return (
+    <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+      {STATUS_OPTIONS.map(opt=>{
+        const active=(value||'Open')===opt;
+        const c=STA_COLORS[opt]||'#6b7280';
+        const isHov=!active&&hov===opt;
+        return (
+          <button key={opt} onClick={()=>!active&&onSave(opt)}
+            onMouseEnter={()=>!active&&setHov(opt)}
+            onMouseLeave={()=>setHov(null)}
+            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',transition:'all 0.15s ease',
+              border:`1px solid ${active||isHov?c:T.border}`,
+              background:active?c:'transparent',
+              color:active?'#fff':(isHov?c:T.text2),
+              fontWeight:active?600:'normal'}}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
 };
-const StatusPills = ({ value, onSave }) => (
-  <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-    {STATUS_OPTIONS.map(opt=>{
-      const active=(value||'Open')===opt;
-      const s=STA_STYLES[opt]||STA_STYLES.Open;
-      return (
-        <button key={opt} onClick={()=>!active&&onSave(opt)}
-          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`0.5px solid ${active?s.activeBorder:T.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:T.text2,transition:'background 0.15s ease'}}
-          onMouseEnter={e=>{if(!active){e.currentTarget.style.background=s.hover;e.currentTarget.style.borderColor=s.activeBorder;}}}
-          onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
-          {opt}
-        </button>
-      );
-    })}
-  </div>
-);
 
 // ── GenericPills (stage, wo_type, invoice_stage) ──────────────────────────────
-const GenericPills = ({ value, options, color, onSave }) => (
-  <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-    {options.map(opt=>{
-      const active=value===opt;
-      return (
-        <button key={opt} onClick={()=>!active&&onSave(opt)}
-          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${color}`,background:active?color:'transparent',color:active?'#fff':color,transition:'background 0.15s ease'}}
-          onMouseEnter={e=>{if(!active)e.currentTarget.style.background=`${color}33`;}}
-          onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
-          {opt}
-        </button>
-      );
-    })}
-  </div>
-);
+const GenericPills = ({ value, options, onSave }) => {
+  const [hov,setHov] = useState(null);
+  return (
+    <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+      {options.map(opt=>{
+        const active=value===opt;
+        const isHov=!active&&hov===opt;
+        return (
+          <button key={opt} onClick={()=>!active&&onSave(opt)}
+            onMouseEnter={()=>!active&&setHov(opt)}
+            onMouseLeave={()=>setHov(null)}
+            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',transition:'all 0.15s ease',
+              border:`1px solid ${active?'#E8630A':(isHov?'#E8630A':T.border)}`,
+              background:active?'#E8630A':'transparent',
+              color:active?'#fff':(isHov?'#E8630A':T.text2),
+              fontWeight:active?600:'normal'}}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
 // ── BoolPill ──────────────────────────────────────────────────────────────────
-const BoolPill = ({ value, labelTrue, labelFalse, colorTrue=T.success, onSave }) => {
-  const on = !!value;
+const BoolPill = ({ value, labelTrue, labelFalse, onSave }) => {
+  const [hov,setHov] = useState(null);
   return (
     <div style={{display:'flex',gap:'5px'}}>
-      <button onClick={()=>onSave(true)}
-        style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:on?'default':'pointer',border:`1px solid ${colorTrue}`,background:on?colorTrue:'transparent',color:on?'#fff':colorTrue,transition:'background 0.15s ease'}}
-        onMouseEnter={e=>{if(!on)e.currentTarget.style.background=`${colorTrue}33`;}}
-        onMouseLeave={e=>{if(!on)e.currentTarget.style.background='transparent';}}>
-        {labelTrue}
-      </button>
-      <button onClick={()=>onSave(false)}
-        style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:!on?'default':'pointer',border:`1px solid ${T.text2}`,background:!on?T.bg3:'transparent',color:!on?T.text0:T.text2,transition:'background 0.15s ease'}}
-        onMouseEnter={e=>{if(on)e.currentTarget.style.background='rgba(90,98,114,0.20)';}}
-        onMouseLeave={e=>{if(on)e.currentTarget.style.background='transparent';}}>
-        {labelFalse}
-      </button>
+      {[{v:true,label:labelTrue},{v:false,label:labelFalse}].map(({v,label})=>{
+        const active=value===v;
+        const isHov=!active&&hov===String(v);
+        return (
+          <button key={String(v)} onClick={()=>onSave(v)}
+            onMouseEnter={()=>!active&&setHov(String(v))}
+            onMouseLeave={()=>setHov(null)}
+            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',transition:'all 0.15s ease',
+              border:`1px solid ${active?'#E8630A':(isHov?'#E8630A':T.border)}`,
+              background:active?'#E8630A':'transparent',
+              color:active?'#fff':(isHov?'#E8630A':T.text2),
+              fontWeight:active?600:'normal'}}>
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 };
@@ -934,12 +958,11 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           {hasActiveFilters&&<button onClick={clearFilters} className="pill-clear" style={{position:'sticky',left:0,zIndex:2}}>× Clear</button>}
           {TYPE_PILLS.map(({key,label})=>{
             const active=typeFilter===key;
-            const color=TYPE_COLOR[key]||T.accent;
             const allTotal=Object.values(typeCounts).reduce((s,n)=>s+n,0);
             const cnt=key==='All'?allTotal:(typeCounts[key]??0);
             return (
               <button key={key} onClick={()=>setTypeFilter(key)}
-                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:active?'600':'400',cursor:active?'default':'pointer',border:`0.5px solid ${active?(key==='All'?T.accent:color):T.border}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':T.text2,flexShrink:0}}>
+                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:active?'600':'400',cursor:active?'default':'pointer',border:`0.5px solid ${active?'#E8630A':T.border}`,background:active?'#E8630A':'transparent',color:active?'#fff':T.text2,flexShrink:0}}>
                 {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
                 {label}{key!=='All'&&<span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>}
               </button>
@@ -953,8 +976,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             {['All','???','Urgent','High','Medium','Low'].map(p=>{
               const cnt=p==='All'?null:priorityCounts[p]??0;
               const active=priorityFilter===p;
-              const PCOL={'???':T.text3,Urgent:T.danger,High:T.warn,Medium:T.success,Low:T.accent};
-              const color=p==='All'?T.accent:(PCOL[p]||T.text3);
+              const color=p==='All'?'#E8630A':(PRI_COLORS[p]||'#6b7280');
               return (
                 <button key={p} onClick={()=>setPriorityFilter(p)}
                   style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:active?'600':'400',cursor:active?'default':'pointer',border:`0.5px solid ${active?color:T.border}`,background:active?color:'transparent',color:active?'#fff':T.text2,flexShrink:0}}>
@@ -969,11 +991,12 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             <div style={{display:'flex',gap:'4px',flexShrink:0}}>
               {['Open','In Progress','On Hold','Closed','All'].map(s=>{
                 const active=statusFilter===s;
+                const sc={Open:'#3b82f6','In Progress':'#f59e0b','On Hold':'#6b7280',Closed:'#22c55e',All:'#E8630A'}[s]||'#E8630A';
                 return (
                   <button key={s} onClick={()=>setStatusFilter(s)}
-                    style={{padding:'3px 8px',borderRadius:'4px',cursor:'pointer',fontSize:F.xs,fontWeight:active?'600':'400',border:`0.5px solid ${active?T.bg3:T.border}`,background:active?T.bg3:'transparent',color:active?T.text0:T.text2,display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
+                    style={{padding:'3px 8px',borderRadius:'4px',cursor:'pointer',fontSize:F.xs,fontWeight:active?'600':'400',border:`0.5px solid ${active?sc:T.border}`,background:active?sc:'transparent',color:active?'#fff':T.text2,display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
                     {s}
-                    {active&&!loading&&<span style={{color:T.text3,fontSize:'10px'}}>·{tasks.length}</span>}
+                    {active&&!loading&&<span style={{opacity:0.7,fontSize:'10px'}}>·{tasks.length}</span>}
                   </button>
                 );
               })}
@@ -1156,7 +1179,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [data,setData]           = useState(initialTask||null);
   const [loading,setLoading]     = useState(!initialTask);
   const [notFound,setNotFound]   = useState(false);
-  const [users,setUsers]         = useState([]);
   const [activeProps,setActiveProps] = useState([]);
   const [vendors,setVendors]     = useState([]);
   const [tenants,setTenants]     = useState([]);
@@ -1200,7 +1222,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   },[prefixedId,initialTask]);
 
   useEffect(()=>{
-    sbFetch('users','select=id,full_name&status=eq.active&order=full_name.asc').then(setUsers).catch(()=>{});
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('vendors','select=id,company_dba,podio_id&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba,podio_id&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
@@ -1417,17 +1438,16 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           <span style={{fontSize:F.xs,color:T.text3,fontWeight:'600'}}>Type:</span>
           {Object.keys(TYPE_PREFIX).map(key=>{
             const active=data.record_type===key;
-            const color=TYPE_COLOR[key];
             return (
               <button key={key} onClick={()=>handleTypeChange(key)}
-                style={{padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,cursor:active?'default':'pointer',
-                  border:active?`0.5px solid ${color}`:`0.5px solid ${T.border}`,
-                  background:active?color:'transparent',
+                style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',
+                  border:`1px solid ${active?'#E8630A':T.border}`,
+                  background:active?'#E8630A':'transparent',
                   color:active?'#fff':T.text2,
-                  fontWeight:active?'600':'400',
-                  transition:'background 0.15s ease,border-color 0.15s ease,color 0.15s ease'}}
-                onMouseEnter={e=>{if(!active){e.currentTarget.style.background=`${color}22`;e.currentTarget.style.borderColor=color;}}}
-                onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
+                  fontWeight:active?600:'normal',
+                  transition:'all 0.15s ease'}}
+                onMouseEnter={e=>{if(!active){e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color='#E8630A';}}}
+                onMouseLeave={e=>{if(!active){e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text2;}}}>
                 {TYPE_SHORT[key]||key}
               </button>
             );
@@ -1483,7 +1503,11 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               </FieldRow>
             )}
             <FieldRow label="Assigned To">
-              <InlineSelect value={data.assigned_to} options={users.map(u=>({value:u.id,label:u.full_name}))} onSave={v=>save('assigned_to',v)}/>
+              <select value={data.assigned_to||''} onChange={async e=>save('assigned_to',e.target.value||null)}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.assigned_to?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {ASSIGNEES.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
             </FieldRow>
             <FieldRow label="FU Date">
               <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
@@ -1551,7 +1575,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 <InlineSelect value={data.wo_category} options={CATEGORY_OPTIONS.work_order} onSave={v=>save('wo_category',v)}/>
               </FieldRow>
               <FieldRow label="Stage">
-                <GenericPills value={data.stage} options={['New','In Progress','Waiting on Vendor','Waiting on Parts','Complete']} color={T.purple} onSave={v=>save('stage',v)}/>
+                <GenericPills value={data.stage} options={['New','In Progress','Waiting on Vendor','Waiting on Parts','Complete']} onSave={v=>save('stage',v)}/>
               </FieldRow>
               <FieldRow label="Bid Status">
                 <InlineBlurField value={data.bid_status||''} onSave={v=>save('bid_status',v)}/>
@@ -1583,7 +1607,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 <InlineSelect value={data.wo_type} options={['Standard','Recurring','Budget Item']} onSave={v=>save('wo_type',v)}/>
               </FieldRow>
               <FieldRow label="Email Request to Vendor">
-                <BoolPill value={data.email_request_sent} labelTrue="Yes" labelFalse="No" colorTrue={T.accent} onSave={v=>save('email_request_sent',v)}/>
+                <BoolPill value={data.email_request_sent} labelTrue="Yes" labelFalse="No" onSave={v=>save('email_request_sent',v)}/>
               </FieldRow>
               <FieldRow label="Estimate Amount">
                 <InlineBlurField value={data.estimate_amount!=null?String(data.estimate_amount):''} moneyFormat onSave={v=>save('estimate_amount',v?parseFloat(String(v).replace(/[^0-9.-]/g,'')):null)}/>
@@ -1595,13 +1619,13 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 <InlineBlurField value={data.invoice_location||''} onSave={v=>save('invoice_location',v)}/>
               </FieldRow>
               <FieldRow label="Invoice Stage">
-                <GenericPills value={data.invoice_stage} options={['Not Received','Received','Approved','Paid']} color={T.success} onSave={v=>save('invoice_stage',v)}/>
+                <GenericPills value={data.invoice_stage} options={['Not Received','Received','Approved','Paid']} onSave={v=>save('invoice_stage',v)}/>
               </FieldRow>
               <FieldRow label="Invoice Paid">
-                <BoolPill value={data.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" colorTrue={T.success} onSave={v=>save('invoice_paid',v)}/>
+                <BoolPill value={data.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" onSave={v=>save('invoice_paid',v)}/>
               </FieldRow>
               <FieldRow label="Budget Item">
-                <BoolPill value={data.is_budget_item} labelTrue="Yes" labelFalse="No" colorTrue={T.warn} onSave={v=>save('is_budget_item',v)}/>
+                <BoolPill value={data.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>save('is_budget_item',v)}/>
               </FieldRow>
               <FieldRow label="Pmt to Bookkeeper" topAlign>
                 <RichTextEditor value={data.pmt_instructions_to_bk} onSave={v=>save('pmt_instructions_to_bk',v)} minRows={5}/>
@@ -1610,7 +1634,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 <RichTextEditor value={data.final_closeout_notes} onSave={v=>save('final_closeout_notes',v)} minRows={5}/>
               </FieldRow>
               <FieldRow label="Make Recurring">
-                <BoolPill value={data.make_recurring} labelTrue="Yes" labelFalse="No" colorTrue={T.purple} onSave={v=>save('make_recurring',v)}/>
+                <BoolPill value={data.make_recurring} labelTrue="Yes" labelFalse="No" onSave={v=>save('make_recurring',v)}/>
               </FieldRow>
             </div>
           )}
@@ -1706,13 +1730,10 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const [vendors,setVendors] = useState([]);
   const [tenants,setTenants] = useState([]);
   const [activeProps,setActiveProps] = useState([]);
-  const [users,setUsers] = useState([]);
-
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('properties','select=prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
-    sbFetch('users','select=id,full_name&status=eq.active&order=full_name.asc').then(setUsers).catch(()=>{});
   },[]);
 
   useEffect(()=>{
@@ -1781,16 +1802,15 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
           <span style={{fontSize:F.xs,color:T.text3,fontWeight:'600'}}>Type:</span>
           {['work_order','task','project','acp_task','sg_task'].map(key=>{
             const active=formData.record_type===key;
-            const color=TYPE_COLOR[key];
             return (
               <button key={key} onClick={()=>set('record_type',key)}
-                style={{padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,cursor:active?'default':'pointer',
-                  border:active?`0.5px solid ${color}`:`0.5px solid ${T.border}`,
-                  background:active?color:'transparent',
-                  color:active?'#fff':T.text2,fontWeight:active?'600':'400',
-                  transition:'background 0.15s ease,border-color 0.15s ease,color 0.15s ease'}}
-                onMouseEnter={e=>{if(!active){e.currentTarget.style.background=`${color}22`;e.currentTarget.style.borderColor=color;}}}
-                onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
+                style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',
+                  border:`1px solid ${active?'#E8630A':T.border}`,
+                  background:active?'#E8630A':'transparent',
+                  color:active?'#fff':T.text2,fontWeight:active?600:'normal',
+                  transition:'all 0.15s ease'}}
+                onMouseEnter={e=>{if(!active){e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color='#E8630A';}}}
+                onMouseLeave={e=>{if(!active){e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text2;}}}>
                 {TYPE_SHORT_NEW[key]||key}
               </button>
             );
@@ -1800,7 +1820,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
       {/* Banner */}
       <div style={{background:'#451a03',borderBottom:`0.5px solid #92400e`,padding:'7px 16px',flexShrink:0}}>
         <span style={{fontSize:F.sm,color:'#fbbf24'}}>
-          New Item — fill in & Save
+          New - Fill &amp; Save
         </span>
       </div>
       {/* Form */}
@@ -1837,7 +1857,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             <select value={formData.assigned_to||''} onChange={e=>{set('assigned_to',e.target.value||null);if(e.target.value)setAssignedToError(false);}}
               style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${assignedToError?T.danger:T.border}`,borderRadius:'4px',padding:'5px 8px',color:formData.assigned_to?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
               <option value="">— select —</option>
-              {users.map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}
+              {ASSIGNEES.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
             {assignedToError&&<div style={{fontSize:F.xs,color:T.danger,marginTop:'3px'}}>Assigned To is required</div>}
           </FieldRow>
