@@ -1113,32 +1113,23 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             {key:'project',label:'Project',Icon:FolderOpen,color:'#a855f7'},
             {key:'acp_task',label:'ACP Task',Icon:Buildings,color:'#f97316'},
             {key:'sg_task',label:'S&G Task',Icon:Star,color:'#84cc16'},
-          ].map(({key,label,Icon,color})=>{
-            const sel=newModalType===key;
-            return (
-              <button key={key} onClick={()=>setNewModalType(key)}
-                style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',marginBottom:'8px',borderRadius:'6px',border:`1px solid ${sel?color:T.border}`,background:sel?`${color}18`:T.bg3,cursor:'pointer',textAlign:'left',transition:'all 0.15s'}}
-                onMouseEnter={e=>{if(!sel)e.currentTarget.style.background=T.bg3+'cc';}}
-                onMouseLeave={e=>{if(!sel)e.currentTarget.style.background=T.bg3;}}>
-                <Icon size={20} weight="bold" color={color}/>
-                <span style={{flex:1,fontSize:F.base,fontWeight:'500',color:T.text0}}>{label}</span>
-                <span style={{color:T.text3,fontSize:'16px'}}>›</span>
-              </button>
-            );
-          })}
-          {newModalType&&(
-            <button onClick={()=>{
-              const params=new URLSearchParams({type:newModalType});
+          ].map(({key,label,Icon,color})=>(
+            <button key={key} onClick={()=>{
+              const params=new URLSearchParams({type:key});
               if(filterPropCode)params.set('prop_code',filterPropCode);
               if(filterTenantId)params.set('tenant_id',filterTenantId);
               if(filterVendorId)params.set('vendor_id',filterVendorId);
               setNewModalOpen(false);
               window.location.href=`/tasks/new?${params.toString()}`;
             }}
-              style={{width:'100%',padding:'10px',background:'#E8630A',border:'none',borderRadius:'6px',color:'#fff',fontSize:F.base,fontWeight:'600',cursor:'pointer',marginTop:'4px'}}>
-              Create {TYPE_LABEL[newModalType]} →
+              style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',marginBottom:'8px',borderRadius:'6px',border:`1px solid ${T.border}`,background:T.bg3,cursor:'pointer',textAlign:'left',transition:'all 0.15s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background=T.bg3+'cc';e.currentTarget.style.borderColor=color;}}
+              onMouseLeave={e=>{e.currentTarget.style.background=T.bg3;e.currentTarget.style.borderColor=T.border;}}>
+              <Icon size={20} weight="bold" color={color}/>
+              <span style={{flex:1,fontSize:F.base,fontWeight:'500',color:T.text0}}>{label}</span>
+              <span style={{color:T.text3,fontSize:'16px'}}>›</span>
             </button>
-          )}
+          ))}
           <div style={{textAlign:'center',marginTop:'12px'}}>
             <button onClick={()=>{setNewModalOpen(false);setNewModalType(null);}}
               style={{background:'transparent',border:'none',cursor:'pointer',color:T.text2,fontSize:F.sm}}>
@@ -1209,7 +1200,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   },[prefixedId,initialTask]);
 
   useEffect(()=>{
-    sbFetch('users','select=id,full_name&order=full_name.asc').then(setUsers).catch(()=>{});
+    sbFetch('users','select=id,full_name&status=eq.active&order=full_name.asc').then(setUsers).catch(()=>{});
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('vendors','select=id,company_dba,podio_id&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba,podio_id&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
@@ -1497,9 +1488,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             <FieldRow label="FU Date">
               <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
             </FieldRow>
-            <FieldRow label="FU End Date">
-              <InlineBlurField type="date" value={data.follow_up_end_date||''} onSave={v=>save('follow_up_end_date',v)}/>
-            </FieldRow>
             <FieldRow label="FU Notes" topAlign>
               <RichTextEditor value={data.follow_up_notes} onSave={v=>save('follow_up_notes',v)} minRows={5}/>
             </FieldRow>
@@ -1705,7 +1693,6 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
     category: null,
     details: null,
     follow_up_date: null,
-    follow_up_end_date: null,
     follow_up_notes: null,
     wo_category: null,
     stage: null,
@@ -1715,6 +1702,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const [saving,setSaving] = useState(false);
   const [saveError,setSaveError] = useState(null);
   const [titleError,setTitleError] = useState(false);
+  const [assignedToError,setAssignedToError] = useState(false);
   const [vendors,setVendors] = useState([]);
   const [tenants,setTenants] = useState([]);
   const [activeProps,setActiveProps] = useState([]);
@@ -1724,7 +1712,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
     sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('properties','select=prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
-    sbFetch('users','select=id,full_name&order=full_name.asc').then(setUsers).catch(()=>{});
+    sbFetch('users','select=id,full_name&status=eq.active&order=full_name.asc').then(setUsers).catch(()=>{});
   },[]);
 
   useEffect(()=>{
@@ -1740,6 +1728,11 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
       setTimeout(()=>setTitleError(false),1200);
       return;
     }
+    if(!formData.assigned_to){
+      setAssignedToError(true);
+      return;
+    }
+    setAssignedToError(false);
     setSaving(true);setSaveError(null);
     try{
       const body={};
@@ -1780,7 +1773,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
           {saveError&&<span style={{fontSize:F.xs,color:T.danger}}>{saveError}</span>}
           <button onClick={handleSave} disabled={saving}
             style={{marginLeft:'auto',background:saving?T.bg3:'#22c55e',border:'none',borderRadius:'4px',padding:'6px 16px',color:'#fff',fontSize:F.sm,fontWeight:'600',cursor:saving?'not-allowed':'pointer',flexShrink:0}}>
-            {saving?'Saving…':'Save New Record'}
+            {saving?'Saving…':'Save'}
           </button>
         </div>
         {/* Type pills */}
@@ -1807,7 +1800,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
       {/* Banner */}
       <div style={{background:'#451a03',borderBottom:`0.5px solid #92400e`,padding:'7px 16px',flexShrink:0}}>
         <span style={{fontSize:F.sm,color:'#fbbf24'}}>
-          New {TYPE_LABEL[formData.record_type]} — fill in details and click Save to create
+          New Item — fill in & Save
         </span>
       </div>
       {/* Form */}
@@ -1840,14 +1833,16 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
               <InlineSelect value={formData.category} options={categoryOpts} onSave={v=>set('category',v)}/>
             </FieldRow>
           )}
-          <FieldRow label="Assigned To">
-            <InlineSelect value={formData.assigned_to} options={users.map(u=>({value:u.id,label:u.full_name}))} onSave={v=>set('assigned_to',v)}/>
+          <FieldRow label="Assigned To *">
+            <select value={formData.assigned_to||''} onChange={e=>{set('assigned_to',e.target.value||null);if(e.target.value)setAssignedToError(false);}}
+              style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${assignedToError?T.danger:T.border}`,borderRadius:'4px',padding:'5px 8px',color:formData.assigned_to?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+              <option value="">— select —</option>
+              {users.map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}
+            </select>
+            {assignedToError&&<div style={{fontSize:F.xs,color:T.danger,marginTop:'3px'}}>Assigned To is required</div>}
           </FieldRow>
           <FieldRow label="FU Date">
             <InlineBlurField type="date" value={formData.follow_up_date||''} onSave={v=>set('follow_up_date',v)}/>
-          </FieldRow>
-          <FieldRow label="FU End Date">
-            <InlineBlurField type="date" value={formData.follow_up_end_date||''} onSave={v=>set('follow_up_end_date',v)}/>
           </FieldRow>
           <FieldRow label="FU Notes" topAlign>
             <RichTextEditor value={formData.follow_up_notes} onSave={v=>set('follow_up_notes',v)} minRows={5}/>
@@ -1886,7 +1881,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
           </button>
           <button onClick={handleSave} disabled={saving}
             style={{background:saving?T.bg3:'#22c55e',border:'none',borderRadius:'4px',padding:'8px 24px',color:'#fff',fontSize:F.base,fontWeight:'600',cursor:saving?'not-allowed':'pointer'}}>
-            {saving?'Saving…':'Save New Record'}
+            {saving?'Saving…':'Save'}
           </button>
         </div>
       </div>
