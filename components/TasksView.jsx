@@ -177,6 +177,20 @@ const ASSIGNEES = [
 const PRI_COLORS = { '???':'#6b7280', Urgent:'#ef4444', High:'#f97316', Medium:'#f59e0b', Low:'#22c55e' };
 const STA_COLORS = { Open:'#3b82f6', 'In Progress':'#f59e0b', 'On Hold':'#6b7280', Closed:'#22c55e', Cancelled:'#ef4444' };
 
+// ── WO-specific pill option sets ─────────────────────────────────────────────
+const WO_TYPE_OPTIONS = ['Work Order Request','Request For Proposal'];
+const EMAIL_REQUEST_OPTIONS = ['No Files','With Files','Discussed In-Person'];
+const INVOICE_STAGE_OPTIONS = ['Email to BK Now','Pending','Uploaded to TO PAY'];
+const INVOICE_LOCATION_OPTIONS = [{label:"'Files'",value:'Files'},{label:'@comments',value:'@comments'}];
+const WORK_STAGE_OPTIONS = [
+  {label:'-Pending',           value:'Pending'},
+  {label:'Work Done - Request Invoice', value:'Work Done - Request Invoice'},
+  {label:'CLOSE - WORK DONE',  value:'CLOSE - WORK DONE'},
+  {label:'CLOSE - Create FU WO',value:'CLOSE - Create FU WO'},
+  {label:'+CLOSE - Work NOT Done',value:'+CLOSE - Work NOT Done'},
+  {label:'++ RE-OPEN WORK ORDER',value:'++ RE-OPEN WORK ORDER'},
+];
+
 // ── Category options (from actual DB data) ────────────────────────────────────
 export const PRIORITY_ORDER = { '???':0, Urgent:1, High:2, Medium:3, Low:4 };
 const PRIORITY_OPTIONS = ['???','Urgent','High','Medium','Low'];
@@ -376,23 +390,26 @@ const StatusPills = ({ value, onSave }) => {
 };
 
 // ── GenericPills (stage, wo_type, invoice_stage) ──────────────────────────────
+// options: string[] or {label,value}[] — clicking active pill deselects (sets null)
 const GenericPills = ({ value, options, onSave }) => {
   const [hov,setHov] = useState(null);
   return (
     <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
       {options.map(opt=>{
-        const active=value===opt;
-        const isHov=!active&&hov===opt;
+        const v = typeof opt==='object'?opt.value:opt;
+        const label = typeof opt==='object'?opt.label:opt;
+        const active=value===v;
+        const isHov=!active&&hov===v;
         return (
-          <button key={opt} onClick={()=>!active&&onSave(opt)}
-            onMouseEnter={()=>!active&&setHov(opt)}
+          <button key={v} onClick={()=>onSave(active?null:v)}
+            onMouseEnter={()=>!active&&setHov(v)}
             onMouseLeave={()=>setHov(null)}
-            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',transition:'all 0.15s ease',
+            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:'pointer',transition:'all 0.15s ease',
               border:`1px solid ${active?'#E8630A':(isHov?'#E8630A':T.border)}`,
               background:active?'#E8630A':'transparent',
               color:active?'#fff':(isHov?'#E8630A':T.text2),
               fontWeight:active?600:'normal'}}>
-            {opt}
+            {label}
           </button>
         );
       })}
@@ -1495,19 +1512,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 </div>
               )}
             </FieldRow>
-            <FieldRow label="Priority"><PriorityPills value={data.priority} onSave={v=>save('priority',v)}/></FieldRow>
-            <FieldRow label="Status"><StatusPills value={data.status} onSave={handleStatusChange}/></FieldRow>
-            {data.record_type!=='work_order'&&(
-              <FieldRow label="Category">
-                <InlineSelect value={data.category} options={categoryOpts} onSave={v=>save('category',v)}/>
-              </FieldRow>
-            )}
-            <FieldRow label="Assigned To">
-              <select value={data.assigned_to||''} onChange={async e=>save('assigned_to',e.target.value||null)}
-                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.assigned_to?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
-                <option value="">—</option>
-                {ASSIGNEES.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+            <FieldRow label="Alert">
+              <InlineBlurField value={data.alert||''} onSave={v=>save('alert',v)}/>
             </FieldRow>
             <FieldRow label="FU Date">
               <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
@@ -1515,14 +1521,25 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             <FieldRow label="FU Notes" topAlign>
               <RichTextEditor value={data.follow_up_notes} onSave={v=>save('follow_up_notes',v)} minRows={5}/>
             </FieldRow>
+            <FieldRow label="Priority"><PriorityPills value={data.priority} onSave={v=>save('priority',v)}/></FieldRow>
+            <FieldRow label="Assigned To">
+              <select value={data.assigned_to||''} onChange={async e=>save('assigned_to',e.target.value||null)}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.assigned_to?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {ASSIGNEES.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </FieldRow>
+            <FieldRow label="Status"><StatusPills value={data.status} onSave={handleStatusChange}/></FieldRow>
+            {data.record_type!=='work_order'&&(
+              <FieldRow label="Category">
+                <InlineSelect value={data.category} options={categoryOpts} onSave={v=>save('category',v)}/>
+              </FieldRow>
+            )}
             <FieldRow label="Details" topAlign>
               <RichTextEditor value={data.details} onSave={v=>save('details',v)} minRows={5}/>
             </FieldRow>
-            <FieldRow label="Alert">
-              <InlineBlurField value={data.alert||''} onSave={v=>save('alert',v)}/>
-            </FieldRow>
-            <FieldRow label="Key Safe Info">
-              <InlineBlurField value={data.key_safe_info||''} onSave={v=>save('key_safe_info',v)}/>
+            <FieldRow label="Internal Notes" topAlign>
+              <RichTextEditor value={data.internal_notes} onSave={v=>save('internal_notes',v)} minRows={5}/>
             </FieldRow>
             <FieldRow label="Depends On Task #">
               <InlineBlurField value={data.depends_on_task_id!=null?String(data.depends_on_task_id):''} onSave={v=>save('depends_on_task_id',v||null)}/>
@@ -1574,11 +1591,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               <FieldRow label="WO Category">
                 <InlineSelect value={data.wo_category} options={CATEGORY_OPTIONS.work_order} onSave={v=>save('wo_category',v)}/>
               </FieldRow>
-              <FieldRow label="Stage">
-                <GenericPills value={data.stage} options={['New','In Progress','Waiting on Vendor','Waiting on Parts','Complete']} onSave={v=>save('stage',v)}/>
+              <FieldRow label="Budget Item?">
+                <BoolPill value={data.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>save('is_budget_item',v)}/>
               </FieldRow>
-              <FieldRow label="Bid Status">
-                <InlineBlurField value={data.bid_status||''} onSave={v=>save('bid_status',v)}/>
+              <FieldRow label="WO Instructions to Vendor" topAlign>
+                <RichTextEditor value={data.instructions_to_vendor} onSave={v=>save('instructions_to_vendor',v)} minRows={5}/>
+              </FieldRow>
+              <FieldRow label="Keys / Key Safe">
+                <InlineBlurField value={data.key_safe_info||''} onSave={v=>save('key_safe_info',v)}/>
               </FieldRow>
               <FieldRow label="Vendor" topAlign>
                 <InlineSelect value={data.vendor_id} options={vendors.map(v=>({value:v.id,label:v.company_dba}))} onSave={v=>save('vendor_id',v)}/>
@@ -1600,41 +1620,52 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                   </a>
                 )}
               </FieldRow>
-              <FieldRow label="Instructions to Vendor" topAlign>
-                <RichTextEditor value={data.instructions_to_vendor} onSave={v=>save('instructions_to_vendor',v)} minRows={5}/>
-              </FieldRow>
               <FieldRow label="WO Type">
-                <InlineSelect value={data.wo_type} options={['Standard','Recurring','Budget Item']} onSave={v=>save('wo_type',v)}/>
+                <GenericPills value={data.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>save('wo_type',v)}/>
               </FieldRow>
-              <FieldRow label="Email Request to Vendor">
-                <BoolPill value={data.email_request_sent} labelTrue="Yes" labelFalse="No" onSave={v=>save('email_request_sent',v)}/>
+              <FieldRow label="Email Request To Vendor">
+                <GenericPills value={data.email_request_sent} options={EMAIL_REQUEST_OPTIONS} onSave={v=>save('email_request_sent',v)}/>
               </FieldRow>
               <FieldRow label="Estimate Amount">
                 <InlineBlurField value={data.estimate_amount!=null?String(data.estimate_amount):''} moneyFormat onSave={v=>save('estimate_amount',v?parseFloat(String(v).replace(/[^0-9.-]/g,'')):null)}/>
               </FieldRow>
-              <FieldRow label="Estimate Log" topAlign>
+              <FieldRow label="Log" topAlign>
                 <RichTextEditor value={data.estimate_log} onSave={v=>save('estimate_log',v)} minRows={5}/>
               </FieldRow>
+              <FieldRow label="Pmt Instructions to BK">
+                <InlineBlurField value={data.pmt_instructions_to_bk||''} onSave={v=>save('pmt_instructions_to_bk',v)}/>
+              </FieldRow>
               <FieldRow label="Invoice Location">
-                <InlineBlurField value={data.invoice_location||''} onSave={v=>save('invoice_location',v)}/>
+                <GenericPills value={data.invoice_location} options={INVOICE_LOCATION_OPTIONS} onSave={v=>save('invoice_location',v)}/>
               </FieldRow>
               <FieldRow label="Invoice Stage">
-                <GenericPills value={data.invoice_stage} options={['Not Received','Received','Approved','Paid']} onSave={v=>save('invoice_stage',v)}/>
+                <GenericPills value={data.invoice_stage} options={INVOICE_STAGE_OPTIONS} onSave={v=>save('invoice_stage',v)}/>
               </FieldRow>
               <FieldRow label="Invoice Paid">
                 <BoolPill value={data.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" onSave={v=>save('invoice_paid',v)}/>
               </FieldRow>
-              <FieldRow label="Budget Item">
-                <BoolPill value={data.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>save('is_budget_item',v)}/>
-              </FieldRow>
-              <FieldRow label="Pmt to Bookkeeper" topAlign>
-                <RichTextEditor value={data.pmt_instructions_to_bk} onSave={v=>save('pmt_instructions_to_bk',v)} minRows={5}/>
-              </FieldRow>
-              <FieldRow label="Final Closeout Notes" topAlign>
+              <FieldRow label="Final Close-Out Notes" topAlign>
                 <RichTextEditor value={data.final_closeout_notes} onSave={v=>save('final_closeout_notes',v)} minRows={5}/>
+              </FieldRow>
+              <FieldRow label="Work Stage">
+                <GenericPills value={data.stage} options={WORK_STAGE_OPTIONS} onSave={v=>save('stage',v)}/>
               </FieldRow>
               <FieldRow label="Make Recurring">
                 <BoolPill value={data.make_recurring} labelTrue="Yes" labelFalse="No" onSave={v=>save('make_recurring',v)}/>
+              </FieldRow>
+              <FieldRow label="Bid Status">
+                <InlineBlurField value={data.bid_status||''} onSave={v=>save('bid_status',v)}/>
+              </FieldRow>
+              <FieldRow label="Drive Folder" hoverable={false}>
+                {data.drive_folder_url
+                  ?<a href={data.drive_folder_url} target="_blank" rel="noopener noreferrer"
+                    style={{display:'inline-block',padding:'4px 12px',border:`1px solid #E8630A`,borderRadius:'4px',color:'#E8630A',fontSize:F.sm,textDecoration:'none',cursor:'pointer'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(232,99,10,0.08)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    📁 Open Drive Folder
+                  </a>
+                  :<span style={{fontSize:F.sm,color:T.text2}}>No Drive folder linked</span>
+                }
               </FieldRow>
             </div>
           )}
@@ -1716,12 +1747,27 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
     vendor_id: initVendorId,
     category: null,
     details: null,
+    internal_notes: null,
+    alert: null,
     follow_up_date: null,
     follow_up_notes: null,
-    wo_category: null,
-    stage: null,
-    instructions_to_vendor: null,
     assigned_to: null,
+    // WO fields
+    wo_category: null,
+    is_budget_item: null,
+    instructions_to_vendor: null,
+    key_safe_info: null,
+    wo_type: null,
+    email_request_sent: null,
+    estimate_amount: null,
+    estimate_log: null,
+    pmt_instructions_to_bk: null,
+    invoice_location: null,
+    invoice_stage: null,
+    invoice_paid: null,
+    final_closeout_notes: null,
+    stage: null,
+    make_recurring: null,
   });
   const [saving,setSaving] = useState(false);
   const [saveError,setSaveError] = useState(null);
@@ -1846,13 +1892,16 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
               <div style={{fontSize:F.sm,fontWeight:'500',color:T.text0}}>{propInfo.property_name}</div>
             </div>}
           </FieldRow>
+          <FieldRow label="Alert">
+            <InlineBlurField value={formData.alert||''} onSave={v=>set('alert',v)}/>
+          </FieldRow>
+          <FieldRow label="FU Date">
+            <InlineBlurField type="date" value={formData.follow_up_date||''} onSave={v=>set('follow_up_date',v)}/>
+          </FieldRow>
+          <FieldRow label="FU Notes" topAlign>
+            <RichTextEditor value={formData.follow_up_notes} onSave={v=>set('follow_up_notes',v)} minRows={5}/>
+          </FieldRow>
           <FieldRow label="Priority"><PriorityPills value={formData.priority} onSave={v=>set('priority',v)}/></FieldRow>
-          <FieldRow label="Status"><StatusPills value={formData.status} onSave={v=>set('status',v)}/></FieldRow>
-          {formData.record_type!=='work_order'&&(
-            <FieldRow label="Category">
-              <InlineSelect value={formData.category} options={categoryOpts} onSave={v=>set('category',v)}/>
-            </FieldRow>
-          )}
           <FieldRow label="Assigned To *">
             <select value={formData.assigned_to||''} onChange={e=>{set('assigned_to',e.target.value||null);if(e.target.value)setAssignedToError(false);}}
               style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${assignedToError?T.danger:T.border}`,borderRadius:'4px',padding:'5px 8px',color:formData.assigned_to?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
@@ -1861,14 +1910,17 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             </select>
             {assignedToError&&<div style={{fontSize:F.xs,color:T.danger,marginTop:'3px'}}>Assigned To is required</div>}
           </FieldRow>
-          <FieldRow label="FU Date">
-            <InlineBlurField type="date" value={formData.follow_up_date||''} onSave={v=>set('follow_up_date',v)}/>
-          </FieldRow>
-          <FieldRow label="FU Notes" topAlign>
-            <RichTextEditor value={formData.follow_up_notes} onSave={v=>set('follow_up_notes',v)} minRows={5}/>
-          </FieldRow>
+          <FieldRow label="Status"><StatusPills value={formData.status} onSave={v=>set('status',v)}/></FieldRow>
+          {formData.record_type!=='work_order'&&(
+            <FieldRow label="Category">
+              <InlineSelect value={formData.category} options={categoryOpts} onSave={v=>set('category',v)}/>
+            </FieldRow>
+          )}
           <FieldRow label="Details" topAlign>
             <RichTextEditor value={formData.details} onSave={v=>set('details',v)} minRows={5}/>
+          </FieldRow>
+          <FieldRow label="Internal Notes" topAlign>
+            <RichTextEditor value={formData.internal_notes} onSave={v=>set('internal_notes',v)} minRows={5}/>
           </FieldRow>
         </div>
         {/* WO-specific section */}
@@ -1882,14 +1934,53 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             <FieldRow label="WO Category">
               <InlineSelect value={formData.wo_category} options={CATEGORY_OPTIONS.work_order} onSave={v=>set('wo_category',v)}/>
             </FieldRow>
+            <FieldRow label="Budget Item?">
+              <BoolPill value={formData.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>set('is_budget_item',v)}/>
+            </FieldRow>
+            <FieldRow label="WO Instructions to Vendor" topAlign>
+              <RichTextEditor value={formData.instructions_to_vendor} onSave={v=>set('instructions_to_vendor',v)} minRows={5}/>
+            </FieldRow>
+            <FieldRow label="Keys / Key Safe">
+              <InlineBlurField value={formData.key_safe_info||''} onSave={v=>set('key_safe_info',v)}/>
+            </FieldRow>
             <FieldRow label="Vendor">
               <InlineSelect value={formData.vendor_id} options={vendors.map(v=>({value:v.id,label:v.company_dba}))} onSave={v=>set('vendor_id',v)}/>
             </FieldRow>
             <FieldRow label="Tenant">
               <InlineSelect value={formData.tenant_id} options={tenants.map(t=>({value:t.id,label:t.tenant_dba}))} onSave={v=>set('tenant_id',v)}/>
             </FieldRow>
-            <FieldRow label="Instructions to Vendor" topAlign>
-              <RichTextEditor value={formData.instructions_to_vendor} onSave={v=>set('instructions_to_vendor',v)} minRows={5}/>
+            <FieldRow label="WO Type">
+              <GenericPills value={formData.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>set('wo_type',v)}/>
+            </FieldRow>
+            <FieldRow label="Email Request To Vendor">
+              <GenericPills value={formData.email_request_sent} options={EMAIL_REQUEST_OPTIONS} onSave={v=>set('email_request_sent',v)}/>
+            </FieldRow>
+            <FieldRow label="Estimate Amount">
+              <InlineBlurField type="number" value={formData.estimate_amount!=null?String(formData.estimate_amount):''} onSave={v=>set('estimate_amount',v?parseFloat(v):null)}/>
+            </FieldRow>
+            <FieldRow label="Log" topAlign>
+              <RichTextEditor value={formData.estimate_log} onSave={v=>set('estimate_log',v)} minRows={5}/>
+            </FieldRow>
+            <FieldRow label="Pmt Instructions to BK">
+              <InlineBlurField value={formData.pmt_instructions_to_bk||''} onSave={v=>set('pmt_instructions_to_bk',v)}/>
+            </FieldRow>
+            <FieldRow label="Invoice Location">
+              <GenericPills value={formData.invoice_location} options={INVOICE_LOCATION_OPTIONS} onSave={v=>set('invoice_location',v)}/>
+            </FieldRow>
+            <FieldRow label="Invoice Stage">
+              <GenericPills value={formData.invoice_stage} options={INVOICE_STAGE_OPTIONS} onSave={v=>set('invoice_stage',v)}/>
+            </FieldRow>
+            <FieldRow label="Invoice Paid">
+              <BoolPill value={formData.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" onSave={v=>set('invoice_paid',v)}/>
+            </FieldRow>
+            <FieldRow label="Final Close-Out Notes" topAlign>
+              <RichTextEditor value={formData.final_closeout_notes} onSave={v=>set('final_closeout_notes',v)} minRows={5}/>
+            </FieldRow>
+            <FieldRow label="Work Stage">
+              <GenericPills value={formData.stage} options={WORK_STAGE_OPTIONS} onSave={v=>set('stage',v)}/>
+            </FieldRow>
+            <FieldRow label="Make Recurring">
+              <BoolPill value={formData.make_recurring} labelTrue="Yes" labelFalse="No" onSave={v=>set('make_recurring',v)}/>
             </FieldRow>
           </div>
         )}
