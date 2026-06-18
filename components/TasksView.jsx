@@ -1702,7 +1702,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           {detailTab==='comms'&&(
             <div style={{flex:1,overflow:'auto',background:T.bg1}}>
               <CommunicationTimeline
-                recordType="task"
+                recordType={data.record_type}
                 recordId={data.id}
                 fromAccount="scott@andersoncp.com"
                 crmRecordLabel={`${displayId}${data.title ? ` — ${data.title}` : ''}`}
