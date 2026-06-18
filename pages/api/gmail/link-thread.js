@@ -11,10 +11,6 @@ export default async function handler(req, res) {
   try {
     const sb = createServerClient();
 
-    // Known constraint on email_thread_links from webhook.js: (thread_id, record_type, record_id)
-    // Logging for verification at runtime:
-    console.log('[link-thread] constraint: thread_id,record_type,record_id (verified from webhook.js upsert)');
-
     const { error: updateErr } = await sb
       .from('email_threads')
       .update({
@@ -39,8 +35,48 @@ export default async function handler(req, res) {
         link_source: 'manual',
       }, { onConflict: 'thread_id,record_type,record_id' });
     } catch (linkErr) {
-      // Skip on duplicate key — thread update already succeeded
-      console.log('[link-thread] email_thread_links skip (duplicate or schema):', linkErr?.message);
+      console.log('[link-thread] email_thread_links skip:', linkErr?.message);
+    }
+
+    // Fetch thread + latest message to build timeline entry
+    const { data: thread } = await sb
+      .from('email_threads')
+      .select('subject, snippet, last_message_at')
+      .eq('id', threadId)
+      .single();
+
+    const { data: latestMsg } = await sb
+      .from('email_messages')
+      .select('id, from_address, from_name, snippet, is_outbound, sent_at, received_at')
+      .eq('thread_id', threadId)
+      .order('sent_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (thread) {
+      const entryAt =
+        latestMsg?.sent_at ||
+        latestMsg?.received_at ||
+        thread.last_message_at ||
+        new Date().toISOString();
+
+      const { error: ctErr } = await sb.from('communication_timeline').insert({
+        record_type:      recordType,
+        record_id:        recordId,
+        entry_type:       'email',
+        email_thread_id:  threadId,
+        email_message_id: latestMsg?.id || null,
+        subject:          thread.subject || '(no subject)',
+        body_preview:     latestMsg?.snippet || thread.snippet || '',
+        direction:        latestMsg?.is_outbound ? 'outbound' : 'inbound',
+        from_address:     latestMsg?.from_address || null,
+        from_name:        latestMsg?.from_name || null,
+        entry_at:         entryAt,
+      });
+
+      if (ctErr) {
+        console.error('[link-thread] communication_timeline insert error:', ctErr.message);
+      }
     }
 
     return res.status(200).json({ ok: true });
