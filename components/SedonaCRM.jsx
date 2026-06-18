@@ -316,7 +316,7 @@ const generateRentRollPDF = (property, rentRows, occupancy) => {
       <td style="text-align:right">${r.base_per_sf?Number(r.base_per_sf).toFixed(2):'—'}</td>
       <td style="text-align:right">${r.nnn_per_sf?Number(r.nnn_per_sf).toFixed(2):'—'}</td>
     </tr>`).join('');
-  win.document.write(`<!DOCTYPE html><html><head><title>Rent Roll - ${property.prop_code}</title>
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rent Roll - ${property.prop_code}</title>
   <style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}h2{font-size:14px;margin-bottom:4px}
   table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#f0f0f0;border:1px solid #ccc;padding:4px 6px;font-size:10px}
   td{border:1px solid #ddd;padding:4px 6px}tfoot td{background:#f0f0f0;font-weight:bold}

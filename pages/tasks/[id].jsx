@@ -1,11 +1,25 @@
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
-import { TaskDetail } from '../../components/TasksView';
+import { TaskDetail, NewTaskForm } from '../../components/TasksView';
 
 export default function TaskDetailPage() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id, type, prop_code, tenant_id, vendor_id } = router.query;
   if (!id) return null;
+
+  if (id === 'new') {
+    return (
+      <AppShell activeView="tasks">
+        <NewTaskForm
+          initType={type || 'task'}
+          initPropCode={prop_code || null}
+          initTenantId={tenant_id || null}
+          initVendorId={vendor_id || null}
+        />
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell activeView="tasks">
       <TaskDetail

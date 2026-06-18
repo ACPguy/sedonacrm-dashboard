@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
-  Wrench, CheckFat, NotePencil, FolderOpen, Buildings, House, ClipboardText, ChatCircle,
+  Wrench, CheckFat, NotePencil, FolderOpen, Buildings, House, Star, ClipboardText, ChatCircle,
   CaretLeft, CaretRight,
 } from '@phosphor-icons/react';
 import {
@@ -167,6 +167,30 @@ export const PriorityDot = ({ priority }) => {
   );
 };
 
+// ── Hardcoded assignees ───────────────────────────────────────────────────────
+const ASSIGNEES = [
+  { id: '573b65b5-ba16-437b-9101-d0bff2453dde', name: 'Scott Anderson' },
+  { id: '9e79f9cd-4415-40d3-b1ce-5c50b35dbf5e', name: 'Gabrielle Anderson' },
+];
+
+// ── Pill color maps ───────────────────────────────────────────────────────────
+const PRI_COLORS = { '???':'#6b7280', Urgent:'#ef4444', High:'#f97316', Medium:'#f59e0b', Low:'#22c55e' };
+const STA_COLORS = { Open:'#3b82f6', 'In Progress':'#f59e0b', 'On Hold':'#6b7280', Closed:'#22c55e', Cancelled:'#ef4444' };
+
+// ── WO-specific pill option sets ─────────────────────────────────────────────
+const WO_TYPE_OPTIONS = ['Work Order Request','Request For Proposal'];
+const EMAIL_REQUEST_OPTIONS = ['No Files','With Files','Discussed In-Person'];
+const INVOICE_STAGE_OPTIONS = ['Email to BK Now','Pending','Uploaded to TO PAY'];
+const INVOICE_LOCATION_OPTIONS = [{label:"'Files'",value:'Files'},{label:'@comments',value:'@comments'}];
+const WORK_STAGE_OPTIONS = [
+  {label:'-Pending',           value:'Pending'},
+  {label:'Work Done - Request Invoice', value:'Work Done - Request Invoice'},
+  {label:'CLOSE - WORK DONE',  value:'CLOSE - WORK DONE'},
+  {label:'CLOSE - Create FU WO',value:'CLOSE - Create FU WO'},
+  {label:'+CLOSE - Work NOT Done',value:'+CLOSE - Work NOT Done'},
+  {label:'++ RE-OPEN WORK ORDER',value:'++ RE-OPEN WORK ORDER'},
+];
+
 // ── Category options (from actual DB data) ────────────────────────────────────
 export const PRIORITY_ORDER = { '???':0, Urgent:1, High:2, Medium:3, Low:4 };
 const PRIORITY_OPTIONS = ['???','Urgent','High','Medium','Low'];
@@ -314,89 +338,106 @@ const InlineSelect = ({ value, options, onSave }) => (
 );
 
 // ── PriorityPills ─────────────────────────────────────────────────────────────
-const PRI_STYLES = {
-  '???':  {activeBg:T.bg3,     activeColor:T.text0, activeBorder:T.text2,   hover:'rgba(107,114,128,0.15)'},
-  Urgent: {activeBg:T.danger,  activeColor:'#fff',   activeBorder:T.danger,  hover:`${T.danger}22`},
-  High:   {activeBg:T.warn,    activeColor:'#fff',   activeBorder:T.warn,    hover:`${T.warn}22`},
-  Medium: {activeBg:T.success, activeColor:'#fff',   activeBorder:T.success, hover:`${T.success}22`},
-  Low:    {activeBg:T.accent,  activeColor:'#fff',   activeBorder:T.accent,  hover:`${T.accent}22`},
+const PriorityPills = ({ value, onSave }) => {
+  const [hov,setHov] = useState(null);
+  return (
+    <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+      {PRIORITY_OPTIONS.map(opt=>{
+        const active=(value||'???')===opt;
+        const c=PRI_COLORS[opt]||'#6b7280';
+        const isHov=!active&&hov===opt;
+        return (
+          <button key={opt} onClick={()=>!active&&onSave(opt)}
+            onMouseEnter={()=>!active&&setHov(opt)}
+            onMouseLeave={()=>setHov(null)}
+            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',transition:'all 0.15s ease',
+              border:`1px solid ${active||isHov?c:T.border}`,
+              background:active?c:'transparent',
+              color:active?'#fff':(isHov?c:T.text2),
+              fontWeight:active?600:'normal'}}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
 };
-const PriorityPills = ({ value, onSave }) => (
-  <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-    {PRIORITY_OPTIONS.map(opt=>{
-      const active=(value||'???')===opt;
-      const s=PRI_STYLES[opt]||PRI_STYLES['???'];
-      return (
-        <button key={opt} onClick={()=>!active&&onSave(opt)}
-          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`0.5px solid ${active?s.activeBorder:T.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:T.text2,transition:'background 0.15s ease'}}
-          onMouseEnter={e=>{if(!active){e.currentTarget.style.background=s.hover;e.currentTarget.style.borderColor=s.activeBorder;}}}
-          onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
-          {opt}
-        </button>
-      );
-    })}
-  </div>
-);
 
 // ── StatusPills ───────────────────────────────────────────────────────────────
-const STA_STYLES = {
-  Open:          {activeBg:T.accent,  activeColor:'#fff',  activeBorder:T.accent,  hover:`${T.accent}22`},
-  'In Progress': {activeBg:T.purple,  activeColor:'#fff',  activeBorder:T.purple,  hover:`${T.purple}22`},
-  'On Hold':     {activeBg:T.warn,    activeColor:T.bg0,   activeBorder:T.warn,    hover:`${T.warn}22`},
-  Closed:        {activeBg:T.text2,   activeColor:'#fff',  activeBorder:T.text2,   hover:'rgba(90,98,114,0.15)'},
-  Cancelled:     {activeBg:T.danger,  activeColor:'#fff',  activeBorder:T.danger,  hover:`${T.danger}22`},
+const StatusPills = ({ value, onSave }) => {
+  const [hov,setHov] = useState(null);
+  return (
+    <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+      {STATUS_OPTIONS.map(opt=>{
+        const active=(value||'Open')===opt;
+        const c=STA_COLORS[opt]||'#6b7280';
+        const isHov=!active&&hov===opt;
+        return (
+          <button key={opt} onClick={()=>!active&&onSave(opt)}
+            onMouseEnter={()=>!active&&setHov(opt)}
+            onMouseLeave={()=>setHov(null)}
+            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',transition:'all 0.15s ease',
+              border:`1px solid ${active||isHov?c:T.border}`,
+              background:active?c:'transparent',
+              color:active?'#fff':(isHov?c:T.text2),
+              fontWeight:active?600:'normal'}}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
 };
-const StatusPills = ({ value, onSave }) => (
-  <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-    {STATUS_OPTIONS.map(opt=>{
-      const active=(value||'Open')===opt;
-      const s=STA_STYLES[opt]||STA_STYLES.Open;
-      return (
-        <button key={opt} onClick={()=>!active&&onSave(opt)}
-          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`0.5px solid ${active?s.activeBorder:T.border}`,background:active?s.activeBg:'transparent',color:active?s.activeColor:T.text2,transition:'background 0.15s ease'}}
-          onMouseEnter={e=>{if(!active){e.currentTarget.style.background=s.hover;e.currentTarget.style.borderColor=s.activeBorder;}}}
-          onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
-          {opt}
-        </button>
-      );
-    })}
-  </div>
-);
 
 // ── GenericPills (stage, wo_type, invoice_stage) ──────────────────────────────
-const GenericPills = ({ value, options, color, onSave }) => (
-  <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
-    {options.map(opt=>{
-      const active=value===opt;
-      return (
-        <button key={opt} onClick={()=>!active&&onSave(opt)}
-          style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:active?'default':'pointer',border:`1px solid ${color}`,background:active?color:'transparent',color:active?'#fff':color,transition:'background 0.15s ease'}}
-          onMouseEnter={e=>{if(!active)e.currentTarget.style.background=`${color}33`;}}
-          onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
-          {opt}
-        </button>
-      );
-    })}
-  </div>
-);
+// options: string[] or {label,value}[] — clicking active pill deselects (sets null)
+const GenericPills = ({ value, options, onSave }) => {
+  const [hov,setHov] = useState(null);
+  return (
+    <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+      {options.map(opt=>{
+        const v = typeof opt==='object'?opt.value:opt;
+        const label = typeof opt==='object'?opt.label:opt;
+        const active=value===v;
+        const isHov=!active&&hov===v;
+        return (
+          <button key={v} onClick={()=>onSave(active?null:v)}
+            onMouseEnter={()=>!active&&setHov(v)}
+            onMouseLeave={()=>setHov(null)}
+            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:'pointer',transition:'all 0.15s ease',
+              border:`1px solid ${active?'#E8630A':(isHov?'#E8630A':T.border)}`,
+              background:active?'#E8630A':'transparent',
+              color:active?'#fff':(isHov?'#E8630A':T.text2),
+              fontWeight:active?600:'normal'}}>
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
 // ── BoolPill ──────────────────────────────────────────────────────────────────
-const BoolPill = ({ value, labelTrue, labelFalse, colorTrue=T.success, onSave }) => {
-  const on = !!value;
+const BoolPill = ({ value, labelTrue, labelFalse, onSave }) => {
+  const [hov,setHov] = useState(null);
   return (
     <div style={{display:'flex',gap:'5px'}}>
-      <button onClick={()=>onSave(true)}
-        style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:on?'default':'pointer',border:`1px solid ${colorTrue}`,background:on?colorTrue:'transparent',color:on?'#fff':colorTrue,transition:'background 0.15s ease'}}
-        onMouseEnter={e=>{if(!on)e.currentTarget.style.background=`${colorTrue}33`;}}
-        onMouseLeave={e=>{if(!on)e.currentTarget.style.background='transparent';}}>
-        {labelTrue}
-      </button>
-      <button onClick={()=>onSave(false)}
-        style={{padding:'3px 10px',borderRadius:'4px',fontSize:F.xs,fontWeight:'600',cursor:!on?'default':'pointer',border:`1px solid ${T.text2}`,background:!on?T.bg3:'transparent',color:!on?T.text0:T.text2,transition:'background 0.15s ease'}}
-        onMouseEnter={e=>{if(on)e.currentTarget.style.background='rgba(90,98,114,0.20)';}}
-        onMouseLeave={e=>{if(on)e.currentTarget.style.background='transparent';}}>
-        {labelFalse}
-      </button>
+      {[{v:true,label:labelTrue},{v:false,label:labelFalse}].map(({v,label})=>{
+        const active=value===v;
+        const isHov=!active&&hov===String(v);
+        return (
+          <button key={String(v)} onClick={()=>onSave(v)}
+            onMouseEnter={()=>!active&&setHov(String(v))}
+            onMouseLeave={()=>setHov(null)}
+            style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',transition:'all 0.15s ease',
+              border:`1px solid ${active?'#E8630A':(isHov?'#E8630A':T.border)}`,
+              background:active?'#E8630A':'transparent',
+              color:active?'#fff':(isHov?'#E8630A':T.text2),
+              fontWeight:active?600:'normal'}}>
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 };
@@ -583,6 +624,10 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const moreAnchorRef                = useRef(null);
   const hasMounted                   = useRef(false);
   const [filtersReady, setFiltersReady] = useState(false);
+  const router                          = useRouter();
+  const [newModalOpen,setNewModalOpen]  = useState(false);
+  const [newModalType,setNewModalType]  = useState(null);
+  const [winW,setWinW]                  = useState(()=>typeof window!=='undefined'?window.innerWidth:999);
 
   // Restore filter state from URL query params on mount (standalone list only)
   // Sets filtersReady=true to unblock the fetch effect once state is applied.
@@ -694,6 +739,19 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     document.title='Tasks | SedonaCRM';
     return ()=>{document.title='SedonaCRM';};
   },[embeddedMode]);
+
+  useEffect(()=>{
+    const h=()=>setWinW(window.innerWidth);
+    window.addEventListener('resize',h);
+    return()=>window.removeEventListener('resize',h);
+  },[]);
+
+  useEffect(()=>{
+    if(!newModalOpen)return;
+    const h=e=>{if(e.key==='Escape'){setNewModalOpen(false);setNewModalType(null);}};
+    window.addEventListener('keydown',h);
+    return()=>window.removeEventListener('keydown',h);
+  },[newModalOpen]);
 
   // Client-side sort (priority → updated_at secondary)
   const sorted = useMemo(()=>[...tasks].sort((a,b)=>{
@@ -877,6 +935,10 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           <span style={{fontSize:F.lg,fontWeight:'600',color:T.text0}}>Tasks</span>
           <span style={{fontSize:F.xs,color:T.text3}}>{filtered.length.toLocaleString()} shown</span>
           <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'8px',flexShrink:0}}>
+            <button onClick={()=>{setNewModalType(null);setNewModalOpen(true);}}
+              style={{background:'#E8630A',color:'#fff',border:'none',borderRadius:'4px',padding:embeddedMode?'6px 12px':'8px 16px',fontSize:embeddedMode?'12px':'14px',fontWeight:'600',cursor:'pointer',flexShrink:0,whiteSpace:'nowrap'}}>
+              + New
+            </button>
             <div style={{display:'flex',gap:'2px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'2px'}}>
               {[{mode:'table',icon:'≡',title:'Table view'},{mode:'kanban',icon:'⊞',title:'Kanban view'}].map(({mode,icon,title})=>(
                 <button key={mode} onClick={()=>setViewMode(mode)} title={title}
@@ -913,12 +975,11 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           {hasActiveFilters&&<button onClick={clearFilters} className="pill-clear" style={{position:'sticky',left:0,zIndex:2}}>× Clear</button>}
           {TYPE_PILLS.map(({key,label})=>{
             const active=typeFilter===key;
-            const color=TYPE_COLOR[key]||T.accent;
             const allTotal=Object.values(typeCounts).reduce((s,n)=>s+n,0);
             const cnt=key==='All'?allTotal:(typeCounts[key]??0);
             return (
               <button key={key} onClick={()=>setTypeFilter(key)}
-                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:active?'600':'400',cursor:active?'default':'pointer',border:`0.5px solid ${active?(key==='All'?T.accent:color):T.border}`,background:active?(key==='All'?T.accent:color):'transparent',color:active?'#fff':T.text2,flexShrink:0}}>
+                style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:active?'600':'400',cursor:active?'default':'pointer',border:`0.5px solid ${active?'#E8630A':T.border}`,background:active?'#E8630A':'transparent',color:active?'#fff':T.text2,flexShrink:0}}>
                 {key!=='All'&&<TaskTypeIcon recordType={key} size={12}/>}
                 {label}{key!=='All'&&<span style={{fontSize:'10px',opacity:0.7}}>·{cnt}</span>}
               </button>
@@ -932,8 +993,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             {['All','???','Urgent','High','Medium','Low'].map(p=>{
               const cnt=p==='All'?null:priorityCounts[p]??0;
               const active=priorityFilter===p;
-              const PCOL={'???':T.text3,Urgent:T.danger,High:T.warn,Medium:T.success,Low:T.accent};
-              const color=p==='All'?T.accent:(PCOL[p]||T.text3);
+              const color=p==='All'?'#E8630A':(PRI_COLORS[p]||'#6b7280');
               return (
                 <button key={p} onClick={()=>setPriorityFilter(p)}
                   style={{display:'flex',alignItems:'center',gap:'4px',padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,fontWeight:active?'600':'400',cursor:active?'default':'pointer',border:`0.5px solid ${active?color:T.border}`,background:active?color:'transparent',color:active?'#fff':T.text2,flexShrink:0}}>
@@ -948,11 +1008,12 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
             <div style={{display:'flex',gap:'4px',flexShrink:0}}>
               {['Open','In Progress','On Hold','Closed','All'].map(s=>{
                 const active=statusFilter===s;
+                const sc={Open:'#3b82f6','In Progress':'#f59e0b','On Hold':'#6b7280',Closed:'#22c55e',All:'#E8630A'}[s]||'#E8630A';
                 return (
                   <button key={s} onClick={()=>setStatusFilter(s)}
-                    style={{padding:'3px 8px',borderRadius:'4px',cursor:'pointer',fontSize:F.xs,fontWeight:active?'600':'400',border:`0.5px solid ${active?T.bg3:T.border}`,background:active?T.bg3:'transparent',color:active?T.text0:T.text2,display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
+                    style={{padding:'3px 8px',borderRadius:'4px',cursor:'pointer',fontSize:F.xs,fontWeight:active?'600':'400',border:`0.5px solid ${active?sc:T.border}`,background:active?sc:'transparent',color:active?'#fff':T.text2,display:'flex',alignItems:'center',gap:'3px',whiteSpace:'nowrap'}}>
                     {s}
-                    {active&&!loading&&<span style={{color:T.text3,fontSize:'10px'}}>·{tasks.length}</span>}
+                    {active&&!loading&&<span style={{opacity:0.7,fontSize:'10px'}}>·{tasks.length}</span>}
                   </button>
                 );
               })}
@@ -1080,6 +1141,50 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
           </div>
         </div>
       )}
+    {newModalOpen&&(
+      <div onClick={e=>{if(e.target===e.currentTarget){setNewModalOpen(false);setNewModalType(null);}}}
+        style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'8px',padding:'24px',maxWidth:'480px',width:'calc(100% - 40px)',boxShadow:'0 20px 60px rgba(0,0,0,0.7)'}}>
+          <div style={{fontSize:'18px',fontWeight:'600',color:T.text0,marginBottom:'4px'}}>New Record — Select Type</div>
+          <div style={{fontSize:F.sm,color:T.text2,marginBottom:'16px'}}>Choose the type to create:</div>
+          {[
+            {key:'task',label:'Task',Icon:CheckFat,color:'#06b6d4'},
+            {key:'work_order',label:'Work Order',Icon:Wrench,color:'#ef4444'},
+            {key:'project',label:'Project',Icon:FolderOpen,color:'#a855f7'},
+            {key:'acp_task',label:'ACP Task',Icon:Buildings,color:'#f97316'},
+            {key:'sg_task',label:'S&G Task',Icon:Star,color:'#84cc16'},
+          ].map(({key,label,Icon,color})=>(
+            <button key={key} onClick={()=>{
+              const params=new URLSearchParams({type:key});
+              if(filterPropCode)params.set('prop_code',filterPropCode);
+              if(filterTenantId)params.set('tenant_id',filterTenantId);
+              if(filterVendorId)params.set('vendor_id',filterVendorId);
+              setNewModalOpen(false);
+              window.location.href=`/tasks/new?${params.toString()}`;
+            }}
+              style={{width:'100%',display:'flex',alignItems:'center',gap:'10px',padding:'12px 14px',marginBottom:'8px',borderRadius:'6px',border:`1px solid ${T.border}`,background:T.bg3,cursor:'pointer',textAlign:'left',transition:'all 0.15s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background=T.bg3+'cc';e.currentTarget.style.borderColor=color;}}
+              onMouseLeave={e=>{e.currentTarget.style.background=T.bg3;e.currentTarget.style.borderColor=T.border;}}>
+              <Icon size={20} weight="bold" color={color}/>
+              <span style={{flex:1,fontSize:F.base,fontWeight:'500',color:T.text0}}>{label}</span>
+              <span style={{color:T.text3,fontSize:'16px'}}>›</span>
+            </button>
+          ))}
+          <div style={{textAlign:'center',marginTop:'12px'}}>
+            <button onClick={()=>{setNewModalOpen(false);setNewModalType(null);}}
+              style={{background:'transparent',border:'none',cursor:'pointer',color:T.text2,fontSize:F.sm}}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    {!embeddedMode&&winW<640&&(
+      <button onClick={()=>{setNewModalType(null);setNewModalOpen(true);}}
+        style={{position:'fixed',bottom:'24px',right:'20px',zIndex:999,width:'52px',height:'52px',borderRadius:'50%',background:'#E8630A',color:'#fff',border:'none',fontSize:'28px',lineHeight:1,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 3px 12px rgba(0,0,0,0.5)'}}>
+        +
+      </button>
+    )}
     </div>
   );
 };
@@ -1091,7 +1196,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [data,setData]           = useState(initialTask||null);
   const [loading,setLoading]     = useState(!initialTask);
   const [notFound,setNotFound]   = useState(false);
-  const [users,setUsers]         = useState([]);
   const [activeProps,setActiveProps] = useState([]);
   const [vendors,setVendors]     = useState([]);
   const [tenants,setTenants]     = useState([]);
@@ -1104,6 +1208,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [navIdx,setNavIdx]       = useState(-1);
   const [navLoading,setNavLoading] = useState(false);
   const [driveFolderLoading,setDriveFolderLoading] = useState(false);
+  const [sysOpen,setSysOpen] = useState(false);
   const resizingRight = useRef(false);
 
   useEffect(()=>{
@@ -1134,7 +1239,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   },[prefixedId,initialTask]);
 
   useEffect(()=>{
-    sbFetch('users','select=id,full_name&order=full_name.asc').then(setUsers).catch(()=>{});
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('vendors','select=id,company_dba,podio_id&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba,podio_id&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
@@ -1351,17 +1455,16 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           <span style={{fontSize:F.xs,color:T.text3,fontWeight:'600'}}>Type:</span>
           {Object.keys(TYPE_PREFIX).map(key=>{
             const active=data.record_type===key;
-            const color=TYPE_COLOR[key];
             return (
               <button key={key} onClick={()=>handleTypeChange(key)}
-                style={{padding:'3px 9px',borderRadius:'4px',fontSize:F.xs,cursor:active?'default':'pointer',
-                  border:active?`0.5px solid ${color}`:`0.5px solid ${T.border}`,
-                  background:active?color:'transparent',
+                style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',
+                  border:`1px solid ${active?'#E8630A':T.border}`,
+                  background:active?'#E8630A':'transparent',
                   color:active?'#fff':T.text2,
-                  fontWeight:active?'600':'400',
-                  transition:'background 0.15s ease,border-color 0.15s ease,color 0.15s ease'}}
-                onMouseEnter={e=>{if(!active){e.currentTarget.style.background=`${color}22`;e.currentTarget.style.borderColor=color;}}}
-                onMouseLeave={e=>{if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.borderColor=T.border;}}}>
+                  fontWeight:active?600:'normal',
+                  transition:'all 0.15s ease'}}
+                onMouseEnter={e=>{if(!active){e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color='#E8630A';}}}
+                onMouseLeave={e=>{if(!active){e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text2;}}}>
                 {TYPE_SHORT[key]||key}
               </button>
             );
@@ -1409,26 +1512,51 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 </div>
               )}
             </FieldRow>
-            <FieldRow label="Priority"><PriorityPills value={data.priority} onSave={v=>save('priority',v)}/></FieldRow>
-            <FieldRow label="Status"><StatusPills value={data.status} onSave={handleStatusChange}/></FieldRow>
-            <FieldRow label="Category">
-              <InlineSelect value={data.category} options={categoryOpts} onSave={v=>save('category',v)}/>
-            </FieldRow>
-            <FieldRow label="Assigned To">
-              <InlineSelect value={data.assigned_to} options={users.map(u=>({value:u.id,label:u.full_name}))} onSave={v=>save('assigned_to',v)}/>
+            <FieldRow label="Alert">
+              <InlineBlurField value={data.alert||''} onSave={v=>save('alert',v)}/>
             </FieldRow>
             <FieldRow label="FU Date">
-              <InlineBlurField type="date" value={data.follow_up_end_date||''} onSave={v=>save('follow_up_end_date',v)}/>
+              <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
             </FieldRow>
             <FieldRow label="FU Notes" topAlign>
               <RichTextEditor value={data.follow_up_notes} onSave={v=>save('follow_up_notes',v)} minRows={5}/>
             </FieldRow>
+            <FieldRow label="Priority"><PriorityPills value={data.priority} onSave={v=>save('priority',v)}/></FieldRow>
+            <FieldRow label="Assigned To">
+              <select value={data.assigned_to||''} onChange={async e=>save('assigned_to',e.target.value||null)}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.assigned_to?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {ASSIGNEES.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </FieldRow>
+            <FieldRow label="Status"><StatusPills value={data.status} onSave={handleStatusChange}/></FieldRow>
+            {data.record_type!=='work_order'&&(
+              <FieldRow label="Category">
+                <InlineSelect value={data.category} options={categoryOpts} onSave={v=>save('category',v)}/>
+              </FieldRow>
+            )}
             <FieldRow label="Details" topAlign>
               <RichTextEditor value={data.details} onSave={v=>save('details',v)} minRows={5}/>
             </FieldRow>
-            <FieldRow label="Alert">
-              <InlineBlurField value={data.alert||''} onSave={v=>save('alert',v)}/>
+            <FieldRow label="Internal Notes" topAlign>
+              <RichTextEditor value={data.internal_notes} onSave={v=>save('internal_notes',v)} minRows={5}/>
             </FieldRow>
+            <FieldRow label="Depends On Task #">
+              <InlineBlurField value={data.depends_on_task_id!=null?String(data.depends_on_task_id):''} onSave={v=>save('depends_on_task_id',v||null)}/>
+            </FieldRow>
+            {(data.record_type==='project'||data.project_id)&&(
+              <>
+                <FieldRow label="Parent Project #">
+                  <InlineBlurField value={data.project_id!=null?String(data.project_id):''} onSave={v=>save('project_id',v||null)}/>
+                </FieldRow>
+                <FieldRow label="Project Type">
+                  <InlineBlurField value={data.project_type||''} onSave={v=>save('project_type',v)}/>
+                </FieldRow>
+                <FieldRow label="Sequence Order">
+                  <InlineBlurField type="number" value={data.sequence_order!=null?String(data.sequence_order):''} onSave={v=>save('sequence_order',v?parseInt(v,10):null)}/>
+                </FieldRow>
+              </>
+            )}
             {isClosed&&(
               <FieldRow label="Close Date">
                 <InlineBlurField type="date" value={data.close_date||''} onSave={v=>save('close_date',v)}/>
@@ -1463,8 +1591,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               <FieldRow label="WO Category">
                 <InlineSelect value={data.wo_category} options={CATEGORY_OPTIONS.work_order} onSave={v=>save('wo_category',v)}/>
               </FieldRow>
-              <FieldRow label="Stage">
-                <GenericPills value={data.stage} options={['New','In Progress','Waiting on Vendor','Waiting on Parts','Complete']} color={T.purple} onSave={v=>save('stage',v)}/>
+              <FieldRow label="Budget Item?">
+                <BoolPill value={data.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>save('is_budget_item',v)}/>
+              </FieldRow>
+              <FieldRow label="WO Instructions to Vendor" topAlign>
+                <RichTextEditor value={data.instructions_to_vendor} onSave={v=>save('instructions_to_vendor',v)} minRows={5}/>
+              </FieldRow>
+              <FieldRow label="Keys / Key Safe">
+                <InlineBlurField value={data.key_safe_info||''} onSave={v=>save('key_safe_info',v)}/>
               </FieldRow>
               <FieldRow label="Vendor" topAlign>
                 <InlineSelect value={data.vendor_id} options={vendors.map(v=>({value:v.id,label:v.company_dba}))} onSave={v=>save('vendor_id',v)}/>
@@ -1486,49 +1620,89 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                   </a>
                 )}
               </FieldRow>
-              <FieldRow label="Key Safe Info">
-                <InlineBlurField value={data.key_safe_info||''} onSave={v=>save('key_safe_info',v)}/>
-              </FieldRow>
-              <FieldRow label="Instructions to Vendor" topAlign>
-                <RichTextEditor value={data.instructions_to_vendor} onSave={v=>save('instructions_to_vendor',v)} minRows={5}/>
-              </FieldRow>
               <FieldRow label="WO Type">
-                <InlineSelect value={data.wo_type} options={['Standard','Recurring','Budget Item']} onSave={v=>save('wo_type',v)}/>
+                <GenericPills value={data.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>save('wo_type',v)}/>
               </FieldRow>
-              <FieldRow label="Email Request to Vendor">
-                <BoolPill value={data.email_request_sent} labelTrue="Yes" labelFalse="No" colorTrue={T.accent} onSave={v=>save('email_request_sent',v)}/>
+              <FieldRow label="Email Request To Vendor">
+                <GenericPills value={data.email_request_sent} options={EMAIL_REQUEST_OPTIONS} onSave={v=>save('email_request_sent',v)}/>
               </FieldRow>
               <FieldRow label="Estimate Amount">
                 <InlineBlurField value={data.estimate_amount!=null?String(data.estimate_amount):''} moneyFormat onSave={v=>save('estimate_amount',v?parseFloat(String(v).replace(/[^0-9.-]/g,'')):null)}/>
               </FieldRow>
-              <FieldRow label="Estimate Log" topAlign>
+              <FieldRow label="Log" topAlign>
                 <RichTextEditor value={data.estimate_log} onSave={v=>save('estimate_log',v)} minRows={5}/>
               </FieldRow>
+              <FieldRow label="Pmt Instructions to BK">
+                <InlineBlurField value={data.pmt_instructions_to_bk||''} onSave={v=>save('pmt_instructions_to_bk',v)}/>
+              </FieldRow>
               <FieldRow label="Invoice Location">
-                <InlineBlurField value={data.invoice_location||''} onSave={v=>save('invoice_location',v)}/>
+                <GenericPills value={data.invoice_location} options={INVOICE_LOCATION_OPTIONS} onSave={v=>save('invoice_location',v)}/>
               </FieldRow>
               <FieldRow label="Invoice Stage">
-                <GenericPills value={data.invoice_stage} options={['Not Received','Received','Approved','Paid']} color={T.success} onSave={v=>save('invoice_stage',v)}/>
+                <GenericPills value={data.invoice_stage} options={INVOICE_STAGE_OPTIONS} onSave={v=>save('invoice_stage',v)}/>
               </FieldRow>
               <FieldRow label="Invoice Paid">
-                <BoolPill value={data.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" colorTrue={T.success} onSave={v=>save('invoice_paid',v)}/>
+                <BoolPill value={data.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" onSave={v=>save('invoice_paid',v)}/>
               </FieldRow>
-              <FieldRow label="Pmt to Bookkeeper" topAlign>
-                <RichTextEditor value={data.pmt_instructions_to_bk} onSave={v=>save('pmt_instructions_to_bk',v)} minRows={5}/>
-              </FieldRow>
-              <FieldRow label="Final Closeout Notes" topAlign>
+              <FieldRow label="Final Close-Out Notes" topAlign>
                 <RichTextEditor value={data.final_closeout_notes} onSave={v=>save('final_closeout_notes',v)} minRows={5}/>
               </FieldRow>
+              <FieldRow label="Work Stage">
+                <GenericPills value={data.stage} options={WORK_STAGE_OPTIONS} onSave={v=>save('stage',v)}/>
+              </FieldRow>
               <FieldRow label="Make Recurring">
-                <BoolPill value={data.make_recurring} labelTrue="Yes" labelFalse="No" colorTrue={T.purple} onSave={v=>save('make_recurring',v)}/>
+                <BoolPill value={data.make_recurring} labelTrue="Yes" labelFalse="No" onSave={v=>save('make_recurring',v)}/>
+              </FieldRow>
+              <FieldRow label="Bid Status">
+                <InlineBlurField value={data.bid_status||''} onSave={v=>save('bid_status',v)}/>
+              </FieldRow>
+              <FieldRow label="Drive Folder" hoverable={false}>
+                {data.drive_folder_url
+                  ?<a href={data.drive_folder_url} target="_blank" rel="noopener noreferrer"
+                    style={{display:'inline-block',padding:'4px 12px',border:`1px solid #E8630A`,borderRadius:'4px',color:'#E8630A',fontSize:F.sm,textDecoration:'none',cursor:'pointer'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(232,99,10,0.08)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    📁 Open Drive Folder
+                  </a>
+                  :<span style={{fontSize:F.sm,color:T.text2}}>No Drive folder linked</span>
+                }
               </FieldRow>
             </div>
           )}
+          {/* System Info — collapsible */}
+          <div style={{margin:'0 16px 12px',background:T.bg2,borderRadius:'8px',overflow:'hidden'}}>
+            <button onClick={()=>setSysOpen(o=>!o)}
+              style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 16px',background:T.bg3,border:'none',cursor:'pointer',color:T.text2,fontSize:F.xs,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em',borderBottom:sysOpen?`0.5px solid ${T.border}`:'none'}}>
+              <span>System Info</span>
+              <span>{sysOpen?'▲':'▼'}</span>
+            </button>
+            {sysOpen&&(
+              <>
+                {data.wo_num!=null&&<FieldRow label="WO Num" hoverable={false}><InlineBlurField readOnly value={String(data.wo_num)}/></FieldRow>}
+                <FieldRow label="Podio ID" hoverable={false}><InlineBlurField readOnly value={data.podio_id!=null?String(data.podio_id):'—'}/></FieldRow>
+                {data.podio_url&&(
+                  <FieldRow label="Podio URL" hoverable={false}>
+                    <a href={data.podio_url} target="_blank" rel="noopener noreferrer"
+                      style={{color:T.accent,fontSize:F.sm,textDecoration:'none',wordBreak:'break-all'}}
+                      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+                      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                      {data.podio_url} ↗
+                    </a>
+                  </FieldRow>
+                )}
+                <FieldRow label="Legacy Module" hoverable={false}><InlineBlurField readOnly value={data.legacy_module||'—'}/></FieldRow>
+                <FieldRow label="UUID" hoverable={false}><div style={{fontSize:F.xs,color:T.text2,fontFamily:'monospace',padding:'4px 0',wordBreak:'break-all'}}>{data.id}</div></FieldRow>
+                <FieldRow label="Created At" hoverable={false}><InlineBlurField readOnly value={data.created_at?fmtDate(data.created_at):'—'}/></FieldRow>
+                <FieldRow label="Created By" hoverable={false}><InlineBlurField readOnly value={data.created_by||'—'}/></FieldRow>
+                <FieldRow label="Updated At" hoverable={false}><InlineBlurField readOnly value={data.updated_at?fmtDate(data.updated_at):'—'}/></FieldRow>
+              </>
+            )}
+          </div>
           </div>}
           {detailTab==='comms'&&(
             <div style={{flex:1,overflow:'auto',background:T.bg1}}>
               <CommunicationTimeline
-                recordType="task"
+                recordType={data.record_type}
                 recordId={data.id}
                 fromAccount="scott@andersoncp.com"
                 crmRecordLabel={`${displayId}${data.title ? ` — ${data.title}` : ''}`}
@@ -1554,6 +1728,274 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           <ChatCircle size={26} weight="fill" color="white"/>
         </button>
       )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NewTaskForm — named export; renders a blank create form at /tasks/new
+// ─────────────────────────────────────────────────────────────────────────────
+export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=null, initVendorId=null }) => {
+  const router = useRouter();
+  const [formData,setFormData] = useState({
+    record_type: initType,
+    title: '',
+    status: 'Open',
+    priority: '???',
+    prop_code: initPropCode,
+    tenant_id: initTenantId,
+    vendor_id: initVendorId,
+    category: null,
+    details: null,
+    internal_notes: null,
+    alert: null,
+    follow_up_date: null,
+    follow_up_notes: null,
+    assigned_to: null,
+    // WO fields
+    wo_category: null,
+    is_budget_item: null,
+    instructions_to_vendor: null,
+    key_safe_info: null,
+    wo_type: null,
+    email_request_sent: null,
+    estimate_amount: null,
+    estimate_log: null,
+    pmt_instructions_to_bk: null,
+    invoice_location: null,
+    invoice_stage: null,
+    invoice_paid: null,
+    final_closeout_notes: null,
+    stage: null,
+    make_recurring: null,
+  });
+  const [saving,setSaving] = useState(false);
+  const [saveError,setSaveError] = useState(null);
+  const [titleError,setTitleError] = useState(false);
+  const [assignedToError,setAssignedToError] = useState(false);
+  const [vendors,setVendors] = useState([]);
+  const [tenants,setTenants] = useState([]);
+  const [activeProps,setActiveProps] = useState([]);
+  useEffect(()=>{
+    sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+    sbFetch('properties','select=prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
+  },[]);
+
+  useEffect(()=>{
+    document.title='New Task | SedonaCRM';
+    return ()=>{document.title='SedonaCRM';};
+  },[]);
+
+  const set=(field,val)=>setFormData(prev=>({...prev,[field]:val}));
+
+  const handleSave=async()=>{
+    if(!formData.title?.trim()){
+      setTitleError(true);
+      setTimeout(()=>setTitleError(false),1200);
+      return;
+    }
+    if(!formData.assigned_to){
+      setAssignedToError(true);
+      return;
+    }
+    setAssignedToError(false);
+    setSaving(true);setSaveError(null);
+    try{
+      const body={};
+      for(const[k,v]of Object.entries(formData)){if(v!=null&&v!=='')body[k]=v;}
+      const res=await fetch('/api/tasks/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const json=await res.json();
+      if(!res.ok)throw new Error(json.error||'Failed to create');
+      router.push(`/tasks/${json.task_num}`);
+    }catch(err){
+      setSaveError(err.message);
+      setSaving(false);
+    }
+  };
+
+  const handleBack=()=>{
+    if(typeof window!=='undefined'&&window.history.length>1){window.history.back();}
+    else{router.push('/tasks');}
+  };
+
+  const TYPE_SHORT_NEW={work_order:'WO',task:'TSK',project:'Proj.',acp_task:'ACP',sg_task:'S&G'};
+  const categoryOpts=CATEGORY_OPTIONS[formData.record_type]||[];
+  const propInfo=activeProps.find(p=>p.prop_code===formData.prop_code);
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
+      {/* Header */}
+      <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',marginBottom:'8px'}}>
+          <button onClick={handleBack}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 10px',color:T.text1,fontSize:F.sm,cursor:'pointer',flexShrink:0}}
+            onMouseEnter={e=>e.currentTarget.style.color=T.text0}
+            onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
+            ← Cancel
+          </button>
+          <span style={{fontSize:F.base,fontWeight:'600',color:T.text0}}>
+            New {TYPE_LABEL[formData.record_type]||formData.record_type}
+          </span>
+          {saveError&&<span style={{fontSize:F.xs,color:T.danger}}>{saveError}</span>}
+          <button onClick={handleSave} disabled={saving}
+            style={{marginLeft:'auto',background:saving?T.bg3:'#22c55e',border:'none',borderRadius:'4px',padding:'6px 16px',color:'#fff',fontSize:F.sm,fontWeight:'600',cursor:saving?'not-allowed':'pointer',flexShrink:0}}>
+            {saving?'Saving…':'Save'}
+          </button>
+        </div>
+        {/* Type pills */}
+        <div style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
+          <span style={{fontSize:F.xs,color:T.text3,fontWeight:'600'}}>Type:</span>
+          {['work_order','task','project','acp_task','sg_task'].map(key=>{
+            const active=formData.record_type===key;
+            return (
+              <button key={key} onClick={()=>set('record_type',key)}
+                style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:active?'default':'pointer',
+                  border:`1px solid ${active?'#E8630A':T.border}`,
+                  background:active?'#E8630A':'transparent',
+                  color:active?'#fff':T.text2,fontWeight:active?600:'normal',
+                  transition:'all 0.15s ease'}}
+                onMouseEnter={e=>{if(!active){e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color='#E8630A';}}}
+                onMouseLeave={e=>{if(!active){e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text2;}}}>
+                {TYPE_SHORT_NEW[key]||key}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {/* Banner */}
+      <div style={{background:'#451a03',borderBottom:`0.5px solid #92400e`,padding:'7px 16px',flexShrink:0}}>
+        <span style={{fontSize:F.sm,color:'#fbbf24'}}>
+          New - Fill &amp; Save
+        </span>
+      </div>
+      {/* Form */}
+      <div style={{flex:1,overflowY:'auto'}}>
+        <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
+          {/* Title */}
+          <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,minHeight:'52px',
+            outline:titleError?`2px solid ${T.danger}`:'none'}}
+            onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.04)'}
+            onMouseLeave={e=>e.currentTarget.style.background=''}>
+            <TaskTypeIcon recordType={formData.record_type} size={22}/>
+            <div style={{flex:1}}>
+              <input value={formData.title} onChange={e=>{set('title',e.target.value);if(titleError)setTitleError(false);}}
+                placeholder="Title (required)"
+                autoFocus
+                style={{width:'100%',boxSizing:'border-box',background:'transparent',border:'none',outline:'none',fontSize:'18px',fontWeight:'600',color:formData.title?T.text0:T.text3,padding:'4px 0'}}/>
+              {titleError&&<div style={{fontSize:F.xs,color:T.danger,marginTop:'2px'}}>Title is required</div>}
+            </div>
+          </div>
+          <FieldRow label="Property" topAlign>
+            <InlineSelect value={formData.prop_code} options={activeProps.map(p=>({value:p.prop_code,label:`${p.prop_code} — ${p.property_name}`}))} onSave={v=>set('prop_code',v)}/>
+            {propInfo&&<div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px 10px'}}>
+              <div style={{fontSize:F.sm,fontWeight:'500',color:T.text0}}>{propInfo.property_name}</div>
+            </div>}
+          </FieldRow>
+          <FieldRow label="Alert">
+            <InlineBlurField value={formData.alert||''} onSave={v=>set('alert',v)}/>
+          </FieldRow>
+          <FieldRow label="FU Date">
+            <InlineBlurField type="date" value={formData.follow_up_date||''} onSave={v=>set('follow_up_date',v)}/>
+          </FieldRow>
+          <FieldRow label="FU Notes" topAlign>
+            <RichTextEditor value={formData.follow_up_notes} onSave={v=>set('follow_up_notes',v)} minRows={5}/>
+          </FieldRow>
+          <FieldRow label="Priority"><PriorityPills value={formData.priority} onSave={v=>set('priority',v)}/></FieldRow>
+          <FieldRow label="Assigned To *">
+            <select value={formData.assigned_to||''} onChange={e=>{set('assigned_to',e.target.value||null);if(e.target.value)setAssignedToError(false);}}
+              style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${assignedToError?T.danger:T.border}`,borderRadius:'4px',padding:'5px 8px',color:formData.assigned_to?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+              <option value="">— select —</option>
+              {ASSIGNEES.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            {assignedToError&&<div style={{fontSize:F.xs,color:T.danger,marginTop:'3px'}}>Assigned To is required</div>}
+          </FieldRow>
+          <FieldRow label="Status"><StatusPills value={formData.status} onSave={v=>set('status',v)}/></FieldRow>
+          {formData.record_type!=='work_order'&&(
+            <FieldRow label="Category">
+              <InlineSelect value={formData.category} options={categoryOpts} onSave={v=>set('category',v)}/>
+            </FieldRow>
+          )}
+          <FieldRow label="Details" topAlign>
+            <RichTextEditor value={formData.details} onSave={v=>set('details',v)} minRows={5}/>
+          </FieldRow>
+          <FieldRow label="Internal Notes" topAlign>
+            <RichTextEditor value={formData.internal_notes} onSave={v=>set('internal_notes',v)} minRows={5}/>
+          </FieldRow>
+        </div>
+        {/* WO-specific section */}
+        {formData.record_type==='work_order'&&(
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden'}}>
+            <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg3}}>
+              <span style={{fontSize:F.xs,fontWeight:'700',color:'#E8630A',textTransform:'uppercase',letterSpacing:'0.07em',display:'flex',alignItems:'center',gap:'6px'}}>
+                <Wrench size={13} weight="bold"/>Work Order Details
+              </span>
+            </div>
+            <FieldRow label="WO Category">
+              <InlineSelect value={formData.wo_category} options={CATEGORY_OPTIONS.work_order} onSave={v=>set('wo_category',v)}/>
+            </FieldRow>
+            <FieldRow label="Budget Item?">
+              <BoolPill value={formData.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>set('is_budget_item',v)}/>
+            </FieldRow>
+            <FieldRow label="WO Instructions to Vendor" topAlign>
+              <RichTextEditor value={formData.instructions_to_vendor} onSave={v=>set('instructions_to_vendor',v)} minRows={5}/>
+            </FieldRow>
+            <FieldRow label="Keys / Key Safe">
+              <InlineBlurField value={formData.key_safe_info||''} onSave={v=>set('key_safe_info',v)}/>
+            </FieldRow>
+            <FieldRow label="Vendor">
+              <InlineSelect value={formData.vendor_id} options={vendors.map(v=>({value:v.id,label:v.company_dba}))} onSave={v=>set('vendor_id',v)}/>
+            </FieldRow>
+            <FieldRow label="Tenant">
+              <InlineSelect value={formData.tenant_id} options={tenants.map(t=>({value:t.id,label:t.tenant_dba}))} onSave={v=>set('tenant_id',v)}/>
+            </FieldRow>
+            <FieldRow label="WO Type">
+              <GenericPills value={formData.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>set('wo_type',v)}/>
+            </FieldRow>
+            <FieldRow label="Email Request To Vendor">
+              <GenericPills value={formData.email_request_sent} options={EMAIL_REQUEST_OPTIONS} onSave={v=>set('email_request_sent',v)}/>
+            </FieldRow>
+            <FieldRow label="Estimate Amount">
+              <InlineBlurField type="number" value={formData.estimate_amount!=null?String(formData.estimate_amount):''} onSave={v=>set('estimate_amount',v?parseFloat(v):null)}/>
+            </FieldRow>
+            <FieldRow label="Log" topAlign>
+              <RichTextEditor value={formData.estimate_log} onSave={v=>set('estimate_log',v)} minRows={5}/>
+            </FieldRow>
+            <FieldRow label="Pmt Instructions to BK">
+              <InlineBlurField value={formData.pmt_instructions_to_bk||''} onSave={v=>set('pmt_instructions_to_bk',v)}/>
+            </FieldRow>
+            <FieldRow label="Invoice Location">
+              <GenericPills value={formData.invoice_location} options={INVOICE_LOCATION_OPTIONS} onSave={v=>set('invoice_location',v)}/>
+            </FieldRow>
+            <FieldRow label="Invoice Stage">
+              <GenericPills value={formData.invoice_stage} options={INVOICE_STAGE_OPTIONS} onSave={v=>set('invoice_stage',v)}/>
+            </FieldRow>
+            <FieldRow label="Invoice Paid">
+              <BoolPill value={formData.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" onSave={v=>set('invoice_paid',v)}/>
+            </FieldRow>
+            <FieldRow label="Final Close-Out Notes" topAlign>
+              <RichTextEditor value={formData.final_closeout_notes} onSave={v=>set('final_closeout_notes',v)} minRows={5}/>
+            </FieldRow>
+            <FieldRow label="Work Stage">
+              <GenericPills value={formData.stage} options={WORK_STAGE_OPTIONS} onSave={v=>set('stage',v)}/>
+            </FieldRow>
+            <FieldRow label="Make Recurring">
+              <BoolPill value={formData.make_recurring} labelTrue="Yes" labelFalse="No" onSave={v=>set('make_recurring',v)}/>
+            </FieldRow>
+          </div>
+        )}
+        {/* Bottom save/cancel */}
+        <div style={{padding:'16px',display:'flex',justifyContent:'center',gap:'12px'}}>
+          <button onClick={handleBack}
+            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'8px 20px',color:T.text1,fontSize:F.base,cursor:'pointer'}}>
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            style={{background:saving?T.bg3:'#22c55e',border:'none',borderRadius:'4px',padding:'8px 24px',color:'#fff',fontSize:F.base,fontWeight:'600',cursor:saving?'not-allowed':'pointer'}}>
+            {saving?'Saving…':'Save'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

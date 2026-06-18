@@ -1,0 +1,27 @@
+import { createServerClient } from '../../../lib/supabaseServer';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { record_type, title, ...rest } = req.body || {};
+  if (!title?.trim()) return res.status(400).json({ error: 'Title is required' });
+  if (!record_type) return res.status(400).json({ error: 'record_type is required' });
+
+  const supabase = createServerClient();
+
+  const insert = { record_type, title: title.trim(), status: rest.status || 'Open', priority: rest.priority || '???' };
+  // Include any other non-null, non-empty fields from the body (but never task_num — trigger assigns it)
+  const SKIP = new Set(['status', 'priority', 'task_num', 'id', 'created_at', 'updated_at']);
+  for (const [k, v] of Object.entries(rest)) {
+    if (!SKIP.has(k) && v != null && v !== '') insert[k] = v;
+  }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert(insert)
+    .select('id, task_num')
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.status(200).json({ id: data.id, task_num: data.task_num });
+}
