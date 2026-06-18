@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key, EnvelopeSimple } from '@phosphor-icons/react';
+import GlobalSearch from './GlobalSearch';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -232,6 +233,7 @@ export default function AppShell({ children, activeView }) {
             <List size={24} weight="bold"/>
           </button>
           <span className="crm-topbar-title" style={{fontSize:F.md,fontWeight:'600',color:'#d4924a',flexShrink:0,whiteSpace:'nowrap'}}>Anderson Commercial Properties</span>
+          <GlobalSearch />
           <div style={{flex:1,overflow:'hidden',minWidth:0}}>
             <div style={{display:'flex',gap:'5px',overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch',padding:'7px 0'}}>
               {activeProps.map(p => {
