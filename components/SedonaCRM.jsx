@@ -8,6 +8,7 @@ import ContactsTable from './shared/ContactsTable';
 import TenantsTable from './shared/TenantsTable';
 import { TenantsList } from './TenantsView';
 import RichTextEditor from './RichTextEditor';
+import GlobalSearch from './GlobalSearch';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { HouseLine, BuildingOffice, Buildings, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple } from '@phosphor-icons/react';
@@ -2308,6 +2309,7 @@ export default function SedonaCRM() {
         {/* Topbar */}
         <div style={{padding:'0 16px',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:'12px',flexShrink:0,minHeight:'42px'}}>
           <span style={{fontSize:F.md,fontWeight:'600',color:'#d4924a',flexShrink:0}}>Anderson Commercial Properties</span>
+          <GlobalSearch />
           <div style={{flex:1,overflow:'hidden',minWidth:0}}>
             <div style={{display:'flex',gap:'5px',overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch',padding:'7px 0'}}>
               {activeProps.map(p => {
