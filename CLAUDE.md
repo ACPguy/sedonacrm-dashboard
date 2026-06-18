@@ -45,7 +45,7 @@ git push
 - Anon key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw`
 - DB connection: `postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-east-1.pooler.supabase.com:5432/postgres`
 - All tables have RLS enabled
-- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`, `email_threads`, `email_messages`, `email_thread_links`
+- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`, `email_threads`, `email_messages`, `email_thread_links`, `communication_timeline`, `users`
 - `SUPABASE_SERVICE_ROLE_KEY` is set in `.env.local` and in Vercel environment variables (used by server-side Gmail/webhook code via `lib/supabaseServer.js`)
 
 ## Core Architecture — Property as Hub
@@ -414,9 +414,11 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - TaskDetail type/priority/status pills: TYPE_SHORT labels (WO/TSK/Note/Proj./ACP/S&G), PRI_STYLES + STA_STYLES use activeBorder, inactive=grey border+text, active=filled color, hover=color22 tint
 
 **Known gaps / still open:**
-- PENDING: Rent Roll PDF UTF-8 fix — em dashes rendering as â€" in blob URL approach; add `<meta charset="utf-8">` to generatePortfolioPDF HTML head (one-line fix)
-- PENDING: Comms tab on task/WO detail does not show emails linked via Link-to-record button — communication_timeline entries written by link-thread.js but not appearing; suspect missing anon SELECT policy on communication_timeline
+- PENDING: Inbox search — no search field in EmailInbox; need text search across subject/from/body_preview
 - PENDING: Inbox refresh button not fully wired — resets local state but does not re-fetch from Supabase
+- PENDING: Auto Drive folder creation on new WO save — currently manual via + Drive Folder button; Phase 4 Work Order Agent (Agent 4) should auto-create on WO creation
+- PENDING: Quick Recipients field — multi-contact pre-populate for EmailCompose TO field; needed on WO, tasks, issues, COIs, insurance, leasing records; Phase 4 build
+- PENDING: task_links junction table — many-to-many record linking (replaces Podio APP Links field); Phase 4 build
 - PENDING: Gmail Pub/Sub watch expiry — watch expires every 7 days; needs periodic renewal
 - PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired (deferred)
 - PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
@@ -445,10 +447,25 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 
 **Back navigation from embedded task click:** `embeddedMode` row click writes `tasksBackUrl = window.location.href` to sessionStorage then does `window.location.href = /tasks/[task_num]`. The property detail URL is kept current via a `useEffect` in `PropertyDetail` that calls `replaceState({...window.history.state, url, as:url}, '', url)` on every tab change.
 
+**Completed session 2026-06-18 — Tasks form + Comms tab + UTF-8 fixes (merged to main):**
+- New Task/WO creation flow: type picker modal (5 types), blank form at /tasks/new?type=..., title + assigned_to validation, POST /api/tasks/create, navigates to new record on save
+- Full WO field audit: all 18 WO fields added in correct Podio order (WO Category → Make Recurring → Drive Folder)
+- email_request_sent migrated boolean → text; WO Type, Email Request, Invoice Location, Invoice Stage, Work Stage all converted to pills
+- Pill style overhaul: ghost (transparent) at rest, orange border+text on hover, solid orange when selected; Priority/Status use semantic colors
+- Assigned To: hardcoded Scott Anderson + Gabrielle Anderson (dropdown, required on new form)
+- Rent Roll PDF UTF-8: `<meta charset="utf-8">` added to both HTML templates (TenantsView.jsx + SedonaCRM.jsx)
+- Comms tab fully working: anon SELECT RLS added to communication_timeline + users; link-thread.js now writes timeline on link (per-message); hardcoded recordType="task" bug fixed to use data.record_type; 1 thread backfilled
+- FU End Date removed (no data, not needed)
+- Banner text: "New - Fill & Save"
+
 **Next priorities (start here next session):**
-1. Rent Roll PDF UTF-8 fix — add `<meta charset="utf-8">` inside `<head>` in generatePortfolioPDF HTML string (TenantsView.jsx, one line)
-2. Debug Comms tab not showing linked emails — check anon SELECT RLS on `communication_timeline`, check CommunicationTimeline.jsx fetch query
+1. Inbox refresh button — wire re-fetch from Supabase (not just local state reset)
+2. Inbox search — add text search field filtering subject/from/body_preview
 3. Phase 4: Workflow automations + Agents 1/3/4/7/9
+   - Work Order Agent (Agent 4): auto Drive folder creation on WO save
+   - Quick Recipients field: multi-contact pre-populate for EmailCompose TO
+   - task_links junction table: many-to-many record linking
+   - Rent adjustment workflow: CPI detection, Fixed Step-Up, MTM flagging, PDF letters
 
 ## Task ID Display vs URL Rule (permanent)
 
