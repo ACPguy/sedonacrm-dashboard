@@ -1444,7 +1444,7 @@ const generatePortfolioPDF = (rows, occupancy, propCode, vacantRows = []) => {
         <td style="text-align:right">${r.asking_nnn_per_sf?'$'+Number(r.asking_nnn_per_sf).toFixed(2):'—'}</td>
       </tr>`).join('')}
     </tbody></table>` : '';
-  const html = `<!DOCTYPE html><html><head><title>${propCode?propCode+' — Rent Roll':'Portfolio Rent Roll'}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${propCode?propCode+' — Rent Roll':'Portfolio Rent Roll'}</title>
   <style>
     @page{size:landscape;margin:12mm}
     body{font-family:Arial,sans-serif;font-size:11px;margin:0}
