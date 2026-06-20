@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key, EnvelopeSimple } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key, EnvelopeSimple, SquaresFour } from '@phosphor-icons/react';
 import GlobalSearch from './GlobalSearch';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -56,6 +56,45 @@ const SectionLabel = ({ label, collapsed }) => collapsed ? null : (
     {label}
   </div>
 );
+
+function PropertyPillsPopover({ activeProps, onNavigate }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+  return (
+    <div ref={ref} style={{position:'relative',flexShrink:0}}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg2,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'6px',flexShrink:0,whiteSpace:'nowrap',transition:'border-color 0.15s,color 0.15s'}}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor=T.accent;e.currentTarget.style.color=T.text0;}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
+        <SquaresFour size={14}/> Properties
+      </button>
+      {open && (
+        <div style={{position:'absolute',top:'calc(100% + 4px)',right:0,zIndex:9998,background:T.bg1,border:`0.5px solid ${T.border}`,borderRadius:'6px',boxShadow:'0 8px 24px rgba(0,0,0,0.4)',padding:'10px',display:'flex',flexWrap:'wrap',gap:'5px',maxWidth:'min(400px, calc(100vw - 24px))'}}>
+          {activeProps.map(p => {
+            const href = `/properties/${p.podio_id ?? 'X'+p.id.slice(-6)}`;
+            return (
+              <a key={p.prop_code}
+                href={href}
+                title={p.property_name}
+                onClick={e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); onNavigate(href); setOpen(false); } }}
+                style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg3,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',textDecoration:'none'}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color=T.text0;}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
+                {p.prop_code}
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AppShell({ children, activeView }) {
   const router = useRouter();
@@ -232,26 +271,10 @@ export default function AppShell({ children, activeView }) {
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             <List size={24} weight="bold"/>
           </button>
-          <span className="crm-topbar-title" style={{fontSize:F.md,fontWeight:'600',color:'#d4924a',flexShrink:0,whiteSpace:'nowrap'}}>Anderson Commercial Properties</span>
+          <span style={{fontSize:'15px',fontWeight:'800',color:'#d4924a',flexShrink:0,letterSpacing:'0.04em',userSelect:'none'}}>ACP</span>
           <GlobalSearch />
-          <div style={{flex:1,overflow:'hidden',minWidth:0}}>
-            <div style={{display:'flex',gap:'5px',overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch',padding:'7px 0'}}>
-              {activeProps.map(p => {
-                const href = `/properties/${p.podio_id ?? 'X'+p.id.slice(-6)}`;
-                return (
-                  <a key={p.prop_code}
-                    href={href}
-                    title={p.property_name}
-                    onClick={e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); go(href); } }}
-                    style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg3,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,display:'inline-flex',alignItems:'center',textDecoration:'none'}}
-                    onMouseEnter={e=>{e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color=T.text0;}}
-                    onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
-                    {p.prop_code}
-                  </a>
-                );
-              })}
-            </div>
-          </div>
+          <div style={{flex:1}}/>
+          <PropertyPillsPopover activeProps={activeProps} onNavigate={go} />
           <div style={{width:'32px',height:'32px',borderRadius:'50%',background:T.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:F.sm,fontWeight:'700',color:'#fff',flexShrink:0}}>SA</div>
         </div>
         {/* Content */}

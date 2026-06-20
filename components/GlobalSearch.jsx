@@ -13,7 +13,7 @@ const T = {
 };
 const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
 
-const MODULE_KEYS = ['tasks','tenants','issues','contacts','vendors','properties','suites'];
+const MODULE_KEYS = ['tasks','tenants','issues','contacts','vendors','properties','suites','inbox'];
 
 const PATHNAME_TO_MODULE = {
   '/tasks': 'tasks',
@@ -26,6 +26,7 @@ const PATHNAME_TO_MODULE = {
   '/suites': 'suites',
   '/rent-schedule': 'rent_schedule',
   '/properties': 'properties',
+  '/inbox': 'inbox',
 };
 
 const MODULE_LABELS = {
@@ -39,6 +40,7 @@ const MODULE_LABELS = {
   suites: 'suites',
   rent_schedule: 'rent schedule',
   properties: 'properties',
+  inbox: 'inbox',
 };
 
 const TASK_BADGE = {
@@ -157,6 +159,40 @@ async function searchModule(moduleKey, term) {
           url: `/suites/${row.podio_id}`,
         })),
       };
+    }
+    case 'inbox': {
+      const [threadsRes, messagesRes] = await Promise.allSettled([
+        sbFetch(`email_threads?select=id,gmail_thread_id,subject,snippet,last_message_at&subject=ilike.${e}&limit=5`),
+        sbFetch(`email_messages?select=id,thread_id,from_name,from_address,snippet,subject&or=(from_name.ilike.${e},from_address.ilike.${e},body_text.ilike.${e})&limit=5`),
+      ]);
+      const threads = threadsRes.status === 'fulfilled' ? (threadsRes.value || []) : [];
+      const messages = messagesRes.status === 'fulfilled' ? (messagesRes.value || []) : [];
+      const seen = new Set();
+      const items = [];
+      for (const row of threads) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        items.push({
+          display: row.subject || '(no subject)',
+          badge: 'Email',
+          badgeColor: T.accent,
+          url: `/inbox?thread=${row.gmail_thread_id || row.id}`,
+          subLine: (row.snippet || '').slice(0, 60) || null,
+        });
+      }
+      for (const row of messages) {
+        if (seen.has(row.thread_id)) continue;
+        seen.add(row.thread_id);
+        const fromInfo = [row.from_name, row.from_address ? `<${row.from_address}>` : ''].filter(Boolean).join(' ').trim();
+        items.push({
+          display: row.subject || '(no subject)',
+          badge: 'Email',
+          badgeColor: T.accent,
+          url: `/inbox?thread=${row.thread_id}`,
+          subLine: (fromInfo || row.snippet || '').slice(0, 60) || null,
+        });
+      }
+      return { module: 'inbox', label: 'Inbox', items: items.slice(0, 5) };
     }
     default:
       return { module: moduleKey, label: moduleKey, items: [] };
@@ -388,7 +424,7 @@ function ResultRow({ item, onClick }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: '8px',
+        display: 'flex', alignItems: item.subLine ? 'flex-start' : 'center', gap: '8px',
         padding: '7px 12px',
         textDecoration: 'none',
         color: T.text0,
@@ -401,14 +437,20 @@ function ResultRow({ item, onClick }) {
         fontSize: '10px', color: '#fff', background: item.badgeColor,
         borderRadius: '3px', padding: '1px 5px', flexShrink: 0,
         fontWeight: 600, whiteSpace: 'nowrap',
+        marginTop: item.subLine ? '1px' : '0',
       }}>
         {item.badge}
       </span>
-      <span style={{
-        flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        {item.display}
-      </span>
+      {item.subLine ? (
+        <div style={{display:'flex',flexDirection:'column',gap:'2px',flex:1,overflow:'hidden'}}>
+          <span style={{color:T.text0,fontSize:F.sm,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.display}</span>
+          <span style={{color:T.text2,fontSize:F.xs,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.subLine}</span>
+        </div>
+      ) : (
+        <span style={{flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+          {item.display}
+        </span>
+      )}
     </a>
   );
 }
