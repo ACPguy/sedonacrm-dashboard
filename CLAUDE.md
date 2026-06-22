@@ -42,10 +42,10 @@ git push
 ## Supabase
 
 - URL: `https://edxcvyleielzevpappui.supabase.co`
-- Anon key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw`
+- Anon key: *(Scott to paste anon key here)*
 - DB connection: `postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-east-1.pooler.supabase.com:5432/postgres`
 - All tables have RLS enabled
-- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`, `email_threads`, `email_messages`, `email_thread_links`, `communication_timeline`, `users`
+- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`
 - `SUPABASE_SERVICE_ROLE_KEY` is set in `.env.local` and in Vercel environment variables (used by server-side Gmail/webhook code via `lib/supabaseServer.js`)
 
 ## Core Architecture — Property as Hub
@@ -180,8 +180,8 @@ export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-eas
 - **Phase 3 Stage 2A:** Complete — 5 Gmail DB tables, webhook receiver, lib/gmail.js, lib/supabaseServer.js
 - **Phase 3 Stage 2B:** Complete — CommunicationTimeline.jsx wired into Tasks, Contacts, Tenants
 - **Phase 3 Stage 2C:** Complete — EmailInbox + EmailCompose + AppShell Inbox nav + unread badge + AI summarize/draft
-- **Gmail Backfill:** Complete — /api/gmail/backfill built + local script scripts/backfill-gmail.js; 2,218 threads + 2,751 messages loaded via local Node.js script (no Vercel timeout constraint)
-- **Link to Record:** Complete — /api/gmail/link-thread + inline 280px search panel in EmailInbox; writes communication_timeline entries on link (ff0213a, merged to main)
+- **Gmail Backfill:** Complete — /api/gmail/backfill built (preview d359a6c); trigger once on production to load 90 days of history
+- **Link to Record:** Complete — /api/gmail/link-thread + inline 280px search panel in EmailInbox (preview d359a6c)
 - **Drive folder auto-creation:** Complete — lib/drive.js, drivePropertyFolders.js, /api/tasks/create-drive-folder; + Drive scope in OAuth
 - **Drive index PDF:** Deferred — createIndexPdf() implemented, folder creation works, PDF media upload silently failing; investigate next session
 - **Phase 4+:** Pending
@@ -396,35 +396,17 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 - "All Props" → "All" on property pills; Type "All" pill count badge removed
 - Commits merged to main: 2d0d7ca, 3ff4f54, eb4f13d, d93dbec, d09e64f, c19db6e, c0a053e, 4adff23
 
-**Completed session 2026-06-15 (session 2) — Gmail Finalization (merged to main):**
-- /api/gmail/backfill: GET/POST, 90-day history, paginates to cap 2000 threads, batches of 10 via Promise.allSettled. maxDuration=300. Local script scripts/backfill-gmail.js used for actual run (2,218 threads, 2,751 messages)
-- /api/gmail/link-thread: POST {threadId,recordType,recordId} → UPDATE email_threads + upsert email_thread_links + INSERT communication_timeline per message (ff0213a)
+**Completed session 2026-06-15 (session 2) — Gmail Backfill + Link to Record (preview branch):**
+- /api/gmail/backfill: GET/POST, 90-day history, paginates to cap 2000 threads, batches of 10 via Promise.allSettled
+- /api/gmail/link-thread: POST {threadId,recordType,recordId} → UPDATE email_threads link_status='manually_linked' + upsert email_thread_links
 - EmailInbox.jsx: "Link to record" button → inline 280px search panel (Work Order/Issue/Tenant/Contact/Task), 300ms debounce, live results, 2s flash → persistent "Linked: [label] →" link
-- RLS: anon SELECT policies added to email_threads, email_messages, email_thread_links; authenticated SELECT policies also added
-- .env.local: fixed from bare JWT to proper key=value format with all 7 required vars
-- Commits: d359a6c (backfill + link-to-record UI), 14e9059 (CLAUDE.md), 5fbccda (backfill maxDuration+write fix), ff0213a (timeline write on link)
-
-**Completed session 2026-06-16 — Mobile Pass + Tenant Consolidation + Rent Roll PDF (merged to main, commit 2cedfa9):**
-- pages/_document.jsx CREATED — viewport meta tag; was root cause of ALL mobile CSS being inactive on real devices (iOS rendering at 980px)
-- Mobile pass: PropertyDetail + TenantDetail tab bars (overflowX scroll, crm-detail-tab-bar class), headers (flexWrap wrap, name ellipsis), tables (overflow containers), grids (repeat(auto-fill,minmax(280px,1fr))), ActivityPanel wrapped in mobile-hidden div
-- globals.css: .crm-detail-tab-bar::-webkit-scrollbar { display:none }
-- Properties list: crm-list-table + crm-mobile-cards card block
-- TenantsList refactor: export const TenantsList, filterPropCode + hidePropertyPills props, self-fetch pattern, prop column/pills hidden when appropriate, Rent Roll PDF button added
-- generatePortfolioPDF: Blob URL approach (URL.createObjectURL) — no popup blocker, no AirPrint flash; landscape @page, orange accents, no grid lines, vacant suites section; window.print() removed; suites column confirmed as `status` not `suite_status`
-- TenantsView default export replaced — wraps TenantsList directly; PropertyDetail Tenants tab uses TenantsList + filterPropCode
-- EmailInbox: useWindowWidth hook, isMobile=width<640, single-panel mobile mode (list hides when thread open, ← Inbox back button), email body maxWidth 100% + wordBreak:break-word
-- TaskDetail type/priority/status pills: TYPE_SHORT labels (WO/TSK/Note/Proj./ACP/S&G), PRI_STYLES + STA_STYLES use activeBorder, inactive=grey border+text, active=filled color, hover=color22 tint
+- Commit: d359a6c (preview branch — pending Scott's approval to merge)
 
 **Known gaps / still open:**
-- PENDING: Inbox search — no search field in EmailInbox; need text search across subject/from/body_preview
-- PENDING: Inbox refresh button not fully wired — resets local state but does not re-fetch from Supabase
-- PENDING: Auto Drive folder creation on new WO save — currently manual via + Drive Folder button; Phase 4 Work Order Agent (Agent 4) should auto-create on WO creation
-- PENDING: Quick Recipients field — multi-contact pre-populate for EmailCompose TO field; needed on WO, tasks, issues, COIs, insurance, leasing records; Phase 4 build
-- PENDING: task_links junction table — many-to-many record linking (replaces Podio APP Links field); Phase 4 build
-- PENDING: Gmail Pub/Sub watch expiry — watch expires every 7 days; needs periodic renewal
-- PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired (deferred)
+- PENDING: Trigger Gmail backfill once on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
 - PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
 - PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
+- PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired
 - PENDING: Drive folder map missing: LPN, WNT, OLY, SSP — deferred until folders are created in Drive
 - PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
 - PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
@@ -449,43 +431,20 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 
 **Back navigation from embedded task click:** `embeddedMode` row click writes `tasksBackUrl = window.location.href` to sessionStorage then does `window.location.href = /tasks/[task_num]`. The property detail URL is kept current via a `useEffect` in `PropertyDetail` that calls `replaceState({...window.history.state, url, as:url}, '', url)` on every tab change.
 
-**Completed session 2026-06-18 — Tasks form + Comms tab + UTF-8 fixes (merged to main):**
-- New Task/WO creation flow: type picker modal (5 types), blank form at /tasks/new?type=..., title + assigned_to validation, POST /api/tasks/create, navigates to new record on save
-- Full WO field audit: all 18 WO fields added in correct Podio order (WO Category → Make Recurring → Drive Folder)
-- email_request_sent migrated boolean → text; WO Type, Email Request, Invoice Location, Invoice Stage, Work Stage all converted to pills
-- Pill style overhaul: ghost (transparent) at rest, orange border+text on hover, solid orange when selected; Priority/Status use semantic colors
-- Assigned To: hardcoded Scott Anderson + Gabrielle Anderson (dropdown, required on new form)
-- Rent Roll PDF UTF-8: `<meta charset="utf-8">` added to both HTML templates (TenantsView.jsx + SedonaCRM.jsx)
-- Comms tab fully working: anon SELECT RLS added to communication_timeline + users; link-thread.js now writes timeline on link (per-message); hardcoded recordType="task" bug fixed to use data.record_type; 1 thread backfilled
-- FU End Date removed (no data, not needed)
-- Banner text: "New - Fill & Save"
-
-**Completed session 2026-06-19 — Inbox search, ACP monogram, property pills popover (merged to main):**
+**Completed session 2026-06-19 — Inbox search, ACP monogram, property pills popover (preview branch):**
 - GlobalSearch: added 'inbox' to MODULE_KEYS + PATHNAME_TO_MODULE + MODULE_LABELS; two-fetch inbox search (email_threads subject + email_messages from/body); two-line ResultRow for inbox items with subLine
 - Architectural rule added (Dev Rule 1): all search queries capped at 5 results server-side
 - AppShell + SedonaCRM: "Anderson Commercial Properties" → bold "ACP" monogram
 - AppShell + SedonaCRM: property pills div replaced with PropertyPillsPopover (⊞ Properties button + floating panel, click-outside closes, Ctrl+click opens new tab)
-
-**Completed session 2026-06-22 — Mobile fixes batch (merged to main):**
-- AppShell + SedonaCRM: removed ACP monogram from topbar banner (kept in sidebar only)
-- AppShell + SedonaCRM: PropertyPillsPopover moved immediately after GlobalSearch; flex:1 spacer moved before SA avatar
-- GlobalSearch dropdown: width changed to `min(360px, calc(100vw - 24px))` + overflowX:hidden for mobile
-- AppShell go(): simplified — always setMobileNavOpen(false) + router.push (removed reload branch)
-- SedonaCRM: added full mobile drawer pattern (mobileNavOpen state, overlay, slide-in drawer, hamburger button, crm-desktop-sidebar class on sidebar)
-- SedonaCRM handleNav + navTo: both call setMobileNavOpen(false); handleNav simplified to router.push only
-- SedonaCRM: extracted navItems JSX variable (reused in desktop sidebar + mobile drawer)
-- Home dashboard: stat grid → repeat(auto-fill,minmax(140px,1fr)); weather row flexWrap:wrap; WeatherCard flex:1 1 260px + minWidth:0
-- SuitesView: StatusBadge renders STATUS_SHORT labels (Occ/Lease, Vac/Lease); status td gets maxWidth+scroll wrapper; mobile card status row: prop_code flexShrink:0, suite name flex:1 truncate, badge flexShrink:0
+- SquaresFour imported in both AppShell.jsx and SedonaCRM.jsx
+- Commit: 163006d (preview branch — pending Scott's approval)
 
 **Next priorities (start here next session):**
-1. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
-2. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
-3. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
-4. Phase 4: Workflow automations + Agents 1/3/4/7/9
-   - Work Order Agent (Agent 4): auto Drive folder creation on WO save
-   - Quick Recipients field: multi-contact pre-populate for EmailCompose TO
-   - task_links junction table: many-to-many record linking
-   - Rent adjustment workflow: CPI detection, Fixed Step-Up, MTM flagging, PDF letters
+1. Merge preview → main (Scott approves: d359a6c + 163006d)
+2. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
+3. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+4. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
+5. Phase 4: Workflow automations + Agents 1/3/4/7/9
 
 ## Task ID Display vs URL Rule (permanent)
 
@@ -502,12 +461,6 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 - **Re-auth must be done on production URL:** `GOOGLE_REDIRECT_URI` is set to `crm.andersoncp.com`. OAuth re-auth will not work from preview/localhost — always do it at crm.andersoncp.com/settings.
 - **Scopes (current):** `gmail.modify`, `gmail.send`, `drive` — do not add `userinfo.email`; use Gmail profile endpoint instead.
 - **Drive client:** `getDriveClient(emailAccountId)` in `lib/drive.js` — reuses same OAuth2 token + refresh pattern as `getGmailClient()`.
-- **Local .env.local must be manually maintained** — `vercel env pull` strips Supabase keys and adds only Vercel/Google vars. Do NOT overwrite .env.local with `vercel env pull`. Current local .env.local has all required keys: `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_PUBSUB_TOPIC`. If Vercel CLI overwrites it, re-add the Supabase keys manually.
-
-## Local Scripts (not committed to git — scripts/ is in .gitignore)
-
-- **`scripts/backfill-gmail.js`** — one-time 90-day Gmail backfill. Reads `.env.local` manually (no dotenv). No Vercel timeout constraint. Supports `TEST_MODE=true` for a 10-thread test run. Run with: `cd ~/sedonacrm-dashboard && node scripts/backfill-gmail.js`
-- **`scripts/test-supabase.mjs`** — Supabase REST connection test (inserts a test row into email_threads). Run with: `node scripts/test-supabase.mjs`
 
 ## Drive Folder Architecture (permanent)
 
