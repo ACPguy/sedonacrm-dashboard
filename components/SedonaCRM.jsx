@@ -2184,10 +2184,11 @@ function PropertyPillsPopover({ activeProps, onNavigate }) {
     <div ref={ref} style={{position:'relative',flexShrink:0}}>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg2,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'6px',flexShrink:0,whiteSpace:'nowrap',transition:'border-color 0.15s,color 0.15s'}}
+        style={{height:'28px',padding:'0 10px',minWidth:'32px',borderRadius:'4px',background:T.bg2,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'6px',flexShrink:0,whiteSpace:'nowrap',transition:'border-color 0.15s,color 0.15s'}}
         onMouseEnter={e=>{e.currentTarget.style.borderColor=T.accent;e.currentTarget.style.color=T.text0;}}
         onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
-        <SquaresFour size={14}/> Properties
+        <SquaresFour size={14}/>
+        <span className="crm-desktop-only" style={{marginLeft:'4px'}}>Properties</span>
       </button>
       {open && (
         <div style={{position:'absolute',top:'calc(100% + 4px)',right:0,zIndex:9998,background:T.bg1,border:`0.5px solid ${T.border}`,borderRadius:'6px',boxShadow:'0 8px 24px rgba(0,0,0,0.4)',padding:'10px',display:'flex',flexWrap:'wrap',gap:'5px',maxWidth:'min(400px, calc(100vw - 24px))'}}>

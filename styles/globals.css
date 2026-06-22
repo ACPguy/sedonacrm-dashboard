@@ -45,6 +45,11 @@ input[type="date"]::-moz-calendar-picker-indicator    { display: none; }
   .crm-desktop-sidebar { display: none !important; }
 }
 
+/* Desktop-only elements: hidden on mobile */
+@media (max-width: 639px) {
+  .crm-desktop-only { display: none !important; }
+}
+
 /* Hamburger: hidden on desktop, flex on mobile */
 .crm-hamburger { display: none !important; }
 @media (max-width: 639px) {
