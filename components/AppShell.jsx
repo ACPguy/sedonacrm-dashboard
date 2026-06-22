@@ -148,11 +148,7 @@ export default function AppShell({ children, activeView }) {
 
   const go = path => {
     setMobileNavOpen(false);
-    if (router.asPath === path || router.asPath.startsWith(path + '/') || router.asPath.startsWith(path + '?')) {
-      router.replace(path).then(() => router.reload());
-    } else {
-      router.push(path);
-    }
+    router.push(path);
   };
   const is = view => activeView === view;
   const effectiveCollapsed = collapsed && !hoverExpanded;
@@ -271,10 +267,9 @@ export default function AppShell({ children, activeView }) {
             onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
             <List size={24} weight="bold"/>
           </button>
-          <span style={{fontSize:'15px',fontWeight:'800',color:'#d4924a',flexShrink:0,letterSpacing:'0.04em',userSelect:'none'}}>ACP</span>
           <GlobalSearch />
-          <div style={{flex:1}}/>
           <PropertyPillsPopover activeProps={activeProps} onNavigate={go} />
+          <div style={{flex:1}}/>
           <div style={{width:'32px',height:'32px',borderRadius:'50%',background:T.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:F.sm,fontWeight:'700',color:'#fff',flexShrink:0}}>SA</div>
         </div>
         {/* Content */}

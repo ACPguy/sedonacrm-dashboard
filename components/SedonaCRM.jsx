@@ -167,7 +167,7 @@ const WeatherCard = ({ city, lat, lon, url }) => {
   };
   return (
     <a href={url} target="_blank" rel="noreferrer"
-      style={{flex:1,display:'block',textDecoration:'none',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 10px'}}
+      style={{flex:'1 1 260px',minWidth:0,display:'block',textDecoration:'none',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 10px'}}
       onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
       onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6px'}}>
@@ -1861,7 +1861,7 @@ const HomeView = () => {
   return (
     <div style={{padding:'20px',overflowY:'auto',height:'100%'}}>
       <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,marginBottom:'16px'}}>Good morning, Scott.</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'12px',marginBottom:'20px'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'12px',marginBottom:'20px'}}>
         {[
           ['Active Properties',stats.properties,T.accent,'ti-building-store'],
           ['Suites',stats.suites,T.purple,'ti-door'],
@@ -1877,7 +1877,7 @@ const HomeView = () => {
           </div>
         ))}
       </div>
-      <div style={{display:'flex',gap:'12px',marginBottom:'20px'}}>
+      <div style={{display:'flex',gap:'12px',marginBottom:'20px',flexWrap:'wrap'}}>
         <WeatherCard city="Sedona AZ" lat={34.8697} lon={-111.7610} url="https://forecast.weather.gov/MapClick.php?CityName=Sedona&state=AZ"/>
         <WeatherCard city="Olympia WA" lat={47.0379} lon={-122.9007} url="https://forecast.weather.gov/MapClick.php?CityName=Olympia&state=WA"/>
       </div>
@@ -2348,10 +2348,9 @@ export default function SedonaCRM() {
       <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
         {/* Topbar */}
         <div style={{padding:'0 16px',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:'12px',flexShrink:0,minHeight:'42px'}}>
-          <span style={{fontSize:'15px',fontWeight:'800',color:'#d4924a',flexShrink:0,letterSpacing:'0.04em',userSelect:'none'}}>ACP</span>
           <GlobalSearch />
-          <div style={{flex:1}}/>
           <PropertyPillsPopover activeProps={activeProps} onNavigate={handleNav} />
+          <div style={{flex:1}}/>
           <div style={{width:'32px',height:'32px',borderRadius:'50%',background:T.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:F.sm,fontWeight:'700',color:'#fff',flexShrink:0}}>SA</div>
         </div>
         {/* View */}

@@ -51,6 +51,14 @@ export const fmtDate = d => {
 const fmtMoney = n => n != null && n !== '' ? '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
 const fmtNum = n => n != null && n !== '' ? Number(n).toLocaleString() : '—';
 
+const STATUS_SHORT = {
+  'Occupied / For Lease': 'Occ / Lease',
+  'Vacant / For Lease':   'Vac / Lease',
+  'Occupied':             'Occupied',
+  'Vacant':               'Vacant',
+  'Archived':             'Archived',
+};
+
 export const StatusBadge = ({ status }) => {
   const s = (status||'').toLowerCase();
   const map = {
@@ -62,7 +70,7 @@ export const StatusBadge = ({ status }) => {
     archived:[T.text3,T.bg3],
   };
   const [color,bg] = map[s]||[T.text2,T.bg3];
-  return <span style={css.badge(color,bg)}>{status||'—'}</span>;
+  return <span style={css.badge(color,bg)}>{STATUS_SHORT[status] ?? status ?? '—'}</span>;
 };
 
 const EditableField = ({ label, value, onSave, type='text' }) => {
@@ -441,7 +449,7 @@ export const SuitesList = ({ suites, loading, error, onSelect, hidePropertyFilte
         </td>
         <td style={{...css.td,fontWeight:'500'}}>{s.suite_num||'—'}</td>
         <td style={{...css.td,color:T.text2}}>{s.space_type||'—'}</td>
-        <td style={css.td}><StatusBadge status={s.status}/></td>
+        <td style={{...css.td,maxWidth:'110px'}}><div style={{overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}><StatusBadge status={s.status}/></div></td>
         <td style={{...css.td,color:tenantName?T.text0:T.text3}}>
           {tenantName || <span style={{color:T.text3,fontStyle:'italic'}}>Vacant</span>}
         </td>

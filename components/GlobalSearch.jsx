@@ -354,8 +354,8 @@ export default function GlobalSearch() {
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 9999,
-          width: '360px',
-          maxHeight: '480px', overflowY: 'auto',
+          width: 'min(360px, calc(100vw - 24px))',
+          maxHeight: '480px', overflowY: 'auto', overflowX: 'hidden',
           background: T.bg1,
           border: `0.5px solid ${T.border}`,
           borderRadius: '6px',
