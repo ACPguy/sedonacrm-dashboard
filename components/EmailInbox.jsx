@@ -641,6 +641,7 @@ export default function EmailInbox() {
               type="text"
               value={inboxSearch}
               onChange={e => setInboxSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') { setInboxSearch(''); e.target.blur(); } }}
               placeholder="Search inbox…"
               style={{
                 width:'100%', height:'28px', background:T.bg2,

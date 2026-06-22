@@ -954,7 +954,9 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
                 <button onClick={()=>setSearch('')}
                   style={{position:'absolute',left:'7px',background:'transparent',border:'none',cursor:'pointer',color:T.text2,fontSize:'14px',lineHeight:1,padding:0,zIndex:1}}>×</button>
               )}
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…"
+              <input value={search} onChange={e=>setSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); e.target.blur(); } }}
+                placeholder="Search…"
                 style={{width:'160px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:`4px 10px 4px ${search?'26px':'10px'}`,color:T.text0,fontSize:F.xs,outline:'none'}}/>
             </div>
           </div>

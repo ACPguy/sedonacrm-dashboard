@@ -544,6 +544,7 @@ export const TenantsList = ({ tenants = [], loading = false, error = null, onSel
               </button>
             )}
             <input value={search} onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); e.target.blur(); } }}
               placeholder="Search…"
               style={{width:'220px', background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'5px', padding:`4px 10px 4px ${search ? '26px' : '10px'}`, color:T.text0, fontSize:F.xs, outline:'none'}}
             />
