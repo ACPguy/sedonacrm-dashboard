@@ -2388,7 +2388,9 @@ export default function SedonaCRM() {
             <List size={24} weight="bold"/>
           </button>
           <GlobalSearch />
-          <PropertyPillsPopover activeProps={activeProps} onNavigate={handleNav} />
+          <span className="crm-desktop-only">
+            <PropertyPillsPopover activeProps={activeProps} onNavigate={handleNav} />
+          </span>
           <div style={{flex:1}}/>
           <div style={{width:'32px',height:'32px',borderRadius:'50%',background:T.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:F.sm,fontWeight:'700',color:'#fff',flexShrink:0}}>SA</div>
         </div>

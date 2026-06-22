@@ -206,9 +206,20 @@ export default function GlobalSearch() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [forceGlobal, setForceGlobal] = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 360 });
   const wrapperRef = useRef(null);
   const debounceRef = useRef(null);
   const inputRef = useRef(null);
+
+  const computeDropPos = () => {
+    if (!wrapperRef.current) return;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const dropW = Math.min(360, window.innerWidth - 16);
+    let left = rect.left;
+    if (left + dropW > window.innerWidth - 8) left = window.innerWidth - dropW - 8;
+    if (left < 8) left = 8;
+    setDropPos({ top: rect.bottom + 4, left, width: dropW });
+  };
 
   // Derive current module from pathname
   const base = '/' + router.pathname.split('/')[1];
@@ -260,9 +271,11 @@ export default function GlobalSearch() {
           groups = group.items.length > 0 ? [group] : [];
         }
         setResults(groups);
+        computeDropPos();
         setOpen(true);
       } catch {
         setResults([]);
+        computeDropPos();
         setOpen(true);
       } finally {
         setLoading(false);
@@ -308,7 +321,7 @@ export default function GlobalSearch() {
   const placeholder = isGlobal ? 'Search everything…' : `Search ${moduleLabel}…`;
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', width: '220px', flexShrink: 0 }}>
+    <div ref={wrapperRef} style={{ position: 'relative', width: '220px', flexShrink: 1, minWidth: 0, maxWidth: '220px' }}>
       {/* Input */}
       <div style={{ position: 'relative' }}>
         <span style={{
@@ -322,7 +335,7 @@ export default function GlobalSearch() {
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          onFocus={e => { e.target.style.borderColor = T.accent; if (query.length >= 2) setOpen(true); }}
+          onFocus={e => { e.target.style.borderColor = T.accent; if (query.length >= 2) { computeDropPos(); setOpen(true); } }}
           onBlur={e => { e.target.style.borderColor = T.border; }}
           placeholder={placeholder}
           style={{
@@ -353,8 +366,11 @@ export default function GlobalSearch() {
       {/* Dropdown */}
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 9999,
-          width: 'min(360px, calc(100vw - 24px))',
+          position: 'fixed',
+          top: `${dropPos.top}px`,
+          left: `${dropPos.left}px`,
+          width: `${dropPos.width}px`,
+          zIndex: 9999,
           maxHeight: '480px', overflowY: 'auto', overflowX: 'hidden',
           background: T.bg1,
           border: `0.5px solid ${T.border}`,
