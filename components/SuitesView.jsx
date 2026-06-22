@@ -584,10 +584,10 @@ export const SuitesList = ({ suites, loading, error, onSelect, hidePropertyFilte
                   onClick={()=>{try{sessionStorage.setItem('suitesBackUrl',window.location.href);const navL=filtered.map(r=>({id:r.id,podio_id:r.podio_id}));sessionStorage.setItem('suitesNavList',JSON.stringify(navL));sessionStorage.setItem('suitesNavIndex',String(filtered.findIndex(r=>r.id===s.id)));}catch{}onSelect(s);}}
                   onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
                   onMouseLeave={e=>e.currentTarget.style.background=rowBg}>
-                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}}>
-                    <span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600'}}>{s.prop_code}</span>
-                    <span style={{fontWeight:'600',fontSize:F.base,color:T.text0}}>Suite {s.suite_num||'—'}</span>
-                    <StatusBadge status={s.status}/>
+                  <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px',overflow:'hidden'}}>
+                    <span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'1px 6px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>{s.prop_code}</span>
+                    <span style={{fontWeight:'600',fontSize:F.base,color:T.text0,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>Suite {s.suite_num||'—'}</span>
+                    <span style={{flexShrink:0}}><StatusBadge status={s.status}/></span>
                   </div>
                   <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
                     <span style={{fontSize:F.xs,color:tenantName?T.text1:T.text3,fontStyle:tenantName?'normal':'italic'}}>{tenantName||'Vacant'}</span>
