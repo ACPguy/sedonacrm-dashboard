@@ -8,9 +8,10 @@ import ContactsTable from './shared/ContactsTable';
 import TenantsTable from './shared/TenantsTable';
 import { TenantsList } from './TenantsView';
 import RichTextEditor from './RichTextEditor';
+import GlobalSearch from './GlobalSearch';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Buildings, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Buildings, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple, SquaresFour, List } from '@phosphor-icons/react';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw';
@@ -166,7 +167,7 @@ const WeatherCard = ({ city, lat, lon, url }) => {
   };
   return (
     <a href={url} target="_blank" rel="noreferrer"
-      style={{flex:1,display:'block',textDecoration:'none',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 10px'}}
+      style={{flex:'1 1 260px',minWidth:0,display:'block',textDecoration:'none',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 10px'}}
       onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
       onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6px'}}>
@@ -1860,7 +1861,7 @@ const HomeView = () => {
   return (
     <div style={{padding:'20px',overflowY:'auto',height:'100%'}}>
       <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,marginBottom:'16px'}}>Good morning, Scott.</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'12px',marginBottom:'20px'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'12px',marginBottom:'20px'}}>
         {[
           ['Active Properties',stats.properties,T.accent,'ti-building-store'],
           ['Suites',stats.suites,T.purple,'ti-door'],
@@ -1876,7 +1877,7 @@ const HomeView = () => {
           </div>
         ))}
       </div>
-      <div style={{display:'flex',gap:'12px',marginBottom:'20px'}}>
+      <div style={{display:'flex',gap:'12px',marginBottom:'20px',flexWrap:'wrap'}}>
         <WeatherCard city="Sedona AZ" lat={34.8697} lon={-111.7610} url="https://forecast.weather.gov/MapClick.php?CityName=Sedona&state=AZ"/>
         <WeatherCard city="Olympia WA" lat={47.0379} lon={-122.9007} url="https://forecast.weather.gov/MapClick.php?CityName=Olympia&state=WA"/>
       </div>
@@ -2170,11 +2171,52 @@ const StubView = ({ title, note }) => (
   </div>
 );
 
+// ── Property Pills Popover ────────────────────────────────────────────────────
+function PropertyPillsPopover({ activeProps, onNavigate }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+  return (
+    <div ref={ref} style={{position:'relative',flexShrink:0}}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg2,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:'6px',flexShrink:0,whiteSpace:'nowrap',transition:'border-color 0.15s,color 0.15s'}}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor=T.accent;e.currentTarget.style.color=T.text0;}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
+        <SquaresFour size={14}/> Properties
+      </button>
+      {open && (
+        <div style={{position:'absolute',top:'calc(100% + 4px)',right:0,zIndex:9998,background:T.bg1,border:`0.5px solid ${T.border}`,borderRadius:'6px',boxShadow:'0 8px 24px rgba(0,0,0,0.4)',padding:'10px',display:'flex',flexWrap:'wrap',gap:'5px',maxWidth:'min(400px, calc(100vw - 24px))'}}>
+          {activeProps.map(p => {
+            const href = `/properties/${p.podio_id ?? 'X'+p.id.slice(-6)}`;
+            return (
+              <a key={p.prop_code}
+                href={href}
+                title={p.property_name}
+                onClick={e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); onNavigate(href); setOpen(false); } }}
+                style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg3,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',textDecoration:'none'}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color=T.text0;}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
+                {p.prop_code}
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Root Component ────────────────────────────────────────────────────────────
 export default function SedonaCRM() {
   const router = useRouter();
   const [currentView,setCurrentView] = useState('morning-briefing');
   const [sidebarCollapsed,setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen,setMobileNavOpen] = useState(false);
   const [sidebarWidth,setSidebarWidth] = useState(168);
   const [expandedMenu,setExpandedMenu] = useState(null);
   const [resetKey,setResetKey] = useState(0);
@@ -2204,19 +2246,57 @@ export default function SedonaCRM() {
   },[sidebarWidth]);
 
   const navTo = (view) => {
+    setMobileNavOpen(false);
     setCurrentView(view);
     setResetKey(k=>k+1);
   };
 
   const handleNav = (path) => {
-    if (router.asPath === path || router.asPath.startsWith(path + '/') || router.asPath.startsWith(path + '?')) {
-      router.replace(path).then(() => router.reload());
-    } else {
-      router.push(path);
-    }
+    setMobileNavOpen(false);
+    router.push(path);
   };
 
   const navProps = { collapsed:sidebarCollapsed, expandedMenu, setExpandedMenu, setCurrentView:navTo };
+
+  const navItems = (
+    <>
+      <NavItem iconComp={<EnvelopeSimple size={18} weight="bold"/>} label="Inbox" href="/inbox" active={currentView==='inbox'} onClick={()=>handleNav('/inbox')} {...navProps}/>
+      <NavItem iconComp={<HouseLine size={18} weight="bold"/>} label="Home" href="/?view=morning-briefing" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
+      {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Operations</div>}
+      <NavItem iconComp={<BuildingOffice size={18} weight="bold"/>} label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}        {...navProps}/>
+      <NavItem iconComp={<ClipboardText size={18} weight="bold"/>} label="Tasks"       href="/tasks"              active={currentView==='tasks'}       onClick={()=>handleNav('/tasks')}        {...navProps}/>
+      <NavItem iconComp={<Storefront size={18} weight="bold"/>} label="Tenants"     href="/tenants"            active={currentView==='tenants'}     onClick={()=>handleNav('/tenants')}      {...navProps}/>
+      <NavItem iconComp={<Truck size={18} weight="bold"/>} label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>handleNav('/vendors')}      {...navProps}/>
+      <NavItem iconComp={<Briefcase size={18} weight="bold"/>} label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>handleNav('/owners')}       {...navProps}/>
+      <NavItem iconComp={<UserCircle size={18} weight="bold"/>} label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>handleNav('/contacts')}     {...navProps}/>
+      <NavItem iconComp={<Cube size={18} weight="bold"/>} label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>handleNav('/suites')}       {...navProps}/>
+      <NavItem iconComp={<Key size={18} weight="bold"/>} label="Key Safes"   href="/key-safes"          active={currentView==='key-safes'}   onClick={()=>handleNav('/key-safes')}    {...navProps}/>
+      {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
+      <NavItem label="Pipeline" href="/?view=leasing"       active={currentView==='leasing'}       onClick={()=>navTo('leasing')}             {...navProps}/>
+      <NavItem label="Leases"   href="/?view=leases"        active={currentView==='leases'}        onClick={()=>navTo('leases')}              {...navProps}/>
+      <NavItem iconComp={<ChartBar size={18} weight="bold"/>} label="Rents"    href="/rent-schedule"       active={currentView==='rent-schedule'} onClick={()=>handleNav('/rent-schedule')} {...navProps}/>
+      {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Compliance</div>}
+      <NavItem iconComp={<Umbrella size={18} weight="bold"/>} label="Insurance"   href="/?view=tnt-cois"    active={currentView==='tnt-cois'}    onClick={()=>navTo('tnt-cois')}    {...navProps}/>
+      <NavItem iconComp={<ClipboardText size={18} weight="bold"/>} label="Inspections" href="/?view=inspections" active={currentView==='inspections'} onClick={()=>navTo('inspections')} {...navProps}/>
+      {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Finance</div>}
+      <NavItem label="QBO Dashboard" href="/?view=qbo"      active={currentView==='qbo'}      onClick={()=>navTo('qbo')}      {...navProps}/>
+      <NavItem label="Invoices"      href="/?view=invoices" active={currentView==='invoices'} onClick={()=>navTo('invoices')} {...navProps}/>
+      {!sidebarCollapsed&&(
+        <button onClick={()=>{const next=!showLegacy;setShowLegacy(next);localStorage.setItem('showLegacyNav',String(next));}}
+          style={{width:'100%',padding:'5px 4px',background:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontSize:'11px',color:T.text3,letterSpacing:'0.06em',textTransform:'uppercase',fontWeight:'600',userSelect:'none',marginTop:'4px'}}
+          onMouseEnter={e=>e.currentTarget.style.color=T.text2}
+          onMouseLeave={e=>e.currentTarget.style.color=T.text3}>
+          <span style={{fontSize:'10px'}}>{showLegacy?'▾':'▸'}</span> Legacy
+        </button>
+      )}
+      {showLegacy&&(
+        <div style={{opacity:0.6}}>
+          <NavItem iconComp={<Wrench size={18} weight="bold"/>} label="Work Orders" href="/work-orders" active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
+          <NavItem iconComp={<CheckFat size={18} weight="bold"/>} label="Issues"    href="/issues"      active={currentView==='issues'}      onClick={()=>handleNav('/issues')}   {...navProps}/>
+        </div>
+      )}
+    </>
+  );
 
   const renderView = () => {
     switch(currentView) {
@@ -2239,8 +2319,34 @@ export default function SedonaCRM() {
 
   return (
     <div style={css.shell}>
+      {/* Mobile nav overlay */}
+      {mobileNavOpen && (
+        <div
+          className="crm-mobile-overlay"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      {/* Mobile nav drawer */}
+      <div style={{
+        position:'fixed',top:0,left:0,height:'100vh',zIndex:50,
+        width:'220px',background:T.bg0,borderRight:`0.5px solid ${T.border}`,
+        display:'flex',flexDirection:'column',overflow:'hidden',
+        transform:mobileNavOpen?'translateX(0)':'translateX(-100%)',
+        transition:'transform 0.2s ease',
+      }}>
+        <div style={{padding:'8px 16px',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',gap:'12px',flexShrink:0,minHeight:'42px'}}>
+          <span style={{fontSize:F.sm,fontWeight:'700',color:'#d4924a',letterSpacing:'0.02em'}}>ACP</span>
+          <button onClick={()=>setMobileNavOpen(false)}
+            style={{background:T.bg3,border:`1px solid ${T.border}`,color:T.text0,cursor:'pointer',padding:'4px 7px',borderRadius:'4px',fontSize:'13px',lineHeight:1}}>
+            ✕
+          </button>
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
+          {navItems}
+        </div>
+      </div>
       {/* Sidebar */}
-      <div style={{width:sidebarCollapsed?'48px':`${sidebarWidth}px`,background:T.bg0,borderRight:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',flexShrink:0,overflow:'hidden',transition:'width 200ms ease'}}>
+      <div className="crm-desktop-sidebar" style={{width:sidebarCollapsed?'48px':`${sidebarWidth}px`,background:T.bg0,borderRight:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',flexShrink:0,overflow:'hidden',transition:'width 200ms ease'}}>
         {/* Top bar */}
         <div style={{...css.topbar,justifyContent:'space-between',flexShrink:0}}>
           {!sidebarCollapsed&&<span style={{fontSize:F.sm,fontWeight:'700',color:'#d4924a',letterSpacing:'0.02em'}}>ACP</span>}
@@ -2253,41 +2359,7 @@ export default function SedonaCRM() {
         </div>
         {/* Nav */}
         <div style={{flex:1,overflowY:'auto',padding:'8px 6px'}}>
-          <NavItem iconComp={<EnvelopeSimple size={18} weight="bold"/>} label="Inbox" href="/inbox" active={currentView==='inbox'} onClick={()=>handleNav('/inbox')} {...navProps}/>
-          <NavItem iconComp={<HouseLine size={18} weight="bold"/>} label="Home" href="/?view=morning-briefing" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
-          {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Operations</div>}
-          <NavItem iconComp={<BuildingOffice size={18} weight="bold"/>} label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}        {...navProps}/>
-          <NavItem iconComp={<ClipboardText size={18} weight="bold"/>} label="Tasks"       href="/tasks"              active={currentView==='tasks'}       onClick={()=>handleNav('/tasks')}        {...navProps}/>
-          <NavItem iconComp={<Storefront size={18} weight="bold"/>} label="Tenants"     href="/tenants"            active={currentView==='tenants'}     onClick={()=>handleNav('/tenants')}      {...navProps}/>
-          <NavItem iconComp={<Truck size={18} weight="bold"/>} label="Vendors"     href="/vendors"            active={currentView==='vendors'}     onClick={()=>handleNav('/vendors')}      {...navProps}/>
-          <NavItem iconComp={<Briefcase size={18} weight="bold"/>} label="Owners"      href="/owners"             active={currentView==='owners'}      onClick={()=>handleNav('/owners')}       {...navProps}/>
-          <NavItem iconComp={<UserCircle size={18} weight="bold"/>} label="Contacts"    href="/contacts"           active={currentView==='contacts'}    onClick={()=>handleNav('/contacts')}     {...navProps}/>
-          <NavItem iconComp={<Cube size={18} weight="bold"/>} label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>handleNav('/suites')}       {...navProps}/>
-          <NavItem iconComp={<Key size={18} weight="bold"/>} label="Key Safes"   href="/key-safes"          active={currentView==='key-safes'}   onClick={()=>handleNav('/key-safes')}    {...navProps}/>
-          {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
-          <NavItem label="Pipeline" href="/?view=leasing"       active={currentView==='leasing'}       onClick={()=>navTo('leasing')}   {...navProps}/>
-          <NavItem label="Leases"   href="/?view=leases"        active={currentView==='leases'}        onClick={()=>navTo('leases')}             {...navProps}/>
-          <NavItem iconComp={<ChartBar size={18} weight="bold"/>} label="Rents"    href="/rent-schedule"       active={currentView==='rent-schedule'} onClick={()=>handleNav('/rent-schedule')} {...navProps}/>
-          {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Compliance</div>}
-          <NavItem iconComp={<Umbrella size={18} weight="bold"/>} label="Insurance"   href="/?view=tnt-cois"    active={currentView==='tnt-cois'}    onClick={()=>navTo('tnt-cois')}    {...navProps}/>
-          <NavItem iconComp={<ClipboardText size={18} weight="bold"/>} label="Inspections" href="/?view=inspections" active={currentView==='inspections'} onClick={()=>navTo('inspections')} {...navProps}/>
-          {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Finance</div>}
-          <NavItem label="QBO Dashboard" href="/?view=qbo"      active={currentView==='qbo'}      onClick={()=>navTo('qbo')}      {...navProps}/>
-          <NavItem label="Invoices"      href="/?view=invoices" active={currentView==='invoices'} onClick={()=>navTo('invoices')} {...navProps}/>
-          {!sidebarCollapsed&&(
-            <button onClick={()=>{const next=!showLegacy;setShowLegacy(next);localStorage.setItem('showLegacyNav',String(next));}}
-              style={{width:'100%',padding:'5px 4px',background:'transparent',border:'none',textAlign:'left',cursor:'pointer',display:'flex',alignItems:'center',gap:'5px',fontSize:'11px',color:T.text3,letterSpacing:'0.06em',textTransform:'uppercase',fontWeight:'600',userSelect:'none',marginTop:'4px'}}
-              onMouseEnter={e=>e.currentTarget.style.color=T.text2}
-              onMouseLeave={e=>e.currentTarget.style.color=T.text3}>
-              <span style={{fontSize:'10px'}}>{showLegacy?'▾':'▸'}</span> Legacy
-            </button>
-          )}
-          {showLegacy&&(
-            <div style={{opacity:0.6}}>
-              <NavItem iconComp={<Wrench size={18} weight="bold"/>} label="Work Orders" href="/work-orders" active={currentView==='work-orders'} onClick={()=>navTo('work-orders')} {...navProps}/>
-              <NavItem iconComp={<CheckFat size={18} weight="bold"/>} label="Issues"    href="/issues"      active={currentView==='issues'}      onClick={()=>handleNav('/issues')}   {...navProps}/>
-            </div>
-          )}
+          {navItems}
         </div>
         {/* Bottom */}
         <div style={{padding:'8px 6px',borderTop:`0.5px solid ${T.border}`,flexShrink:0}}>
@@ -2307,25 +2379,17 @@ export default function SedonaCRM() {
       <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
         {/* Topbar */}
         <div style={{padding:'0 16px',background:T.bg0,borderBottom:`0.5px solid ${T.border}`,display:'flex',alignItems:'center',gap:'12px',flexShrink:0,minHeight:'42px'}}>
-          <span style={{fontSize:F.md,fontWeight:'600',color:'#d4924a',flexShrink:0}}>Anderson Commercial Properties</span>
-          <div style={{flex:1,overflow:'hidden',minWidth:0}}>
-            <div style={{display:'flex',gap:'5px',overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch',padding:'7px 0'}}>
-              {activeProps.map(p => {
-                const href = `/properties/${p.podio_id ?? 'X'+p.id.slice(-6)}`;
-                return (
-                  <a key={p.prop_code}
-                    href={href}
-                    title={p.property_name}
-                    onClick={e => { if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); handleNav(href); } }}
-                    style={{height:'28px',padding:'0 10px',borderRadius:'4px',background:T.bg3,border:`0.5px solid ${T.border}`,color:T.text1,fontSize:'11px',fontWeight:'500',cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,display:'inline-flex',alignItems:'center',textDecoration:'none'}}
-                    onMouseEnter={e=>{e.currentTarget.style.borderColor='#E8630A';e.currentTarget.style.color=T.text0;}}
-                    onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.color=T.text1;}}>
-                    {p.prop_code}
-                  </a>
-                );
-              })}
-            </div>
-          </div>
+          <button
+            className="crm-hamburger"
+            onClick={()=>setMobileNavOpen(o=>!o)}
+            style={{background:'transparent',border:'none',color:T.text1,cursor:'pointer',padding:'4px',borderRadius:'4px',minWidth:'44px',minHeight:'44px',display:'none'}}
+            onMouseEnter={e=>e.currentTarget.style.color=T.text0}
+            onMouseLeave={e=>e.currentTarget.style.color=T.text1}>
+            <List size={24} weight="bold"/>
+          </button>
+          <GlobalSearch />
+          <PropertyPillsPopover activeProps={activeProps} onNavigate={handleNav} />
+          <div style={{flex:1}}/>
           <div style={{width:'32px',height:'32px',borderRadius:'50%',background:T.accent,display:'flex',alignItems:'center',justifyContent:'center',fontSize:F.sm,fontWeight:'700',color:'#fff',flexShrink:0}}>SA</div>
         </div>
         {/* View */}

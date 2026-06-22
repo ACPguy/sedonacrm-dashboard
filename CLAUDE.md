@@ -294,19 +294,21 @@ echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
 
 ## Development Rules
 
-1. **SELECT DISTINCT before any UI field from Podio** — Before building any dropdown, filter, badge, or component that displays or filters a field sourced from Podio data, always run `SELECT DISTINCT col FROM table ORDER BY col;` to confirm the exact values in the database. Never hardcode options without checking first.
+1. **Search queries must always have a server-side LIMIT cap** — Never pull unbounded rows from any table into a search result. Max 5 results per module per search. Body/text searches use JOINs with limits — never full table scans. Performance is a first-class design constraint. See GlobalSearch.jsx for the canonical pattern.
 
-2. **npm run dev before every commit** — After every set of changes, run `npm run dev` (or `npm run build`) and confirm no build errors before committing or pushing. Fix errors first, then push. Never push broken code to GitHub (it deploys broken to Vercel).
+2. **SELECT DISTINCT before any UI field from Podio** — Before building any dropdown, filter, badge, or component that displays or filters a field sourced from Podio data, always run `SELECT DISTINCT col FROM table ORDER BY col;` to confirm the exact values in the database. Never hardcode options without checking first.
 
-3. **Left nav always-navigate on click** — Nav items must always navigate on click, even when the user is already on that module or inside a detail record. Use the `handleNav`/`go` pattern: if `router.asPath` already matches the target path (exact, or starts with `path + '/'`, or `path + '?'`), call `router.replace(path).then(() => router.reload())`; otherwise call `router.push(path)`. Never use `?t=Date.now()` — Next.js does not re-mount components for same-path navigations with different query params. This pattern is in `go()` in AppShell.jsx and `handleNav()` in SedonaCRM.jsx; apply the same logic in any new nav code.
+3. **npm run dev before every commit** — After every set of changes, run `npm run dev` (or `npm run build`) and confirm no build errors before committing or pushing. Fix errors first, then push. Never push broken code to GitHub (it deploys broken to Vercel).
 
-4. **Date fields always use `<input type="date">`** — Any editable field that stores a date must use `<input type="date">` so the browser's native calendar picker opens on click. Display mode (not editing) must always show MM-DD-YYYY via `fmtDate()`. Value stored/sent to Supabase must be YYYY-MM-DD. This applies to `InlineBlurField` (pass `type="date"`) and `EditableField` (pass `type="date"`). No exceptions unless Scott explicitly requests otherwise.
+4. **Left nav always-navigate on click** — Nav items must always navigate on click, even when the user is already on that module or inside a detail record. Use the `handleNav`/`go` pattern: if `router.asPath` already matches the target path (exact, or starts with `path + '/'`, or `path + '?'`), call `router.replace(path).then(() => router.reload())`; otherwise call `router.push(path)`. Never use `?t=Date.now()` — Next.js does not re-mount components for same-path navigations with different query params. This pattern is in `go()` in AppShell.jsx and `handleNav()` in SedonaCRM.jsx; apply the same logic in any new nav code.
 
-5. **Pill hover rule** — Inactive pills in any pill picker (`PriorityPills`, `StatusPills`, and any similar component) show a semi-transparent (~20% alpha) version of their active color on hover, via `onMouseEnter`/`onMouseLeave` setting `background`. Use `transition: 'background 0.15s ease'` on all pills. Active pill: no hover change — leave it alone.
+5. **Date fields always use `<input type="date">`** — Any editable field that stores a date must use `<input type="date">` so the browser's native calendar picker opens on click. Display mode (not editing) must always show MM-DD-YYYY via `fmtDate()`. Value stored/sent to Supabase must be YYYY-MM-DD. This applies to `InlineBlurField` (pass `type="date"`) and `EditableField` (pass `type="date"`). No exceptions unless Scott explicitly requests otherwise.
 
-6. **Multi-line text fields** — All `RichTextEditor` and `<textarea>` fields use `minRows={5}` (default). Edit mode: minimum 120px tall (`minRows * 24px`); always include 72px bottom padding so there are 3 lines of blank space below the cursor; content auto-expands to show all existing text with no scrollbar. Always include the full TipTap toolbar. Label div inside `RichTextEditor` stays conditional (`{label && ...}`).
+6. **Pill hover rule** — Inactive pills in any pill picker (`PriorityPills`, `StatusPills`, and any similar component) show a semi-transparent (~20% alpha) version of their active color on hover, via `onMouseEnter`/`onMouseLeave` setting `background`. Use `transition: 'background 0.15s ease'` on all pills. Active pill: no hover change — leave it alone.
 
-7. **Destructive Database Operations — ALWAYS STOP AND CONFIRM** — Before executing ANY of the following, stop and tell me exactly what you are about to run and why, then wait for my explicit confirmation before proceeding:
+7. **Multi-line text fields** — All `RichTextEditor` and `<textarea>` fields use `minRows={5}` (default). Edit mode: minimum 120px tall (`minRows * 24px`); always include 72px bottom padding so there are 3 lines of blank space below the cursor; content auto-expands to show all existing text with no scrollbar. Always include the full TipTap toolbar. Label div inside `RichTextEditor` stays conditional (`{label && ...}`).
+
+8. **Destructive Database Operations — ALWAYS STOP AND CONFIRM** — Before executing ANY of the following, stop and tell me exactly what you are about to run and why, then wait for my explicit confirmation before proceeding:
    - TRUNCATE (any table)
    - DROP TABLE or DROP COLUMN
    - DELETE FROM (any table)
@@ -316,11 +318,11 @@ echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
    This rule applies even when --dangerously-skip-permissions is active.
    For all other operations (file reads, file writes, git, npm, SELECT queries), proceed without asking.
 
-8. **High-volume list views default to Open only — never fetch all records on mount** — Work Orders and Issues list views load only Open (non-closed) records by default. Closed records are NOT fetched until the user explicitly selects a Closed or All filter pill. Each filter pill click triggers a new Supabase query — do NOT filter a pre-loaded full dataset client-side. This applies everywhere these tables render: standalone list views, Property detail tabs, Tenant detail tabs, Contact detail tabs, and any other embedded context.
+9. **High-volume list views default to Open only — never fetch all records on mount** — Work Orders and Issues list views load only Open (non-closed) records by default. Closed records are NOT fetched until the user explicitly selects a Closed or All filter pill. Each filter pill click triggers a new Supabase query — do NOT filter a pre-loaded full dataset client-side. This applies everywhere these tables render: standalone list views, Property detail tabs, Tenant detail tabs, Contact detail tabs, and any other embedded context.
 
-9. **Mobile stat summary rows are always pill-style horizontal scroll** — Any row of summary statistics rendered above a table (occupancy stats, financial totals, portfolio counts, or any other KPI summary) must use the `.stats-pill-row` + `.stat-pill` CSS pattern on mobile (< 768px). Desktop layout is unrestricted. Never render a multi-row grid of stat cards on mobile — it consumes too much vertical space. Use `.md-hidden` on the mobile pill row (shows on mobile, hidden on desktop) and `.mobile-hidden` on the desktop grid (hidden on mobile, shows on desktop). This applies to all existing and future list views: Tenants, Properties, Work Orders, Issues, Contacts, Vendors, Owners, and any new module added in future phases.
+10. **Mobile stat summary rows are always pill-style horizontal scroll** — Any row of summary statistics rendered above a table (occupancy stats, financial totals, portfolio counts, or any other KPI summary) must use the `.stats-pill-row` + `.stat-pill` CSS pattern on mobile (< 768px). Desktop layout is unrestricted. Never render a multi-row grid of stat cards on mobile — it consumes too much vertical space. Use `.md-hidden` on the mobile pill row (shows on mobile, hidden on desktop) and `.mobile-hidden` on the desktop grid (hidden on mobile, shows on desktop). This applies to all existing and future list views: Tenants, Properties, Work Orders, Issues, Contacts, Vendors, Owners, and any new module added in future phases.
 
-10. **Filter state is always encoded in URL query params** — Every list view with filter pills (prop_code, type, priority, status, or any other filter dimension) must encode the active filter state into the URL via `window.history.replaceState` on every filter change, and restore state from URL params on mount. Use a `hasMounted` ref to skip the initial sync so the restore effect runs first. This ensures the browser back button and the detail-view back button always return to the exact filtered state the user was in. Apply to all existing modules (Tasks, Work Orders, Issues, Tenants, Contacts, Vendors, Owners, Properties) and all future list views added in Phases 3 through 10.
+11. **Filter state is always encoded in URL query params** — Every list view with filter pills (prop_code, type, priority, status, or any other filter dimension) must encode the active filter state into the URL via `window.history.replaceState` on every filter change, and restore state from URL params on mount. Use a `hasMounted` ref to skip the initial sync so the restore effect runs first. This ensures the browser back button and the detail-view back button always return to the exact filtered state the user was in. Apply to all existing modules (Tasks, Work Orders, Issues, Tenants, Contacts, Vendors, Owners, Properties) and all future list views added in Phases 3 through 10.
 
 ## URL Routing Rules (permanent)
 
@@ -458,10 +460,28 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 - FU End Date removed (no data, not needed)
 - Banner text: "New - Fill & Save"
 
+**Completed session 2026-06-19 — Inbox search, ACP monogram, property pills popover (merged to main):**
+- GlobalSearch: added 'inbox' to MODULE_KEYS + PATHNAME_TO_MODULE + MODULE_LABELS; two-fetch inbox search (email_threads subject + email_messages from/body); two-line ResultRow for inbox items with subLine
+- Architectural rule added (Dev Rule 1): all search queries capped at 5 results server-side
+- AppShell + SedonaCRM: "Anderson Commercial Properties" → bold "ACP" monogram
+- AppShell + SedonaCRM: property pills div replaced with PropertyPillsPopover (⊞ Properties button + floating panel, click-outside closes, Ctrl+click opens new tab)
+
+**Completed session 2026-06-22 — Mobile fixes batch (merged to main):**
+- AppShell + SedonaCRM: removed ACP monogram from topbar banner (kept in sidebar only)
+- AppShell + SedonaCRM: PropertyPillsPopover moved immediately after GlobalSearch; flex:1 spacer moved before SA avatar
+- GlobalSearch dropdown: width changed to `min(360px, calc(100vw - 24px))` + overflowX:hidden for mobile
+- AppShell go(): simplified — always setMobileNavOpen(false) + router.push (removed reload branch)
+- SedonaCRM: added full mobile drawer pattern (mobileNavOpen state, overlay, slide-in drawer, hamburger button, crm-desktop-sidebar class on sidebar)
+- SedonaCRM handleNav + navTo: both call setMobileNavOpen(false); handleNav simplified to router.push only
+- SedonaCRM: extracted navItems JSX variable (reused in desktop sidebar + mobile drawer)
+- Home dashboard: stat grid → repeat(auto-fill,minmax(140px,1fr)); weather row flexWrap:wrap; WeatherCard flex:1 1 260px + minWidth:0
+- SuitesView: StatusBadge renders STATUS_SHORT labels (Occ/Lease, Vac/Lease); status td gets maxWidth+scroll wrapper; mobile card status row: prop_code flexShrink:0, suite name flex:1 truncate, badge flexShrink:0
+
 **Next priorities (start here next session):**
-1. Inbox refresh button — wire re-fetch from Supabase (not just local state reset)
-2. Inbox search — add text search field filtering subject/from/body_preview
-3. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
+2. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+3. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
+4. Phase 4: Workflow automations + Agents 1/3/4/7/9
    - Work Order Agent (Agent 4): auto Drive folder creation on WO save
    - Quick Recipients field: multi-contact pre-populate for EmailCompose TO
    - task_links junction table: many-to-many record linking
