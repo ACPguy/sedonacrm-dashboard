@@ -439,12 +439,21 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 - SquaresFour imported in both AppShell.jsx and SedonaCRM.jsx
 - Commit: 163006d (preview branch — pending Scott's approval)
 
+**Completed session 2026-06-23 — Mobile topbar, search fixes, Escape key handlers (preview branch):**
+- Mobile topbar: Properties button is now icon-only on mobile (text hidden via crm-desktop-only), full label on desktop
+- GlobalSearch dropdown: switched to position:fixed with viewport-aware computeDropPos() — no off-screen clipping on iPhone
+- EmailInbox.jsx: added client-side inbox search filter on subject/from/body_preview; activates at 2+ chars; magnifying glass icon + x clear button
+- Escape key handler added to all 12 search inputs across the app: GlobalSearch, EmailInbox, TasksView, TenantsView, ContactsView, VendorsView, WorkOrdersView, IssuesView, OwnersView, SuitesView, RentScheduleView, SedonaCRM PropertiesView
+- Commits: 829d02d, e15ef60, 62ddfbf, 5909cd4, 80e1f89 (preview branch)
+
 **Next priorities (start here next session):**
-1. Merge preview → main (Scott approves: d359a6c + 163006d)
-2. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
-3. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
-4. Debug index PDF upload (pdf-lib Readable stream + Drive media upload)
-5. Phase 4: Workflow automations + Agents 1/3/4/7/9
+1. Phase 4 kickoff — Workflow automations + AI Agents
+2. Agent 7 first: Morning Briefing (7am daily digest)
+3. Agent 1: Lease Watch (expiration alerts + draft notices)
+4. Agent 4: Work Order Agent (auto Drive folder creation on WO save)
+5. Notice-to-vacate logging workflow + MTM flag + Morning Briefing integration
+6. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
+7. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
 
 ## Task ID Display vs URL Rule (permanent)
 
