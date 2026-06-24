@@ -466,13 +466,29 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 - NewTaskForm WO section: same replacement (companyLink=null, isMobile=false on create form)
 - Commit: 7e42dec (preview branch)
 
+**Completed session 2026-06-24b — Phase 4 Agent 7: Morning Briefing (preview branch):**
+- DB: `briefings` table — run_date (UNIQUE), status (pending/running/complete/error), triggered_by, urgent/attention/fyi (jsonb arrays), snapshot (jsonb), raw_prompt, error_message, timestamps. RLS enabled with admin_all_briefings policy.
+- `vercel.json` created — cron schedule "0 12 * * *" (12:00 UTC = 5:00am AZ, no DST)
+- `/api/agents/morning-briefing`: GET returns today's briefing (maybeSingle); POST auth via x-vercel-cron or x-briefing-secret env var; idempotent (complete → return existing); marks status=running, runs 14 parallel Supabase queries, builds urgent/attention/fyi/snapshot, upserts complete; try/catch upserts error status on failure. maxDuration=60.
+- Queries: overdue tasks + urgent leases (≤30d) + urgent COIs (≤14d) / this-week tasks + attention leases (31-120d) + property insurance (≤30d) + attention COIs (15-60d) + active rent / new tasks + completed tasks + new contacts (yesterday) / open task count + active tenant count + active property count
+- `BriefingView.jsx`: Sun icon header with date + last-run time; Run Now button; three SectionCard components (🔴/🟡/🟢) each with clickable item rows linking to deep URLs in new tab; StatPill snapshot bar; polling every 5s when status=running; handles none/running/complete/error states
+- `/briefing` page route wrapping BriefingView in AppShell
+- `AppShell.jsx`: Sun icon imported; "Briefing" NavBtn added after Home, before Operations section
+- Commit: 72c4a61 (preview branch)
+
+**ENV VARS REQUIRED IN VERCEL (must be set before cron or Run Now will work):**
+- `BRIEFING_SECRET` — any random string; authenticates manual POST calls (server-side)
+- `NEXT_PUBLIC_BRIEFING_SECRET` — same value; used by BriefingView client-side Run Now button
+Set at: Vercel → Project Settings → Environment Variables (both Production + Preview environments)
+
 **Next priorities (start here next session):**
-1. Merge all preview work to main
-2. Phase 4 kickoff — Agent 7 Morning Briefing first
-3. Agent 1: Lease Watch (expiration alerts + draft notices)
-4. Agent 4: Work Order Agent (auto Drive folder creation on WO save)
-5. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
-6. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+1. Merge preview → main (approve 72c4a61)
+2. Set BRIEFING_SECRET + NEXT_PUBLIC_BRIEFING_SECRET in Vercel environment variables
+3. Test "Run Now" on production at crm.andersoncp.com/briefing
+4. Agent 1: Lease Watch (expiration alerts + draft notices)
+5. Agent 4: Work Order Agent (auto Drive folder creation on WO save)
+6. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
+7. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
 
 ## Task ID Display vs URL Rule (permanent)
 
