@@ -337,6 +337,56 @@ const InlineSelect = ({ value, options, onSave }) => (
   </select>
 );
 
+// ── CompanyContactRow ─────────────────────────────────────────────────────────
+// Paired company + contact selects with FK-filtered contact list and auto-select.
+const CompanyContactRow = ({ companyLabel, contactLabel, companyValue, contactValue, companyOptions, allContacts, onSaveCompany, onSaveContact, companyLink, isMobile }) => {
+  const filteredContacts = useMemo(
+    () => companyValue ? allContacts.filter(c => c.vendor_id === companyValue || c.tenant_id === companyValue) : allContacts,
+    [companyValue, allContacts],
+  );
+  useEffect(() => {
+    if (filteredContacts.length === 1 && contactValue !== filteredContacts[0].id) {
+      onSaveContact(filteredContacts[0].id);
+    }
+  }, [companyValue, filteredContacts.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const contactObj = allContacts.find(c => c.id === contactValue);
+  const contactLink = contactObj ? `/contacts/${contactObj.podio_id ?? 'X'+contactObj.id.slice(-6)}` : null;
+  const lbl = { fontSize:F.sm, fontWeight:'600', color:'#6B7280', marginBottom:'4px' };
+  const lnk = { fontSize:F.xs, color:T.accent, marginTop:'4px', display:'block', textDecoration:'none' };
+  const companyCol = (
+    <div style={{ flex:1, minWidth:0 }}>
+      <div style={lbl}>{companyLabel}</div>
+      <InlineSelect value={companyValue} options={companyOptions} onSave={onSaveCompany}/>
+      {companyLink&&<a href={companyLink} style={lnk}
+        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+        {companyOptions.find(o=>o.value===companyValue)?.label} ↗
+      </a>}
+    </div>
+  );
+  const contactCol = (
+    <div style={{ flex:1, minWidth:0 }}>
+      <div style={lbl}>{contactLabel}</div>
+      <InlineSelect
+        value={contactValue}
+        options={filteredContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')})) }
+        onSave={onSaveContact}
+      />
+      {contactLink&&<a href={contactLink} style={lnk}
+        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
+        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+        {contactObj?.full_name} ↗
+      </a>}
+    </div>
+  );
+  return (
+    <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 12px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
+      {companyCol}
+      {contactCol}
+    </div>
+  );
+};
+
 // ── PriorityPills ─────────────────────────────────────────────────────────────
 const PriorityPills = ({ value, onSave }) => {
   const [hov,setHov] = useState(null);
@@ -1246,8 +1296,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('vendors','select=id,company_dba,podio_id&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba,podio_id&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
+    sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
+    sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
 
   useEffect(()=>{
@@ -1606,32 +1656,30 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               <FieldRow label="Keys / Key Safe">
                 <InlineBlurField value={data.key_safe_info||''} onSave={v=>save('key_safe_info',v)}/>
               </FieldRow>
-              <FieldRow label="Vendor Contact" topAlign>
-                <InlineSelect value={data.vendor_contact_id} options={vendorContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')}))  } onSave={v=>save('vendor_contact_id',v)}/>
-              </FieldRow>
-              <FieldRow label="Vendor Company" topAlign>
-                <InlineSelect value={data.vendor_id} options={vendors.map(v=>({value:v.id,label:v.company_dba}))} onSave={v=>save('vendor_id',v)}/>
-                {data.vendor_id&&vendorLink(data.vendor_id)&&(
-                  <a href={vendorLink(data.vendor_id)} style={{fontSize:F.xs,color:T.accent,marginTop:'4px',display:'block',textDecoration:'none'}}
-                    onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-                    onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-                    {vendors.find(v=>v.id===data.vendor_id)?.company_dba} ↗
-                  </a>
-                )}
-              </FieldRow>
-              <FieldRow label="Tenant Contact" topAlign>
-                <InlineSelect value={data.tenant_contact_id} options={tenantContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')}))  } onSave={v=>save('tenant_contact_id',v)}/>
-              </FieldRow>
-              <FieldRow label="Tenant Company" topAlign>
-                <InlineSelect value={data.tenant_id} options={tenants.map(t=>({value:t.id,label:t.tenant_dba}))} onSave={v=>save('tenant_id',v)}/>
-                {data.tenant_id&&tenantLink(data.tenant_id)&&(
-                  <a href={tenantLink(data.tenant_id)} style={{fontSize:F.xs,color:T.accent,marginTop:'4px',display:'block',textDecoration:'none'}}
-                    onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-                    onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-                    {tenants.find(t=>t.id===data.tenant_id)?.tenant_dba} ↗
-                  </a>
-                )}
-              </FieldRow>
+              <CompanyContactRow
+                companyLabel="Vendor Company"
+                contactLabel="Vendor Contact"
+                companyValue={data.vendor_id}
+                contactValue={data.vendor_contact_id}
+                companyOptions={vendors.map(v=>({value:v.id,label:v.company_dba}))}
+                allContacts={vendorContacts}
+                onSaveCompany={v=>save('vendor_id',v)}
+                onSaveContact={v=>save('vendor_contact_id',v)}
+                companyLink={data.vendor_id?vendorLink(data.vendor_id):null}
+                isMobile={isMobile}
+              />
+              <CompanyContactRow
+                companyLabel="Tenant Company"
+                contactLabel="Tenant Contact"
+                companyValue={data.tenant_id}
+                contactValue={data.tenant_contact_id}
+                companyOptions={tenants.map(t=>({value:t.id,label:t.tenant_dba}))}
+                allContacts={tenantContacts}
+                onSaveCompany={v=>save('tenant_id',v)}
+                onSaveContact={v=>save('tenant_contact_id',v)}
+                companyLink={data.tenant_id?tenantLink(data.tenant_id):null}
+                isMobile={isMobile}
+              />
               <FieldRow label="WO Type">
                 <GenericPills value={data.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>save('wo_type',v)}/>
               </FieldRow>
@@ -1796,8 +1844,8 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
     sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('properties','select=prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
+    sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
+    sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
 
   useEffect(()=>{
@@ -1961,18 +2009,30 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             <FieldRow label="Keys / Key Safe">
               <InlineBlurField value={formData.key_safe_info||''} onSave={v=>set('key_safe_info',v)}/>
             </FieldRow>
-            <FieldRow label="Vendor Contact">
-              <InlineSelect value={formData.vendor_contact_id} options={vendorContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')}))  } onSave={v=>set('vendor_contact_id',v)}/>
-            </FieldRow>
-            <FieldRow label="Vendor Company">
-              <InlineSelect value={formData.vendor_id} options={vendors.map(v=>({value:v.id,label:v.company_dba}))} onSave={v=>set('vendor_id',v)}/>
-            </FieldRow>
-            <FieldRow label="Tenant Contact">
-              <InlineSelect value={formData.tenant_contact_id} options={tenantContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')}))  } onSave={v=>set('tenant_contact_id',v)}/>
-            </FieldRow>
-            <FieldRow label="Tenant Company">
-              <InlineSelect value={formData.tenant_id} options={tenants.map(t=>({value:t.id,label:t.tenant_dba}))} onSave={v=>set('tenant_id',v)}/>
-            </FieldRow>
+            <CompanyContactRow
+              companyLabel="Vendor Company"
+              contactLabel="Vendor Contact"
+              companyValue={formData.vendor_id}
+              contactValue={formData.vendor_contact_id}
+              companyOptions={vendors.map(v=>({value:v.id,label:v.company_dba}))}
+              allContacts={vendorContacts}
+              onSaveCompany={v=>set('vendor_id',v)}
+              onSaveContact={v=>set('vendor_contact_id',v)}
+              companyLink={null}
+              isMobile={false}
+            />
+            <CompanyContactRow
+              companyLabel="Tenant Company"
+              contactLabel="Tenant Contact"
+              companyValue={formData.tenant_id}
+              contactValue={formData.tenant_contact_id}
+              companyOptions={tenants.map(t=>({value:t.id,label:t.tenant_dba}))}
+              allContacts={tenantContacts}
+              onSaveCompany={v=>set('tenant_id',v)}
+              onSaveContact={v=>set('tenant_contact_id',v)}
+              companyLink={null}
+              isMobile={false}
+            />
             <FieldRow label="WO Type">
               <GenericPills value={formData.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>set('wo_type',v)}/>
             </FieldRow>
