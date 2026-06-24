@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { EnvelopeSimple, ArrowCounterClockwise, CheckCircle, Circle, Spinner, Robot, Archive } from '@phosphor-icons/react';
+import { EnvelopeSimple, ArrowCounterClockwise, CheckCircle, Circle, Spinner, Robot, Archive, MagnifyingGlass } from '@phosphor-icons/react';
 import EmailCompose from './EmailCompose';
 
 const SUPABASE_URL  = 'https://edxcvyleielzevpappui.supabase.co';
@@ -533,6 +533,7 @@ export default function EmailInbox() {
   const [loading,        setLoading]        = useState(true);
   const [selectedThread, setSelectedThread] = useState(null);
   const [refreshKey,     setRefreshKey]     = useState(0);
+  const [inboxSearch,    setInboxSearch]    = useState('');
 
   const buildQuery = useCallback((f) => {
     let params = `order=last_message_at.desc&limit=100&select=*`;
@@ -589,6 +590,23 @@ export default function EmailInbox() {
     }
   };
 
+  const filteredThreads = inboxSearch.trim().length < 2
+    ? threads
+    : (() => {
+        const q = inboxSearch.trim().toLowerCase();
+        const seen = new Set();
+        return threads.filter(t => {
+          if (seen.has(t.id)) return false;
+          seen.add(t.id);
+          return (
+            (t.subject || '').toLowerCase().includes(q) ||
+            (t.from_name || '').toLowerCase().includes(q) ||
+            (t.from_address || '').toLowerCase().includes(q) ||
+            (t.body_preview || '').toLowerCase().includes(q)
+          );
+        });
+      })();
+
   return (
     <div style={{ display:'flex', height:'100%', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden' }}>
 
@@ -615,6 +633,33 @@ export default function EmailInbox() {
               <FilterPill key={key} label={label} active={filter === key} onClick={() => setFilter(key)}/>
             ))}
           </div>
+          <div style={{ marginTop:'8px', position:'relative' }}>
+            <span style={{ position:'absolute', left:'8px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none', display:'flex', alignItems:'center' }}>
+              <MagnifyingGlass size={13} weight="bold" color={T.text3}/>
+            </span>
+            <input
+              type="text"
+              value={inboxSearch}
+              onChange={e => setInboxSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') { setInboxSearch(''); e.target.blur(); } }}
+              placeholder="Search inbox…"
+              style={{
+                width:'100%', height:'28px', background:T.bg2,
+                border:`0.5px solid ${T.border}`, borderRadius:'5px',
+                padding:'4px 28px 4px 26px', color:T.text0,
+                fontSize:F.sm, outline:'none', boxSizing:'border-box',
+              }}
+              onFocus={e => e.target.style.borderColor = T.accent}
+              onBlur={e => e.target.style.borderColor = T.border}
+            />
+            {inboxSearch.length > 0 && (
+              <button
+                onClick={() => setInboxSearch('')}
+                style={{ position:'absolute', right:'6px', top:'50%', transform:'translateY(-50%)', background:'transparent', border:'none', color:T.text2, cursor:'pointer', fontSize:'14px', lineHeight:1, padding:'2px 4px' }}>
+                ×
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Thread list */}
@@ -622,15 +667,19 @@ export default function EmailInbox() {
           {loading && (
             <div style={{ padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading…</div>
           )}
-          {!loading && threads.length === 0 && (
+          {!loading && filteredThreads.length === 0 && (
             <div style={{ padding:'40px 20px', textAlign:'center' }}>
               <div style={{ fontSize:'28px', color:T.bg3, marginBottom:'8px' }}>✉</div>
               <div style={{ fontSize:F.sm, color:T.text2 }}>
-                {filter === 'unread' ? 'No unread messages.' : filter === 'flagged' ? 'No flagged messages.' : 'No messages found.'}
+                {inboxSearch.trim().length >= 2
+                  ? `No results for "${inboxSearch.trim()}"`
+                  : filter === 'unread' ? 'No unread messages.'
+                  : filter === 'flagged' ? 'No flagged messages.'
+                  : 'No messages found.'}
               </div>
             </div>
           )}
-          {!loading && threads.map(thread => (
+          {!loading && filteredThreads.map(thread => (
             <ThreadListItem
               key={thread.id}
               thread={thread}

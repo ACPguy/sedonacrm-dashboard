@@ -286,7 +286,7 @@ export default function GlobalSearch() {
 
   // Escape to close
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const handler = (e) => { if (e.key === 'Escape') { setOpen(false); setQuery(''); setResults([]); inputRef.current?.blur(); } };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, []);

@@ -1557,7 +1557,9 @@ export const PropertiesView = () => {
               </button>
             ))}
           </div>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search properties…"
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); e.target.blur(); } }}
+            placeholder="Search properties…"
             style={{flex:1,background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 10px',color:T.text0,fontSize:F.sm,outline:'none'}}/>
         </div>
       </div>
