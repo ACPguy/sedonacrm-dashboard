@@ -1087,7 +1087,7 @@ const PhaseButton = ({ label }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 // WorkOrder Detail
 // ─────────────────────────────────────────────────────────────────────────────
-export const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
+export const WorkOrderDetail = ({ wo, onBack, onUpdate, vendors = [], tenants = [] }) => {
   const [data, setData]                     = useState(wo);
   const [activeProps, setActiveProps]       = useState([]);
   const [vendorName, setVendorName]         = useState('');
@@ -1400,14 +1400,26 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
               <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Linked at go-live</span>
             </WoFieldRow>
 
-            {/* 13. Vendor Linker */}
-            <WoFieldRow label="Vendor" hoverable={false}>
-              {renderVendorLink()}
+            {/* 13. Vendor */}
+            <WoFieldRow label="Vendor">
+              <select
+                value={data.vendor_id || ''}
+                onChange={async e => { await save('vendor_id', e.target.value || null); }}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.vendor_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {vendors.map(v => <option key={v.id} value={v.id}>{v.company_dba}</option>)}
+              </select>
             </WoFieldRow>
 
-            {/* 14. Tenant Linker */}
-            <WoFieldRow label="Tenant (if any)" hoverable={false}>
-              {renderTenantLink()}
+            {/* 14. Tenant (if any) */}
+            <WoFieldRow label="Tenant (if any)">
+              <select
+                value={data.tenant_id || ''}
+                onChange={async e => { await save('tenant_id', e.target.value || null); }}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.tenant_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {tenants.map(t => <option key={t.id} value={t.id}>{t.tenant_dba}</option>)}
+              </select>
             </WoFieldRow>
 
             {/* 15. WO Type */}
@@ -1465,13 +1477,25 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
             </WoFieldRow>
 
             {/* 27. Vendor Company */}
-            <WoFieldRow label="Vendor Company" hoverable={false}>
-              {renderVendorLink()}
+            <WoFieldRow label="Vendor Company">
+              <select
+                value={data.vendor_id || ''}
+                onChange={async e => { await save('vendor_id', e.target.value || null); }}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.vendor_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {vendors.map(v => <option key={v.id} value={v.id}>{v.company_dba}</option>)}
+              </select>
             </WoFieldRow>
 
             {/* 28. Tenant Company */}
-            <WoFieldRow label="Tenant Company" hoverable={false}>
-              {renderTenantLink()}
+            <WoFieldRow label="Tenant Company">
+              <select
+                value={data.tenant_id || ''}
+                onChange={async e => { await save('tenant_id', e.target.value || null); }}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.tenant_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">—</option>
+                {tenants.map(t => <option key={t.id} value={t.id}>{t.tenant_dba}</option>)}
+              </select>
             </WoFieldRow>
 
             {/* 29. Suite — no FK on work_orders */}
@@ -1516,6 +1540,13 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WorkOrdersView() {
   const [selected, setSelected] = useState(null);
+  const [vendors, setVendors]   = useState([]);
+  const [tenants, setTenants]   = useState([]);
+
+  useEffect(() => {
+    sbFetch('vendors', 'select=id,company_dba&order=company_dba.asc').then(setVendors).catch(() => {});
+    sbFetch('tenants', 'select=id,tenant_dba&order=tenant_dba.asc').then(setTenants).catch(() => {});
+  }, []);
 
   const handleSelect = useCallback((wo) => {
     history.pushState({ woId: wo.id }, '');
@@ -1543,6 +1574,8 @@ export default function WorkOrdersView() {
           key={selected.id}
           wo={selected}
           onBack={handleBack}
+          vendors={vendors}
+          tenants={tenants}
         />
       )}
     </div>

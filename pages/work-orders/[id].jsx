@@ -5,9 +5,16 @@ import { sbFetch, T, F, WorkOrderDetail } from '../../components/WorkOrdersView'
 
 export default function WorkOrderDetailPage() {
   const router = useRouter();
-  const [wo, setWo]         = useState(null);
+  const [wo, setWo]           = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState(null);
+  const [error, setError]     = useState(null);
+  const [vendors, setVendors] = useState([]);
+  const [tenants, setTenants] = useState([]);
+
+  useEffect(() => {
+    sbFetch('vendors', 'select=id,company_dba&order=company_dba.asc').then(setVendors).catch(() => {});
+    sbFetch('tenants', 'select=id,tenant_dba&order=tenant_dba.asc').then(setTenants).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -52,6 +59,8 @@ export default function WorkOrderDetailPage() {
             wo={wo}
             onBack={handleBack}
             onUpdate={updated => setWo(updated)}
+            vendors={vendors}
+            tenants={tenants}
           />
         )}
       </div>
