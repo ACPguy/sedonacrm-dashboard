@@ -1092,6 +1092,8 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate, vendors = [], tenants = 
   const [activeProps, setActiveProps]       = useState([]);
   const [vendorName, setVendorName]         = useState('');
   const [tenantName, setTenantName]         = useState('');
+  const [vendorContacts, setVendorContacts] = useState([]);
+  const [tenantContacts, setTenantContacts] = useState([]);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [rightWidth, setRightWidth]         = useState(300);
   const [copied, setCopied]                 = useState(false);
@@ -1112,6 +1114,13 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate, vendors = [], tenants = 
         .then(d=>{if(d[0])setTenantName(d[0].tenant_dba||'');}).catch(()=>{});
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    sbFetch('contacts', 'select=id,full_name,company_dba&category=eq.Vendor&status=eq.active&order=full_name.asc')
+      .then(data => setVendorContacts(data)).catch(() => {});
+    sbFetch('contacts', 'select=id,full_name,company_dba&category=eq.Tenant&status=eq.active&order=full_name.asc')
+      .then(data => setTenantContacts(data)).catch(() => {});
+  }, []);
 
   const startRightResize = useCallback((e) => {
     resizingRight.current = true;
@@ -1400,25 +1409,29 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate, vendors = [], tenants = 
               <span style={{fontSize:F.sm,color:T.text3,fontStyle:'italic'}}>Linked at go-live</span>
             </WoFieldRow>
 
-            {/* 13. Vendor */}
-            <WoFieldRow label="Vendor">
+            {/* 13. Vendor Contact */}
+            <WoFieldRow label="Vendor Contact">
               <select
-                value={data.vendor_id || ''}
-                onChange={async e => { await save('vendor_id', e.target.value || null); }}
-                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.vendor_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
-                <option value="">—</option>
-                {vendors.map(v => <option key={v.id} value={v.id}>{v.company_dba}</option>)}
+                value={data.vendor_contact_id || ''}
+                onChange={async e => { await save('vendor_contact_id', e.target.value || null); }}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.vendor_contact_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">— Select vendor contact —</option>
+                {vendorContacts.map(c => (
+                  <option key={c.id} value={c.id}>{c.full_name}{c.company_dba ? ` — ${c.company_dba}` : ''}</option>
+                ))}
               </select>
             </WoFieldRow>
 
-            {/* 14. Tenant (if any) */}
-            <WoFieldRow label="Tenant (if any)">
+            {/* 14. Tenant Contact */}
+            <WoFieldRow label="Tenant Contact">
               <select
-                value={data.tenant_id || ''}
-                onChange={async e => { await save('tenant_id', e.target.value || null); }}
-                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.tenant_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
-                <option value="">—</option>
-                {tenants.map(t => <option key={t.id} value={t.id}>{t.tenant_dba}</option>)}
+                value={data.tenant_contact_id || ''}
+                onChange={async e => { await save('tenant_contact_id', e.target.value || null); }}
+                style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:data.tenant_contact_id?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+                <option value="">— Select tenant contact —</option>
+                {tenantContacts.map(c => (
+                  <option key={c.id} value={c.id}>{c.full_name}{c.company_dba ? ` — ${c.company_dba}` : ''}</option>
+                ))}
               </select>
             </WoFieldRow>
 
