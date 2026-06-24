@@ -1117,9 +1117,9 @@ export const WorkOrderDetail = ({ wo, onBack, onUpdate, vendors = [], tenants = 
 
   useEffect(() => {
     sbFetch('contacts', 'select=id,full_name,company_dba&category=eq.Vendor&status=eq.active&order=full_name.asc')
-      .then(data => setVendorContacts(data)).catch(() => {});
+      .then(rows => setVendorContacts(rows)).catch(() => {});
     sbFetch('contacts', 'select=id,full_name,company_dba&category=eq.Tenant&status=eq.active&order=full_name.asc')
-      .then(data => setTenantContacts(data)).catch(() => {});
+      .then(rows => setTenantContacts(rows)).catch(() => {});
   }, []);
 
   const startRightResize = useCallback((e) => {
