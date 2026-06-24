@@ -384,6 +384,8 @@ components/AppShell.jsx     — shared sidebar/chrome for all routed pages
 
 **task_contacts table**: junction between tasks and contacts (migrated from issue_contacts; 0 rows since issue_contacts was empty).
 
+**contacts table** — added columns (2026-06-24): `vendor_id UUID FK→vendors(id) ON DELETE SET NULL`, `tenant_id UUID FK→tenants(id) ON DELETE SET NULL` + indexes. These link a contact person to their Vendor company or Tenant company — used by CompanyContactRow to filter the contact dropdown to contacts belonging to the selected company.
+
 ## Next Priorities
 
 **Completed session 2026-06-15 (session 1) — TasksView as primary embedded component + back-nav + UI polish (merged to main):**
@@ -446,14 +448,31 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 - Escape key handler added to all 12 search inputs across the app: GlobalSearch, EmailInbox, TasksView, TenantsView, ContactsView, VendorsView, WorkOrdersView, IssuesView, OwnersView, SuitesView, RentScheduleView, SedonaCRM PropertiesView
 - Commits: 829d02d, e15ef60, 62ddfbf, 5909cd4, 80e1f89 (preview branch)
 
+**Completed session 2026-06-23b — Vendor/Tenant contact pickers on WO detail panel (preview branch):**
+- Fixed WO detail vendor/tenant fields: Vendor Contact and Tenant Contact now show individual people (contacts table, category=Vendor/Tenant); Vendor Company and Tenant Company remain as separate company selects below
+- Added vendor_contact_id and tenant_contact_id columns to both work_orders and tasks tables (FK to contacts)
+- Fixed variable shadowing bug in vendorContacts/tenantContacts fetch (.then(data=>) renamed to .then(rows=>))
+- Identified that /tasks/[id] uses TasksView's own WO detail panel (not WorkOrdersView) — all contact picker changes applied to TasksView
+- Commits: 5bd6127, cd5da2a (preview branch)
+
+**Completed session 2026-06-24 — Paired company+contact rows with FK filtering and auto-select (preview branch):**
+- DB migration: contacts.vendor_id (FK → vendors) + contacts.tenant_id (FK → tenants) + indexes
+- CompanyContactRow: new module-level component in TasksView.jsx (before TaskDetail); props: companyLabel, contactLabel, companyValue, contactValue, companyOptions, allContacts, onSaveCompany, onSaveContact, companyLink, isMobile
+- Filtering: allContacts filtered to c.vendor_id===companyValue||c.tenant_id===companyValue; if no companyValue shows all
+- Auto-select: useEffect([companyValue, filteredContacts.length]) fires when exactly 1 match and it's not already selected
+- Contact ↗ link: built from allContacts.find(c=>c.id===contactValue) using podio_id ?? 'X'+id.slice(-6)
+- Desktop layout: two equal flex columns side-by-side (gap 12px); mobile: stacked column
+- TaskDetail WO panel: 4 FieldRows replaced by 2 CompanyContactRow instances; sbFetch updated to include podio_id,vendor_id / podio_id,tenant_id
+- NewTaskForm WO section: same replacement (companyLink=null, isMobile=false on create form)
+- Commit: 7e42dec (preview branch)
+
 **Next priorities (start here next session):**
-1. Phase 4 kickoff — Workflow automations + AI Agents
-2. Agent 7 first: Morning Briefing (7am daily digest)
+1. Merge all preview work to main
+2. Phase 4 kickoff — Agent 7 Morning Briefing first
 3. Agent 1: Lease Watch (expiration alerts + draft notices)
 4. Agent 4: Work Order Agent (auto Drive folder creation on WO save)
-5. Notice-to-vacate logging workflow + MTM flag + Morning Briefing integration
-6. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
-7. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
+5. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
+6. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
 
 ## Task ID Display vs URL Rule (permanent)
 
