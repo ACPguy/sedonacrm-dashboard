@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key, EnvelopeSimple, SquaresFour, Sun } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key, EnvelopeSimple, SquaresFour } from '@phosphor-icons/react';
 import GlobalSearch from './GlobalSearch';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -157,7 +157,7 @@ export default function AppShell({ children, activeView }) {
     <>
       <NavBtn label="Home" href="/?view=morning-briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={effectiveCollapsed} icon={<HouseLine size={18} weight="bold"/>}/>
       <NavBtn label="Inbox" href="/inbox" active={is('inbox')} onClick={()=>go('/inbox')} collapsed={effectiveCollapsed} icon={<EnvelopeSimple size={18} weight="bold"/>} badge={unreadCount}/>
-      <NavBtn label="Briefing" href="/briefing" active={is('briefing')} onClick={()=>go('/briefing')} collapsed={effectiveCollapsed} icon={<Sun size={18} weight="bold"/>}/>
+
       <SectionLabel label="Operations" collapsed={effectiveCollapsed}/>
       <NavBtn label="Properties"  href="/properties"   active={is('properties')}  onClick={()=>go('/properties')}   collapsed={effectiveCollapsed} icon={<BuildingOffice size={18} weight="bold"/>}/>
       <NavBtn label="Tasks"       href="/tasks"        active={is('tasks')}       onClick={()=>go('/tasks')}        collapsed={effectiveCollapsed} icon={<ClipboardText size={18} weight="bold"/>}/>
