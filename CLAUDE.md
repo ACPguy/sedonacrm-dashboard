@@ -497,11 +497,21 @@ Set at: Vercel → Project Settings → Environment Variables (both Production +
 - Note: SedonaCRM.jsx and AppShell.jsx nav order (Home above Inbox) was already correct from prior sessions — no change needed
 - Commit: (preview branch — see git log)
 
+**Completed session 2026-06-25d — Phase 4 Agent 1: Lease Watch (preview branch):**
+- DB: `lease_watch_drafts` table — tenant_id (FK→tenants CASCADE), prop_code, milestone (12mo/6mo/3mo/2mo/1mo), lease_ends, days_remaining, to_email, to_name, subject, body, status (draft/edited/approved/sent/dismissed), UNIQUE(tenant_id, milestone). RLS enabled with admin_all_lease_watch_drafts policy. Indexes on tenant_id, status, milestone.
+- `pages/api/agents/lease-watch.js`: GET returns active drafts with tenants join (tenant_dba, podio_id, id); POST auth via x-vercel-cron or x-briefing-secret; iterates Active+Active tenants, checks milestone windows, skips existing drafts, calls claude-sonnet-4-6 to generate personalized email per milestone, upserts to lease_watch_drafts. maxDuration=120.
+- `components/LeaseWatchDrafts.jsx`: card component matching BriefingView T/F theme tokens; milestone pills with color coding (12mo=gray, 6mo=blue, 3mo=orange, 2mo=red, 1mo=bright red bold); draft rows as anchor links to /tenants/[podio_id]; compact=true (BriefingView mode), compact=false (standalone mode with "coming in Phase 5" note); "Run Lease Watch" orange button; pending count badge.
+- `BriefingView.jsx`: added `import LeaseWatchDrafts from './LeaseWatchDrafts'`; `<LeaseWatchDrafts compact={true} />` inserted after the three SectionCards and before the snapshot StatPills.
+- `vercel.json`: added second cron entry `"0 13 * * *"` → `/api/agents/lease-watch` (1:00 PM UTC = 6:00 AM AZ, runs 1 hour after Morning Briefing).
+
+**Milestone windows:**
+- 12mo: 335–365 days | 6mo: 150–185 days | 3mo: 75–95 days | 2mo: 45–65 days | 1mo: 1–35 days
+
 **Next priorities (start here next session):**
 1. Merge preview → main (approve all preview commits)
 2. Set BRIEFING_SECRET + NEXT_PUBLIC_BRIEFING_SECRET in Vercel environment variables
-3. Test "Run Now" on production at crm.andersoncp.com — Home view shows BriefingView
-4. Agent 1: Lease Watch (expiration alerts + draft notices)
+3. Test "Run Now" on production at crm.andersoncp.com — Home view shows BriefingView + LeaseWatchDrafts
+4. Test "Run Lease Watch" on production — generates AI drafts for tenants in milestone windows
 5. Agent 4: Work Order Agent (auto Drive folder creation on WO save)
 6. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
 7. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners

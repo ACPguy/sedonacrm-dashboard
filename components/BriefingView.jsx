@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sun } from '@phosphor-icons/react';
+import LeaseWatchDrafts from './LeaseWatchDrafts';
 
 const T = {
   bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
@@ -216,6 +217,10 @@ export default function BriefingView() {
               <SectionCard emoji="🔴" title="Urgent" items={urgent}    color={T.danger} />
               <SectionCard emoji="🟡" title="Attention" items={attention} color={T.warn}   />
               <SectionCard emoji="🟢" title="FYI"    items={fyi}       color={T.success} />
+            </div>
+
+            <div style={{ marginTop: '24px' }}>
+              <LeaseWatchDrafts compact={true} />
             </div>
 
             {/* Snapshot bar */}
