@@ -74,7 +74,7 @@ function BriefingItem({ item }) {
   );
   if (item.url) {
     return (
-      <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textDecoration: 'none' }}>
+      <a href={item.url} style={{ display: 'block', textDecoration: 'none' }}>
         {inner}
       </a>
     );
@@ -212,15 +212,13 @@ export default function BriefingView() {
 
         {!loading && briefing?.status === 'complete' && (
           <>
+            <LeaseWatchDrafts compact={true} />
+
             {/* Three section cards */}
             <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <SectionCard emoji="🔴" title="Urgent" items={urgent}    color={T.danger} />
               <SectionCard emoji="🟡" title="Attention" items={attention} color={T.warn}   />
               <SectionCard emoji="🟢" title="FYI"    items={fyi}       color={T.success} />
-            </div>
-
-            <div style={{ marginTop: '24px' }}>
-              <LeaseWatchDrafts compact={true} />
             </div>
 
             {/* Snapshot bar */}

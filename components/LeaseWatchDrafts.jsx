@@ -47,8 +47,6 @@ function DraftRow({ draft }) {
   return (
     <a
       href={tenantUrl}
-      target="_blank"
-      rel="noopener noreferrer"
       style={{ display: 'block', textDecoration: 'none' }}
     >
       <div

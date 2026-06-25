@@ -17,13 +17,12 @@ ALWAYS use `~/sedonacrm-dashboard/`. This is the active repo.
 ## Commands
 
 ```bash
-npm run dev        # dev server at localhost:3000
+npm run dev # dev server at localhost:3000
 npm run build
 npm run start
 
 # Daily workflow
 cd ~/sedonacrm-dashboard
-npm run dev
 git add .
 git commit -m "description"
 git push
@@ -42,11 +41,11 @@ git push
 ## Supabase
 
 - URL: `https://edxcvyleielzevpappui.supabase.co`
-- Anon key: *(Scott to paste anon key here)*
+- Anon key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw`
 - DB connection: `postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-east-1.pooler.supabase.com:5432/postgres`
 - All tables have RLS enabled
-- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`
-- `SUPABASE_SERVICE_ROLE_KEY` is set in `.env.local` and in Vercel environment variables (used by server-side Gmail/webhook code via `lib/supabaseServer.js`)
+- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`, `email_threads`, `email_messages`, `email_thread_links`, `communication_timeline`, `users`, `briefings`, `lease_watch_drafts`
+- `SUPABASE_SERVICE_ROLE_KEY` is set in `.env.local` and in Vercel environment variables
 
 ## Core Architecture — Property as Hub
 
@@ -69,86 +68,175 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
 ~/sedonacrm-dashboard/components/
   AppShell.jsx              — shared sidebar/chrome for all routed pages
   SedonaCRM.jsx             — main shell, nav, routing, Home dashboard, Properties list
-  CommunicationTimeline.jsx — reusable unified comms timeline (email/note/call); used in Tasks, Contacts, Tenants
+  CommunicationTimeline.jsx — reusable unified comms timeline (email/note/call)
   IssuesView.jsx            — issues list + detail (routed, accepts prop_code filter)
   WorkOrdersView.jsx        — work orders list + detail (routed, accepts prop_code filter)
-  TasksView.jsx             — unified tasks list + detail, all 6 record types (routed); has Details|Comms tabs
-  TenantsView.jsx           — tenants list + detail (routed, accepts prop_code filter); has Communications tab
+  TasksView.jsx             — unified tasks list + detail, all 6 record types (routed)
+  TenantsView.jsx           — tenants list + detail (routed, accepts prop_code filter)
   SuitesView.jsx            — suites list + detail (routed, accepts prop_code filter)
-  RentScheduleView.jsx      — rent schedule list + detail (routed, accepts prop_code filter)
-  ContactsView.jsx          — contacts list + detail (routed); has Comms tab
+  RentScheduleView.jsx      — rent schedule list + detail (routed)
+  ContactsView.jsx          — contacts list + detail (routed)
   VendorsView.jsx           — vendors list + detail (routed)
   OwnersView.jsx            — property owners list + detail (routed)
+  BriefingView.jsx          — Morning Briefing dashboard (wired into SedonaCRM.jsx HomeView)
+  LeaseWatchDrafts.jsx      — Lease Watch compact card; embedded in BriefingView
   shared/
-    TasksTable.jsx     — shared reusable tasks table (self-fetching, filterable)
+    TasksTable.jsx     — reference only (no longer used in embedded contexts)
     WorkOrdersTable.jsx, TenantsTable.jsx, SuitesTable.jsx, IssuesTable.jsx, ContactsTable.jsx
 
-~/sedonacrm-dashboard/lib/
-  gmail.js               — getGmailClient() (OAuth2 + token refresh), setupWatch()
-  drive.js               — getDriveClient(), getOrCreateWorkHistoryFolder(), createTaskFolder(), createIndexPdf()
-  drivePropertyFolders.js — hardcoded prop_code → Google Drive root folder ID map (14 active properties)
+lib/
+  gmail.js               — getGmailClient(), setupWatch()
+  drive.js               — getDriveClient(), createTaskFolder(), createIndexPdf()
+  drivePropertyFolders.js — hardcoded prop_code → Drive root folder ID map (14 active)
   supabaseServer.js      — createServerClient() using SUPABASE_SERVICE_ROLE_KEY
 
-~/sedonacrm-dashboard/utils/
-  taskPrefix.js   — getTaskPrefix(task): prop_code-based display ID (CR1-3685); display-only, never in URLs
-  formatDate.js   — formatDate(val): MM-DD-YYYY UTC formatter
-
-~/sedonacrm-dashboard/pages/
-  index.jsx            — main SPA entry (SedonaCRM shell)
-  tasks/index.jsx + [id].jsx   — /tasks, /tasks/3737 (bare task_num URLs)
-  issues/index.jsx + [id].jsx
-  work-orders/index.jsx + [id].jsx
-  tenants/index.jsx + [id].jsx
-  rent-schedule/index.jsx + [id].jsx
-  contacts/index.jsx + [id].jsx
-  vendors/index.jsx + [id].jsx
-  owners/index.jsx + [id].jsx
-  settings/index.jsx
-  inbox/index.jsx      — /inbox — EmailInbox in AppShell
-  api/gmail/webhook.js      — Pub/Sub push receiver; processes history, upserts email_threads + email_messages + communication_timeline
-  api/gmail/send.js         — POST: send email via Gmail API; injects CRM header + footer; writes timeline
-  api/gmail/thread-update.js — POST: mark-read / archive via service-role PATCH
-  api/gmail/backfill.js      — GET/POST: one-time 90-day thread+message backfill (cap 2000 threads, batches of 10)
-  api/gmail/link-thread.js   — POST {threadId,recordType,recordId}: links email_threads + upserts email_thread_links
-  api/ai/summarize.js        — POST {threadText} → Anthropic API → {summary}
-  api/ai/draft-reply.js      — POST {threadText} → Anthropic API → {draft}
-  api/tasks/create-drive-folder.js — POST {taskId}: creates Work History subfolder + 000_CR1-N_Info.pdf
+pages/api/agents/
+  morning-briefing.js — GET today's briefing; POST runs 14 parallel queries, saves to briefings table
+  lease-watch.js      — GET active drafts; POST iterates tenants, calls Claude API, saves drafts
 ```
 
-## Standalone Portfolio Views (routed Next.js pages)
+## Phase Status
 
-- Tasks — fully routed (`/tasks`, `/tasks/[task_num]` e.g. `/tasks/3737` — bare task_num, no prefix)
-- Inbox — fully routed (`/inbox`) — EmailInbox two-panel view
-- Issues — fully routed (`/issues`, `/issues/[id]`)
-- Work Orders — fully routed (`/work-orders`, `/work-orders/[id]`)
-- Tenants — fully routed (`/tenants`, `/tenants/[id]`)
-- Suites — fully routed (`/suites`, `/suites/[id]`)
-- Rent Schedule — fully routed (`/rent-schedule`, `/rent-schedule/[id]`)
-- Contacts — fully routed (`/contacts`, `/contacts/[id]`)
-- Vendors — fully routed (`/vendors`, `/vendors/[id]`)
-- Owners — fully routed (`/owners`, `/owners/[id]`)
-- Settings — fully routed (`/settings`) — Gmail OAuth connect
-- Properties list — built (SPA only, property detail is the next build)
-- Leasing Pipeline — SPA view only (not routed)
-- Calendar — pending
-- Morning Briefing / Dashboard — pending
+- **Phases 0–3:** Complete
+- **Phase 4:** IN PROGRESS
+  - Agent 7 Morning Briefing: Complete (cron `0 12 * * *` = 5am AZ)
+    - `briefings` table, `/api/agents/morning-briefing`, `BriefingView.jsx`
+    - HomeView wired: SedonaCRM.jsx HomeView => `<BriefingView embedded={true} />`
+    - Env vars set in Vercel: BRIEFING_SECRET + NEXT_PUBLIC_BRIEFING_SECRET
+  - Agent 1 Lease Watch: Complete (cron `0 13 * * *` = 6am AZ)
+    - `lease_watch_drafts` table, `/api/agents/lease-watch`, `LeaseWatchDrafts.jsx`
+    - Milestones: 12mo/6mo/3mo/2mo/1mo; Claude API drafts personalized emails
+    - Drafts saved with status='draft'; approve button placeholder (send wires in Phase 6)
+    - Compact card in BriefingView above Urgent/Attention/FYI; full editor in tenant record (Phase 5)
+    - Remaining Phase 4: Agents 3, 4, 9
+- **Phase 5+:** Pending
 
-## Per-Record Standards
+## Agents Env Vars (Vercel) — all set ✅
 
-Every record in the system gets:
-- Unique URL with deep linking
-- Copy link button
-- Communication thread (email + SMS + internal notes)
-- Field-level audit log
-- HelloSign e-signature button
-- AI summarize thread button
-- Google Drive file attachments
+- BRIEFING_SECRET
+- NEXT_PUBLIC_BRIEFING_SECRET
+- ANTHROPIC_API_KEY
 
-## User Roles
+## Next Priorities
 
-- **Admin (Scott):** everything
-- **Employee:** properties, tenants, work orders, tasks, communications — no financials
-- **Vendor:** only their assigned work orders
+1. Run three-fix prompt on preview (remove target=_blank, move LeaseWatch above section cards) — then merge to main
+2. Test Run Lease Watch on production
+3. Agent 3 New Inquiry
+4. Agent 4 Work Order Agent (auto Drive folder on WO creation)
+5. Phase 5 start: Leasing Pipeline
+
+## Current Git State
+
+- preview branch: ahead of main — needs merge after three-fix prompt
+- Last successful main: a3f69e9 (Morning Briefing + BriefingView on Home + nav order)
+- Outstanding on preview: same-tab link fix + LeaseWatch card position fix (not yet committed successfully)
+- Task: run the three-fix CC prompt, then merge preview → main
+
+## Seeding Rules
+
+Use `psql` only — `export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-east-1.pooler.supabase.com:5432/postgres'`
+- Before seeding any table: check columns, drop CHECK+FK constraints, test R01, run full loop
+- Chromebook: all files land in `/home/scott/`, NOT `~/Downloads`
+
+## Workflow Rules
+
+1. **All code to preview branch** — never directly to main unless Scott says "approved, merge"
+2. **One commit per session** — stage ALL changes including CLAUDE.md in one commit. NEVER commit CLAUDE.md separately. One push = one deployment.
+3. **npm run build before every push** — zero errors required
+4. **Read CLAUDE.md first** — at start of every new session before doing anything
+5. **Start fresh session after each major feature or ~2 hours**
+6. **CLAUDE.md size rule:** Keep under 30k chars. Before adding session notes, remove oldest completed session logs. Only Next Priorities and Current Git State need to persist as session history.
+
+## Session Close Procedure
+
+1. Update CLAUDE.md: Next Priorities + Current Git State + any new permanent rules/schema. Keep under 30k.
+2. Commit ALL changes + CLAUDE.md in ONE commit to preview branch.
+3. Merge preview → main if Scott approved.
+4. Upload build log to Drive (parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA`)
+5. Upload updated CLAUDE.md to Drive as `CLAUDE_YYYY-MM-DD.md` (parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA`)
+6. Move previous dated copy to Archive (folder `1I1kBuVZd7jbLh_WYzFtEBzrtmKcvazfb`)
+NEVER upload `.md` files without `disableConversionToGoogleType: true`
+
+## Development Rules (permanent)
+
+1. **SELECT DISTINCT before any UI field from Podio** — confirm exact values before building dropdowns/filters
+2. **npm run build before every commit**
+3. **Left nav always-navigate on click** — use `handleNav`/`go` pattern: if already on target path, call `router.replace().then(() => router.reload())`
+4. **Date fields always use `<input type="date">`** — browser native picker; display via `fmtDate()` (MM-DD-YYYY); store YYYY-MM-DD
+5. **Pill hover:** inactive pills ~20% alpha on hover, `0.15s ease` transition
+6. **Multi-line text:** minRows=5, TipTap toolbar, auto-expand
+7. **Destructive DB ops:** ALWAYS stop and confirm before TRUNCATE / DROP / DELETE / ALTER removing data
+8. **List views default to Open only** — WO + Issues; fetch Closed only when user selects filter
+9. **Mobile stat rows:** pill-style horizontal scroll on mobile (<768px)
+10. **Filter state in URL query params** on every filter change; restore on mount
+
+## Architecture Rules (permanent)
+
+- **Single source of truth:** ONE shared component per table/list in `components/shared/`. NEVER build a second version.
+- **Dual nav architecture:** `AppShell.jsx` (routed pages) + `SedonaCRM.jsx` (SPA). Nav changes must be applied to BOTH.
+- **`property_agreements` table:** ACP's mgmt agreement with owners — NOT leasing pipeline. Never confuse.
+
+## URL Routing Rules (permanent)
+
+- All detail pages use `podio_id`, NOT UUID: `/[module]/[podio_id]`
+- Link generation: `record.podio_id ?? 'X'+record.id.slice(-6)`
+- Vendors + Owners: ZERO podio_id coverage — all X-fallback until go-live Podio sync
+- Tasks URL: bare `task_num` only (`/tasks/3685`) — never WO-prefixed
+- Lookup: if param has hyphens => UUID fallback; otherwise => podio_id
+
+## History API Rule (permanent)
+
+ALWAYS spread existing state:
+`window.history.replaceState({ ...window.history.state, url: newUrl, as: newUrl }, '', newUrl)`
+NEVER use `replaceState({}, ...)` — strips Next.js __N marker, breaks Back button.
+
+## Prev/Next Navigation (permanent)
+
+All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigation.
+- List view writes `{module}NavList` + `{module}NavIndex` to sessionStorage on row click
+- `goNav(dir)` fetches adjacent record, updates URL via replaceState (spread pattern)
+- `goNavRef` pattern required for arrow key useEffect with empty dep array
+- Skip arrow key when in input/textarea/select or contentEditable
+
+## Gmail / OAuth Rules (permanent)
+
+- Token store: `email_accounts` table (not `gmail_tokens`)
+- OAuth re-auth only at crm.andersoncp.com/settings (GOOGLE_REDIRECT_URI is production)
+- Scopes: `gmail.modify`, `gmail.send`, `drive` — do NOT add `userinfo.email`
+- Do NOT overwrite .env.local with `vercel env pull`
+
+## Tasks Module DB Notes (permanent)
+
+- `tasks` table: record_types = work_order (2,914), task (1,234), sg_task (220), note/project/acp_task (0)
+- UNIQUE index: (record_type, task_num) — task_num is Podio ID
+- Display ID: `getTaskPrefix(task)` from `utils/taskPrefix.js` → `CR1-3685`
+- Sequences: work_order=3717, task=1846, acp_task=518, sg_task=220
+- Added columns: drive_folder_id, drive_folder_url, drive_index_pdf_id, vendor_contact_id, tenant_contact_id
+
+## Schema Notes (permanent)
+
+- `contacts` table: Added `vendor_id uuid FK → vendors` + `tenant_id uuid FK → tenants` — filters contacts by company in WO panel
+- `work_orders` + `tasks`: added `vendor_contact_id` + `tenant_contact_id`
+- `briefings` table: run_date (UNIQUE), status, urgent/jsonb, attention/jsonb, fyi/jsonb, snapshot/jsonb
+- `lease_watch_drafts` table: tenant_id + milestone (UNIQUE pair), subject, body, status (draft/edited/approved/sent/dismissed)
+
+## Drive Folder Architecture (permanent)
+
+- Trigger: manual `+ Drive Folder` button in WO header
+- Structure: `[Property Root]/Work History/[displayId] — [title] — [YYYY-MM-DD]/`
+- Hardcoded in `lib/drivePropertyFolders.js` (14 active properties)
+- Index PDF upload silently failing (pdf-lib issue) — independent of folder creation
+
+## Embedded TasksView Architecture (permanent)
+
+All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills filterXxx={...}/>`:
+| Context | Props |
+|---|---|
+| Property detail (SedonaCRM.jsx) | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
+| Owner detail (OwnersView.jsx) | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
+| Tenant detail (TenantsView.jsx) | `filterTenantId={data.id} hidePropertyPills embeddedMode` |
+| Vendor detail (VendorsView.jsx) | `filterVendorId={data.id} hidePropertyPills embeddedMode` |
+| Contact detail (ContactsView.jsx) | `filterContactId={data.id} hidePropertyPills embeddedMode` |
 
 ## Valid prop_codes (48 total, 14 active)
 
@@ -157,436 +245,3 @@ Every record in the system gets:
 DEM, DON, FOX, KOD, KTA, LAP, LASO, LEEN, LPP, MILL, MYN, OLY, OMP, PLZ, PW213, PWP,
 RHS, RR, SAC, SEP, SS, SSB, STP, SUNT, SWV, SYC, VDN, VVP, WAL, WNT, WSP, YAV
 ```
-
-## Seeding Rules
-
-Use `psql` only — never the Supabase SQL editor.
-
-```bash
-export DB='postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-east-1.pooler.supabase.com:5432/postgres'
-```
-
-- Chromebook: all files land in `/home/scott/` (Linux files root), NOT `~/Downloads`
-- Before seeding any table: check columns, drop CHECK+FK constraints, test with R01, run full loop
-- CASCADE check before any TRUNCATE
-- Working directory for all file edits: `~/sedonacrm-dashboard/`
-
-## Phase Status
-
-- **Phase 0:** Complete
-- **Phase 1:** Complete (26 tables seeded, 3 deferred)
-- **Phase 2:** IN PROGRESS — UI build
-- **Phase 3 Stage 1:** Complete — Gmail OAuth, /settings page
-- **Phase 3 Stage 2A:** Complete — 5 Gmail DB tables, webhook receiver, lib/gmail.js, lib/supabaseServer.js
-- **Phase 3 Stage 2B:** Complete — CommunicationTimeline.jsx wired into Tasks, Contacts, Tenants
-- **Phase 3 Stage 2C:** Complete — EmailInbox + EmailCompose + AppShell Inbox nav + unread badge + AI summarize/draft
-- **Gmail Backfill:** Complete — /api/gmail/backfill built (preview d359a6c); trigger once on production to load 90 days of history
-- **Link to Record:** Complete — /api/gmail/link-thread + inline 280px search panel in EmailInbox (preview d359a6c)
-- **Drive folder auto-creation:** Complete — lib/drive.js, drivePropertyFolders.js, /api/tasks/create-drive-folder; + Drive scope in OAuth
-- **Drive index PDF:** Deferred — createIndexPdf() implemented, folder creation works, PDF media upload silently failing; investigate next session
-- **Phase 4+:** Pending
-
-## Gmail DB Tables (Phase 3 Stage 2A)
-
-Five tables created in Supabase for the Gmail integration:
-
-| Table | Purpose |
-|---|---|
-| `email_accounts` | One row per connected Gmail account; stores OAuth tokens, pubsub watch state |
-| `email_threads` | One row per Gmail thread; linked to a CRM record via `linked_record_type` + `linked_record_id` |
-| `email_messages` | One row per Gmail message; stores headers, body (html/text), direction |
-| `email_thread_links` | Junction: many records can be linked to one thread (primary + reference links) |
-| `communication_timeline` | Unified activity log per record: entry_type = email / note / call / sms |
-
-`communication_timeline` fields used by CommunicationTimeline.jsx:
-- `record_type`, `record_id` — the CRM record this entry belongs to
-- `entry_type` — 'email' | 'note' | 'call' | 'sms'
-- `email_message_id`, `email_thread_id` — FKs for email entries
-- `subject`, `body_preview`, `direction`, `from_address`, `from_name`, `entry_at`
-- `is_reference`, `reference_record_type`, `reference_record_id`, `reference_label`, `reference_url`
-
-## Session Management
-
-1. **Run /compact before closing** — At the end of every working session, run `/compact` to summarize the conversation and reduce context size before closing.
-
-2. **Start a fresh session after each major feature or ~2 hours** — Exit and re-launch Claude Code after completing each major feature or after approximately 2 hours of work, whichever comes first. This keeps context lean and prevents slowdowns.
-
-3. **Read CLAUDE.md first on every new session** — Before doing anything else at the start of a new session, read this file to restore full project context.
-
-4. **Update Next Priorities after every session** — After completing work, update the "Next Priorities" section below with what was finished and what comes next, so the next session picks up exactly where this one left off.
-
-## Session Close Procedure (mandatory — every session)
-
-At the end of every session, CC must complete ALL of the following steps in order:
-
-1. Update CLAUDE.md with everything built this session (new files, schema changes,
-   architecture rules, known gaps, next priorities)
-
-2. Commit CLAUDE.md to main:
-   ```
-   git add CLAUDE.md
-   git commit -m "CLAUDE.md: update after [session topic]"
-   git push origin main
-   ```
-
-3. Write build log to `~/[YYYY-MM-DD]_SedonaCRM_Build_Log_[Topic].md`
-
-PERMANENT RULES — CLAUDE.md Drive archive:
-- The repo file is always CLAUDE.md (never rename — CC auto-reads it by this exact filename)
-- Drive archive copies are named with a date prefix: CLAUDE_YYYY-MM-DD.md (e.g. CLAUDE_2026-06-11.md)
-- Never overwrite a previous Drive archive copy — always create a new dated file
-- After uploading the new dated copy, move the previous dated copy to the Archive folder
-- Keep all dated copies in Archive indefinitely — never delete them
-
-4. Upload build log to Google Drive:
-   - parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA` (2 - Build Log folder)
-   - contentMimeType: `text/plain`
-   - disableConversionToGoogleType: `true`
-   - Title: `YYYY-MM-DD_SedonaCRM_Build_Log_Topic.md` (exact filename)
-
-5. Upload updated CLAUDE.md to Google Drive as a new dated file:
-   - Title: `CLAUDE_YYYY-MM-DD.md` (e.g. `CLAUDE_2026-06-12.md`)
-   - parentId: `1n6NTGVHDQJAYp14Z6LasI7uuwMV_pxUA` (2 - Build Log folder — keep current copy here)
-   - contentMimeType: `text/plain`
-   - disableConversionToGoogleType: `true`
-
-6. Move the PREVIOUS session's CLAUDE_YYYY-MM-DD.md to the Archive folder:
-   - Archive folder ID: `1I1kBuVZd7jbLh_WYzFtEBzrtmKcvazfb`
-   - Use Drive MCP move or copy+delete to relocate the old dated file
-   - Never delete old copies — archive only
-
-7. Report both Drive file IDs to confirm successful upload.
-
-NEVER skip any of these steps. NEVER upload `.md` files without
-`disableConversionToGoogleType: true` — they will convert to Google Docs.
-NEVER upload to the wrong folder.
-
-## Permanent Terminology Notes
-
-- **`property_agreements` table** (14 rows) = ACP's management agreement with property owners. Contains: commission structures, management fees, agreement start/end/expiration dates, and terms of ACP's contract to manage and lease the property. This is **NOT** the leasing pipeline. Never confuse these.
-
-## Architecture Rule — Single Source of Truth for All Table Components
-
-Every table/list view in the app must have exactly **ONE** shared component that is used everywhere.
-The primary version is always the one in the left-hand navigation pane.
-That component is built once, lives in `components/shared/`, and is imported everywhere it is needed.
-**NEVER build a second version of a table for use in a sub-view, tab, or detail form.**
-Instead, pass props to the shared component to control filtering and hide features not needed in that context.
-
-**Standard props every shared table component must accept:**
-- `filterPropCode` (string, optional) — auto-filter to this property
-- `filterTenantId` (string, optional) — auto-filter to this tenant
-- `hidePropertyFilter` (boolean) — hides preset property sort buttons when used inside a property detail
-- `hideSearch` (boolean, optional) — hides search bar if not needed in context
-
-Any change made to a shared component automatically reflects everywhere it is used.
-**If CC finds itself creating a second version of an existing table — STOP and use the shared component instead.**
-
-## Workflow Rule — Preview Branch Only
-
-All code changes go to the `preview` branch — never directly to `main`.
-Never run `git push origin main` unless Scott explicitly says "approved, merge to main."
-Always run `npm run build` before pushing — zero errors required.
-When stopped and waiting for Scott, always run:
-```
-echo -e "\a\a\a" && echo "★★★ STOPPED — WAITING FOR SCOTT ★★★"
-```
-
-## Development Rules
-
-1. **Search queries must always have a server-side LIMIT cap** — Never pull unbounded rows from any table into a search result. Max 5 results per module per search. Body/text searches use JOINs with limits — never full table scans. Performance is a first-class design constraint. See GlobalSearch.jsx for the canonical pattern.
-
-2. **SELECT DISTINCT before any UI field from Podio** — Before building any dropdown, filter, badge, or component that displays or filters a field sourced from Podio data, always run `SELECT DISTINCT col FROM table ORDER BY col;` to confirm the exact values in the database. Never hardcode options without checking first.
-
-3. **npm run dev before every commit** — After every set of changes, run `npm run dev` (or `npm run build`) and confirm no build errors before committing or pushing. Fix errors first, then push. Never push broken code to GitHub (it deploys broken to Vercel).
-
-4. **Left nav always-navigate on click** — Nav items must always navigate on click, even when the user is already on that module or inside a detail record. Use the `handleNav`/`go` pattern: if `router.asPath` already matches the target path (exact, or starts with `path + '/'`, or `path + '?'`), call `router.replace(path).then(() => router.reload())`; otherwise call `router.push(path)`. Never use `?t=Date.now()` — Next.js does not re-mount components for same-path navigations with different query params. This pattern is in `go()` in AppShell.jsx and `handleNav()` in SedonaCRM.jsx; apply the same logic in any new nav code.
-
-5. **Date fields always use `<input type="date">`** — Any editable field that stores a date must use `<input type="date">` so the browser's native calendar picker opens on click. Display mode (not editing) must always show MM-DD-YYYY via `fmtDate()`. Value stored/sent to Supabase must be YYYY-MM-DD. This applies to `InlineBlurField` (pass `type="date"`) and `EditableField` (pass `type="date"`). No exceptions unless Scott explicitly requests otherwise.
-
-6. **Pill hover rule** — Inactive pills in any pill picker (`PriorityPills`, `StatusPills`, and any similar component) show a semi-transparent (~20% alpha) version of their active color on hover, via `onMouseEnter`/`onMouseLeave` setting `background`. Use `transition: 'background 0.15s ease'` on all pills. Active pill: no hover change — leave it alone.
-
-7. **Multi-line text fields** — All `RichTextEditor` and `<textarea>` fields use `minRows={5}` (default). Edit mode: minimum 120px tall (`minRows * 24px`); always include 72px bottom padding so there are 3 lines of blank space below the cursor; content auto-expands to show all existing text with no scrollbar. Always include the full TipTap toolbar. Label div inside `RichTextEditor` stays conditional (`{label && ...}`).
-
-8. **Destructive Database Operations — ALWAYS STOP AND CONFIRM** — Before executing ANY of the following, stop and tell me exactly what you are about to run and why, then wait for my explicit confirmation before proceeding:
-   - TRUNCATE (any table)
-   - DROP TABLE or DROP COLUMN
-   - DELETE FROM (any table)
-   - Any ALTER TABLE that removes or modifies existing data
-   - Any psql command that could result in data loss
-
-   This rule applies even when --dangerously-skip-permissions is active.
-   For all other operations (file reads, file writes, git, npm, SELECT queries), proceed without asking.
-
-9. **High-volume list views default to Open only — never fetch all records on mount** — Work Orders and Issues list views load only Open (non-closed) records by default. Closed records are NOT fetched until the user explicitly selects a Closed or All filter pill. Each filter pill click triggers a new Supabase query — do NOT filter a pre-loaded full dataset client-side. This applies everywhere these tables render: standalone list views, Property detail tabs, Tenant detail tabs, Contact detail tabs, and any other embedded context.
-
-10. **Mobile stat summary rows are always pill-style horizontal scroll** — Any row of summary statistics rendered above a table (occupancy stats, financial totals, portfolio counts, or any other KPI summary) must use the `.stats-pill-row` + `.stat-pill` CSS pattern on mobile (< 768px). Desktop layout is unrestricted. Never render a multi-row grid of stat cards on mobile — it consumes too much vertical space. Use `.md-hidden` on the mobile pill row (shows on mobile, hidden on desktop) and `.mobile-hidden` on the desktop grid (hidden on mobile, shows on desktop). This applies to all existing and future list views: Tenants, Properties, Work Orders, Issues, Contacts, Vendors, Owners, and any new module added in future phases.
-
-11. **Filter state is always encoded in URL query params** — Every list view with filter pills (prop_code, type, priority, status, or any other filter dimension) must encode the active filter state into the URL via `window.history.replaceState` on every filter change, and restore state from URL params on mount. Use a `hasMounted` ref to skip the initial sync so the restore effect runs first. This ensures the browser back button and the detail-view back button always return to the exact filtered state the user was in. Apply to all existing modules (Tasks, Work Orders, Issues, Tenants, Contacts, Vendors, Owners, Properties) and all future list views added in Phases 3 through 10.
-
-## URL Routing Rules (permanent)
-
-- All detail page routes use `podio_id`, NOT UUID
-- Pattern: `/[module]/[podio_id]` — e.g. `/work-orders/3737`, `/tenants/2556`
-- Detail page lookup: if param contains hyphens → `WHERE id = param` (UUID fallback for old bookmarks); otherwise → `WHERE podio_id = param`
-- List view link generation: always use `record.podio_id ?? 'X'+record.id.slice(-6)`
-- X-prefix fallback (e.g. `X32f3fc`) = null podio_id row; cold URL load will return not-found (acceptable until podio_ids are populated)
-- Production domain: crm.andersoncp.com
-- Never construct detail URLs using UUID directly
-- Tables with full podio_id coverage: tenants (312/312), suites (177/177), rent_schedule (1406/1406), work_orders (2914/2914), contacts (2539/2539), issues (1233/1234), properties (47/48)
-- Tables with ZERO podio_id coverage (all X-fallback): vendors (0/622), property_owners (0/43)
-- Vendors podio_id: not available in xlsx export — will be populated at go-live via Podio API sync; currently uses X-fallback URLs
-
-## Routing Pattern (established — all major modules complete)
-
-All modules follow the same Next.js routing pattern. Issues was the template; all others now match.
-
-**File structure per module:**
-```
-pages/<module>/index.jsx    — list page, wraps component in AppShell
-pages/<module>/[id].jsx     — cold-loadable detail page, loads by podio_id
-components/<Module>View.jsx — named exports: sbFetch, sbPatch, T, F, fmtDate, css,
-                               StatusBadge, EditableField, ActivityPanel, <Module>Detail
-                               default export: <Module>View (list, used by index page)
-components/AppShell.jsx     — shared sidebar/chrome for all routed pages
-```
-
-**Navigation rules:**
-- All routed modules: SedonaCRM nav → `router.push('/<module>')` (not navTo)
-- AppShell nav: routed modules → `/<module>`, SPA-only views → `/?view=xxx`
-- SedonaCRM reads `router.query.view` on load and sets currentView
-- Ctrl+click a row → native anchor tag (href set on `<a>` wrapping the row cell)
-- Back button in detail → `sessionStorage.getItem('<module>BackUrl') || '/<module>'`
-- Escape key in detail → calls onBack()
-
-**When adding a new routed module (e.g. Properties detail, Suites):**
-1. Add named exports to the component (sbFetch, T, F, Detail component, etc.)
-2. Create `pages/<module>/index.jsx` wrapping the view in AppShell
-3. Create `pages/<module>/[id].jsx` loading the record by podio_id
-4. Add nav item to AppShell pointing to `/<module>`
-5. Change SedonaCRM nav onClick to `router.push('/<module>')`
-
-## Tasks Module — DB Architecture Notes
-
-**tasks table** (4,368 rows as of 2026-06-06):
-- record_type: work_order (2,914), task (1,234), sg_task (220), note/project/acp_task (0 — ready for new records)
-- UNIQUE index: `(record_type, task_num)` — global unique on task_num alone is impossible because WO and issue Podio IDs overlap in 1,046 values across apps
-- task_num is the Podio ID for work_orders and tasks; sequential (1–220) for sg_tasks
-- **Display IDs:** `getTaskPrefix(task)` → prop_code-based e.g. `CR1-3685`, `ACP-1816`, or bare `3685` if no prop_code — display only, never in URLs
-- **URL format:** `/tasks/3685` — bare task_num only. `parsePrefixedId` handles both bare numbers and legacy `WO-N` format (backwards-compatible)
-- **Lookup:** bare task_num queries without record_type filter, `order=record_type.desc` so work_order wins on conflicts
-- Internal type prefixes (WO-, TSK-) — used only in `formatTaskNum()` export; not used in URLs or display
-- Sequences: work_order=3717, task=1846, acp_task=518, note=1, sg_task=220
-- wo_status mapping applied: work_order status = Open (151), Closed (2,336), Cancelled (427)
-- Added columns (2026-06-09): `drive_folder_id TEXT`, `drive_folder_url TEXT`, `drive_index_pdf_id TEXT`
-
-**task_sequences table**: tracks next task_num per record_type. Trigger `trg_tasks_assign_num` fires BEFORE INSERT, auto-increments and assigns task_num.
-
-**task_contacts table**: junction between tasks and contacts (migrated from issue_contacts; 0 rows since issue_contacts was empty).
-
-**contacts table** — added columns (2026-06-24): `vendor_id UUID FK→vendors(id) ON DELETE SET NULL`, `tenant_id UUID FK→tenants(id) ON DELETE SET NULL` + indexes. These link a contact person to their Vendor company or Tenant company — used by CompanyContactRow to filter the contact dropdown to contacts belonging to the selected company.
-
-## Next Priorities
-
-**Completed session 2026-06-15 (session 1) — TasksView as primary embedded component + back-nav + UI polish (merged to main):**
-- handleSelectProp sets URL to /properties/${p.prop_code}; goNav replaceState spreads {...window.history.state} (History API __N fix)
-- PropertyDetail useEffect syncs active tab to URL on every tab switch
-- Replaced TasksTable with TasksView embeddedMode in all 5 embedded contexts (Property, Owner, Tenant, Vendor, Contact)
-- TasksView filter pills restyled — inactive pills: transparent bg, T.text2 color, 0.5px solid T.border
-- Search extended to vendor+tenant names via parallel sbFetch + PostgREST or= syntax
-- Properties and Suites list headings left-aligned; property detail header Buildings icon added
-- "All Props" → "All" on property pills; Type "All" pill count badge removed
-- Commits merged to main: 2d0d7ca, 3ff4f54, eb4f13d, d93dbec, d09e64f, c19db6e, c0a053e, 4adff23
-
-**Completed session 2026-06-15 (session 2) — Gmail Backfill + Link to Record (preview branch):**
-- /api/gmail/backfill: GET/POST, 90-day history, paginates to cap 2000 threads, batches of 10 via Promise.allSettled
-- /api/gmail/link-thread: POST {threadId,recordType,recordId} → UPDATE email_threads link_status='manually_linked' + upsert email_thread_links
-- EmailInbox.jsx: "Link to record" button → inline 280px search panel (Work Order/Issue/Tenant/Contact/Task), 300ms debounce, live results, 2s flash → persistent "Linked: [label] →" link
-- Commit: d359a6c (preview branch — pending Scott's approval to merge)
-
-**Known gaps / still open:**
-- PENDING: Trigger Gmail backfill once on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
-- PENDING: Filter state URL encoding (Rule 10) not yet applied to Work Orders, Issues, Tenants, Contacts, Vendors, Owners list views
-- PENDING: Index PDF upload silently failing — investigate pdf-lib Readable stream + Drive media upload
-- PENDING: File attachments in EmailCompose — drag/drop UI exists, actual send not wired
-- PENDING: Drive folder map missing: LPN, WNT, OLY, SSP — deferred until folders are created in Drive
-- PENDING: Populate podio_id for vendors — deferred to go-live Podio API sync
-- PENDING: Property detail remaining tabs: Financial (CAM/Taxes/PM Fees/Invoices/Insurance), Operations (Inspections), Ownership (Owners/Agreements/Reports)
-
-**Known data gaps (not code bugs — populate at go-live / via data entry):**
-- `tasks.vendor_id`: 0/4368 rows populated → Vendor Tasks tab always "No tasks found" until tasks linked to vendors
-- `task_contacts` junction: 0 rows → Contact Tasks tab always "No tasks found" until task-contact links created
-- `tasks.tenant_id`: 135/4368 rows populated → Tenant Tasks tab sparse until populated
-
-## Embedded Tasks Tabs — Architecture (permanent)
-
-All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills filterXxx={...}/>` — the same canonical component as the standalone /tasks list view. `TasksTable.jsx` is kept in `components/shared/` for reference but is no longer used in any embedded context.
-
-**Embedded call sites:**
-| Context | Component file | Props |
-|---|---|---|
-| Property detail | SedonaCRM.jsx | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
-| Owner detail | OwnersView.jsx | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
-| Tenant detail | TenantsView.jsx | `filterTenantId={data.id} hidePropertyPills embeddedMode` |
-| Vendor detail | VendorsView.jsx | `filterVendorId={data.id} hidePropertyPills embeddedMode` |
-| Contact detail | ContactsView.jsx | `filterContactId={data.id} hidePropertyPills embeddedMode` |
-
-**Back navigation from embedded task click:** `embeddedMode` row click writes `tasksBackUrl = window.location.href` to sessionStorage then does `window.location.href = /tasks/[task_num]`. The property detail URL is kept current via a `useEffect` in `PropertyDetail` that calls `replaceState({...window.history.state, url, as:url}, '', url)` on every tab change.
-
-**Completed session 2026-06-19 — Inbox search, ACP monogram, property pills popover (preview branch):**
-- GlobalSearch: added 'inbox' to MODULE_KEYS + PATHNAME_TO_MODULE + MODULE_LABELS; two-fetch inbox search (email_threads subject + email_messages from/body); two-line ResultRow for inbox items with subLine
-- Architectural rule added (Dev Rule 1): all search queries capped at 5 results server-side
-- AppShell + SedonaCRM: "Anderson Commercial Properties" → bold "ACP" monogram
-- AppShell + SedonaCRM: property pills div replaced with PropertyPillsPopover (⊞ Properties button + floating panel, click-outside closes, Ctrl+click opens new tab)
-- SquaresFour imported in both AppShell.jsx and SedonaCRM.jsx
-- Commit: 163006d (preview branch — pending Scott's approval)
-
-**Completed session 2026-06-23 — Mobile topbar, search fixes, Escape key handlers (preview branch):**
-- Mobile topbar: Properties button is now icon-only on mobile (text hidden via crm-desktop-only), full label on desktop
-- GlobalSearch dropdown: switched to position:fixed with viewport-aware computeDropPos() — no off-screen clipping on iPhone
-- EmailInbox.jsx: added client-side inbox search filter on subject/from/body_preview; activates at 2+ chars; magnifying glass icon + x clear button
-- Escape key handler added to all 12 search inputs across the app: GlobalSearch, EmailInbox, TasksView, TenantsView, ContactsView, VendorsView, WorkOrdersView, IssuesView, OwnersView, SuitesView, RentScheduleView, SedonaCRM PropertiesView
-- Commits: 829d02d, e15ef60, 62ddfbf, 5909cd4, 80e1f89 (preview branch)
-
-**Completed session 2026-06-23b — Vendor/Tenant contact pickers on WO detail panel (preview branch):**
-- Fixed WO detail vendor/tenant fields: Vendor Contact and Tenant Contact now show individual people (contacts table, category=Vendor/Tenant); Vendor Company and Tenant Company remain as separate company selects below
-- Added vendor_contact_id and tenant_contact_id columns to both work_orders and tasks tables (FK to contacts)
-- Fixed variable shadowing bug in vendorContacts/tenantContacts fetch (.then(data=>) renamed to .then(rows=>))
-- Identified that /tasks/[id] uses TasksView's own WO detail panel (not WorkOrdersView) — all contact picker changes applied to TasksView
-- Commits: 5bd6127, cd5da2a (preview branch)
-
-**Completed session 2026-06-24 — Paired company+contact rows with FK filtering and auto-select (preview branch):**
-- DB migration: contacts.vendor_id (FK → vendors) + contacts.tenant_id (FK → tenants) + indexes
-- CompanyContactRow: new module-level component in TasksView.jsx (before TaskDetail); props: companyLabel, contactLabel, companyValue, contactValue, companyOptions, allContacts, onSaveCompany, onSaveContact, companyLink, isMobile
-- Filtering: allContacts filtered to c.vendor_id===companyValue||c.tenant_id===companyValue; if no companyValue shows all
-- Auto-select: useEffect([companyValue, filteredContacts.length]) fires when exactly 1 match and it's not already selected
-- Contact ↗ link: built from allContacts.find(c=>c.id===contactValue) using podio_id ?? 'X'+id.slice(-6)
-- Desktop layout: two equal flex columns side-by-side (gap 12px); mobile: stacked column
-- TaskDetail WO panel: 4 FieldRows replaced by 2 CompanyContactRow instances; sbFetch updated to include podio_id,vendor_id / podio_id,tenant_id
-- NewTaskForm WO section: same replacement (companyLink=null, isMobile=false on create form)
-- Commit: 7e42dec (preview branch)
-
-**Completed session 2026-06-24b — Phase 4 Agent 7: Morning Briefing (preview branch):**
-- DB: `briefings` table — run_date (UNIQUE), status (pending/running/complete/error), triggered_by, urgent/attention/fyi (jsonb arrays), snapshot (jsonb), raw_prompt, error_message, timestamps. RLS enabled with admin_all_briefings policy.
-- `vercel.json` created — cron schedule "0 12 * * *" (12:00 UTC = 5:00am AZ, no DST)
-- `/api/agents/morning-briefing`: GET returns today's briefing (maybeSingle); POST auth via x-vercel-cron or x-briefing-secret env var; idempotent (complete → return existing); marks status=running, runs 14 parallel Supabase queries, builds urgent/attention/fyi/snapshot, upserts complete; try/catch upserts error status on failure. maxDuration=60.
-- Queries: overdue tasks + urgent leases (≤30d) + urgent COIs (≤14d) / this-week tasks + attention leases (31-120d) + property insurance (≤30d) + attention COIs (15-60d) + active rent / new tasks + completed tasks + new contacts (yesterday) / open task count + active tenant count + active property count
-- `BriefingView.jsx`: Sun icon header with date + last-run time; Run Now button; three SectionCard components (🔴/🟡/🟢) each with clickable item rows linking to deep URLs in new tab; StatPill snapshot bar; polling every 5s when status=running; handles none/running/complete/error states
-- `/briefing` page route wrapping BriefingView in AppShell
-- `AppShell.jsx`: Sun icon imported; "Briefing" NavBtn added after Home, before Operations section
-- Commit: 72c4a61 (preview branch)
-
-**ENV VARS REQUIRED IN VERCEL (must be set before cron or Run Now will work):**
-- `BRIEFING_SECRET` — any random string; authenticates manual POST calls (server-side)
-- `NEXT_PUBLIC_BRIEFING_SECRET` — same value; used by BriefingView client-side Run Now button
-Set at: Vercel → Project Settings → Environment Variables (both Production + Preview environments)
-
-**Completed session 2026-06-25 — HomeView wired to BriefingView + nav reorder (preview branch):**
-- SedonaCRM.jsx: imported BriefingView; replaced HomeView placeholder italic div with `<BriefingView embedded={true} />`
-- SedonaCRM.jsx: swapped nav order — Home (HouseLine) now above Inbox (EnvelopeSimple) in navItems block
-- Commit: 1183bbe (preview branch)
-
-**Completed session 2026-06-25b — AppShell nav order fix (preview branch):**
-- AppShell.jsx: swapped Home (HouseLine) above Inbox (EnvelopeSimple) in navItems — SedonaCRM.jsx was already correct from prior session but AppShell.jsx was missed
-- Commit: ed1f514 (preview branch)
-
-**Completed session 2026-06-25c — Remove standalone Briefing route + AppShell cleanup (preview branch):**
-- AppShell.jsx: removed Briefing NavBtn (label="Briefing" href="/briefing") — Briefing view lives inside HomeView (SedonaCRM.jsx) via BriefingView embedded prop; no standalone /briefing route needed
-- AppShell.jsx: removed Sun from @phosphor-icons/react import (no longer used)
-- pages/briefing/index.jsx: deleted (standalone /briefing page route removed)
-- Note: SedonaCRM.jsx and AppShell.jsx nav order (Home above Inbox) was already correct from prior sessions — no change needed
-- Commit: (preview branch — see git log)
-
-**Completed session 2026-06-25d — Phase 4 Agent 1: Lease Watch (preview branch):**
-- DB: `lease_watch_drafts` table — tenant_id (FK→tenants CASCADE), prop_code, milestone (12mo/6mo/3mo/2mo/1mo), lease_ends, days_remaining, to_email, to_name, subject, body, status (draft/edited/approved/sent/dismissed), UNIQUE(tenant_id, milestone). RLS enabled with admin_all_lease_watch_drafts policy. Indexes on tenant_id, status, milestone.
-- `pages/api/agents/lease-watch.js`: GET returns active drafts with tenants join (tenant_dba, podio_id, id); POST auth via x-vercel-cron or x-briefing-secret; iterates Active+Active tenants, checks milestone windows, skips existing drafts, calls claude-sonnet-4-6 to generate personalized email per milestone, upserts to lease_watch_drafts. maxDuration=120.
-- `components/LeaseWatchDrafts.jsx`: card component matching BriefingView T/F theme tokens; milestone pills with color coding (12mo=gray, 6mo=blue, 3mo=orange, 2mo=red, 1mo=bright red bold); draft rows as anchor links to /tenants/[podio_id]; compact=true (BriefingView mode), compact=false (standalone mode with "coming in Phase 5" note); "Run Lease Watch" orange button; pending count badge.
-- `BriefingView.jsx`: added `import LeaseWatchDrafts from './LeaseWatchDrafts'`; `<LeaseWatchDrafts compact={true} />` inserted after the three SectionCards and before the snapshot StatPills.
-- `vercel.json`: added second cron entry `"0 13 * * *"` → `/api/agents/lease-watch` (1:00 PM UTC = 6:00 AM AZ, runs 1 hour after Morning Briefing).
-
-**Milestone windows:**
-- 12mo: 335–365 days | 6mo: 150–185 days | 3mo: 75–95 days | 2mo: 45–65 days | 1mo: 1–35 days
-
-**Next priorities (start here next session):**
-1. Merge preview → main (approve all preview commits)
-2. Set BRIEFING_SECRET + NEXT_PUBLIC_BRIEFING_SECRET in Vercel environment variables
-3. Test "Run Now" on production at crm.andersoncp.com — Home view shows BriefingView + LeaseWatchDrafts
-4. Test "Run Lease Watch" on production — generates AI drafts for tenants in milestone windows
-5. Agent 4: Work Order Agent (auto Drive folder creation on WO save)
-6. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
-7. Filter state URL encoding (Rule 11) for Work Orders, Issues, Tenants, Contacts, Vendors, Owners
-
-## Task ID Display vs URL Rule (permanent)
-
-- **Display:** `getTaskPrefix(task)` from `utils/taskPrefix.js` → prop_code prefix e.g. `CR1-3685`, `ACP-1816`, or bare `3685` if no prop_code. Used in table `#` column, page title, badge, CRM email footer label.
-- **URL:** Always bare `task_num` — `/tasks/3685`. Never use `formatTaskNum()` (WO-prefix) in URLs.
-- **`formatTaskNum()`** is a named export still available but used only internally for legacy `parsePrefixedId` reverse-lookup. Do not use in new URL construction.
-- **Lookup (in-app):** `TaskDetail` fetch useEffect reads `tasksNavList[tasksNavIndex]` from sessionStorage; uses `task_num=eq.N&record_type=eq.X` — unambiguous, correct record always opens.
-- **Lookup (cold load / no navList match):** `task_num=eq.N&order=record_type.desc` fallback — `work_order` wins on collisions. Acceptable for bare bookmarked/shared URLs.
-
-## OAuth / Google API Rules (permanent)
-
-- **Token store:** `email_accounts` table is the canonical OAuth token store. Never read from `gmail_tokens` for API calls — `gmail_tokens` is Stage 1 legacy only.
-- **Callback profile fetch:** Use `https://gmail.googleapis.com/gmail/v1/users/me/profile` (not the userinfo endpoint) — requires only `gmail.modify` scope. Field is `emailAddress` not `email`.
-- **Re-auth must be done on production URL:** `GOOGLE_REDIRECT_URI` is set to `crm.andersoncp.com`. OAuth re-auth will not work from preview/localhost — always do it at crm.andersoncp.com/settings.
-- **Scopes (current):** `gmail.modify`, `gmail.send`, `drive` — do not add `userinfo.email`; use Gmail profile endpoint instead.
-- **Drive client:** `getDriveClient(emailAccountId)` in `lib/drive.js` — reuses same OAuth2 token + refresh pattern as `getGmailClient()`.
-
-## Drive Folder Architecture (permanent)
-
-- **Trigger:** Manual `+ Drive Folder` button in work_order task detail header. Fire-and-forget POST to `/api/tasks/create-drive-folder`.
-- **Structure:** `[Property Root]/Work History/[displayId] — [title] — [YYYY-MM-DD]/`
-- **Property root folders:** Hardcoded in `lib/drivePropertyFolders.js` (14 active properties). Missing properties return 400.
-- **Index PDF:** `000_[propCode]-[taskNum]_Info.pdf` created inside the task folder — best-effort, never blocks folder creation.
-- **Error handling:** PDF errors logged only, never surfaced to user. Folder creation success is returned immediately.
-- **DB columns:** `tasks.drive_folder_id`, `tasks.drive_folder_url`, `tasks.drive_index_pdf_id`
-
-## History API Rules (permanent)
-
-**ALWAYS spread existing state in replaceState/pushState calls:**
-```js
-// CORRECT — preserves Next.js __N marker
-window.history.replaceState({ ...window.history.state, url: newUrl, as: newUrl }, '', newUrl);
-
-// WRONG — strips __N, breaks popstate/Backspace in Next.js router
-window.history.replaceState({}, '', newUrl);
-```
-
-**Why:** Next.js's popstate handler checks `event.state.__N` to decide whether to perform a client-side route transition. A bare `{}` wipes this marker. On first Backspace the router sees no `__N` and does nothing — page freezes. Second Backspace hits an older stale entry, causing cycling rather than returning to the list.
-
-**Scope note:** Other modules (WorkOrders, Issues, Tenants, etc.) also call `replaceState` for filter-URL sync but use SPA-style popstate listeners rather than relying on Next's router for Back — different architecture, not necessarily broken today. Flag and fix if any future module routes through Next's router-based back navigation.
-
-**Applies to:** any `window.history.replaceState` or `window.history.pushState` call in this codebase. No exceptions.
-
-## Prev/Next Navigation Rule (permanent)
-
-All detail views support keyboard (ArrowLeft/ArrowRight) and button (‹ ›) navigation across the list that opened them.
-
-**List view writes to sessionStorage on row click:**
-```js
-const navL = items.map(r => ({ id: r.id, podio_id: r.podio_id })); // include only fields needed by goNav
-sessionStorage.setItem('{module}NavList', JSON.stringify(navL));
-sessionStorage.setItem('{module}NavIndex', String(items.findIndex(r => r.id === item.id)));
-```
-
-**Detail view pattern:**
-- State: `const [navList,setNavList]=useState(null); const [navIdx,setNavIdx]=useState(-1); const [navLoading,setNavLoading]=useState(false);`
-- Mount useEffect reads `{module}NavList` / `{module}NavIndex` from sessionStorage (empty dep array)
-- `goNav(dir)` fetches adjacent record, calls `setData(newRec)`, updates `navIdx`, writes new index to sessionStorage, calls `window.history.replaceState({...window.history.state, url: newUrl, as: newUrl}, '', newUrl)`
-- `goNavRef` pattern: `const goNavRef=useRef(goNav); goNavRef.current=goNav;` placed after `goNav` definition, before early returns — arrow key useEffect uses `goNavRef.current` with empty dep array
-- Arrow key useEffect skips when `e.target.tagName` is input/textarea/select or `e.target.isContentEditable`
-- Nav UI: shown only when `navList && navList.length > 1`; right-aligned in header first flex div via `marginLeft:'auto'`; CaretLeft/CaretRight size=18 weight="bold" from @phosphor-icons/react
-
-**Per-module keys and identifiers:**
-| Module | NavList key | NavIndex key | Identifier | goNav query | URL |
-|---|---|---|---|---|---|
-| Tasks | tasksNavList | tasksNavIndex | `{task_num,record_type}` | task_num=eq.N (+ record_type if known) | `/tasks/N` |
-| WorkOrders | workOrdersNavList | workOrdersNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/work-orders/N` |
-| Issues | issuesNavList | issuesNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/issues/N` |
-| Tenants | tenantsNavList | tenantsNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/tenants/N` |
-| Suites | suitesNavList | suitesNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/suites/N` |
-| RentSchedule | rentNavList | rentNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/rent-schedule/N` |
-| Contacts | contactsNavList | contactsNavIndex | `{id,podio_id}` | `podio_id=eq.N` | `/contacts/N` |
-| Vendors | vendorsNavList | vendorsNavIndex | `{id,podio_id}` | podio_id (or id fallback) | `/vendors/N` or `/vendors/XsufFix` |
-| Owners | ownersNavList | ownersNavIndex | `{id,podio_id}` | podio_id (or id fallback) | `/owners/N` or `/owners/XsufFix` |
-| KeySafes | keySafesNavList | keySafesNavIndex | `{id}` | `id=eq.UUID` | `/key-safes/XsufFix` |
