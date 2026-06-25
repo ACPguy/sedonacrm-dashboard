@@ -486,8 +486,12 @@ Set at: Vercel → Project Settings → Environment Variables (both Production +
 - SedonaCRM.jsx: swapped nav order — Home (HouseLine) now above Inbox (EnvelopeSimple) in navItems block
 - Commit: 1183bbe (preview branch)
 
+**Completed session 2026-06-25b — AppShell nav order fix (preview branch):**
+- AppShell.jsx: swapped Home (HouseLine) above Inbox (EnvelopeSimple) in navItems — SedonaCRM.jsx was already correct from prior session but AppShell.jsx was missed
+- Commit: ed1f514 (preview branch)
+
 **Next priorities (start here next session):**
-1. Merge preview → main (approve commits through 1183bbe)
+1. Merge preview → main (approve commits through ed1f514)
 2. Set BRIEFING_SECRET + NEXT_PUBLIC_BRIEFING_SECRET in Vercel environment variables
 3. Test "Run Now" on production at crm.andersoncp.com/briefing
 4. Agent 1: Lease Watch (expiration alerts + draft notices)
