@@ -140,6 +140,9 @@ Rules:
         });
 
         const apiData = await apiRes.json();
+        if (!apiRes.ok) {
+          throw new Error(`Anthropic API error ${apiRes.status}: ${apiData.error?.message || JSON.stringify(apiData)}`);
+        }
         const rawText = apiData.content?.[0]?.text || '';
         const lines = rawText.trim().split('\n');
         const subjectLine = lines.find(l => l.toLowerCase().startsWith('subject:'));
