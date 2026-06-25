@@ -93,7 +93,7 @@ function StatPill({ label, value }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function BriefingView() {
+export default function BriefingView({ embedded = false }) {
   const [briefing, setBriefing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -152,7 +152,7 @@ export default function BriefingView() {
   const snapshot  = briefing?.snapshot  || {};
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', background: T.bg1 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', ...(embedded ? {} : { height: '100%', overflow: 'auto' }), background: T.bg1 }}>
 
       {/* Header */}
       <div style={{ padding: '14px 20px 12px', borderBottom: `0.5px solid ${T.border}`, background: T.bg0, flexShrink: 0 }}>
@@ -179,7 +179,7 @@ export default function BriefingView() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
+      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px', ...(embedded ? {} : { flex: 1, minHeight: 0 }) }}>
 
         {loading && (
           <div style={{ textAlign: 'center', padding: '40px', color: T.text2, fontSize: F.base }}>Loading briefing…</div>
