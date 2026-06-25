@@ -214,7 +214,7 @@ export default function BriefingView() {
           <>
             <LeaseWatchDrafts compact={true} />
 
-            {/* Three section cards */}
+            {/* Three section cards — Urgent, Attention, FYI */}
             <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <SectionCard emoji="🔴" title="Urgent" items={urgent}    color={T.danger} />
               <SectionCard emoji="🟡" title="Attention" items={attention} color={T.warn}   />
