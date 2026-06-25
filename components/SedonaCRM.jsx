@@ -9,6 +9,7 @@ import TenantsTable from './shared/TenantsTable';
 import { TenantsList } from './TenantsView';
 import RichTextEditor from './RichTextEditor';
 import GlobalSearch from './GlobalSearch';
+import BriefingView from './BriefingView';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { HouseLine, BuildingOffice, Buildings, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple, SquaresFour, List } from '@phosphor-icons/react';
@@ -1883,9 +1884,7 @@ const HomeView = () => {
         <WeatherCard city="Sedona AZ" lat={34.8697} lon={-111.7610} url="https://forecast.weather.gov/MapClick.php?CityName=Sedona&state=AZ"/>
         <WeatherCard city="Olympia WA" lat={47.0379} lon={-122.9007} url="https://forecast.weather.gov/MapClick.php?CityName=Olympia&state=WA"/>
       </div>
-      <div style={{...css.card,color:T.text2,fontSize:F.sm,fontStyle:'italic'}}>
-        Urgent items, recent activity, and leasing pipeline will populate here as agents are activated in Phase 4.
-      </div>
+      <BriefingView embedded={true} />
     </div>
   );
 };
@@ -2263,8 +2262,8 @@ export default function SedonaCRM() {
 
   const navItems = (
     <>
-      <NavItem iconComp={<EnvelopeSimple size={18} weight="bold"/>} label="Inbox" href="/inbox" active={currentView==='inbox'} onClick={()=>handleNav('/inbox')} {...navProps}/>
       <NavItem iconComp={<HouseLine size={18} weight="bold"/>} label="Home" href="/?view=morning-briefing" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
+      <NavItem iconComp={<EnvelopeSimple size={18} weight="bold"/>} label="Inbox" href="/inbox" active={currentView==='inbox'} onClick={()=>handleNav('/inbox')} {...navProps}/>
       {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Operations</div>}
       <NavItem iconComp={<BuildingOffice size={18} weight="bold"/>} label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}        {...navProps}/>
       <NavItem iconComp={<ClipboardText size={18} weight="bold"/>} label="Tasks"       href="/tasks"              active={currentView==='tasks'}       onClick={()=>handleNav('/tasks')}        {...navProps}/>
