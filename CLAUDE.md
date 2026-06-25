@@ -490,10 +490,17 @@ Set at: Vercel → Project Settings → Environment Variables (both Production +
 - AppShell.jsx: swapped Home (HouseLine) above Inbox (EnvelopeSimple) in navItems — SedonaCRM.jsx was already correct from prior session but AppShell.jsx was missed
 - Commit: ed1f514 (preview branch)
 
+**Completed session 2026-06-25c — Remove standalone Briefing route + AppShell cleanup (preview branch):**
+- AppShell.jsx: removed Briefing NavBtn (label="Briefing" href="/briefing") — Briefing view lives inside HomeView (SedonaCRM.jsx) via BriefingView embedded prop; no standalone /briefing route needed
+- AppShell.jsx: removed Sun from @phosphor-icons/react import (no longer used)
+- pages/briefing/index.jsx: deleted (standalone /briefing page route removed)
+- Note: SedonaCRM.jsx and AppShell.jsx nav order (Home above Inbox) was already correct from prior sessions — no change needed
+- Commit: (preview branch — see git log)
+
 **Next priorities (start here next session):**
-1. Merge preview → main (approve commits through ed1f514)
+1. Merge preview → main (approve all preview commits)
 2. Set BRIEFING_SECRET + NEXT_PUBLIC_BRIEFING_SECRET in Vercel environment variables
-3. Test "Run Now" on production at crm.andersoncp.com/briefing
+3. Test "Run Now" on production at crm.andersoncp.com — Home view shows BriefingView
 4. Agent 1: Lease Watch (expiration alerts + draft notices)
 5. Agent 4: Work Order Agent (auto Drive folder creation on WO save)
 6. Trigger Gmail backfill on production: `curl -X POST https://crm.andersoncp.com/api/gmail/backfill`
