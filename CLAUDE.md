@@ -481,8 +481,13 @@ All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills
 - `NEXT_PUBLIC_BRIEFING_SECRET` — same value; used by BriefingView client-side Run Now button
 Set at: Vercel → Project Settings → Environment Variables (both Production + Preview environments)
 
+**Completed session 2026-06-25 — HomeView wired to BriefingView + nav reorder (preview branch):**
+- SedonaCRM.jsx: imported BriefingView; replaced HomeView placeholder italic div with `<BriefingView embedded={true} />`
+- SedonaCRM.jsx: swapped nav order — Home (HouseLine) now above Inbox (EnvelopeSimple) in navItems block
+- Commit: 1183bbe (preview branch)
+
 **Next priorities (start here next session):**
-1. Merge preview → main (approve 72c4a61)
+1. Merge preview → main (approve commits through 1183bbe)
 2. Set BRIEFING_SECRET + NEXT_PUBLIC_BRIEFING_SECRET in Vercel environment variables
 3. Test "Run Now" on production at crm.andersoncp.com/briefing
 4. Agent 1: Lease Watch (expiration alerts + draft notices)
