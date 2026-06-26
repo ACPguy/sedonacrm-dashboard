@@ -190,7 +190,7 @@ const MessageRow = ({ msg, defaultExpanded }) => {
           {msg.body_html ? (
             <iframe
               srcDoc={msg.body_html}
-              style={{ width:'100%', border:'none', borderRadius:'6px', minHeight:'200px' }}
+              style={{ width:'100%', border:'none', borderRadius:'6px', minHeight:'200px', background:'#ffffff' }}
               scrolling="no"
               title="email-body"
               onLoad={e => {
