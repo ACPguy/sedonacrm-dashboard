@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { EnvelopeSimple, ArrowCounterClockwise, CheckCircle, Circle, Spinner, Robot, Archive, MagnifyingGlass } from '@phosphor-icons/react';
+import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, MagnifyingGlass } from '@phosphor-icons/react';
 import EmailCompose from './EmailCompose';
 
 const SUPABASE_URL  = 'https://edxcvyleielzevpappui.supabase.co';
@@ -633,7 +633,6 @@ export default function EmailInbox() {
               <EnvelopeSimple size={18} weight="bold" color={T.accent}/>
               <span style={{ fontSize:F.md, fontWeight:'700', color:T.text0 }}>Inbox</span>
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
               <button type="button"
                 onClick={handleSyncNow}
                 disabled={isSyncing}
@@ -646,15 +645,6 @@ export default function EmailInbox() {
                   : <span>Sync</span>
                 }
               </button>
-              <button type="button"
-                onClick={() => setRefreshKey(k => k + 1)}
-                title="Refresh from DB"
-                style={{ background:'transparent', border:'none', color:T.text2, cursor:'pointer', padding:'4px', borderRadius:'4px', display:'flex' }}
-                onMouseEnter={e => e.currentTarget.style.color=T.text0}
-                onMouseLeave={e => e.currentTarget.style.color=T.text2}>
-                <ArrowCounterClockwise size={16} weight="bold"/>
-              </button>
-            </div>
           </div>
           <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
             {FILTER_TABS.map(({ key, label }) => (

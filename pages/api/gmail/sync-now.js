@@ -165,6 +165,27 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
 
   if (!threadRow) return;
 
+  // Fetch full body for linked messages (same as webhook.js)
+  let bodyHtml = null;
+  let bodyText = null;
+  let bodyStored = false;
+
+  if (linkStatus !== 'unlinked') {
+    try {
+      const fullMsg = await gmailClient.users.messages.get({
+        userId: 'me',
+        id: gmailMessageId,
+        format: 'full',
+      });
+      const { html, text } = extractBody(fullMsg.data.payload);
+      bodyHtml = html;
+      bodyText = text;
+      bodyStored = true;
+    } catch (err) {
+      console.log(`[sync-now] body fetch failed for ${gmailMessageId}:`, err?.message);
+    }
+  }
+
   const { data: msgRow } = await sb.from('email_messages').insert({
     gmail_message_id: gmailMessageId,
     thread_id: threadRow.id,
@@ -175,9 +196,9 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
     cc_addresses: parseAddressHeader(headers['cc']),
     subject: headers['subject'] || '(no subject)',
     snippet: msg.snippet,
-    body_html: null,
-    body_text: null,
-    body_stored: false,
+    body_html: bodyHtml,
+    body_text: bodyText,
+    body_stored: bodyStored,
     crm_record_header: crmHeader,
     is_outbound: isOutbound,
     is_latest_in_thread: true,
@@ -214,6 +235,26 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
       entry_at: new Date(parseInt(msg.internalDate)).toISOString(),
     });
   }
+}
+
+function extractBody(payload) {
+  if (!payload) return { html: null, text: null };
+  if (payload.mimeType === 'text/html') {
+    return { html: Buffer.from(payload.body?.data || '', 'base64').toString(), text: null };
+  }
+  if (payload.mimeType === 'text/plain') {
+    return { html: null, text: Buffer.from(payload.body?.data || '', 'base64').toString() };
+  }
+  if (payload.parts) {
+    let html = null, text = null;
+    for (const p of payload.parts) {
+      const r = extractBody(p);
+      if (r.html) html = r.html;
+      if (r.text) text = r.text;
+    }
+    return { html, text };
+  }
+  return { html: null, text: null };
 }
 
 function parseAddressHeader(raw) {
