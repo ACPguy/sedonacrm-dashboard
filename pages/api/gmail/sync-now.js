@@ -70,7 +70,7 @@ export default async function handler(req, res) {
         .from('email_messages')
         .select('id')
         .eq('gmail_message_id', m.id)
-        .single();
+        .maybeSingle();
       if (!exists) {
         await processNewMessage(gmailClient, sb, account, m.id);
         synced++;
