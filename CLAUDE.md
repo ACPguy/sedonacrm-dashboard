@@ -158,11 +158,12 @@ pages/api/gmail/
 
 ## Next Priorities
 
-1. Build manual Gmail "Sync Now" button in Inbox view
-2. Verify Agent 3 end-to-end with real inquiry email
-3. Confirm NewInquiryDrafts card displays correctly in BriefingView
-4. Begin Agent 4 (Work Order — auto Drive folder on WO creation)
-5. Phase 5 start: Leasing Pipeline
+1. Remove inbox search box (redundant with global search)
+2. Fix email body text readability
+3. Verify Agent 3 (New Inquiry) end-to-end
+4. Merge preview → main
+5. Agent 4 (Work Order agent)
+6. Phase 5 — Leasing Pipeline
 
 ## Current Git State
 
