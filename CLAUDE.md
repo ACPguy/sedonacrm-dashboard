@@ -192,6 +192,7 @@ Use `psql` only — `export DB='postgresql://postgres.edxcvyleielzevpappui:Sedon
 4. **Read CLAUDE.md first** — at start of every new session before doing anything
 5. **Start fresh CC session after each major feature or ~2 hours** — keeps context lean, prevents slowdowns and output degradation
 6. **CLAUDE.md size rule:** Keep under 30k chars. Remove oldest completed session logs before adding new ones.
+7. **Push immediately after every commit** — never let commits sit locally. Every `git commit` must be followed immediately by `git push origin preview`. No batching commits before pushing.
 
 ## Session Close Procedure
 
