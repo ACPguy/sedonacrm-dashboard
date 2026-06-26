@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sun } from '@phosphor-icons/react';
 import LeaseWatchDrafts from './LeaseWatchDrafts';
+import NewInquiryDrafts from './NewInquiryDrafts';
 
 const T = {
   bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
@@ -213,6 +214,7 @@ export default function BriefingView() {
         {!loading && briefing?.status === 'complete' && (
           <>
             <LeaseWatchDrafts compact={true} />
+            <NewInquiryDrafts />
 
             {/* Three section cards */}
             <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flexWrap: 'wrap' }}>

@@ -56,6 +56,17 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  // Dismiss action
+  const body = req.body || {};
+  if (body.action === 'dismiss' && body.id) {
+    const { error: updateErr } = await sb
+      .from('inquiry_drafts')
+      .update({ status: 'dismissed' })
+      .eq('id', body.id);
+    if (updateErr) return res.status(500).json({ error: updateErr.message });
+    return res.status(200).json({ ok: true });
+  }
+
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const results = { generated: [], skipped: [], errors: [] };
 
