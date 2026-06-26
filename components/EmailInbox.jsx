@@ -59,10 +59,10 @@ const FilterPill = ({ label, active, onClick }) => (
   </button>
 );
 
-const ActionBtn = ({ label, icon, onClick, disabled, variant }) => {
+const ActionBtn = ({ label, icon, onClick, disabled, variant, color }) => {
   const base = variant === 'primary'
     ? { background:T.accent, border:`0.5px solid ${T.accent}`, color:'#fff' }
-    : { background:T.bg2, border:`0.5px solid ${T.border}`, color: disabled ? T.text3 : T.text0 };
+    : { background:T.bg2, border:`0.5px solid ${color || T.border}`, color: disabled ? T.text3 : (color || T.text0) };
   return (
     <button type="button" onClick={disabled ? undefined : onClick}
       onMouseEnter={e => { if (!disabled && variant !== 'primary') e.currentTarget.style.background = T.bg3; }}
@@ -216,7 +216,7 @@ const MessageRow = ({ msg, defaultExpanded }) => {
 };
 
 // ── Thread Detail Panel ────────────────────────────────────────────────────────
-const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThreadUpdate, onLink }) => {
+const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply, onThreadUpdate, onLink }) => {
   const [messages,     setMessages]     = useState([]);
   const [loadingMsgs,  setLoadingMsgs]  = useState(true);
   const [aiSummary,    setAiSummary]    = useState('');
@@ -385,6 +385,7 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThrea
         <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', alignItems:'center' }}>
           <ActionBtn label="Reply" variant="primary" onClick={handleReply}/>
           <ActionBtn label="Archive" icon={<Archive size={13}/>} onClick={() => onArchive(thread.id)}/>
+          <ActionBtn label="Spam" icon={<span>🚫</span>} color={T.warn} onClick={() => onSpam(thread.id)}/>
           <ActionBtn
             label={thread.is_read ? 'Mark Unread' : 'Mark Read'}
             icon={thread.is_read ? <Circle size={13}/> : <CheckCircle size={13}/>}
@@ -593,6 +594,16 @@ export default function EmailInbox() {
     }).catch(() => {});
   };
 
+  const handleSpam = async (threadId) => {
+    setThreads(ts => ts.filter(t => t.id !== threadId));
+    if (selectedThread?.id === threadId) setSelectedThread(null);
+    await fetch('/api/gmail/spam', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-briefing-secret': process.env.NEXT_PUBLIC_BRIEFING_SECRET },
+      body: JSON.stringify({ threadId }),
+    }).catch(() => {});
+  };
+
   const handleLink = (updates) => {
     if (!selectedThread) return;
     setSelectedThread(t => ({ ...t, ...updates }));
@@ -685,6 +696,7 @@ export default function EmailInbox() {
               thread={selectedThread}
               onMarkRead={handleMarkRead}
               onArchive={handleArchive}
+              onSpam={handleSpam}
               onReply={() => {}}
               onThreadUpdate={() => setRefreshKey(k => k + 1)}
               onLink={handleLink}
