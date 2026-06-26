@@ -533,6 +533,7 @@ export default function EmailInbox() {
   const [loading,        setLoading]        = useState(true);
   const [selectedThread, setSelectedThread] = useState(null);
   const [refreshKey,     setRefreshKey]     = useState(0);
+  const [isSyncing,      setIsSyncing]      = useState(false);
   const [inboxSearch,    setInboxSearch]    = useState('');
 
   const buildQuery = useCallback((f) => {
@@ -551,6 +552,19 @@ export default function EmailInbox() {
       .catch(() => setThreads([]))
       .finally(() => setLoading(false));
   }, [filter, refreshKey, buildQuery]);
+
+  const handleSyncNow = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await fetch('/api/gmail/sync-now', { method: 'POST' });
+    } catch (err) {
+      console.error('[sync-now]', err);
+    } finally {
+      setIsSyncing(false);
+      setRefreshKey(k => k + 1); // re-fetch from DB after sync
+    }
+  };
 
   const handleMarkRead = async (threadId, isRead) => {
     setThreads(ts => ts.map(t => t.id === threadId ? { ...t, is_read: isRead, unread_count: isRead ? 0 : t.unread_count } : t));
@@ -619,14 +633,28 @@ export default function EmailInbox() {
               <EnvelopeSimple size={18} weight="bold" color={T.accent}/>
               <span style={{ fontSize:F.md, fontWeight:'700', color:T.text0 }}>Inbox</span>
             </div>
-            <button type="button"
-              onClick={() => setRefreshKey(k => k + 1)}
-              title="Refresh"
-              style={{ background:'transparent', border:'none', color:T.text2, cursor:'pointer', padding:'4px', borderRadius:'4px', display:'flex' }}
-              onMouseEnter={e => e.currentTarget.style.color=T.text0}
-              onMouseLeave={e => e.currentTarget.style.color=T.text2}>
-              <ArrowCounterClockwise size={16} weight="bold"/>
-            </button>
+            <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
+              <button type="button"
+                onClick={handleSyncNow}
+                disabled={isSyncing}
+                title="Sync new mail from Gmail"
+                style={{ background:'transparent', border:`1px solid ${T.border}`, color: isSyncing ? T.text3 : T.accent, cursor: isSyncing ? 'not-allowed' : 'pointer', padding:'3px 8px', borderRadius:'4px', display:'flex', alignItems:'center', gap:'4px', fontSize:'11px', fontWeight:'600' }}
+                onMouseEnter={e => { if (!isSyncing) e.currentTarget.style.borderColor = T.accent; }}
+                onMouseLeave={e => { if (!isSyncing) e.currentTarget.style.borderColor = T.border; }}>
+                {isSyncing
+                  ? <><Spinner size={13} className="spin"/> <span>Syncing…</span></>
+                  : <span>Sync</span>
+                }
+              </button>
+              <button type="button"
+                onClick={() => setRefreshKey(k => k + 1)}
+                title="Refresh from DB"
+                style={{ background:'transparent', border:'none', color:T.text2, cursor:'pointer', padding:'4px', borderRadius:'4px', display:'flex' }}
+                onMouseEnter={e => e.currentTarget.style.color=T.text0}
+                onMouseLeave={e => e.currentTarget.style.color=T.text2}>
+                <ArrowCounterClockwise size={16} weight="bold"/>
+              </button>
+            </div>
           </div>
           <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
             {FILTER_TABS.map(({ key, label }) => (
