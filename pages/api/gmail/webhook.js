@@ -165,18 +165,16 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
   let bodyText = null;
   let bodyStored = false;
 
-  if (linkStatus !== 'unlinked') {
-    const fullMsg = await gmailClient.users.messages.get({
-      userId: 'me',
-      id: gmailMessageId,
-      format: 'full',
-    });
+  const fullMsg = await gmailClient.users.messages.get({
+    userId: 'me',
+    id: gmailMessageId,
+    format: 'full',
+  });
 
-    const { html, text } = extractBody(fullMsg.data.payload);
-    bodyHtml = html;
-    bodyText = text;
-    bodyStored = true;
-  }
+  const { html, text } = extractBody(fullMsg.data.payload);
+  bodyHtml = html;
+  bodyText = text;
+  bodyStored = true;
 
   const { data: msgRow } = await sb.from('email_messages').insert({
     gmail_message_id: gmailMessageId,
