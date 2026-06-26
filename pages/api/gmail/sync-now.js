@@ -59,6 +59,26 @@ export default async function handler(req, res) {
         .eq('id', account.id);
     }
 
+    // Fallback: if history returned nothing, poll inbox directly for missed messages
+    if (synced === 0) {
+      const listRes = await gmailClient.users.messages.list({
+        userId: 'me',
+        labelIds: ['INBOX'],
+        maxResults: 25,
+      });
+      for (const m of (listRes.data.messages || [])) {
+        const { data: exists } = await sb
+          .from('email_messages')
+          .select('id')
+          .eq('gmail_message_id', m.id)
+          .single();
+        if (!exists) {
+          await processNewMessage(gmailClient, sb, account, m.id);
+          synced++;
+        }
+      }
+    }
+
     return res.status(200).json({ synced, message: `Synced ${synced} new message(s)` });
 
   } catch (err) {
@@ -165,25 +185,22 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
 
   if (!threadRow) return;
 
-  // Fetch full body for linked messages (same as webhook.js)
   let bodyHtml = null;
   let bodyText = null;
   let bodyStored = false;
 
-  if (linkStatus !== 'unlinked') {
-    try {
-      const fullMsg = await gmailClient.users.messages.get({
-        userId: 'me',
-        id: gmailMessageId,
-        format: 'full',
-      });
-      const { html, text } = extractBody(fullMsg.data.payload);
-      bodyHtml = html;
-      bodyText = text;
-      bodyStored = true;
-    } catch (err) {
-      console.log(`[sync-now] body fetch failed for ${gmailMessageId}:`, err?.message);
-    }
+  try {
+    const fullMsg = await gmailClient.users.messages.get({
+      userId: 'me',
+      id: gmailMessageId,
+      format: 'full',
+    });
+    const { html, text } = extractBody(fullMsg.data.payload);
+    bodyHtml = html;
+    bodyText = text;
+    bodyStored = true;
+  } catch (err) {
+    console.log(`[sync-now] body fetch failed for ${gmailMessageId}:`, err?.message);
   }
 
   const { data: msgRow } = await sb.from('email_messages').insert({
