@@ -30,13 +30,13 @@ git push
 
 ## Tech Stack
 
-- Next.js + React, hosted on Vercel
+- Next.js + React, hosted on Vercel Pro ($20/mo)
 - Supabase (Postgres + Auth + RLS)
 - Tailwind CSS
 - Gmail, Google Calendar, Google Drive (MCP connected)
 - Twilio for SMS (Phase 6)
 - HelloSign webhooks for e-signature (Phase 3)
-- Claude API — Sonnet 4 for AI agents (Phase 4+)
+- Claude API — Sonnet 4.6 for AI agents (Phase 4+)
 
 ## Supabase
 
@@ -44,7 +44,7 @@ git push
 - Anon key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw`
 - DB connection: `postgresql://postgres.edxcvyleielzevpappui:SedonaCRM2026@aws-1-us-east-1.pooler.supabase.com:5432/postgres`
 - All tables have RLS enabled
-- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`, `email_threads`, `email_messages`, `email_thread_links`, `communication_timeline`, `users`, `briefings`, `lease_watch_drafts`
+- Anon SELECT grants exist on: `properties`, `tenants`, `rent_schedule`, `work_orders`, `issues`, `leasing_pipeline`, `property_insurance`, `tnt_cois`, `monthly_reports`, `property_taxes`, `suites`, `tasks`, `task_contacts`, `email_threads`, `email_messages`, `email_thread_links`, `communication_timeline`, `users`, `briefings`, `lease_watch_drafts`, `inquiry_drafts`
 - `SUPABASE_SERVICE_ROLE_KEY` is set in `.env.local` and in Vercel environment variables
 
 ## Core Architecture — Property as Hub
@@ -80,6 +80,7 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   OwnersView.jsx            — property owners list + detail (routed)
   BriefingView.jsx          — Morning Briefing dashboard (wired into SedonaCRM.jsx HomeView)
   LeaseWatchDrafts.jsx      — Lease Watch compact card; embedded in BriefingView
+  NewInquiryDrafts.jsx      — New Inquiry compact card; embedded in BriefingView below LeaseWatch
   shared/
     TasksTable.jsx     — reference only (no longer used in embedded contexts)
     WorkOrdersTable.jsx, TenantsTable.jsx, SuitesTable.jsx, IssuesTable.jsx, ContactsTable.jsx
@@ -93,6 +94,11 @@ lib/
 pages/api/agents/
   morning-briefing.js — GET today's briefing; POST runs 14 parallel queries, saves to briefings table
   lease-watch.js      — GET active drafts; POST iterates tenants, calls Claude API, saves drafts
+  new-inquiry.js      — GET active drafts; POST keyword filter → Claude draft → pipeline insert → thread link; dismiss action
+
+pages/api/gmail/
+  renew-watch.js      — POST renews Gmail Pub/Sub watch; cron every 6 days
+  webhook.js          — processes Pub/Sub push notifications, syncs email_threads + email_messages
 ```
 
 ## Phase Status
@@ -101,14 +107,22 @@ pages/api/agents/
 - **Phase 4:** IN PROGRESS
   - Agent 7 Morning Briefing: Complete (cron `0 12 * * *` = 5am AZ)
     - `briefings` table, `/api/agents/morning-briefing`, `BriefingView.jsx`
-    - HomeView wired: SedonaCRM.jsx HomeView => `<BriefingView embedded={true} />`
+    - HomeView wired: SedonaCRM.jsx HomeView => `<BriefingView />`
     - Env vars set in Vercel: BRIEFING_SECRET + NEXT_PUBLIC_BRIEFING_SECRET
   - Agent 1 Lease Watch: Complete (cron `0 13 * * *` = 6am AZ)
     - `lease_watch_drafts` table, `/api/agents/lease-watch`, `LeaseWatchDrafts.jsx`
     - Milestones: 12mo/6mo/3mo/2mo/1mo; Claude API drafts personalized emails
     - Drafts saved with status='draft'; approve button placeholder (send wires in Phase 6)
-    - Compact card in BriefingView above Urgent/Attention/FYI; full editor in tenant record (Phase 5)
-    - Remaining Phase 4: Agents 3, 4, 9
+    - Compact card in BriefingView above NewInquiryDrafts and above Urgent/Attention/FYI
+  - Agent 3 New Inquiry: Complete (cron `0 15,17,19,21,23,1 * * *` = 8am–6pm AZ, 6x/day)
+    - `inquiry_drafts` table, `/api/agents/new-inquiry`, `NewInquiryDrafts.jsx`
+    - Keyword detection → Claude draft reply → leasing_pipeline insert → thread link → dedup
+    - Dismiss action: POST { action: 'dismiss', id } → sets status='dismissed'
+    - Compact card in BriefingView below LeaseWatchDrafts, above Urgent/Attention/FYI
+    - Approve button placeholder (send wires in Phase 6)
+  - Gmail Watch Auto-Renewal: Complete (cron `0 11 */6 * *` = every 6 days)
+    - `pages/api/gmail/renew-watch.js` — renewed manually 2026-06-26, expires 2026-07-03
+  - Remaining Phase 4: Agents 4, 9
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -117,20 +131,27 @@ pages/api/agents/
 - NEXT_PUBLIC_BRIEFING_SECRET
 - ANTHROPIC_API_KEY
 
+## Monthly Cost
+
+- Vercel Pro: $20/mo (upgraded from Hobby 2026-06-26 — required for 6x/day crons)
+- Claude API: active, ~$10–15/mo estimated
+- Supabase: $0 (free tier)
+- Twilio: not yet active (Phase 6)
+- Total: ~$30–35/mo
+
 ## Next Priorities
 
-1. Run three-fix prompt on preview (remove target=_blank, move LeaseWatch above section cards) — then merge to main
-2. Test Run Lease Watch on production
-3. Agent 3 New Inquiry
-4. Agent 4 Work Order Agent (auto Drive folder on WO creation)
+1. Build manual Gmail "Sync Now" button in Inbox view
+2. Verify Agent 3 end-to-end with real inquiry email
+3. Confirm NewInquiryDrafts card displays correctly in BriefingView
+4. Begin Agent 4 (Work Order — auto Drive folder on WO creation)
 5. Phase 5 start: Leasing Pipeline
 
 ## Current Git State
 
-- preview branch: ahead of main — needs merge after three-fix prompt
-- Last successful main: a3f69e9 (Morning Briefing + BriefingView on Home + nav order)
-- Outstanding on preview: same-tab link fix + LeaseWatch card position fix (not yet committed successfully)
-- Task: run the three-fix CC prompt, then merge preview → main
+- main: `8de3736` — new-inquiry cron restored to 6x/day (Vercel Pro)
+- preview: in sync with main
+- All Phase 4 Agent 3 work fully merged and live on production
 
 ## Seeding Rules
 
@@ -175,6 +196,7 @@ NEVER upload `.md` files without `disableConversionToGoogleType: true`
 - **Single source of truth:** ONE shared component per table/list in `components/shared/`. NEVER build a second version.
 - **Dual nav architecture:** `AppShell.jsx` (routed pages) + `SedonaCRM.jsx` (SPA). Nav changes must be applied to BOTH.
 - **`property_agreements` table:** ACP's mgmt agreement with owners — NOT leasing pipeline. Never confuse.
+- **Vercel build cache:** `next.config.js` uses `generateBuildId: async () => require('crypto').randomBytes(8).toString('hex')` — ensures every deploy gets a fresh route manifest. Do not remove.
 
 ## URL Routing Rules (permanent)
 
@@ -204,6 +226,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - OAuth re-auth only at crm.andersoncp.com/settings (GOOGLE_REDIRECT_URI is production)
 - Scopes: `gmail.modify`, `gmail.send`, `drive` — do NOT add `userinfo.email`
 - Do NOT overwrite .env.local with `vercel env pull`
+- Gmail watch expires every 7 days — auto-renewed by cron `0 11 */6 * *` via `/api/gmail/renew-watch`
 
 ## Tasks Module DB Notes (permanent)
 
@@ -219,6 +242,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `work_orders` + `tasks`: added `vendor_contact_id` + `tenant_contact_id`
 - `briefings` table: run_date (UNIQUE), status, urgent/jsonb, attention/jsonb, fyi/jsonb, snapshot/jsonb
 - `lease_watch_drafts` table: tenant_id + milestone (UNIQUE pair), subject, body, status (draft/edited/approved/sent/dismissed)
+- `inquiry_drafts` table: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status (draft/edited/approved/sent/dismissed), created_at
 
 ## Drive Folder Architecture (permanent)
 
