@@ -59,23 +59,21 @@ export default async function handler(req, res) {
         .eq('id', account.id);
     }
 
-    // Fallback: if history returned nothing, poll inbox directly for missed messages
-    if (synced === 0) {
-      const listRes = await gmailClient.users.messages.list({
-        userId: 'me',
-        labelIds: ['INBOX'],
-        maxResults: 25,
-      });
-      for (const m of (listRes.data.messages || [])) {
-        const { data: exists } = await sb
-          .from('email_messages')
-          .select('id')
-          .eq('gmail_message_id', m.id)
-          .single();
-        if (!exists) {
-          await processNewMessage(gmailClient, sb, account, m.id);
-          synced++;
-        }
+    // Always poll inbox directly to catch any messages missed by history
+    const listRes = await gmailClient.users.messages.list({
+      userId: 'me',
+      labelIds: ['INBOX'],
+      maxResults: 50,
+    });
+    for (const m of (listRes.data.messages || [])) {
+      const { data: exists } = await sb
+        .from('email_messages')
+        .select('id')
+        .eq('gmail_message_id', m.id)
+        .single();
+      if (!exists) {
+        await processNewMessage(gmailClient, sb, account, m.id);
+        synced++;
       }
     }
 
