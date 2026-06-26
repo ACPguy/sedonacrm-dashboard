@@ -158,17 +158,21 @@ pages/api/gmail/
 
 ## Next Priorities
 
-1. Remove inbox search box (redundant with global search)
-2. Fix email body text readability
-3. Verify Agent 3 (New Inquiry) end-to-end
-4. Merge preview → main
-5. Agent 4 (Work Order agent)
-6. Phase 5 — Leasing Pipeline
+1. Verify iframe email rendering on Vercel preview
+2. Merge preview → main
+3. Agent 4 (Work Order agent)
+4. Phase 5 — Leasing Pipeline
 
 ## Current Git State
 
-- main: `8de3736` — new-inquiry cron restored to 6x/day (Vercel Pro)
-- preview: in sync with main
+- main: `ea48cd3` — (pre-session)
+- preview: `0e76e0f` — fix: render HTML emails in iframe for accurate Gmail-like display
+
+## Session Log — 2026-06-26
+
+- Removed inbox search box from EmailInbox.jsx (redundant with global search) — `c43af81`
+- Replaced `dangerouslySetInnerHTML` HTML email rendering with auto-sizing iframe (`srcdoc`) — `0e76e0f`
+- Verified Agent 3 (New Inquiry) end-to-end: agent runs correctly, auth works, keyword filter working, zero errors. No real leasing inquiry emails in inbox yet — agent is ready and waiting. All output tables (inquiry_drafts, leasing_pipeline, email_thread_links) are empty as expected for a new agent.
 
 ---
 
