@@ -188,9 +188,17 @@ const MessageRow = ({ msg, defaultExpanded }) => {
       {expanded && (
         <div style={{ padding:'12px 16px 16px 54px', background:T.bg2 }}>
           {msg.body_html ? (
-            <div
-              style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', maxWidth:'100%', overflowX:'auto', wordBreak:'break-word' }}
-              dangerouslySetInnerHTML={{ __html: msg.body_html }}
+            <iframe
+              srcDoc={msg.body_html}
+              style={{ width:'100%', border:'none', borderRadius:'6px', minHeight:'200px' }}
+              scrolling="no"
+              title="email-body"
+              onLoad={e => {
+                try {
+                  const h = e.target.contentDocument.body.scrollHeight;
+                  e.target.style.height = (h + 32) + 'px';
+                } catch(_) {}
+              }}
             />
           ) : msg.body_text ? (
             <pre style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', whiteSpace:'pre-wrap', fontFamily:'inherit', margin:0 }}>
