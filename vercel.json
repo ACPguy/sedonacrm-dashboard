@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/agents/new-inquiry",
-      "schedule": "0 15 * * *"
+      "schedule": "0 15,17,19,21,23,1 * * *"
     },
     {
       "path": "/api/gmail/renew-watch",
