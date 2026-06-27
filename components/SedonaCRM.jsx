@@ -1861,7 +1861,7 @@ const HomeView = () => {
         <WeatherCard city="Sedona AZ" lat={34.8697} lon={-111.7610} url="https://forecast.weather.gov/MapClick.php?CityName=Sedona&state=AZ"/>
         <WeatherCard city="Olympia WA" lat={47.0379} lon={-122.9007} url="https://forecast.weather.gov/MapClick.php?CityName=Olympia&state=WA"/>
       </div>
-      <BriefingView embedded={true} />
+      <BriefingView />
     </div>
   );
 };
