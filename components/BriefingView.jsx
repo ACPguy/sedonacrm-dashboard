@@ -101,13 +101,14 @@ function CollapsibleSection({ dotColor, title, items, open, onToggle, isMobile }
           minHeight: '44px',
         }}>
         <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
-        <span style={{ fontSize: F.sm, fontWeight: '700', color: T.text0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: F.sm, fontWeight: '700', color: T.text0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {title}
         </span>
         <span style={{ fontSize: F.xs, background: T.bg2, color: T.text1, padding: '1px 7px', borderRadius: '10px', fontWeight: '600', flexShrink: 0 }}>
           {items.length}
         </span>
-        <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0, marginLeft: '4px' }}>{open ? '▼' : '▶'}</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0 }}>{open ? '▼' : '▶'}</span>
       </div>
       {open && (
         <div>

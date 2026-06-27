@@ -122,6 +122,7 @@ export default function NewInquiryDrafts() {
   const [running, setRunning] = useState(false);
   const [dismissingId, setDismissingId] = useState(null);
   const [error, setError] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const fetchDrafts = async () => {
     try {
@@ -175,16 +176,21 @@ export default function NewInquiryDrafts() {
   };
 
   return (
-    <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '8px', overflow: 'hidden' }}>
+    <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '8px', overflow: 'visible' }}>
       {/* Card header */}
-      <div style={{
-        padding: '10px 16px',
-        borderBottom: `0.5px solid ${T.border}`,
-        background: T.bg3,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-      }}>
+      <div
+        onClick={() => setCollapsed(c => !c)}
+        style={{
+          padding: '10px 16px',
+          borderBottom: `0.5px solid ${T.border}`,
+          background: T.bg3,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer',
+          userSelect: 'none',
+          minHeight: '44px',
+        }}>
         <span style={{ fontSize: F.md }}>🏢</span>
         <span style={{ fontSize: F.sm, fontWeight: '700', color: T.text1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           New Leasing Inquiries
@@ -200,7 +206,7 @@ export default function NewInquiryDrafts() {
           {loading ? '…' : drafts.length}
         </span>
         <button
-          onClick={handleRun}
+          onClick={e => { e.stopPropagation(); handleRun(); }}
           disabled={running}
           style={{
             marginLeft: 'auto',
@@ -218,23 +224,32 @@ export default function NewInquiryDrafts() {
         >
           {running ? 'Running…' : 'Run Now'}
         </button>
+        <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0, marginLeft: '8px' }}>
+          {collapsed ? '▶' : '▼'}
+        </span>
       </div>
 
       {/* Body */}
-      {loading && (
-        <div style={{ padding: '16px', fontSize: F.sm, color: T.text2, textAlign: 'center' }}>Loading…</div>
+      {!collapsed && (
+        <>
+          {loading && (
+            <div style={{ padding: '16px', fontSize: F.sm, color: T.text2, textAlign: 'center' }}>Loading…</div>
+          )}
+          {error && !loading && (
+            <div style={{ padding: '12px 16px', fontSize: F.sm, color: T.danger }}>{error}</div>
+          )}
+          {!loading && !error && drafts.length === 0 && (
+            <div style={{ padding: '16px', fontSize: F.sm, color: T.text3, textAlign: 'center' }}>
+              No new inquiries
+            </div>
+          )}
+          <div style={{ maxHeight: '320px', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            {!loading && drafts.map(d => (
+              <DraftRow key={d.id} draft={d} onDismiss={handleDismiss} dismissingId={dismissingId} />
+            ))}
+          </div>
+        </>
       )}
-      {error && !loading && (
-        <div style={{ padding: '12px 16px', fontSize: F.sm, color: T.danger }}>{error}</div>
-      )}
-      {!loading && !error && drafts.length === 0 && (
-        <div style={{ padding: '16px', fontSize: F.sm, color: T.text3, textAlign: 'center' }}>
-          No new inquiries
-        </div>
-      )}
-      {!loading && drafts.map(d => (
-        <DraftRow key={d.id} draft={d} onDismiss={handleDismiss} dismissingId={dismissingId} />
-      ))}
     </div>
   );
 }

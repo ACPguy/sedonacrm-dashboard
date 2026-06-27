@@ -82,6 +82,7 @@ export default function LeaseWatchDrafts({ compact = false }) {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
   const pollRef = useRef(null);
 
   const fetchDrafts = async () => {
@@ -132,16 +133,21 @@ export default function LeaseWatchDrafts({ compact = false }) {
   });
 
   return (
-    <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '8px', overflow: 'hidden' }}>
+    <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '8px', overflow: 'visible' }}>
       {/* Card header */}
-      <div style={{
-        padding: '10px 16px',
-        borderBottom: `0.5px solid ${T.border}`,
-        background: T.bg3,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-      }}>
+      <div
+        onClick={() => setCollapsed(c => !c)}
+        style={{
+          padding: '10px 16px',
+          borderBottom: `0.5px solid ${T.border}`,
+          background: T.bg3,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer',
+          userSelect: 'none',
+          minHeight: '44px',
+        }}>
         <span style={{ fontSize: F.md }}>📋</span>
         <span style={{ fontSize: F.sm, fontWeight: '700', color: T.text1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Lease Watch
@@ -157,7 +163,7 @@ export default function LeaseWatchDrafts({ compact = false }) {
           {loading ? '…' : pendingDrafts.length}
         </span>
         <button
-          onClick={handleRun}
+          onClick={e => { e.stopPropagation(); handleRun(); }}
           disabled={running}
           style={{
             marginLeft: 'auto',
@@ -175,27 +181,36 @@ export default function LeaseWatchDrafts({ compact = false }) {
         >
           {running ? 'Running…' : 'Run Lease Watch'}
         </button>
+        <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0, marginLeft: '8px' }}>
+          {collapsed ? '▶' : '▼'}
+        </span>
       </div>
 
       {/* Body */}
-      {loading && (
-        <div style={{ padding: '16px', fontSize: F.sm, color: T.text2, textAlign: 'center' }}>Loading…</div>
-      )}
-      {error && !loading && (
-        <div style={{ padding: '12px 16px', fontSize: F.sm, color: T.danger }}>{error}</div>
-      )}
-      {!loading && !error && sortedDrafts.length === 0 && (
-        <div style={{ padding: '16px', fontSize: F.sm, color: T.text3, textAlign: 'center' }}>
-          No pending lease notices
-        </div>
-      )}
-      {!loading && sortedDrafts.length > 0 && sortedDrafts.map(d => (
-        <DraftRow key={`${d.tenant_id}:${d.milestone}`} draft={d} />
-      ))}
-      {!compact && (
-        <div style={{ padding: '10px 16px', fontSize: F.xs, color: T.text3, borderTop: sortedDrafts.length > 0 ? `0.5px solid ${T.border}` : 'none' }}>
-          Full draft editor available in tenant record (coming in Phase 5).
-        </div>
+      {!collapsed && (
+        <>
+          {loading && (
+            <div style={{ padding: '16px', fontSize: F.sm, color: T.text2, textAlign: 'center' }}>Loading…</div>
+          )}
+          {error && !loading && (
+            <div style={{ padding: '12px 16px', fontSize: F.sm, color: T.danger }}>{error}</div>
+          )}
+          {!loading && !error && sortedDrafts.length === 0 && (
+            <div style={{ padding: '16px', fontSize: F.sm, color: T.text3, textAlign: 'center' }}>
+              No pending lease notices
+            </div>
+          )}
+          <div style={{ maxHeight: '320px', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            {!loading && sortedDrafts.length > 0 && sortedDrafts.map(d => (
+              <DraftRow key={`${d.tenant_id}:${d.milestone}`} draft={d} />
+            ))}
+          </div>
+          {!compact && (
+            <div style={{ padding: '10px 16px', fontSize: F.xs, color: T.text3, borderTop: sortedDrafts.length > 0 ? `0.5px solid ${T.border}` : 'none' }}>
+              Full draft editor available in tenant record (coming in Phase 5).
+            </div>
+          )}
+        </>
       )}
     </div>
   );
