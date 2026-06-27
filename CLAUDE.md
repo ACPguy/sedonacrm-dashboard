@@ -128,9 +128,10 @@ lib/
   supabaseServer.js      — createServerClient() using SUPABASE_SERVICE_ROLE_KEY
 
 pages/api/agents/
-  morning-briefing.js — GET today's briefing; POST runs 14 parallel queries, saves to briefings table
-  lease-watch.js      — GET active drafts; POST iterates tenants, calls Claude API, saves drafts
-  new-inquiry.js      — GET active drafts; POST keyword filter → Claude draft → pipeline insert → thread link; dismiss action
+  morning-briefing.js  — GET today's briefing; POST runs 14 parallel queries, saves to briefings table
+  lease-watch.js       — GET active drafts; POST iterates tenants, calls Claude API, saves drafts
+  new-inquiry.js       — GET active drafts; POST keyword filter → Claude draft → pipeline insert → thread link; dismiss action
+  work-order-agent.js  — GET today's wo_agent_runs row; POST nudges (past-due + no-activity) + high-cost flags (≥$2,500)
 
 pages/api/gmail/
   renew-watch.js      — POST renews Gmail Pub/Sub watch; cron every 6 days
@@ -145,7 +146,8 @@ pages/api/gmail/
   - Agent 1 Lease Watch: Complete (cron `0 13 * * *` = 6am AZ)
   - Agent 3 New Inquiry: Complete (cron `0 15,17,19,21,23,1 * * *` = 8am–6pm AZ, 6x/day)
   - Gmail Watch Auto-Renewal: Complete (cron `0 11 */6 * *` = every 6 days; renewed 2026-06-26, expires 2026-07-03)
-  - Remaining Phase 4: Agents 4, 9
+  - Agent 4 Work Order Agent: API complete (`/api/agents/work-order-agent`) — nudges + high-cost flags; pending: migration SQL, UI card, cron
+  - Remaining Phase 4: Agent 9
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -158,18 +160,27 @@ pages/api/gmail/
 
 ## Next Priorities
 
-1. Agent 4 (Work Order agent — auto Drive folder on WO creation)
-2. Phase 5 — Leasing Pipeline
+1. Run `wo_agent_runs` migration SQL in psql (SQL at bottom of `pages/api/agents/work-order-agent.js`)
+2. Add `wo_agent_runs` to Supabase anon SELECT grants
+3. Wire WorkOrderAgentDrafts UI card into BriefingView (nudge + high-cost items)
+4. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
+5. S&G Drive folder ID — Scott to supply (needed before sg_task Drive folders work)
+6. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
-- main: merged from preview 2026-06-27
+- main: merged from preview 2026-06-27 (session close)
 - preview: in sync with main
 
 ## Session Log — 2026-06-27
 
-- Deleted pages/api/gmail/debug-sync.js (temporary no-auth diagnostic endpoint)
-- HomeView: removed stats strip (Active Properties / Suites / Active Tenants / Open Work Orders stat cards + useState + useEffect)
+- Deleted `pages/api/gmail/debug-sync.js` (temporary no-auth diagnostic endpoint)
+- HomeView: removed stats strip (four stat cards + useState + useEffect)
+- BriefingView: refactored into 5 collapsible agent sections (Lease Watch / Work Orders / Tasks / Insurance / FYI); added `propCode` prop for property detail embed; `useWindowWidth` mobile pass; localStorage collapse state per context
+- LeaseWatchDrafts: collapsible header, scrollable draft rows (max 320px), `stopPropagation` on Run button
+- NewInquiryDrafts: same collapsible + scrollable pattern
+- Drive folder name now date-first: `2026-06-27 — CR1-3685 — title`; removed work_order-only restriction; auto-creates Drive folder on task save (fire-and-forget)
+- Agent 4 Work Order Agent: `pages/api/agents/work-order-agent.js` — nudge items (past-due by priority tier + no-activity 14d) + high-cost flags (≥$2,500); stores to `wo_agent_runs` table (needs migration)
 
 ---
 
@@ -304,6 +315,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `briefings`: run_date (UNIQUE), status, urgent/attention/fyi/snapshot (jsonb)
 - `lease_watch_drafts`: tenant_id + milestone (UNIQUE pair), subject, body, status
 - `inquiry_drafts`: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status
+- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ⚠️ migration SQL pending (see bottom of work-order-agent.js)
 
 ## Drive Folder Architecture (permanent)
 
