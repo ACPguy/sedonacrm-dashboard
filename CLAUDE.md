@@ -146,8 +146,14 @@ pages/api/gmail/
   - Agent 1 Lease Watch: Complete (cron `0 13 * * *` = 6am AZ)
   - Agent 3 New Inquiry: Complete (cron `0 15,17,19,21,23,1 * * *` = 8am–6pm AZ, 6x/day)
   - Gmail Watch Auto-Renewal: Complete (cron `0 11 */6 * *` = every 6 days; renewed 2026-06-26, expires 2026-07-03)
-  - Agent 4 Work Order Agent: API complete (`/api/agents/work-order-agent`) — nudges + high-cost flags; pending: migration SQL, UI card, cron
+  - Agent 4 Work Order Agent: API complete (`/api/agents/work-order-agent`) — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; pending: migration SQL, UI card, cron
   - Remaining Phase 4: Agent 9
+- **Phase 4 Supporting work (2026-06-26):**
+  - BriefingView refactored: 5 collapsible agent sections, `propCode` prop for property-scoped embed, mobile pass, `embedded` prop restored to signature after merge conflict stranded it
+  - Drive folders: date-first naming (`YYYY-MM-DD — ID — title`), auto-create on save for ALL task types (not just work_order)
+  - LeaseWatchDrafts + NewInquiryDrafts: collapsible headers + scrollable bodies (max 320px)
+  - HomeView stats strip removed (4-card grid + useState + useEffect deleted)
+  - Vercel upgraded to Pro plan — 1,000 function limit, no consolidation needed
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -158,29 +164,39 @@ pages/api/gmail/
 
 - Vercel Pro: $20/mo | Claude API: ~$10–15/mo | Supabase: $0 | Total: ~$30–35/mo
 
+## Known Gaps
+
+- **PENDING: `wo_agent_runs` migration SQL** — must run before Agent 4 UI works:
+  ```sql
+  CREATE TABLE IF NOT EXISTS wo_agent_runs (
+    id uuid default gen_random_uuid() primary key,
+    run_date date not null unique,
+    status text not null default 'none',
+    nudge_items jsonb default '[]',
+    high_cost_items jsonb default '[]',
+    updated_at timestamptz default now()
+  );
+  ALTER TABLE wo_agent_runs ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "anon_select" ON wo_agent_runs FOR SELECT TO anon USING (true);
+  ```
+- **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
+- **PENDING: WorkOrderAgentDrafts UI card** — wire nudge + high-cost items into BriefingView after migration SQL runs
+- **PENDING: BriefingView propCode embed** — wire `<BriefingView propCode={data.prop_code} />` into Property detail Operations tab
+
 ## Next Priorities
 
-1. Run `wo_agent_runs` migration SQL in psql (SQL at bottom of `pages/api/agents/work-order-agent.js`)
-2. Add `wo_agent_runs` to Supabase anon SELECT grants
-3. Wire WorkOrderAgentDrafts UI card into BriefingView (nudge + high-cost items)
+1. **SESSION START FIXES (do these first):**
+   - a. All collapsible sections default to CLOSED — change `defaultOpen` logic in `BriefingView.jsx`: current logic opens sections that have urgent items; change to ALL sections closed by default (`sections.map(s => [s.key, false])`). localStorage still saves user preference after first interaction.
+   - b. New Leasing Inquiries "Approve" button — open EmailCompose pre-populated with `draft.prospect_email`, `draft.subject`, `draft.body`; currently `onClick={() => {}}` (stub)
+2. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
+3. Wire WorkOrderAgentDrafts UI card into BriefingView
 4. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-5. S&G Drive folder ID — Scott to supply (needed before sg_task Drive folders work)
-6. Phase 5: Leasing Pipeline
+5. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
-- main: merged from preview 2026-06-27 (session close)
+- main: `13a152a` — fix: restore embedded prop to BriefingView signature
 - preview: in sync with main
-
-## Session Log — 2026-06-27
-
-- Deleted `pages/api/gmail/debug-sync.js` (temporary no-auth diagnostic endpoint)
-- HomeView: removed stats strip (four stat cards + useState + useEffect)
-- BriefingView: refactored into 5 collapsible agent sections (Lease Watch / Work Orders / Tasks / Insurance / FYI); added `propCode` prop for property detail embed; `useWindowWidth` mobile pass; localStorage collapse state per context
-- LeaseWatchDrafts: collapsible header, scrollable draft rows (max 320px), `stopPropagation` on Run button
-- NewInquiryDrafts: same collapsible + scrollable pattern
-- Drive folder name now date-first: `2026-06-27 — CR1-3685 — title`; removed work_order-only restriction; auto-creates Drive folder on task save (fire-and-forget)
-- Agent 4 Work Order Agent: `pages/api/agents/work-order-agent.js` — nudge items (past-due by priority tier + no-activity 14d) + high-cost flags (≥$2,500); stores to `wo_agent_runs` table (needs migration)
 
 ---
 
@@ -319,9 +335,9 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 
 ## Drive Folder Architecture (permanent)
 
-- Trigger: manual `+ Drive Folder` button in WO header
-- Structure: `[Property Root]/Work History/[displayId] — [title] — [YYYY-MM-DD]/`
-- Hardcoded in `lib/drivePropertyFolders.js` (14 active properties)
+- Trigger: auto-created on task save (fire-and-forget) for ALL record types; also manual `+ Drive Folder` button in WO header
+- Structure: `[Property Root]/Work History/[YYYY-MM-DD] — [displayId] — [title]/`
+- Hardcoded in `lib/drivePropertyFolders.js` (14 active properties; S&G folder ID pending)
 - Index PDF upload silently failing (pdf-lib issue) — independent of folder creation
 
 ## Embedded TasksView Architecture (permanent)
