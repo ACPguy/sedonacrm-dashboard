@@ -23,5 +23,14 @@ export default async function handler(req, res) {
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  // Fire-and-forget Drive folder creation (never blocks response)
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://crm.andersoncp.com';
+  fetch(`${baseUrl}/api/tasks/create-drive-folder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskId: data.id }),
+  }).catch(err => console.error('[create] drive folder fire-and-forget failed:', err.message));
+
   return res.status(200).json({ id: data.id, task_num: data.task_num });
 }

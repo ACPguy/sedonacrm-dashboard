@@ -18,7 +18,6 @@ export default async function handler(req, res) {
       .single();
 
     if (taskErr || !task) return res.status(404).json({ error: 'Task not found' });
-    if (task.record_type !== 'work_order') return res.status(400).json({ error: 'Task is not a work_order' });
     if (task.drive_folder_id) {
       const url = `https://drive.google.com/drive/folders/${task.drive_folder_id}`;
       return res.status(200).json({ folderId: task.drive_folder_id, folderUrl: url, alreadyExisted: true });
@@ -46,9 +45,9 @@ export default async function handler(req, res) {
     const displayId = propCode ? `${propCode}-${task.task_num}` : String(task.task_num);
     const titlePart = task.title ? ` — ${task.title.substring(0, 50)}` : '';
     const datePart = task.created_at
-      ? ` — ${new Date(task.created_at).toISOString().split('T')[0]}`
-      : ` — ${new Date().toISOString().split('T')[0]}`;
-    const folderName = `${displayId}${titlePart}${datePart}`;
+      ? new Date(task.created_at).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0];
+    const folderName = `${datePart} — ${displayId}${titlePart}`;
 
     const newFolderId = await createTaskFolder(drive, workHistoryFolderId, folderName);
     const folderUrl = `https://drive.google.com/drive/folders/${newFolderId}`;
