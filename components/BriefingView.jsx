@@ -130,7 +130,7 @@ function StatPill({ label, value }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function BriefingView({ propCode }) {
+export default function BriefingView({ propCode, embedded }) {
   const w = useWindowWidth();
   const isMobile = w < 640;
 
