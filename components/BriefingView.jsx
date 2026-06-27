@@ -13,6 +13,16 @@ const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' }
 
 const BRIEFING_SECRET = process.env.NEXT_PUBLIC_BRIEFING_SECRET || '';
 
+function useWindowWidth() {
+  const [w, setW] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  useEffect(() => {
+    const h = () => setW(window.innerWidth);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, []);
+  return w;
+}
+
 async function runBriefing() {
   const res = await fetch('/api/agents/morning-briefing', {
     method: 'POST',
@@ -39,54 +49,80 @@ function getAZDateStr() {
   return azTime.toISOString().slice(0, 10);
 }
 
-// ── Section card ──────────────────────────────────────────────────────────────
-function SectionCard({ emoji, title, items, color }) {
-  return (
-    <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '8px', overflow: 'hidden', flex: 1, minWidth: 0 }}>
-      <div style={{ padding: '10px 16px', borderBottom: `0.5px solid ${T.border}`, background: T.bg3, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ fontSize: F.md }}>{emoji}</span>
-        <span style={{ fontSize: F.sm, fontWeight: '700', color: color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</span>
-        <span style={{ fontSize: F.xs, background: T.bg2, color: T.text1, padding: '1px 7px', borderRadius: '10px', fontWeight: '600', marginLeft: 'auto' }}>
-          {items.length}
-        </span>
-      </div>
-      <div>
-        {items.length === 0 ? (
-          <div style={{ padding: '16px', fontSize: F.sm, color: T.text2, textAlign: 'center' }}>Nothing to report</div>
-        ) : (
-          items.map((item, i) => <BriefingItem key={i} item={item} />)
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ── Briefing item row ─────────────────────────────────────────────────────────
-function BriefingItem({ item }) {
+function BriefingItem({ item, isMobile }) {
   const [hov, setHov] = useState(false);
   const inner = (
     <div
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', borderBottom: `0.5px solid ${T.border}`, gap: '12px', background: hov ? T.bg3 : 'transparent', transition: 'background 0.1s', cursor: item.url ? 'pointer' : 'default' }}
+      style={{
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        justifyContent: 'space-between',
+        padding: '8px 16px',
+        borderBottom: `0.5px solid ${T.border}`,
+        gap: isMobile ? '2px' : '12px',
+        background: hov ? T.bg3 : 'transparent',
+        transition: 'background 0.1s',
+        cursor: item.url ? 'pointer' : 'default',
+      }}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}>
-      <span style={{ fontSize: F.sm, color: T.text0, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{item.label}</span>
-      {item.meta && <span style={{ fontSize: F.xs, color: T.text2, whiteSpace: 'nowrap', flexShrink: 0 }}>{item.meta}</span>}
+      <span style={{ fontSize: F.sm, color: T.text0, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: isMobile ? 'normal' : 'nowrap', flex: 1 }}>
+        {item.label}
+      </span>
+      {item.meta && (
+        <span style={{ fontSize: F.xs, color: T.text2, whiteSpace: 'nowrap', flexShrink: 0 }}>{item.meta}</span>
+      )}
     </div>
   );
   if (item.url) {
-    return (
-      <a href={item.url} style={{ display: 'block', textDecoration: 'none' }}>
-        {inner}
-      </a>
-    );
+    return <a href={item.url} style={{ display: 'block', textDecoration: 'none' }}>{inner}</a>;
   }
   return inner;
+}
+
+// ── Collapsible section ───────────────────────────────────────────────────────
+function CollapsibleSection({ dotColor, title, items, open, onToggle, isMobile }) {
+  if (items.length === 0) return null;
+  return (
+    <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '8px', overflow: 'hidden', marginBottom: '8px' }}>
+      <div
+        onClick={onToggle}
+        style={{
+          padding: '10px 16px',
+          borderBottom: open ? `0.5px solid ${T.border}` : 'none',
+          background: T.bg3,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer',
+          userSelect: 'none',
+          minHeight: '44px',
+        }}>
+        <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
+        <span style={{ fontSize: F.sm, fontWeight: '700', color: T.text0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {title}
+        </span>
+        <span style={{ fontSize: F.xs, background: T.bg2, color: T.text1, padding: '1px 7px', borderRadius: '10px', fontWeight: '600', flexShrink: 0 }}>
+          {items.length}
+        </span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0 }}>{open ? '▼' : '▶'}</span>
+      </div>
+      {open && (
+        <div>
+          {items.map((item, i) => <BriefingItem key={i} item={item} isMobile={isMobile} />)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Snapshot stat pill ────────────────────────────────────────────────────────
 function StatPill({ label, value }) {
   return (
-    <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '6px', padding: '8px 16px', textAlign: 'center', minWidth: '120px' }}>
+    <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '6px', padding: '8px 16px', textAlign: 'center', minWidth: '120px', flexShrink: 0 }}>
       <div style={{ fontSize: F.xl, fontWeight: '700', color: T.text0 }}>{value}</div>
       <div style={{ fontSize: F.xs, color: T.text2, marginTop: '2px' }}>{label}</div>
     </div>
@@ -94,12 +130,31 @@ function StatPill({ label, value }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function BriefingView({ embedded = false }) {
-  const [briefing, setBriefing] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [fetchError, setFetchError] = useState(null);
+export default function BriefingView({ propCode }) {
+  const w = useWindowWidth();
+  const isMobile = w < 640;
+
+  const [briefing, setBriefing]       = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [running, setRunning]         = useState(false);
+  const [fetchError, setFetchError]   = useState(null);
+  const [openSections, setOpenSections] = useState(null);
   const pollRef = useRef(null);
+
+  const lsKey = `briefing_sections_${propCode || 'home'}`;
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(lsKey);
+      if (stored) setOpenSections(JSON.parse(stored));
+    } catch {}
+  }, [lsKey]);
+
+  useEffect(() => {
+    if (openSections !== null) {
+      try { localStorage.setItem(lsKey, JSON.stringify(openSections)); } catch {}
+    }
+  }, [openSections, lsKey]);
 
   const fetchBriefing = async () => {
     try {
@@ -114,11 +169,8 @@ export default function BriefingView({ embedded = false }) {
     }
   };
 
-  useEffect(() => {
-    fetchBriefing();
-  }, []);
+  useEffect(() => { fetchBriefing(); }, []);
 
-  // Poll when status=running
   useEffect(() => {
     if (briefing?.status === 'running') {
       pollRef.current = setInterval(async () => {
@@ -144,13 +196,52 @@ export default function BriefingView({ embedded = false }) {
     }
   };
 
-  const todayStr = getAZDateStr();
+  const todayStr       = getAZDateStr();
   const todayFormatted = formatDate(todayStr);
 
+  // Tag items with source array so dot-color and default-open logic can use it
   const urgent    = briefing?.urgent    || [];
   const attention = briefing?.attention || [];
   const fyi       = briefing?.fyi       || [];
   const snapshot  = briefing?.snapshot  || {};
+
+  const urgentTagged    = urgent.map(i => ({ ...i, _src: 'urgent' }));
+  const attentionTagged = attention.map(i => ({ ...i, _src: 'attention' }));
+  const allActionable   = [...urgentTagged, ...attentionTagged];
+
+  const filterFn = propCode
+    ? (item) => item.meta?.includes(propCode)
+    : () => true;
+
+  const leaseItems     = allActionable.filter(i => i.type === 'lease' && filterFn(i));
+  const woItems        = allActionable.filter(i => i.type === 'task' && i.label?.includes('WO') && filterFn(i));
+  const taskItems      = allActionable.filter(i => i.type === 'task' && !i.label?.includes('WO') && filterFn(i));
+  const insuranceItems = allActionable.filter(i => (i.type === 'coi' || i.type === 'property_insurance') && filterFn(i));
+  const fyiItems       = fyi.filter(filterFn);
+
+  const dotColor = (items) => {
+    if (items.some(i => i._src === 'urgent'))    return T.danger;
+    if (items.some(i => i._src === 'attention')) return T.warn;
+    return T.success;
+  };
+
+  const sections = [
+    { key: 'lease',     title: 'Lease Watch', items: leaseItems,     color: dotColor(leaseItems) },
+    { key: 'wo',        title: 'Work Orders',  items: woItems,        color: dotColor(woItems) },
+    { key: 'tasks',     title: 'Tasks',        items: taskItems,      color: dotColor(taskItems) },
+    { key: 'insurance', title: 'Insurance',    items: insuranceItems, color: dotColor(insuranceItems) },
+    { key: 'fyi',       title: 'FYI',          items: fyiItems,       color: T.success },
+  ];
+
+  // Default: open if section has any urgent items; otherwise closed
+  const defaultOpen = Object.fromEntries(
+    sections.map(s => [s.key, s.items.some(i => i._src === 'urgent')])
+  );
+  const resolvedOpen = openSections ?? defaultOpen;
+
+  const toggleSection = (key) => {
+    setOpenSections({ ...resolvedOpen, [key]: !resolvedOpen[key] });
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', ...(embedded ? {} : { height: '100%', overflow: 'auto' }), background: T.bg1 }}>
@@ -161,7 +252,9 @@ export default function BriefingView({ embedded = false }) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Sun size={22} weight="fill" style={{ color: '#d4924a', flexShrink: 0 }} />
-              <span style={{ fontSize: F.lg, fontWeight: '700', color: T.text0 }}>Morning Briefing</span>
+              <span style={{ fontSize: propCode ? F.base : F.lg, fontWeight: '700', color: T.text0 }}>
+                {propCode ? `Property Briefing — ${propCode}` : 'Morning Briefing'}
+              </span>
             </div>
             <div style={{ fontSize: F.sm, color: T.text2, marginTop: '2px', paddingLeft: '32px' }}>{todayFormatted}</div>
             {briefing?.updated_at && briefing.status === 'complete' && (
@@ -170,12 +263,14 @@ export default function BriefingView({ embedded = false }) {
               </div>
             )}
           </div>
-          <button
-            onClick={handleRunNow}
-            disabled={running}
-            style={{ background: running ? T.bg3 : '#E8630A', border: 'none', borderRadius: '5px', padding: '7px 18px', color: '#fff', fontSize: F.sm, fontWeight: '600', cursor: running ? 'not-allowed' : 'pointer', flexShrink: 0, opacity: running ? 0.7 : 1 }}>
-            {running ? 'Running…' : 'Run Now'}
-          </button>
+          {!propCode && (
+            <button
+              onClick={handleRunNow}
+              disabled={running}
+              style={{ background: running ? T.bg3 : '#E8630A', border: 'none', borderRadius: '5px', padding: '7px 18px', color: '#fff', fontSize: F.sm, fontWeight: '600', cursor: running ? 'not-allowed' : 'pointer', flexShrink: 0, opacity: running ? 0.7 : 1, minHeight: '44px' }}>
+              {running ? 'Running…' : 'Run Now'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -213,24 +308,42 @@ export default function BriefingView({ embedded = false }) {
 
         {!loading && briefing?.status === 'complete' && (
           <>
-            <LeaseWatchDrafts compact={true} />
-            <NewInquiryDrafts />
+            {/* Draft agent cards — portfolio home only */}
+            {!propCode && <LeaseWatchDrafts compact={true} />}
+            {!propCode && <NewInquiryDrafts />}
 
-            {/* Three section cards — Urgent, Attention, FYI */}
-            <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <SectionCard emoji="🔴" title="Urgent" items={urgent}    color={T.danger} />
-              <SectionCard emoji="🟡" title="Attention" items={attention} color={T.warn}   />
-              <SectionCard emoji="🟢" title="FYI"    items={fyi}       color={T.success} />
+            {/* Collapsible agent sections */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {sections.map(sec => (
+                <CollapsibleSection
+                  key={sec.key}
+                  dotColor={sec.color}
+                  title={sec.title}
+                  items={sec.items}
+                  open={!!resolvedOpen[sec.key]}
+                  onToggle={() => toggleSection(sec.key)}
+                  isMobile={isMobile}
+                />
+              ))}
             </div>
 
-            {/* Snapshot bar */}
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <StatPill label="Active Properties" value={snapshot.activePropertiesCount ?? '—'} />
-              <StatPill label="Active Tenants"    value={snapshot.activeTenantsCount ?? '—'} />
-              <StatPill label="Open Tasks"        value={snapshot.openTasksCount ?? '—'} />
-              <StatPill label="Urgent Items"      value={snapshot.urgentCount ?? 0} />
-              <StatPill label="Attention Items"   value={snapshot.attentionCount ?? 0} />
-            </div>
+            {/* Portfolio snapshot strip — home view only */}
+            {!propCode && (
+              <div style={{
+                display: 'flex',
+                gap: '10px',
+                overflowX: isMobile ? 'auto' : 'visible',
+                flexWrap: isMobile ? 'nowrap' : 'wrap',
+                WebkitOverflowScrolling: 'touch',
+                paddingBottom: isMobile ? '4px' : '0',
+              }}>
+                <StatPill label="Active Properties" value={snapshot.activePropertiesCount ?? '—'} />
+                <StatPill label="Active Tenants"    value={snapshot.activeTenantsCount ?? '—'} />
+                <StatPill label="Open Tasks"        value={snapshot.openTasksCount ?? '—'} />
+                <StatPill label="Urgent Items"      value={snapshot.urgentCount ?? 0} />
+                <StatPill label="Attention Items"   value={snapshot.attentionCount ?? 0} />
+              </div>
+            )}
           </>
         )}
       </div>
