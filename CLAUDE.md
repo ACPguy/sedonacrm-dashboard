@@ -195,7 +195,7 @@ pages/api/gmail/
 
 ## Current Git State
 
-- main: `13a152a` — fix: restore embedded prop to BriefingView signature
+- main: `060c483` — CLAUDE.md update after 2026-06-26 session
 - preview: in sync with main
 
 ---
