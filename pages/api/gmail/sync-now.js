@@ -4,66 +4,89 @@ import { getGmailClient } from '../../../lib/gmail';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  // Return 200 immediately — Pub/Sub requires fast acknowledgement
-  res.status(200).end();
-
   try {
-    await processWebhook(req.body);
-  } catch (err) {
-    console.error('[gmail/webhook] processing error:', err);
-  }
-}
+    const sb = createServerClient();
 
-async function processWebhook(body) {
-  const raw = body?.message?.data;
-  if (!raw) return;
+    const { data: account, error: accErr } = await sb
+      .from('email_accounts')
+      .select('*')
+      .eq('is_active', true)
+      .single();
 
-  const data = JSON.parse(Buffer.from(raw, 'base64').toString());
-  const { emailAddress, historyId } = data;
-
-  if (!emailAddress) return;
-
-  const sb = createServerClient();
-
-  const { data: account } = await sb
-    .from('email_accounts')
-    .select('*')
-    .eq('email', emailAddress)
-    .eq('is_active', true)
-    .single();
-
-  if (!account) return;
-
-  const gmailClient = await getGmailClient(account.id);
-
-  const startHistoryId = account.pubsub_history_id?.toString();
-  if (!startHistoryId) {
-    await sb.from('email_accounts').update({
-      pubsub_history_id: parseInt(historyId),
-    }).eq('id', account.id);
-    return;
-  }
-
-  const historyRes = await gmailClient.users.history.list({
-    userId: 'me',
-    startHistoryId,
-    historyTypes: ['messageAdded'],
-  });
-
-  const historyItems = historyRes.data.history || [];
-
-  for (const item of historyItems) {
-    for (const msg of (item.messagesAdded || [])) {
-      await processNewMessage(gmailClient, sb, account, msg.message.id);
+    if (accErr || !account) {
+      return res.status(400).json({ error: 'No active email account found' });
     }
-  }
 
-  await sb.from('email_accounts').update({
-    pubsub_history_id: parseInt(historyId),
-  }).eq('id', account.id);
+    const gmailClient = await getGmailClient(account.id);
+
+    const startHistoryId = account.pubsub_history_id?.toString();
+    if (!startHistoryId) {
+      return res.status(200).json({ synced: 0, message: 'No history ID — nothing to sync' });
+    }
+
+    // Fetch history since last known historyId
+    let historyRes;
+    try {
+      historyRes = await gmailClient.users.history.list({
+        userId: 'me',
+        startHistoryId,
+        historyTypes: ['messageAdded'],
+      });
+    } catch (err) {
+      // historyId too old — update to current and return
+      const profileRes = await gmailClient.users.getProfile({ userId: 'me' });
+      await sb.from('email_accounts')
+        .update({ pubsub_history_id: parseInt(profileRes.data.historyId) })
+        .eq('id', account.id);
+      return res.status(200).json({ synced: 0, message: 'History expired — reset to current' });
+    }
+
+    const historyItems = historyRes.data.history || [];
+    const newHistoryId = historyRes.data.historyId;
+
+    let synced = 0;
+    for (const item of historyItems) {
+      for (const msg of (item.messagesAdded || [])) {
+        await processNewMessage(gmailClient, sb, account, msg.message.id);
+        synced++;
+      }
+    }
+
+    // Update history cursor
+    if (newHistoryId) {
+      await sb.from('email_accounts')
+        .update({ pubsub_history_id: parseInt(newHistoryId) })
+        .eq('id', account.id);
+    }
+
+    // Always poll inbox directly to catch any messages missed by history
+    const listRes = await gmailClient.users.messages.list({
+      userId: 'me',
+      labelIds: ['INBOX'],
+      maxResults: 50,
+    });
+    for (const m of (listRes.data.messages || [])) {
+      const { data: exists } = await sb
+        .from('email_messages')
+        .select('id')
+        .eq('gmail_message_id', m.id)
+        .maybeSingle();
+      if (!exists) {
+        await processNewMessage(gmailClient, sb, account, m.id);
+        synced++;
+      }
+    }
+
+    return res.status(200).json({ synced, message: `Synced ${synced} new message(s)` });
+
+  } catch (err) {
+    console.error('[sync-now] error:', err);
+    return res.status(500).json({ error: err.message });
+  }
 }
 
 async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
+  // Skip if already in DB
   const { data: existing } = await sb
     .from('email_messages')
     .select('id')
@@ -109,7 +132,6 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
       .select('id')
       .ilike('email', fromAddress)
       .single();
-
     if (contact) {
       linkedRecordType = 'contact';
       linkedRecordId = contact.id;
@@ -165,16 +187,19 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
   let bodyText = null;
   let bodyStored = false;
 
-  const fullMsg = await gmailClient.users.messages.get({
-    userId: 'me',
-    id: gmailMessageId,
-    format: 'full',
-  });
-
-  const { html, text } = extractBody(fullMsg.data.payload);
-  bodyHtml = html;
-  bodyText = text;
-  bodyStored = true;
+  try {
+    const fullMsg = await gmailClient.users.messages.get({
+      userId: 'me',
+      id: gmailMessageId,
+      format: 'full',
+    });
+    const { html, text } = extractBody(fullMsg.data.payload);
+    bodyHtml = html;
+    bodyText = text;
+    bodyStored = true;
+  } catch (err) {
+    console.log(`[sync-now] body fetch failed for ${gmailMessageId}:`, err?.message);
+  }
 
   const { data: msgRow } = await sb.from('email_messages').insert({
     gmail_message_id: gmailMessageId,
@@ -224,43 +249,6 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
       from_name: fromName,
       entry_at: new Date(parseInt(msg.internalDate)).toISOString(),
     });
-
-    if (linkedRecordType !== 'contact') {
-      const lookupEmail = isOutbound ? parseFirstEmail(headers['to']) : fromAddress;
-      const { data: contactMatch } = await sb
-        .from('contacts')
-        .select('id')
-        .ilike('email', lookupEmail)
-        .single();
-
-      if (contactMatch) {
-        await sb.from('email_thread_links').upsert({
-          thread_id: threadRow.id,
-          record_type: 'contact',
-          record_id: contactMatch.id,
-          link_type: 'reference',
-        }, { onConflict: 'thread_id,record_type,record_id' });
-
-        await sb.from('communication_timeline').insert({
-          record_type: 'contact',
-          record_id: contactMatch.id,
-          entry_type: 'email',
-          email_message_id: msgRow.id,
-          email_thread_id: threadRow.id,
-          subject: headers['subject'] || '(no subject)',
-          body_preview: (msg.snippet || '').substring(0, 500),
-          direction: isOutbound ? 'outbound' : 'inbound',
-          from_address: fromAddress,
-          from_name: fromName,
-          is_reference: true,
-          reference_record_type: linkedRecordType,
-          reference_record_id: linkedRecordId,
-          reference_label: linkedRecordType + ' record',
-          reference_url: '/' + linkedRecordType + 's/' + linkedRecordId,
-          entry_at: new Date(parseInt(msg.internalDate)).toISOString(),
-        });
-      }
-    }
   }
 }
 
@@ -290,10 +278,4 @@ function parseAddressHeader(raw) {
     const m = a.trim().match(/^(.*?)\s*<(.+)>$/) || [null, a.trim(), a.trim()];
     return { name: m[1]?.trim() || '', email: (m[2] || a).trim().toLowerCase() };
   });
-}
-
-function parseFirstEmail(raw) {
-  if (!raw) return '';
-  const m = raw.trim().match(/<(.+)>/) || [null, raw.trim()];
-  return (m[1] || '').toLowerCase();
 }

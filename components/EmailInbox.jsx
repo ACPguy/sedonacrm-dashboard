@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { EnvelopeSimple, ArrowCounterClockwise, CheckCircle, Circle, Spinner, Robot, Archive, MagnifyingGlass } from '@phosphor-icons/react';
+import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, MagnifyingGlass } from '@phosphor-icons/react';
 import EmailCompose from './EmailCompose';
 
 const SUPABASE_URL  = 'https://edxcvyleielzevpappui.supabase.co';
@@ -59,10 +59,10 @@ const FilterPill = ({ label, active, onClick }) => (
   </button>
 );
 
-const ActionBtn = ({ label, icon, onClick, disabled, variant }) => {
+const ActionBtn = ({ label, icon, onClick, disabled, variant, color }) => {
   const base = variant === 'primary'
     ? { background:T.accent, border:`0.5px solid ${T.accent}`, color:'#fff' }
-    : { background:T.bg2, border:`0.5px solid ${T.border}`, color: disabled ? T.text3 : T.text0 };
+    : { background:T.bg2, border:`0.5px solid ${color || T.border}`, color: disabled ? T.text3 : (color || T.text0) };
   return (
     <button type="button" onClick={disabled ? undefined : onClick}
       onMouseEnter={e => { if (!disabled && variant !== 'primary') e.currentTarget.style.background = T.bg3; }}
@@ -188,9 +188,17 @@ const MessageRow = ({ msg, defaultExpanded }) => {
       {expanded && (
         <div style={{ padding:'12px 16px 16px 54px', background:T.bg2 }}>
           {msg.body_html ? (
-            <div
-              style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', maxWidth:'100%', overflowX:'auto', wordBreak:'break-word' }}
-              dangerouslySetInnerHTML={{ __html: msg.body_html }}
+            <iframe
+              srcDoc={msg.body_html}
+              style={{ width:'100%', border:'none', borderRadius:'6px', minHeight:'200px', background:'#ffffff' }}
+              scrolling="no"
+              title="email-body"
+              onLoad={e => {
+                try {
+                  const h = e.target.contentDocument.body.scrollHeight;
+                  e.target.style.height = (h + 32) + 'px';
+                } catch(_) {}
+              }}
             />
           ) : msg.body_text ? (
             <pre style={{ fontSize:F.sm, color:T.text0, lineHeight:'1.6', whiteSpace:'pre-wrap', fontFamily:'inherit', margin:0 }}>
@@ -208,7 +216,7 @@ const MessageRow = ({ msg, defaultExpanded }) => {
 };
 
 // ── Thread Detail Panel ────────────────────────────────────────────────────────
-const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThreadUpdate, onLink }) => {
+const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply, onThreadUpdate, onLink }) => {
   const [messages,     setMessages]     = useState([]);
   const [loadingMsgs,  setLoadingMsgs]  = useState(true);
   const [aiSummary,    setAiSummary]    = useState('');
@@ -377,6 +385,7 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onReply, onThrea
         <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', alignItems:'center' }}>
           <ActionBtn label="Reply" variant="primary" onClick={handleReply}/>
           <ActionBtn label="Archive" icon={<Archive size={13}/>} onClick={() => onArchive(thread.id)}/>
+          <ActionBtn label="Spam" icon={<span>🚫</span>} color={T.warn} onClick={() => onSpam(thread.id)}/>
           <ActionBtn
             label={thread.is_read ? 'Mark Unread' : 'Mark Read'}
             icon={thread.is_read ? <Circle size={13}/> : <CheckCircle size={13}/>}
@@ -533,7 +542,7 @@ export default function EmailInbox() {
   const [loading,        setLoading]        = useState(true);
   const [selectedThread, setSelectedThread] = useState(null);
   const [refreshKey,     setRefreshKey]     = useState(0);
-  const [inboxSearch,    setInboxSearch]    = useState('');
+  const [isSyncing,      setIsSyncing]      = useState(false);
 
   const buildQuery = useCallback((f) => {
     let params = `order=last_message_at.desc&limit=100&select=*`;
@@ -551,6 +560,19 @@ export default function EmailInbox() {
       .catch(() => setThreads([]))
       .finally(() => setLoading(false));
   }, [filter, refreshKey, buildQuery]);
+
+  const handleSyncNow = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await fetch('/api/gmail/sync-now', { method: 'POST' });
+    } catch (err) {
+      console.error('[sync-now]', err);
+    } finally {
+      setIsSyncing(false);
+      setRefreshKey(k => k + 1); // re-fetch from DB after sync
+    }
+  };
 
   const handleMarkRead = async (threadId, isRead) => {
     setThreads(ts => ts.map(t => t.id === threadId ? { ...t, is_read: isRead, unread_count: isRead ? 0 : t.unread_count } : t));
@@ -572,6 +594,16 @@ export default function EmailInbox() {
     }).catch(() => {});
   };
 
+  const handleSpam = async (threadId) => {
+    setThreads(ts => ts.filter(t => t.id !== threadId));
+    if (selectedThread?.id === threadId) setSelectedThread(null);
+    await fetch('/api/gmail/spam', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-briefing-secret': process.env.NEXT_PUBLIC_BRIEFING_SECRET },
+      body: JSON.stringify({ threadId }),
+    }).catch(() => {});
+  };
+
   const handleLink = (updates) => {
     if (!selectedThread) return;
     setSelectedThread(t => ({ ...t, ...updates }));
@@ -590,22 +622,6 @@ export default function EmailInbox() {
     }
   };
 
-  const filteredThreads = inboxSearch.trim().length < 2
-    ? threads
-    : (() => {
-        const q = inboxSearch.trim().toLowerCase();
-        const seen = new Set();
-        return threads.filter(t => {
-          if (seen.has(t.id)) return false;
-          seen.add(t.id);
-          return (
-            (t.subject || '').toLowerCase().includes(q) ||
-            (t.from_name || '').toLowerCase().includes(q) ||
-            (t.from_address || '').toLowerCase().includes(q) ||
-            (t.body_preview || '').toLowerCase().includes(q)
-          );
-        });
-      })();
 
   return (
     <div style={{ display:'flex', height:'100%', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden' }}>
@@ -619,46 +635,23 @@ export default function EmailInbox() {
               <EnvelopeSimple size={18} weight="bold" color={T.accent}/>
               <span style={{ fontSize:F.md, fontWeight:'700', color:T.text0 }}>Inbox</span>
             </div>
-            <button type="button"
-              onClick={() => setRefreshKey(k => k + 1)}
-              title="Refresh"
-              style={{ background:'transparent', border:'none', color:T.text2, cursor:'pointer', padding:'4px', borderRadius:'4px', display:'flex' }}
-              onMouseEnter={e => e.currentTarget.style.color=T.text0}
-              onMouseLeave={e => e.currentTarget.style.color=T.text2}>
-              <ArrowCounterClockwise size={16} weight="bold"/>
-            </button>
+              <button type="button"
+                onClick={handleSyncNow}
+                disabled={isSyncing}
+                title="Sync new mail from Gmail"
+                style={{ background:'transparent', border:`1px solid ${T.border}`, color: isSyncing ? T.text3 : T.accent, cursor: isSyncing ? 'not-allowed' : 'pointer', padding:'3px 8px', borderRadius:'4px', display:'flex', alignItems:'center', gap:'4px', fontSize:'11px', fontWeight:'600' }}
+                onMouseEnter={e => { if (!isSyncing) e.currentTarget.style.borderColor = T.accent; }}
+                onMouseLeave={e => { if (!isSyncing) e.currentTarget.style.borderColor = T.border; }}>
+                {isSyncing
+                  ? <><Spinner size={13} className="spin"/> <span>Syncing…</span></>
+                  : <span>Sync</span>
+                }
+              </button>
           </div>
           <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
             {FILTER_TABS.map(({ key, label }) => (
               <FilterPill key={key} label={label} active={filter === key} onClick={() => setFilter(key)}/>
             ))}
-          </div>
-          <div style={{ marginTop:'8px', position:'relative' }}>
-            <span style={{ position:'absolute', left:'8px', top:'50%', transform:'translateY(-50%)', pointerEvents:'none', display:'flex', alignItems:'center' }}>
-              <MagnifyingGlass size={13} weight="bold" color={T.text3}/>
-            </span>
-            <input
-              type="text"
-              value={inboxSearch}
-              onChange={e => setInboxSearch(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Escape') { setInboxSearch(''); e.target.blur(); } }}
-              placeholder="Search inbox…"
-              style={{
-                width:'100%', height:'28px', background:T.bg2,
-                border:`0.5px solid ${T.border}`, borderRadius:'5px',
-                padding:'4px 28px 4px 26px', color:T.text0,
-                fontSize:F.sm, outline:'none', boxSizing:'border-box',
-              }}
-              onFocus={e => e.target.style.borderColor = T.accent}
-              onBlur={e => e.target.style.borderColor = T.border}
-            />
-            {inboxSearch.length > 0 && (
-              <button
-                onClick={() => setInboxSearch('')}
-                style={{ position:'absolute', right:'6px', top:'50%', transform:'translateY(-50%)', background:'transparent', border:'none', color:T.text2, cursor:'pointer', fontSize:'14px', lineHeight:1, padding:'2px 4px' }}>
-                ×
-              </button>
-            )}
           </div>
         </div>
 
@@ -667,19 +660,17 @@ export default function EmailInbox() {
           {loading && (
             <div style={{ padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading…</div>
           )}
-          {!loading && filteredThreads.length === 0 && (
+          {!loading && threads.length === 0 && (
             <div style={{ padding:'40px 20px', textAlign:'center' }}>
               <div style={{ fontSize:'28px', color:T.bg3, marginBottom:'8px' }}>✉</div>
               <div style={{ fontSize:F.sm, color:T.text2 }}>
-                {inboxSearch.trim().length >= 2
-                  ? `No results for "${inboxSearch.trim()}"`
-                  : filter === 'unread' ? 'No unread messages.'
+                {filter === 'unread' ? 'No unread messages.'
                   : filter === 'flagged' ? 'No flagged messages.'
                   : 'No messages found.'}
               </div>
             </div>
           )}
-          {!loading && filteredThreads.map(thread => (
+          {!loading && threads.map(thread => (
             <ThreadListItem
               key={thread.id}
               thread={thread}
@@ -705,6 +696,7 @@ export default function EmailInbox() {
               thread={selectedThread}
               onMarkRead={handleMarkRead}
               onArchive={handleArchive}
+              onSpam={handleSpam}
               onReply={() => {}}
               onThreadUpdate={() => setRefreshKey(k => k + 1)}
               onLink={handleLink}
