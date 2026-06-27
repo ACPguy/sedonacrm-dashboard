@@ -1854,32 +1854,9 @@ const TenantsView = () => {
 
 // ── Home / Morning Briefing ───────────────────────────────────────────────────
 const HomeView = () => {
-  const [stats,setStats] = useState({properties:0,suites:0,tenants:0,workOrders:0});
-  useEffect(()=>{
-    sbFetch('properties','select=id&status=eq.active').then(d=>setStats(s=>({...s,properties:d.length}))).catch(()=>{});
-    sbFetch('suites','select=id').then(d=>setStats(s=>({...s,suites:d.length}))).catch(()=>{});
-    sbFetch('tenants','select=id&tenant_status=eq.Active').then(d=>setStats(s=>({...s,tenants:d.length}))).catch(()=>{});
-    sbFetch('work_orders','select=id&status=eq.Open').then(d=>setStats(s=>({...s,workOrders:d.length}))).catch(()=>{});
-  },[]);
   return (
     <div style={{padding:'20px',overflowY:'auto',height:'100%'}}>
       <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,marginBottom:'16px'}}>Good morning, Scott.</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:'12px',marginBottom:'20px'}}>
-        {[
-          ['Active Properties',stats.properties,T.accent,'ti-building-store'],
-          ['Suites',stats.suites,T.purple,'ti-door'],
-          ['Active Tenants',stats.tenants,T.success,'ti-users'],
-          ['Open Work Orders',stats.workOrders,stats.workOrders>10?T.warn:T.text1,'ti-tool'],
-        ].map(([label,val,color,icon])=>(
-          <div key={label} style={{...css.card,display:'flex',alignItems:'center',gap:'12px'}}>
-            <i className={`ti ${icon}`} style={{fontSize:'22px',color,flexShrink:0}} aria-hidden="true"></i>
-            <div>
-              <div style={{fontSize:F.xl,fontWeight:'700',color}}>{val}</div>
-              <div style={{fontSize:F.xs,color:T.text2,textTransform:'uppercase',letterSpacing:'0.05em'}}>{label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
       <div style={{display:'flex',gap:'12px',marginBottom:'20px',flexWrap:'wrap'}}>
         <WeatherCard city="Sedona AZ" lat={34.8697} lon={-111.7610} url="https://forecast.weather.gov/MapClick.php?CityName=Sedona&state=AZ"/>
         <WeatherCard city="Olympia WA" lat={47.0379} lon={-122.9007} url="https://forecast.weather.gov/MapClick.php?CityName=Olympia&state=WA"/>

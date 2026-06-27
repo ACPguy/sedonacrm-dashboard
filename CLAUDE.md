@@ -158,28 +158,18 @@ pages/api/gmail/
 
 ## Next Priorities
 
-1. Delete pages/api/gmail/debug-sync.js (temporary route — no auth)
-2. Merge preview → main
-3. Agent 4 (Work Order agent)
-4. Phase 5 — Leasing Pipeline
+1. Agent 4 (Work Order agent — auto Drive folder on WO creation)
+2. Phase 5 — Leasing Pipeline
 
 ## Current Git State
 
-- main: `ea48cd3` — (pre-session, not yet merged)
-- preview: `6a4acf6` — feat: Report Spam button
+- main: merged from preview 2026-06-27
+- preview: in sync with main
 
-## Session Log — 2026-06-26
+## Session Log — 2026-06-27
 
-- Removed inbox search box from EmailInbox.jsx (redundant with global search) — `c43af81`
-- Replaced `dangerouslySetInnerHTML` HTML email rendering with auto-sizing iframe (`srcdoc`) — `0e76e0f`
-- Verified Agent 3 (New Inquiry) end-to-end: agent runs correctly, auth works, keyword filter working, zero errors.
-- webhook.js: always fetch full email body for all incoming messages (removed linkStatus guard) — `826c595`
-- sync-now.js: always fetch full body + inbox poll now runs unconditionally (maxResults 50) + maybeSingle fix — `24c0e5a`, `d42e1be`, `6eaa0d6`
-- backfill-bodies.js: new POST endpoint (x-briefing-secret auth) backfills body for 50 messages per call — `6eaa0d6`
-- debug-sync.js: temporary no-auth GET diagnostic endpoint (backfill + inbox poll) — `65ba8fe` — DELETE NEXT SESSION
-- EmailInbox.jsx: white background on email iframe (`background:'#ffffff'`) — `4568d1c`
-- EmailInbox.jsx + spam.js: Report Spam button (orange, 🚫) — labels thread SPAM in Gmail, removes from inbox list — `6a4acf6`
-- Added Workflow Rule 7 (push immediately after every commit) — `0deb2f2`
+- Deleted pages/api/gmail/debug-sync.js (temporary no-auth diagnostic endpoint)
+- HomeView: removed stats strip (Active Properties / Suites / Active Tenants / Open Work Orders stat cards + useState + useEffect)
 
 ---
 
