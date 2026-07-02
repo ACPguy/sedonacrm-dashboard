@@ -213,7 +213,6 @@ export default function BriefingView({ propCode, embedded }) {
     ? (item) => item.meta?.includes(propCode)
     : () => true;
 
-  const leaseItems     = allActionable.filter(i => i.type === 'lease' && filterFn(i));
   const woItems        = allActionable.filter(i => i.type === 'task' && i.label?.includes('WO') && filterFn(i));
   const taskItems      = allActionable.filter(i => i.type === 'task' && !i.label?.includes('WO') && filterFn(i));
   const insuranceItems = allActionable.filter(i => (i.type === 'coi' || i.type === 'property_insurance') && filterFn(i));
@@ -226,7 +225,6 @@ export default function BriefingView({ propCode, embedded }) {
   };
 
   const sections = [
-    { key: 'lease',     title: 'Lease Watch', items: leaseItems,     color: dotColor(leaseItems) },
     { key: 'wo',        title: 'Work Orders',  items: woItems,        color: dotColor(woItems) },
     { key: 'tasks',     title: 'Tasks',        items: taskItems,      color: dotColor(taskItems) },
     { key: 'insurance', title: 'Insurance',    items: insuranceItems, color: dotColor(insuranceItems) },
@@ -248,12 +246,39 @@ export default function BriefingView({ propCode, embedded }) {
 
       {/* Header */}
       <div style={{ padding: '10px 20px 8px', borderBottom: `0.5px solid ${T.border}`, background: T.bg0, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <Sun size={16} weight="fill" style={{ color: '#d4924a', flexShrink: 0 }} />
           <span style={{ fontSize: F.sm, color: T.text2 }}>{todayFormatted}</span>
           {briefing?.updated_at && briefing.status === 'complete' && (
             <span style={{ fontSize: F.xs, color: T.text3 }}>· Last run: {formatTime(briefing.updated_at)}</span>
           )}
+          <span style={{ flex: 1 }} />
+          {briefing?.status === 'complete' && (
+            <>
+              <button
+                onClick={() => {
+                  const next = Object.fromEntries(sections.map(s => [s.key, true]));
+                  setOpenSections(next);
+                }}
+                style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
+                Expand All
+              </button>
+              <button
+                onClick={() => {
+                  const next = Object.fromEntries(sections.map(s => [s.key, false]));
+                  setOpenSections(next);
+                }}
+                style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
+                Collapse All
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => { setLoading(true); fetchBriefing(); }}
+            title="Refresh"
+            style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 8px', fontSize: F.sm, color: T.text1, cursor: 'pointer', lineHeight: 1 }}>
+            ↻
+          </button>
         </div>
       </div>
 

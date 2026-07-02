@@ -69,6 +69,9 @@ function DraftRow({ draft }) {
           <span style={{ color: T.text2 }}> · {draft.prop_code}</span>
         </span>
         <span style={{ fontSize: F.xs, color: T.text2, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          {draft.lease_ends ? new Date(draft.lease_ends + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+        </span>
+        <span style={{ fontSize: F.xs, color: T.text3, whiteSpace: 'nowrap', flexShrink: 0 }}>
           {draft.days_remaining}d
         </span>
         <span style={{ fontSize: F.xs, color: T.text3, flexShrink: 0 }}>→</span>
