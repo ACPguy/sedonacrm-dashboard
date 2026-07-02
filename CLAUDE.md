@@ -154,6 +154,12 @@ pages/api/gmail/
   - LeaseWatchDrafts + NewInquiryDrafts: collapsible headers + scrollable bodies (max 320px)
   - HomeView stats strip removed (4-card grid + useState + useEffect deleted)
   - Vercel upgraded to Pro plan — 1,000 function limit, no consolidation needed
+- **Home / BriefingView polish (2026-07-02):**
+  - HomeView: header renamed "Home" with HouseLine icon; weather strip made collapsible (default closed, localStorage persisted), larger fonts
+  - BriefingView: Morning Briefing title + all Run Now / Run Lease Watch buttons removed; ↻ dropdown added (Refresh + Re-run Briefing); Expand All / Collapse All buttons added to header
+  - Redundant Lease Watch collapsible section removed from BriefingView sections array
+  - Lease expiration date added to LeaseWatchDrafts DraftRow
+  - All 5 sections (Work Orders, Tasks, Insurance, FYI, Lease Watch, New Inquiries) default closed; all respond to Expand/Collapse All via `cardsExpanded` prop
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -185,17 +191,14 @@ pages/api/gmail/
 
 ## Next Priorities
 
-1. **SESSION START FIXES (do these first):**
-   - a. All collapsible sections default to CLOSED — change `defaultOpen` logic in `BriefingView.jsx`: current logic opens sections that have urgent items; change to ALL sections closed by default (`sections.map(s => [s.key, false])`). localStorage still saves user preference after first interaction.
-   - b. New Leasing Inquiries "Approve" button — open EmailCompose pre-populated with `draft.prospect_email`, `draft.subject`, `draft.body`; currently `onClick={() => {}}` (stub)
-2. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
-3. Wire WorkOrderAgentDrafts UI card into BriefingView
-4. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-5. Phase 5: Leasing Pipeline
+1. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
+2. Wire WorkOrderAgentDrafts UI card into BriefingView
+3. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
+4. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
-- main: `060c483` — CLAUDE.md update after 2026-06-26 session
+- main: `09ea81c` — merge preview (2026-07-02 session)
 - preview: in sync with main
 
 ---
