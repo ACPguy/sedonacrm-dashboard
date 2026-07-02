@@ -168,22 +168,22 @@ const WeatherCard = ({ city, lat, lon, url }) => {
   };
   return (
     <a href={url} target="_blank" rel="noreferrer"
-      style={{flex:'1 1 260px',minWidth:0,display:'block',textDecoration:'none',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'8px 10px'}}
+      style={{flex:'1 1 260px',minWidth:0,display:'block',textDecoration:'none',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'10px 14px'}}
       onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
       onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
       <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6px'}}>
-        <span style={{fontSize:F.sm,fontWeight:'500',color:T.text2,textTransform:'uppercase',letterSpacing:'0.05em'}}>
+        <span style={{fontSize:F.base,fontWeight:'600',color:T.text2,textTransform:'uppercase',letterSpacing:'0.05em'}}>
           {city}{current!==null&&<span style={{color:T.text1}}> · {current}°F</span>}
         </span>
       </div>
       {days?(
-        <div style={{display:'flex',gap:'2px'}}>
+        <div style={{display:'flex',gap:'4px'}}>
           {days.map((d,i)=>{const{icon,color}=wmoIcon(d.code,d.pop);return(
             <div key={i} style={{flex:1,textAlign:'center'}}>
-              <div style={{fontSize:'10px',color:T.text3}}>{d.dow}</div>
-              <div style={{fontSize:'13px',color}}>{icon}</div>
-              <div style={{fontSize:F.xs,fontWeight:'500',color:T.text0}}>{d.hi}°</div>
-              <div style={{fontSize:'10px',color:d.pop>=30?T.accent:T.text3}}>{d.pop}%</div>
+              <div style={{fontSize:'11px',color:T.text3}}>{d.dow}</div>
+              <div style={{fontSize:'16px',color}}>{icon}</div>
+              <div style={{fontSize:F.sm,fontWeight:'700',color:T.text0}}>{d.hi}°</div>
+              <div style={{fontSize:'11px',color:d.pop>=30?T.accent:T.text3}}>{d.pop}%</div>
             </div>
           );})}
         </div>
@@ -1854,13 +1854,40 @@ const TenantsView = () => {
 
 // ── Home / Morning Briefing ───────────────────────────────────────────────────
 const HomeView = () => {
+  const [weatherOpen, setWeatherOpen] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('home_weather_open') ?? 'false'); } catch { return false; }
+  });
+  const toggleWeather = () => setWeatherOpen(o => {
+    const next = !o;
+    try { localStorage.setItem('home_weather_open', JSON.stringify(next)); } catch {}
+    return next;
+  });
   return (
     <div style={{padding:'20px',overflowY:'auto',height:'100%'}}>
-      <div style={{fontSize:F.lg,fontWeight:'600',color:T.text0,marginBottom:'16px'}}>Good morning, Scott.</div>
-      <div style={{display:'flex',gap:'12px',marginBottom:'20px',flexWrap:'wrap'}}>
-        <WeatherCard city="Sedona AZ" lat={34.8697} lon={-111.7610} url="https://forecast.weather.gov/MapClick.php?CityName=Sedona&state=AZ"/>
-        <WeatherCard city="Olympia WA" lat={47.0379} lon={-122.9007} url="https://forecast.weather.gov/MapClick.php?CityName=Olympia&state=WA"/>
+      {/* Page header */}
+      <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'16px'}}>
+        <HouseLine size={22} weight="bold" style={{color:T.accent,flexShrink:0}}/>
+        <span style={{fontSize:F.lg,fontWeight:'700',color:T.text0}}>Home</span>
       </div>
+
+      {/* Collapsible weather strip */}
+      <div style={{marginBottom:'16px',background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'8px',overflow:'hidden'}}>
+        <div
+          onClick={toggleWeather}
+          style={{padding:'10px 16px',display:'flex',alignItems:'center',gap:'8px',cursor:'pointer',userSelect:'none',background:T.bg3,borderBottom:weatherOpen?`0.5px solid ${T.border}`:'none',minHeight:'44px'}}>
+          <span style={{fontSize:'18px'}}>🌤</span>
+          <span style={{fontSize:F.sm,fontWeight:'700',color:T.text0}}>Weather</span>
+          <span style={{flex:1}}/>
+          <span style={{fontSize:F.xs,color:T.text2}}>{weatherOpen?'▼':'▶'}</span>
+        </div>
+        {weatherOpen && (
+          <div style={{display:'flex',gap:'12px',padding:'12px',flexWrap:'wrap'}}>
+            <WeatherCard city="Sedona AZ" lat={34.8697} lon={-111.7610} url="https://forecast.weather.gov/MapClick.php?CityName=Sedona&state=AZ"/>
+            <WeatherCard city="Olympia WA" lat={47.0379} lon={-122.9007} url="https://forecast.weather.gov/MapClick.php?CityName=Olympia&state=WA"/>
+          </div>
+        )}
+      </div>
+
       <BriefingView />
     </div>
   );

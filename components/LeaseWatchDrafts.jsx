@@ -80,7 +80,6 @@ function DraftRow({ draft }) {
 export default function LeaseWatchDrafts({ compact = false }) {
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
   const [error, setError] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
   const pollRef = useRef(null);
@@ -104,23 +103,6 @@ export default function LeaseWatchDrafts({ compact = false }) {
     fetchDrafts();
     return () => clearInterval(pollRef.current);
   }, []);
-
-  const handleRun = async () => {
-    setRunning(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/agents/lease-watch', {
-        method: 'POST',
-        headers: { 'x-briefing-secret': BRIEFING_SECRET },
-      });
-      await res.json();
-      await fetchDrafts();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setRunning(false);
-    }
-  };
 
   const pendingDrafts = drafts.filter(d => d.status === 'draft' || d.status === 'edited');
 
@@ -162,26 +144,7 @@ export default function LeaseWatchDrafts({ compact = false }) {
         }}>
           {loading ? '…' : pendingDrafts.length}
         </span>
-        <button
-          onClick={e => { e.stopPropagation(); handleRun(); }}
-          disabled={running}
-          style={{
-            marginLeft: 'auto',
-            background: running ? T.bg2 : '#E8630A',
-            border: 'none',
-            borderRadius: '5px',
-            padding: '4px 12px',
-            color: '#fff',
-            fontSize: F.xs,
-            fontWeight: '600',
-            cursor: running ? 'not-allowed' : 'pointer',
-            opacity: running ? 0.7 : 1,
-            flexShrink: 0,
-          }}
-        >
-          {running ? 'Running…' : 'Run Lease Watch'}
-        </button>
-        <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0, marginLeft: '8px' }}>
+        <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0, marginLeft: 'auto' }}>
           {collapsed ? '▶' : '▼'}
         </span>
       </div>

@@ -119,7 +119,6 @@ function DraftRow({ draft, onDismiss, dismissingId }) {
 export default function NewInquiryDrafts() {
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
   const [dismissingId, setDismissingId] = useState(null);
   const [error, setError] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -139,22 +138,6 @@ export default function NewInquiryDrafts() {
   };
 
   useEffect(() => { fetchDrafts(); }, []);
-
-  const handleRun = async () => {
-    setRunning(true);
-    setError(null);
-    try {
-      await fetch('/api/agents/new-inquiry', {
-        method: 'POST',
-        headers: { 'x-briefing-secret': BRIEFING_SECRET },
-      });
-      await fetchDrafts();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setRunning(false);
-    }
-  };
 
   const handleDismiss = async (id) => {
     setDismissingId(id);
@@ -205,26 +188,7 @@ export default function NewInquiryDrafts() {
         }}>
           {loading ? '…' : drafts.length}
         </span>
-        <button
-          onClick={e => { e.stopPropagation(); handleRun(); }}
-          disabled={running}
-          style={{
-            marginLeft: 'auto',
-            background: running ? T.bg2 : '#E8630A',
-            border: 'none',
-            borderRadius: '5px',
-            padding: '4px 12px',
-            color: '#fff',
-            fontSize: F.xs,
-            fontWeight: '600',
-            cursor: running ? 'not-allowed' : 'pointer',
-            opacity: running ? 0.7 : 1,
-            flexShrink: 0,
-          }}
-        >
-          {running ? 'Running…' : 'Run Now'}
-        </button>
-        <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0, marginLeft: '8px' }}>
+        <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0, marginLeft: 'auto' }}>
           {collapsed ? '▶' : '▼'}
         </span>
       </div>

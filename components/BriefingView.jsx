@@ -247,29 +247,12 @@ export default function BriefingView({ propCode, embedded }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', background: T.bg1 }}>
 
       {/* Header */}
-      <div style={{ padding: '14px 20px 12px', borderBottom: `0.5px solid ${T.border}`, background: T.bg0, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Sun size={22} weight="fill" style={{ color: '#d4924a', flexShrink: 0 }} />
-              <span style={{ fontSize: propCode ? F.base : F.lg, fontWeight: '700', color: T.text0 }}>
-                {propCode ? `Property Briefing — ${propCode}` : 'Morning Briefing'}
-              </span>
-            </div>
-            <div style={{ fontSize: F.sm, color: T.text2, marginTop: '2px', paddingLeft: '32px' }}>{todayFormatted}</div>
-            {briefing?.updated_at && briefing.status === 'complete' && (
-              <div style={{ fontSize: F.xs, color: T.text3, marginTop: '1px', paddingLeft: '32px' }}>
-                Last run: {formatTime(briefing.updated_at)}
-              </div>
-            )}
-          </div>
-          {!propCode && (
-            <button
-              onClick={handleRunNow}
-              disabled={running}
-              style={{ background: running ? T.bg3 : '#E8630A', border: 'none', borderRadius: '5px', padding: '7px 18px', color: '#fff', fontSize: F.sm, fontWeight: '600', cursor: running ? 'not-allowed' : 'pointer', flexShrink: 0, opacity: running ? 0.7 : 1, minHeight: '44px' }}>
-              {running ? 'Running…' : 'Run Now'}
-            </button>
+      <div style={{ padding: '10px 20px 8px', borderBottom: `0.5px solid ${T.border}`, background: T.bg0, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Sun size={16} weight="fill" style={{ color: '#d4924a', flexShrink: 0 }} />
+          <span style={{ fontSize: F.sm, color: T.text2 }}>{todayFormatted}</span>
+          {briefing?.updated_at && briefing.status === 'complete' && (
+            <span style={{ fontSize: F.xs, color: T.text3 }}>· Last run: {formatTime(briefing.updated_at)}</span>
           )}
         </div>
       </div>
@@ -288,7 +271,7 @@ export default function BriefingView({ propCode, embedded }) {
         {!loading && !fetchError && briefing?.status === 'none' && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: T.text2 }}>
             <div style={{ fontSize: F.lg, marginBottom: '12px' }}>No briefing yet today</div>
-            <div style={{ fontSize: F.sm, color: T.text3 }}>Click "Run Now" to generate today's briefing.</div>
+            <div style={{ fontSize: F.sm, color: T.text3 }}>Today's briefing will be ready after 5 AM AZ time.</div>
           </div>
         )}
 
