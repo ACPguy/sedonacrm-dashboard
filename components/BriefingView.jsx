@@ -139,7 +139,10 @@ export default function BriefingView({ propCode, embedded }) {
   const [running, setRunning]         = useState(false);
   const [fetchError, setFetchError]   = useState(null);
   const [openSections, setOpenSections] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [cardsExpanded, setCardsExpanded] = useState(undefined);
   const pollRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   const lsKey = `briefing_sections_${propCode || 'home'}`;
 
@@ -183,6 +186,17 @@ export default function BriefingView({ propCode, embedded }) {
     return () => clearInterval(pollRef.current);
   }, [briefing?.status]);
 
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [dropdownOpen]);
+
   const handleRunNow = async () => {
     setRunning(true);
     setFetchError(null);
@@ -213,7 +227,6 @@ export default function BriefingView({ propCode, embedded }) {
     ? (item) => item.meta?.includes(propCode)
     : () => true;
 
-  const leaseItems     = allActionable.filter(i => i.type === 'lease' && filterFn(i));
   const woItems        = allActionable.filter(i => i.type === 'task' && i.label?.includes('WO') && filterFn(i));
   const taskItems      = allActionable.filter(i => i.type === 'task' && !i.label?.includes('WO') && filterFn(i));
   const insuranceItems = allActionable.filter(i => (i.type === 'coi' || i.type === 'property_insurance') && filterFn(i));
@@ -226,7 +239,6 @@ export default function BriefingView({ propCode, embedded }) {
   };
 
   const sections = [
-    { key: 'lease',     title: 'Lease Watch', items: leaseItems,     color: dotColor(leaseItems) },
     { key: 'wo',        title: 'Work Orders',  items: woItems,        color: dotColor(woItems) },
     { key: 'tasks',     title: 'Tasks',        items: taskItems,      color: dotColor(taskItems) },
     { key: 'insurance', title: 'Insurance',    items: insuranceItems, color: dotColor(insuranceItems) },
@@ -235,7 +247,7 @@ export default function BriefingView({ propCode, embedded }) {
 
   // Default: open if section has any urgent items; otherwise closed
   const defaultOpen = Object.fromEntries(
-    sections.map(s => [s.key, s.items.some(i => i._src === 'urgent')])
+    sections.map(s => [s.key, false])
   );
   const resolvedOpen = openSections ?? defaultOpen;
 
@@ -247,30 +259,65 @@ export default function BriefingView({ propCode, embedded }) {
     <div style={{ display: 'flex', flexDirection: 'column', ...(embedded ? {} : { height: '100%', overflow: 'auto' }), background: T.bg1 }}>
 
       {/* Header */}
-      <div style={{ padding: '14px 20px 12px', borderBottom: `0.5px solid ${T.border}`, background: T.bg0, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Sun size={22} weight="fill" style={{ color: '#d4924a', flexShrink: 0 }} />
-              <span style={{ fontSize: propCode ? F.base : F.lg, fontWeight: '700', color: T.text0 }}>
-                {propCode ? `Property Briefing — ${propCode}` : 'Morning Briefing'}
-              </span>
-            </div>
-            <div style={{ fontSize: F.sm, color: T.text2, marginTop: '2px', paddingLeft: '32px' }}>{todayFormatted}</div>
-            {briefing?.updated_at && briefing.status === 'complete' && (
-              <div style={{ fontSize: F.xs, color: T.text3, marginTop: '1px', paddingLeft: '32px' }}>
-                Last run: {formatTime(briefing.updated_at)}
+      <div style={{ padding: '10px 20px 8px', borderBottom: `0.5px solid ${T.border}`, background: T.bg0, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <Sun size={16} weight="fill" style={{ color: '#d4924a', flexShrink: 0 }} />
+          <span style={{ fontSize: F.sm, color: T.text2 }}>{todayFormatted}</span>
+          {briefing?.updated_at && briefing.status === 'complete' && (
+            <span style={{ fontSize: F.xs, color: T.text3 }}>· Last run: {formatTime(briefing.updated_at)}</span>
+          )}
+          <span style={{ flex: 1 }} />
+          {briefing?.status === 'complete' && (
+            <>
+              <button
+                onClick={() => {
+                  setOpenSections({ wo: true, tasks: true, insurance: true, fyi: true });
+                  setCardsExpanded(true);
+                }}
+                style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
+                Expand All
+              </button>
+              <button
+                onClick={() => {
+                  setOpenSections({ wo: false, tasks: false, insurance: false, fyi: false });
+                  setCardsExpanded(false);
+                }}
+                style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
+                Collapse All
+              </button>
+            </>
+          )}
+          <div ref={dropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={() => setDropdownOpen(o => !o)}
+              style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', minHeight: '28px' }}>
+              ↻ <span style={{ fontSize: '10px', color: T.text2 }}>▾</span>
+            </button>
+            {dropdownOpen && (
+              <div style={{
+                position: 'absolute', right: 0, top: '100%', marginTop: '4px',
+                background: T.bg3, border: `0.5px solid ${T.border}`, borderRadius: '6px',
+                minWidth: '160px', zIndex: 100, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              }}>
+                <button
+                  onClick={() => { setDropdownOpen(false); setLoading(true); fetchBriefing(); }}
+                  style={{ width: '100%', padding: '9px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: F.sm, color: T.text0, cursor: 'pointer', display: 'block' }}
+                  onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                  ↻ Refresh
+                </button>
+                <div style={{ height: '0.5px', background: T.border }} />
+                <button
+                  onClick={async () => { setDropdownOpen(false); await handleRunNow(); }}
+                  disabled={running}
+                  style={{ width: '100%', padding: '9px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: F.sm, color: running ? T.text3 : T.warn, cursor: running ? 'not-allowed' : 'pointer', display: 'block', opacity: running ? 0.6 : 1 }}
+                  onMouseEnter={e => { if (!running) e.currentTarget.style.background = T.bg2; }}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                  {running ? '⏳ Running…' : '▶ Re-run Briefing'}
+                </button>
               </div>
             )}
           </div>
-          {!propCode && (
-            <button
-              onClick={handleRunNow}
-              disabled={running}
-              style={{ background: running ? T.bg3 : '#E8630A', border: 'none', borderRadius: '5px', padding: '7px 18px', color: '#fff', fontSize: F.sm, fontWeight: '600', cursor: running ? 'not-allowed' : 'pointer', flexShrink: 0, opacity: running ? 0.7 : 1, minHeight: '44px' }}>
-              {running ? 'Running…' : 'Run Now'}
-            </button>
-          )}
         </div>
       </div>
 
@@ -288,7 +335,7 @@ export default function BriefingView({ propCode, embedded }) {
         {!loading && !fetchError && briefing?.status === 'none' && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: T.text2 }}>
             <div style={{ fontSize: F.lg, marginBottom: '12px' }}>No briefing yet today</div>
-            <div style={{ fontSize: F.sm, color: T.text3 }}>Click "Run Now" to generate today's briefing.</div>
+            <div style={{ fontSize: F.sm, color: T.text3 }}>Today's briefing will be ready after 5 AM AZ time.</div>
           </div>
         )}
 
@@ -309,8 +356,8 @@ export default function BriefingView({ propCode, embedded }) {
         {!loading && briefing?.status === 'complete' && (
           <>
             {/* Draft agent cards — portfolio home only */}
-            {!propCode && <LeaseWatchDrafts compact={true} />}
-            {!propCode && <NewInquiryDrafts />}
+            {!propCode && <LeaseWatchDrafts compact={true} expanded={cardsExpanded} />}
+            {!propCode && <NewInquiryDrafts expanded={cardsExpanded} />}
 
             {/* Collapsible agent sections */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
