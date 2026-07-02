@@ -116,12 +116,17 @@ function DraftRow({ draft, onDismiss, dismissingId }) {
   );
 }
 
-export default function NewInquiryDrafts() {
+export default function NewInquiryDrafts({ expanded }) {
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dismissingId, setDismissingId] = useState(null);
   const [error, setError] = useState(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
+
+  useEffect(() => {
+    if (expanded === true) setCollapsed(false);
+    if (expanded === false) setCollapsed(true);
+  }, [expanded]);
 
   const fetchDrafts = async () => {
     try {

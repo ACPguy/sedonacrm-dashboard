@@ -80,12 +80,17 @@ function DraftRow({ draft }) {
   );
 }
 
-export default function LeaseWatchDrafts({ compact = false }) {
+export default function LeaseWatchDrafts({ compact = false, expanded }) {
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const pollRef = useRef(null);
+
+  useEffect(() => {
+    if (expanded === true) setCollapsed(false);
+    if (expanded === false) setCollapsed(true);
+  }, [expanded]);
 
   const fetchDrafts = async () => {
     try {

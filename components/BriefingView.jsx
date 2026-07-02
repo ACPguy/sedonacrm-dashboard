@@ -140,6 +140,7 @@ export default function BriefingView({ propCode, embedded }) {
   const [fetchError, setFetchError]   = useState(null);
   const [openSections, setOpenSections] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [cardsExpanded, setCardsExpanded] = useState(undefined);
   const pollRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -271,6 +272,7 @@ export default function BriefingView({ propCode, embedded }) {
               <button
                 onClick={() => {
                   setOpenSections({ wo: true, tasks: true, insurance: true, fyi: true });
+                  setCardsExpanded(true);
                 }}
                 style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
                 Expand All
@@ -278,6 +280,7 @@ export default function BriefingView({ propCode, embedded }) {
               <button
                 onClick={() => {
                   setOpenSections({ wo: false, tasks: false, insurance: false, fyi: false });
+                  setCardsExpanded(false);
                 }}
                 style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
                 Collapse All
@@ -353,8 +356,8 @@ export default function BriefingView({ propCode, embedded }) {
         {!loading && briefing?.status === 'complete' && (
           <>
             {/* Draft agent cards — portfolio home only */}
-            {!propCode && <LeaseWatchDrafts compact={true} />}
-            {!propCode && <NewInquiryDrafts />}
+            {!propCode && <LeaseWatchDrafts compact={true} expanded={cardsExpanded} />}
+            {!propCode && <NewInquiryDrafts expanded={cardsExpanded} />}
 
             {/* Collapsible agent sections */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
