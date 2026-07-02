@@ -246,7 +246,7 @@ export default function BriefingView({ propCode, embedded }) {
 
   // Default: open if section has any urgent items; otherwise closed
   const defaultOpen = Object.fromEntries(
-    sections.map(s => [s.key, s.items.some(i => i._src === 'urgent')])
+    sections.map(s => [s.key, false])
   );
   const resolvedOpen = openSections ?? defaultOpen;
 
@@ -270,16 +270,14 @@ export default function BriefingView({ propCode, embedded }) {
             <>
               <button
                 onClick={() => {
-                  const next = Object.fromEntries(sections.map(s => [s.key, true]));
-                  setOpenSections(next);
+                  setOpenSections({ wo: true, tasks: true, insurance: true, fyi: true });
                 }}
                 style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
                 Expand All
               </button>
               <button
                 onClick={() => {
-                  const next = Object.fromEntries(sections.map(s => [s.key, false]));
-                  setOpenSections(next);
+                  setOpenSections({ wo: false, tasks: false, insurance: false, fyi: false });
                 }}
                 style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
                 Collapse All
