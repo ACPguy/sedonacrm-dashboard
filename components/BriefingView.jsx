@@ -139,7 +139,9 @@ export default function BriefingView({ propCode, embedded }) {
   const [running, setRunning]         = useState(false);
   const [fetchError, setFetchError]   = useState(null);
   const [openSections, setOpenSections] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const pollRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   const lsKey = `briefing_sections_${propCode || 'home'}`;
 
@@ -182,6 +184,17 @@ export default function BriefingView({ propCode, embedded }) {
     }
     return () => clearInterval(pollRef.current);
   }, [briefing?.status]);
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [dropdownOpen]);
 
   const handleRunNow = async () => {
     setRunning(true);
@@ -273,12 +286,37 @@ export default function BriefingView({ propCode, embedded }) {
               </button>
             </>
           )}
-          <button
-            onClick={() => { setLoading(true); fetchBriefing(); }}
-            title="Refresh"
-            style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 8px', fontSize: F.sm, color: T.text1, cursor: 'pointer', lineHeight: 1 }}>
-            ↻
-          </button>
+          <div ref={dropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={() => setDropdownOpen(o => !o)}
+              style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', minHeight: '28px' }}>
+              ↻ <span style={{ fontSize: '10px', color: T.text2 }}>▾</span>
+            </button>
+            {dropdownOpen && (
+              <div style={{
+                position: 'absolute', right: 0, top: '100%', marginTop: '4px',
+                background: T.bg3, border: `0.5px solid ${T.border}`, borderRadius: '6px',
+                minWidth: '160px', zIndex: 100, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              }}>
+                <button
+                  onClick={() => { setDropdownOpen(false); setLoading(true); fetchBriefing(); }}
+                  style={{ width: '100%', padding: '9px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: F.sm, color: T.text0, cursor: 'pointer', display: 'block' }}
+                  onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                  ↻ Refresh
+                </button>
+                <div style={{ height: '0.5px', background: T.border }} />
+                <button
+                  onClick={async () => { setDropdownOpen(false); await handleRunNow(); }}
+                  disabled={running}
+                  style={{ width: '100%', padding: '9px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: F.sm, color: running ? T.text3 : T.warn, cursor: running ? 'not-allowed' : 'pointer', display: 'block', opacity: running ? 0.6 : 1 }}
+                  onMouseEnter={e => { if (!running) e.currentTarget.style.background = T.bg2; }}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                  {running ? '⏳ Running…' : '▶ Re-run Briefing'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
