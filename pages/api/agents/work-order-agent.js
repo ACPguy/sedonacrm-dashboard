@@ -29,7 +29,8 @@ export default async function handler(req, res) {
   const sb = createServerClient();
   const today = getAZDate();
 
-  const isCron   = req.headers['x-vercel-cron'] === '1';
+  const isCron   = req.headers['x-vercel-cron'] === '1' ||
+                   req.headers['authorization'] === `Bearer ${process.env.CRON_SECRET}`;
   const isManual = req.headers['x-briefing-secret'] === process.env.BRIEFING_SECRET;
 
   // ── Plain GET (no cron header): return today's saved run ──────────────────
