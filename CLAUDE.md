@@ -71,7 +71,7 @@ git push
 - Tailwind CSS
 - Gmail, Google Calendar, Google Drive (MCP connected)
 - Twilio for SMS (Phase 6)
-- HelloSign webhooks for e-signature (Phase 3)
+- Dropbox Sign (two-part sequential signing) for e-signature — Phase 5 Stage 3, ~$75/mo, for lease + lease amendment signing. Not yet built.
 - Claude API — Sonnet 4.6 for AI agents (Phase 4+)
 
 ## Supabase
@@ -172,6 +172,7 @@ pages/api/gmail/
 
 ## Known Gaps
 
+- **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
 - **PENDING: `wo_agent_runs` migration SQL** — must run before Agent 4 UI works:
   ```sql
   CREATE TABLE IF NOT EXISTS wo_agent_runs (
@@ -198,8 +199,8 @@ pages/api/gmail/
 
 ## Current Git State
 
-- main: `09ea81c` — merge preview (2026-07-02 session)
-- preview: in sync with main
+- main: `8dd25bc` — Merge branch 'preview' (local only; origin/main at `1a99b58`)
+- preview: this session close commit — docs only (2026-07-03, session 2)
 
 ---
 
@@ -249,6 +250,8 @@ Use `psql` only — `export DB='postgresql://postgres.edxcvyleielzevpappui:Sedon
 11. **Search queries: server-side LIMIT cap of 5 results per module** — never unbounded queries
 12. **grep -n before editing any large JSX file** — CC frequently misidentifies line numbers without this step
 13. **Claude.ai single instruction rule** — give one clear instruction at a time. Never counter an instruction with an alternative in the same response.
+14. **AI agents draft only — Scott approves everything. Nothing sends autonomously, ever.** Applies to all agents (Lease Watch, CAM Reconciliation, New Inquiry, Work Order, Rent Collection, Insurance Cert, Morning Briefing, Owner Reporting, Re-Engagement, Portfolio Analyst).
+15. **Every record requires:** unique URL, copy-link button, communication thread, audit log, AI summarize button, Drive file attachments. Audit log and AI summarize are not yet built on most record types — treat as an open build item per module, not as already satisfied.
 
 ---
 
