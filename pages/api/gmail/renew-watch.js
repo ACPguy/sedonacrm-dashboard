@@ -4,7 +4,8 @@ import { getGmailClient, setupWatch } from '../../../lib/gmail';
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
-  const isCron = req.headers['x-vercel-cron'] === '1';
+  const isCron = req.headers['x-vercel-cron'] === '1' ||
+                 req.headers['authorization'] === `Bearer ${process.env.CRON_SECRET}`;
   const isManual = req.headers['x-briefing-secret'] === process.env.BRIEFING_SECRET;
   if (!isCron && !isManual) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
