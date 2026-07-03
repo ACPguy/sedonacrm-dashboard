@@ -155,7 +155,7 @@ export default function AppShell({ children, activeView }) {
 
   const navItems = (
     <>
-      <NavBtn label="Home" href="/?view=morning-briefing" active={is('morning-briefing')} onClick={()=>go('/?view=morning-briefing')} collapsed={effectiveCollapsed} icon={<HouseLine size={18} weight="bold"/>}/>
+      <NavBtn label="Home" href="/home" active={is('home')} onClick={()=>go('/home')} collapsed={effectiveCollapsed} icon={<HouseLine size={18} weight="bold"/>}/>
       <NavBtn label="Inbox" href="/inbox" active={is('inbox')} onClick={()=>go('/inbox')} collapsed={effectiveCollapsed} icon={<EnvelopeSimple size={18} weight="bold"/>} badge={unreadCount}/>
 
       <SectionLabel label="Operations" collapsed={effectiveCollapsed}/>
