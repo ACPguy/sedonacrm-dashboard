@@ -2266,7 +2266,7 @@ export default function SedonaCRM() {
 
   const navItems = (
     <>
-      <NavItem iconComp={<HouseLine size={18} weight="bold"/>} label="Home" href="/?view=morning-briefing" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
+      <NavItem iconComp={<HouseLine size={18} weight="bold"/>} label="Home" href="/home" active={currentView==='morning-briefing'} onClick={()=>navTo('morning-briefing')} {...navProps}/>
       <NavItem iconComp={<EnvelopeSimple size={18} weight="bold"/>} label="Inbox" href="/inbox" active={currentView==='inbox'} onClick={()=>handleNav('/inbox')} {...navProps}/>
       {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Operations</div>}
       <NavItem iconComp={<BuildingOffice size={18} weight="bold"/>} label="Properties"  href="/?view=properties"  active={currentView==='properties'}  onClick={()=>navTo('properties')}        {...navProps}/>
