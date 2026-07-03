@@ -127,14 +127,18 @@ lib/
   drivePropertyFolders.js — hardcoded prop_code → Drive root folder ID map (14 active)
   supabaseServer.js      — createServerClient() using SUPABASE_SERVICE_ROLE_KEY
 
+pages/
+  index.jsx              — renders <SedonaCRM /> (SPA root)
+  home.jsx               — renders <SedonaCRM /> at clean /home URL (HomeView by default)
+
 pages/api/agents/
-  morning-briefing.js  — GET today's briefing; POST runs 14 parallel queries, saves to briefings table
-  lease-watch.js       — GET active drafts; POST iterates tenants, calls Claude API, saves drafts
-  new-inquiry.js       — GET active drafts; POST keyword filter → Claude draft → pipeline insert → thread link; dismiss action
-  work-order-agent.js  — GET today's wo_agent_runs row; POST nudges (past-due + no-activity) + high-cost flags (≥$2,500)
+  morning-briefing.js  — GET today's briefing; cron/POST runs 14 parallel queries, saves to briefings table
+  lease-watch.js       — GET active drafts; cron/POST iterates tenants, calls Claude API, saves drafts
+  new-inquiry.js       — GET active drafts; cron/POST keyword filter → Claude draft → pipeline insert → thread link; dismiss action
+  work-order-agent.js  — GET today's wo_agent_runs row; cron/POST nudges (past-due + no-activity) + high-cost flags (≥$2,500)
 
 pages/api/gmail/
-  renew-watch.js      — POST renews Gmail Pub/Sub watch; cron every 6 days
+  renew-watch.js      — POST/GET renews Gmail Pub/Sub watch; cron every 6 days
   webhook.js          — processes Pub/Sub push notifications, syncs email_threads + email_messages
 ```
 
@@ -148,23 +152,20 @@ pages/api/gmail/
   - Gmail Watch Auto-Renewal: Complete (cron `0 11 */6 * *` = every 6 days; renewed 2026-06-26, expires 2026-07-03)
   - Agent 4 Work Order Agent: API complete (`/api/agents/work-order-agent`) — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; pending: migration SQL, UI card, cron
   - Remaining Phase 4: Agent 9
-- **Phase 4 Supporting work (2026-06-26):**
-  - BriefingView refactored: 5 collapsible agent sections, `propCode` prop for property-scoped embed, mobile pass, `embedded` prop restored to signature after merge conflict stranded it
-  - Drive folders: date-first naming (`YYYY-MM-DD — ID — title`), auto-create on save for ALL task types (not just work_order)
-  - LeaseWatchDrafts + NewInquiryDrafts: collapsible headers + scrollable bodies (max 320px)
-  - HomeView stats strip removed (4-card grid + useState + useEffect deleted)
-  - Vercel upgraded to Pro plan — 1,000 function limit, no consolidation needed
-- **Home / BriefingView polish (2026-07-02):**
-  - HomeView: header renamed "Home" with HouseLine icon; weather strip made collapsible (default closed, localStorage persisted), larger fonts
-  - BriefingView: Morning Briefing title + all Run Now / Run Lease Watch buttons removed; ↻ dropdown added (Refresh + Re-run Briefing); Expand All / Collapse All buttons added to header
-  - Redundant Lease Watch collapsible section removed from BriefingView sections array
-  - Lease expiration date added to LeaseWatchDrafts DraftRow
-  - All 5 sections (Work Orders, Tasks, Insurance, FYI, Lease Watch, New Inquiries) default closed; all respond to Expand/Collapse All via `cardsExpanded` prop
+- **Phase 4 Supporting work (complete):**
+  - BriefingView: 5 collapsible agent sections, `propCode` prop, mobile pass, `embedded` prop
+  - Drive folders: date-first naming, auto-create on save for ALL task types
+  - LeaseWatchDrafts + NewInquiryDrafts: collapsible headers + scrollable bodies
+  - HomeView: "Home" header + HouseLine icon, collapsible weather strip, larger fonts
+  - BriefingView: ↻ dropdown (Refresh + Re-run), Expand/Collapse All; all 5 sections default closed
+  - Cron auth fixes (2026-07-03): all 5 cron routes now accept GET (Vercel sends GET) + CRON_SECRET Bearer header
+  - Home URL (2026-07-03): clean `/home` route; `/?view=morning-briefing` 307-redirects to `/home`
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
 
 - BRIEFING_SECRET, NEXT_PUBLIC_BRIEFING_SECRET, ANTHROPIC_API_KEY
+- CRON_SECRET — ⚠️ must be set in Vercel Project Settings → Environment Variables for cron Bearer auth to work
 
 ## Monthly Cost
 
@@ -186,21 +187,23 @@ pages/api/gmail/
   ALTER TABLE wo_agent_runs ENABLE ROW LEVEL SECURITY;
   CREATE POLICY "anon_select" ON wo_agent_runs FOR SELECT TO anon USING (true);
   ```
+- **PENDING: CRON_SECRET env var** — must be added to Vercel Project Settings → Environment Variables, then redeploy. All 5 cron routes check `Authorization: Bearer <CRON_SECRET>` but the var isn't set yet.
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
 - **PENDING: WorkOrderAgentDrafts UI card** — wire nudge + high-cost items into BriefingView after migration SQL runs
 - **PENDING: BriefingView propCode embed** — wire `<BriefingView propCode={data.prop_code} />` into Property detail Operations tab
 
 ## Next Priorities
 
-1. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
-2. Wire WorkOrderAgentDrafts UI card into BriefingView
-3. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-4. Phase 5: Leasing Pipeline
+1. Add CRON_SECRET to Vercel env vars + redeploy to activate Bearer auth on all cron routes
+2. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
+3. Wire WorkOrderAgentDrafts UI card into BriefingView
+4. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
+5. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
-- main: `8dd25bc` — Merge branch 'preview' (local only; origin/main at `1a99b58`)
-- preview: this session close commit — docs only (2026-07-03, session 2)
+- main: `c6182d1` — session close 2026-07-03
+- preview: this session close commit
 
 ---
 
@@ -252,6 +255,7 @@ Use `psql` only — `export DB='postgresql://postgres.edxcvyleielzevpappui:Sedon
 13. **Claude.ai single instruction rule** — give one clear instruction at a time. Never counter an instruction with an alternative in the same response.
 14. **AI agents draft only — Scott approves everything. Nothing sends autonomously, ever.** Applies to all agents (Lease Watch, CAM Reconciliation, New Inquiry, Work Order, Rent Collection, Insurance Cert, Morning Briefing, Owner Reporting, Re-Engagement, Portfolio Analyst).
 15. **Every record requires:** unique URL, copy-link button, communication thread, audit log, AI summarize button, Drive file attachments. Audit log and AI summarize are not yet built on most record types — treat as an open build item per module, not as already satisfied.
+16. **Vercel Cron auth — CRON_SECRET is required.** All cron routes must check `req.headers['authorization'] === \`Bearer ${process.env.CRON_SECRET}\`` in addition to `x-vercel-cron`. Vercel's documented method is the Bearer token; `x-vercel-cron` alone is unreliable. Pattern: `isCron = x-vercel-cron === '1' || authorization === Bearer CRON_SECRET`. Plain GET (no cron header) returns existing data for UI polls. Never remove the Bearer check.
 
 ---
 
@@ -287,6 +291,7 @@ Use `psql` only — `export DB='postgresql://postgres.edxcvyleielzevpappui:Sedon
 - **Vercel build cache:** `next.config.js` uses `generateBuildId: async () => require('crypto').randomBytes(8).toString('hex')` — do not remove.
 - **Vercel env vars:** changes require full redeploy. If a new var doesn't propagate after redeploy, delete it and recreate before redeploying.
 - **GitHub raw reads:** subject to 60–120s CDN cache after push. Use `wc -l` comparison as fast check for whether a file changed.
+- **Home URL:** `/home` is the canonical home route (renders SedonaCRM SPA). `/?view=morning-briefing` 307-redirects to `/home`. Do not revert to query-param routing for Home.
 
 ---
 
@@ -337,7 +342,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `briefings`: run_date (UNIQUE), status, urgent/attention/fyi/snapshot (jsonb)
 - `lease_watch_drafts`: tenant_id + milestone (UNIQUE pair), subject, body, status
 - `inquiry_drafts`: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status
-- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ⚠️ migration SQL pending (see bottom of work-order-agent.js)
+- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ⚠️ migration SQL pending (see Known Gaps)
 
 ## Drive Folder Architecture (permanent)
 
