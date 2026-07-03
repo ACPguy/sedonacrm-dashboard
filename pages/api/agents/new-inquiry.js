@@ -35,7 +35,11 @@ export default async function handler(req, res) {
 
   const sb = createServerClient();
 
-  if (req.method === 'GET') {
+  const isCron = req.headers['x-vercel-cron'] === '1';
+  const isManual = req.headers['x-briefing-secret'] === process.env.BRIEFING_SECRET;
+
+  // Plain GET (no cron header) — return active drafts for the UI card
+  if (req.method === 'GET' && !isCron) {
     const { data, error } = await sb
       .from('inquiry_drafts')
       .select('id, prospect_name, prospect_email, subject, body, status, created_at')
@@ -49,9 +53,7 @@ export default async function handler(req, res) {
     );
   }
 
-  // POST — auth
-  const isCron = req.headers['x-vercel-cron'] === '1';
-  const isManual = req.headers['x-briefing-secret'] === process.env.BRIEFING_SECRET;
+  // Cron GET or manual POST — require auth
   if (!isCron && !isManual) {
     return res.status(401).json({ error: 'Unauthorized' });
   }

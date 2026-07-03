@@ -35,15 +35,17 @@ export default async function handler(req, res) {
   const sb = createServerClient();
   const today = getAZDate();
 
-  if (req.method === 'GET') {
+  const isCron = req.headers['x-vercel-cron'] === '1';
+  const isManual = req.headers['x-briefing-secret'] === process.env.BRIEFING_SECRET;
+
+  // Plain GET (no cron header) — return today's saved briefing for the dashboard
+  if (req.method === 'GET' && !isCron) {
     const { data } = await sb.from('briefings').select('*').eq('run_date', today).maybeSingle();
     if (!data) return res.status(200).json({ status: 'none' });
     return res.status(200).json(data);
   }
 
-  // POST — auth check
-  const isCron = req.headers['x-vercel-cron'] === '1';
-  const isManual = req.headers['x-briefing-secret'] === process.env.BRIEFING_SECRET;
+  // Cron GET or manual POST — require auth
   if (!isCron && !isManual) {
     return res.status(401).json({ error: 'Unauthorized' });
   }

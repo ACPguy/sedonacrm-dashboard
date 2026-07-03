@@ -2,7 +2,7 @@ import { createServerClient } from '../../../lib/supabaseServer';
 import { getGmailClient, setupWatch } from '../../../lib/gmail';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
   const isCron = req.headers['x-vercel-cron'] === '1';
   const isManual = req.headers['x-briefing-secret'] === process.env.BRIEFING_SECRET;
