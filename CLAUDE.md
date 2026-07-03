@@ -165,7 +165,7 @@ pages/api/gmail/
 ## Agents Env Vars (Vercel) — all set ✅
 
 - BRIEFING_SECRET, NEXT_PUBLIC_BRIEFING_SECRET, ANTHROPIC_API_KEY
-- CRON_SECRET — ⚠️ must be set in Vercel Project Settings → Environment Variables for cron Bearer auth to work
+- CRON_SECRET ✅ set in Vercel (Production + Preview) — confirmed working (Gmail watch renewal succeeded)
 
 ## Monthly Cost
 
@@ -187,15 +187,13 @@ pages/api/gmail/
   ALTER TABLE wo_agent_runs ENABLE ROW LEVEL SECURITY;
   CREATE POLICY "anon_select" ON wo_agent_runs FOR SELECT TO anon USING (true);
   ```
-- **PENDING: CRON_SECRET env var** — must be added to Vercel Project Settings → Environment Variables, then redeploy. All 5 cron routes check `Authorization: Bearer <CRON_SECRET>` but the var isn't set yet.
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
 - **PENDING: WorkOrderAgentDrafts UI card** — wire nudge + high-cost items into BriefingView after migration SQL runs
 - **PENDING: BriefingView propCode embed** — wire `<BriefingView propCode={data.prop_code} />` into Property detail Operations tab
 
 ## Next Priorities
 
-1. Add CRON_SECRET to Vercel env vars + redeploy to activate Bearer auth on all cron routes
-2. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
+1. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
 3. Wire WorkOrderAgentDrafts UI card into BriefingView
 4. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
 5. Phase 5: Leasing Pipeline
