@@ -167,6 +167,7 @@ pages/api/gmail/
   - EmailInbox batch select (2026-07-07): checkboxes on thread rows + batch toolbar (Archive/Spam/Delete); batch-action.js calls Gmail API for each action
   - handleArchive bug fix (2026-07-07): single-thread Archive now also calls Gmail API (removeLabelIds INBOX) via batch-action endpoint
   - EmailInbox compact rows (2026-07-07): single-line ThreadListItem with sender name (130px col, hidden mobile), subject+snippet combined, paperclip icon, small indicator badges; shift-click range select; row height ~32px
+  - EmailInbox resizable list panel (2026-07-07): draggable 4px divider between list and detail; width persists to localStorage (key: sedonacrm_inbox_list_width); bounds 280–700px; offset calculated via containerRef.getBoundingClientRect().left (works with variable sidebar width); sender col uses flex clamp(70px,28%,200px) for proportional growth
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅

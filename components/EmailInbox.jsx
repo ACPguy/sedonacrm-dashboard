@@ -109,7 +109,7 @@ const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick,
         }
         {!isMobile && (
           <span style={{
-            width:'130px', flexShrink:0,
+            flex:'0 0 clamp(70px, 28%, 200px)',
             fontSize:F.xs, fontWeight: isUnread ? '700' : '400',
             color: isUnread ? T.text0 : T.text1,
             overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
@@ -552,6 +552,14 @@ export default function EmailInbox() {
   const [isSyncing,      setIsSyncing]      = useState(false);
   const [selectedIds,    setSelectedIds]    = useState(new Set());
   const [lastCheckedIndex, setLastCheckedIndex] = useState(null);
+  const [listWidth, setListWidth] = useState(() => {
+    if (typeof window === 'undefined') return 340;
+    const saved = localStorage.getItem('sedonacrm_inbox_list_width');
+    return saved ? parseInt(saved) : 340;
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef(null);
+  const listWidthRef = useRef(340);
 
   const buildQuery = useCallback((f) => {
     let params = `order=last_message_at.desc&limit=100&select=*`;
@@ -647,6 +655,31 @@ export default function EmailInbox() {
     setLastCheckedIndex(index);
   };
 
+  const handleDividerMouseDown = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleMouseMove = (e) => {
+      const left = containerRef.current?.getBoundingClientRect().left || 0;
+      const newWidth = Math.max(280, Math.min(700, e.clientX - left));
+      setListWidth(newWidth);
+      listWidthRef.current = newWidth;
+    };
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      localStorage.setItem('sedonacrm_inbox_list_width', String(listWidthRef.current));
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
   const handleBatchAction = async (action) => {
     const ids = Array.from(selectedIds);
     setThreads(ts => ts.filter(t => !ids.includes(t.id)));
@@ -698,10 +731,10 @@ export default function EmailInbox() {
   }, [selectedThread, threads]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ display:'flex', height:'100%', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden' }}>
+    <div ref={containerRef} style={{ display:'flex', height:'100%', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden', userSelect: isDragging ? 'none' : 'auto' }}>
 
       {/* Left panel — thread list */}
-      <div style={{ width:isMobile?'100%':'340px', flexShrink:0, display:isMobile&&selectedThread?'none':'flex', flexDirection:'column', borderRight:`0.5px solid ${T.border}`, overflow:'hidden' }}>
+      <div style={{ width:isMobile?'100%':listWidth+'px', flexShrink:0, display:isMobile&&selectedThread?'none':'flex', flexDirection:'column', borderRight:isMobile?`0.5px solid ${T.border}`:'none', overflow:'hidden' }}>
         {/* Header */}
         <div style={{ padding:'12px 16px', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
@@ -772,6 +805,20 @@ export default function EmailInbox() {
           ))}
         </div>
       </div>
+
+      {/* Resizable divider */}
+      {!isMobile && (
+        <div
+          onMouseDown={handleDividerMouseDown}
+          style={{
+            width:'4px', flexShrink:0, cursor:'col-resize',
+            background: isDragging ? T.accent : T.border,
+            transition: isDragging ? 'none' : 'background 0.15s ease',
+          }}
+          onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = T.accent; }}
+          onMouseLeave={e => { if (!isDragging) e.currentTarget.style.background = T.border; }}
+        />
+      )}
 
       {/* Right panel — thread detail */}
       <div style={{ flex:1, overflow:'hidden', display:isMobile&&!selectedThread?'none':'flex', flexDirection:'column' }}>
