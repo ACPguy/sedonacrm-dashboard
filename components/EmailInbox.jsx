@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, MagnifyingGlass } from '@phosphor-icons/react';
+import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, Trash, X, MagnifyingGlass } from '@phosphor-icons/react';
 import EmailCompose from './EmailCompose';
 
 const SUPABASE_URL  = 'https://edxcvyleielzevpappui.supabase.co';
@@ -81,7 +81,7 @@ const ActionBtn = ({ label, icon, onClick, disabled, variant, color }) => {
 };
 
 // ── Thread List Item ───────────────────────────────────────────────────────────
-const ThreadListItem = ({ thread, selected, onClick }) => {
+const ThreadListItem = ({ thread, selected, onClick, isChecked, onToggleSelect }) => {
   const isUnread  = !thread.is_read;
   const sender    = thread.snippet_from || thread.linked_record_type || '—';
 
@@ -96,6 +96,13 @@ const ThreadListItem = ({ thread, selected, onClick }) => {
       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
     >
       <div style={{ display:'flex', alignItems:'flex-start', gap:'8px' }}>
+        <input
+          type="checkbox"
+          checked={isChecked}
+          onChange={onToggleSelect}
+          onClick={e => e.stopPropagation()}
+          style={{ marginTop:'3px', flexShrink:0, cursor:'pointer', width:'14px', height:'14px', accentColor: T.accent }}
+        />
         {isUnread
           ? <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:T.accent, flexShrink:0, marginTop:'5px' }}/>
           : <div style={{ width:'7px', height:'7px', flexShrink:0 }}/>
@@ -216,7 +223,7 @@ const MessageRow = ({ msg, defaultExpanded }) => {
 };
 
 // ── Thread Detail Panel ────────────────────────────────────────────────────────
-const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply, onThreadUpdate, onLink }) => {
+const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply, onThreadUpdate, onLink, navigateThread, hasPrev, hasNext }) => {
   const [messages,     setMessages]     = useState([]);
   const [loadingMsgs,  setLoadingMsgs]  = useState(true);
   const [aiSummary,    setAiSummary]    = useState('');
@@ -391,6 +398,8 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply,
             icon={thread.is_read ? <Circle size={13}/> : <CheckCircle size={13}/>}
             onClick={() => onMarkRead(thread.id, !thread.is_read)}
           />
+          <ActionBtn label="‹" disabled={!hasPrev} onClick={() => navigateThread('prev')}/>
+          <ActionBtn label="›" disabled={!hasNext} onClick={() => navigateThread('next')}/>
           {linkFlash ? (
             <span style={{ fontSize:F.xs, color:T.success, fontWeight:'600', padding:'5px 10px', border:`0.5px solid ${T.success}`, borderRadius:'4px' }}>✓ Linked</span>
           ) : linkSuccess ? (
@@ -543,6 +552,7 @@ export default function EmailInbox() {
   const [selectedThread, setSelectedThread] = useState(null);
   const [refreshKey,     setRefreshKey]     = useState(0);
   const [isSyncing,      setIsSyncing]      = useState(false);
+  const [selectedIds,    setSelectedIds]    = useState(new Set());
 
   const buildQuery = useCallback((f) => {
     let params = `order=last_message_at.desc&limit=100&select=*`;
@@ -555,6 +565,7 @@ export default function EmailInbox() {
   useEffect(() => {
     setLoading(true);
     setSelectedThread(null);
+    setSelectedIds(new Set());
     sbFetch('email_threads', buildQuery(filter))
       .then(setThreads)
       .catch(() => setThreads([]))
@@ -587,10 +598,10 @@ export default function EmailInbox() {
   const handleArchive = async (threadId) => {
     setThreads(ts => ts.filter(t => t.id !== threadId));
     if (selectedThread?.id === threadId) setSelectedThread(null);
-    await fetch('/api/gmail/thread-update', {
+    await fetch('/api/gmail/batch-action', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ threadId, updates: { is_archived: true } }),
+      headers: { 'Content-Type': 'application/json', 'x-briefing-secret': process.env.NEXT_PUBLIC_BRIEFING_SECRET },
+      body: JSON.stringify({ threadIds: [threadId], action: 'archive' }),
     }).catch(() => {});
   };
 
@@ -610,6 +621,29 @@ export default function EmailInbox() {
     setThreads(ts => ts.map(t => t.id === selectedThread.id ? { ...t, ...updates } : t));
   };
 
+  const toggleSelect = (threadId) => {
+    setSelectedIds(ids => {
+      const next = new Set(ids);
+      if (next.has(threadId)) next.delete(threadId);
+      else next.add(threadId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBatchAction = async (action) => {
+    const ids = Array.from(selectedIds);
+    setThreads(ts => ts.filter(t => !ids.includes(t.id)));
+    if (selectedThread && ids.includes(selectedThread.id)) setSelectedThread(null);
+    clearSelection();
+    await fetch('/api/gmail/batch-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-briefing-secret': process.env.NEXT_PUBLIC_BRIEFING_SECRET },
+      body: JSON.stringify({ threadIds: ids, action }),
+    }).catch(() => {});
+  };
+
   const handleSelectThread = async (thread) => {
     setSelectedThread(thread);
     if (!thread.is_read) {
@@ -622,6 +656,31 @@ export default function EmailInbox() {
     }
   };
 
+  const navigateThread = (direction) => {
+    if (!selectedThread) return;
+    const idx = threads.findIndex(t => t.id === selectedThread.id);
+    if (idx === -1) return;
+    const nextIdx = direction === 'next' ? idx + 1 : idx - 1;
+    if (nextIdx < 0 || nextIdx >= threads.length) return;
+    handleSelectThread(threads[nextIdx]);
+  };
+
+  const selectedIdx = selectedThread ? threads.findIndex(t => t.id === selectedThread.id) : -1;
+  const hasPrev = selectedIdx > 0;
+  const hasNext = selectedIdx !== -1 && selectedIdx < threads.length - 1;
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (!selectedThread) return;
+      const tag = document.activeElement?.tagName;
+      const isEditable = document.activeElement?.isContentEditable;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || isEditable) return;
+      if (e.key === 'ArrowLeft') navigateThread('prev');
+      if (e.key === 'ArrowRight') navigateThread('next');
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedThread, threads]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ display:'flex', height:'100%', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden' }}>
@@ -655,6 +714,20 @@ export default function EmailInbox() {
           </div>
         </div>
 
+        {/* Batch action toolbar */}
+        {selectedIds.size > 0 && (
+          <div style={{ padding:'7px 12px', background:T.bg3, borderBottom:`0.5px solid ${T.border}`, display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', flexShrink:0 }}>
+            <span style={{ fontSize:F.xs, color:T.text1, fontWeight:'600', marginRight:'4px' }}>{selectedIds.size} selected</span>
+            <ActionBtn label="Archive" icon={<Archive size={13}/>} onClick={() => handleBatchAction('archive')}/>
+            <ActionBtn label="Spam" icon={<span>🚫</span>} color={T.warn} onClick={() => handleBatchAction('spam')}/>
+            <ActionBtn label="Delete" icon={<Trash size={13}/>} color={T.danger} onClick={() => handleBatchAction('delete')}/>
+            <button type="button" onClick={clearSelection}
+              style={{ marginLeft:'auto', background:'transparent', border:'none', color:T.text2, cursor:'pointer', fontSize:F.xs, display:'flex', alignItems:'center', gap:'3px', padding:'2px 4px' }}>
+              <X size={13}/> Cancel
+            </button>
+          </div>
+        )}
+
         {/* Thread list */}
         <div style={{ flex:1, overflowY:'auto' }}>
           {loading && (
@@ -676,6 +749,8 @@ export default function EmailInbox() {
               thread={thread}
               selected={selectedThread?.id === thread.id}
               onClick={() => handleSelectThread(thread)}
+              isChecked={selectedIds.has(thread.id)}
+              onToggleSelect={() => toggleSelect(thread.id)}
             />
           ))}
         </div>
@@ -700,6 +775,9 @@ export default function EmailInbox() {
               onReply={() => {}}
               onThreadUpdate={() => setRefreshKey(k => k + 1)}
               onLink={handleLink}
+              navigateThread={navigateThread}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
             />
           </>
         ) : (

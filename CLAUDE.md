@@ -140,6 +140,8 @@ pages/api/agents/
 pages/api/gmail/
   renew-watch.js      — POST/GET renews Gmail Pub/Sub watch; cron every 6 days
   webhook.js          — processes Pub/Sub push notifications, syncs email_threads + email_messages
+  sync-now.js         — POST syncs Gmail history + polls INBOX; GET returns current state
+  batch-action.js     — POST { threadIds, action: archive|spam|delete } — calls Gmail API + updates Supabase; auth: x-briefing-secret
 ```
 
 ## Phase Status
@@ -160,6 +162,10 @@ pages/api/gmail/
   - BriefingView: ↻ dropdown (Refresh + Re-run), Expand/Collapse All; all 5 sections default closed
   - Cron auth fixes (2026-07-03): all 5 cron routes now accept GET (Vercel sends GET) + CRON_SECRET Bearer header
   - Home URL (2026-07-03): clean `/home` route; `/?view=morning-briefing` 307-redirects to `/home`
+  - Gmail sync fixes (2026-07-07): skip SPAM/TRASH in history.list loop; outbound emails matched to contacts via "to" header
+  - EmailInbox prev/next nav (2026-07-07): ‹ › buttons + ArrowLeft/Right keyboard nav in thread detail; steps through in-memory threads array
+  - EmailInbox batch select (2026-07-07): checkboxes on thread rows + batch toolbar (Archive/Spam/Delete); batch-action.js calls Gmail API for each action
+  - handleArchive bug fix (2026-07-07): single-thread Archive now also calls Gmail API (removeLabelIds INBOX) via batch-action endpoint
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -201,7 +207,7 @@ pages/api/gmail/
 ## Current Git State
 
 - main: `c6182d1` — session close 2026-07-03
-- preview: Gmail sync fixes (2026-07-07) — spam/trash skip + outbound contact matching
+- preview: EmailInbox prev/next nav + batch select/archive/spam/delete (2026-07-07)
 
 ---
 
@@ -341,6 +347,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `lease_watch_drafts`: tenant_id + milestone (UNIQUE pair), subject, body, status
 - `inquiry_drafts`: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status
 - `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ⚠️ migration SQL pending (see Known Gaps)
+- `email_threads`: added `is_deleted boolean DEFAULT false` (2026-07-07) — set by batch-action delete action
 
 ## Drive Folder Architecture (permanent)
 
