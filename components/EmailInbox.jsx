@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, Trash, X, MagnifyingGlass } from '@phosphor-icons/react';
+import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, Trash, X, MagnifyingGlass, Paperclip } from '@phosphor-icons/react';
 import EmailCompose from './EmailCompose';
 
 const SUPABASE_URL  = 'https://edxcvyleielzevpappui.supabase.co';
@@ -81,63 +81,61 @@ const ActionBtn = ({ label, icon, onClick, disabled, variant, color }) => {
 };
 
 // ── Thread List Item ───────────────────────────────────────────────────────────
-const ThreadListItem = ({ thread, selected, onClick, isChecked, onToggleSelect }) => {
-  const isUnread  = !thread.is_read;
-  const sender    = thread.snippet_from || thread.linked_record_type || '—';
+const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick, index, isMobile }) => {
+  const isUnread = !thread.is_read;
+  const senderDisplay = thread.last_sender_name || thread.last_sender_address || '(unknown)';
 
   return (
     <div onClick={onClick}
       style={{
-        padding:'10px 14px', borderBottom:`0.5px solid ${T.border}`,
+        padding:'6px 12px', borderBottom:`0.5px solid ${T.border}`,
         background: selected ? T.bg2 : 'transparent',
         cursor:'pointer', transition:'background 0.12s',
       }}
       onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; }}
       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
     >
-      <div style={{ display:'flex', alignItems:'flex-start', gap:'8px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:'7px', minHeight:'32px' }}>
         <input
           type="checkbox"
           checked={isChecked}
-          onChange={onToggleSelect}
-          onClick={e => e.stopPropagation()}
-          style={{ marginTop:'3px', flexShrink:0, cursor:'pointer', width:'14px', height:'14px', accentColor: T.accent }}
+          onChange={() => {}}
+          onClick={e => onCheckboxClick(index, thread, e)}
+          style={{ flexShrink:0, cursor:'pointer', width:'14px', height:'14px', accentColor: T.accent }}
         />
         {isUnread
-          ? <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:T.accent, flexShrink:0, marginTop:'5px' }}/>
+          ? <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:T.accent, flexShrink:0 }}/>
           : <div style={{ width:'7px', height:'7px', flexShrink:0 }}/>
         }
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'6px', marginBottom:'2px' }}>
-            <span style={{
-              fontSize:F.sm, fontWeight: isUnread ? '700' : '500',
-              color: isUnread ? T.text0 : T.text1,
-              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1,
-            }}>
-              {thread.subject || '(no subject)'}
+        {!isMobile && (
+          <span style={{
+            width:'130px', flexShrink:0,
+            fontSize:F.xs, fontWeight: isUnread ? '700' : '400',
+            color: isUnread ? T.text0 : T.text1,
+            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+          }}>
+            {senderDisplay}
+          </span>
+        )}
+        <span style={{ flex:1, minWidth:0, fontSize:F.xs, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+          <span style={{ fontWeight: isUnread ? '600' : '400', color: isUnread ? T.text0 : T.text1 }}>
+            {thread.subject || '(no subject)'}
+          </span>
+          {thread.snippet && (
+            <span style={{ color:T.text2 }}> — {thread.snippet}</span>
+          )}
+        </span>
+        <div style={{ display:'flex', alignItems:'center', gap:'5px', flexShrink:0 }}>
+          {thread.linked_record_type && (
+            <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>
+              {thread.linked_record_type.toUpperCase().slice(0, 3)}
             </span>
-            <span style={{ fontSize:'11px', color:T.text3, flexShrink:0 }}>{relativeTime(thread.last_message_at)}</span>
-          </div>
-          <div style={{ fontSize:F.xs, color:T.text2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:'4px' }}>
-            {thread.snippet || ''}
-          </div>
-          <div style={{ display:'flex', gap:'4px', alignItems:'center', flexWrap:'wrap' }}>
-            {thread.linked_record_type && (
-              <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'3px', background:`${T.warn}22`, color:T.warn, fontWeight:'600' }}>
-                {thread.linked_record_type}
-              </span>
-            )}
-            {thread.link_status === 'flagged' && (
-              <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'3px', background:`${T.danger}22`, color:T.danger, fontWeight:'600' }}>
-                Unlinked
-              </span>
-            )}
-            {thread.unread_count > 0 && (
-              <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'3px', background:`${T.accent}22`, color:T.accent }}>
-                {thread.unread_count} unread
-              </span>
-            )}
-          </div>
+          )}
+          {thread.link_status === 'flagged' && (
+            <span style={{ width:'6px', height:'6px', borderRadius:'1px', background:T.danger, flexShrink:0, display:'inline-block' }}/>
+          )}
+          {thread.has_attachment && <Paperclip size={13} color={T.text2}/>}
+          <span style={{ fontSize:'11px', color:T.text3, minWidth:'32px', textAlign:'right' }}>{relativeTime(thread.last_message_at)}</span>
         </div>
       </div>
     </div>
@@ -553,6 +551,7 @@ export default function EmailInbox() {
   const [refreshKey,     setRefreshKey]     = useState(0);
   const [isSyncing,      setIsSyncing]      = useState(false);
   const [selectedIds,    setSelectedIds]    = useState(new Set());
+  const [lastCheckedIndex, setLastCheckedIndex] = useState(null);
 
   const buildQuery = useCallback((f) => {
     let params = `order=last_message_at.desc&limit=100&select=*`;
@@ -566,6 +565,7 @@ export default function EmailInbox() {
     setLoading(true);
     setSelectedThread(null);
     setSelectedIds(new Set());
+    setLastCheckedIndex(null);
     sbFetch('email_threads', buildQuery(filter))
       .then(setThreads)
       .catch(() => setThreads([]))
@@ -630,7 +630,22 @@ export default function EmailInbox() {
     });
   };
 
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => { setSelectedIds(new Set()); setLastCheckedIndex(null); };
+
+  const handleCheckboxClick = (index, thread, e) => {
+    e.stopPropagation();
+    if (e.shiftKey && lastCheckedIndex !== null) {
+      const [start, end] = [lastCheckedIndex, index].sort((a, b) => a - b);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) next.add(threads[i].id);
+        return next;
+      });
+    } else {
+      toggleSelect(thread.id);
+    }
+    setLastCheckedIndex(index);
+  };
 
   const handleBatchAction = async (action) => {
     const ids = Array.from(selectedIds);
@@ -743,14 +758,16 @@ export default function EmailInbox() {
               </div>
             </div>
           )}
-          {!loading && threads.map(thread => (
+          {!loading && threads.map((thread, index) => (
             <ThreadListItem
               key={thread.id}
               thread={thread}
               selected={selectedThread?.id === thread.id}
               onClick={() => handleSelectThread(thread)}
               isChecked={selectedIds.has(thread.id)}
-              onToggleSelect={() => toggleSelect(thread.id)}
+              onCheckboxClick={handleCheckboxClick}
+              index={index}
+              isMobile={isMobile}
             />
           ))}
         </div>

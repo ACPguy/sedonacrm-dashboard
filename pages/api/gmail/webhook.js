@@ -125,6 +125,18 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
     }
   }
 
+  const fullMsg = await gmailClient.users.messages.get({
+    userId: 'me',
+    id: gmailMessageId,
+    format: 'full',
+  });
+
+  const { html, text } = extractBody(fullMsg.data.payload);
+  const bodyHtml = html;
+  const bodyText = text;
+  const bodyStored = true;
+  const attachmentFlag = hasAttachment(fullMsg.data.payload);
+
   const gmailThreadId = msg.threadId;
   let threadRow;
 
@@ -138,6 +150,9 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
     const updates = {
       last_message_at: new Date(parseInt(msg.internalDate)).toISOString(),
       snippet: msg.snippet,
+      last_sender_name: fromName,
+      last_sender_address: fromAddress,
+      has_attachment: attachmentFlag,
     };
     if (existingThread.link_status === 'unlinked' && linkStatus !== 'unlinked') {
       updates.linked_record_type = linkedRecordType;
@@ -161,26 +176,14 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
       is_read: isOutbound,
       unread_count: isOutbound ? 0 : 1,
       gmail_labels: msg.labelIds || [],
+      last_sender_name: fromName,
+      last_sender_address: fromAddress,
+      has_attachment: attachmentFlag,
     }).select().single();
     threadRow = created;
   }
 
   if (!threadRow) return;
-
-  let bodyHtml = null;
-  let bodyText = null;
-  let bodyStored = false;
-
-  const fullMsg = await gmailClient.users.messages.get({
-    userId: 'me',
-    id: gmailMessageId,
-    format: 'full',
-  });
-
-  const { html, text } = extractBody(fullMsg.data.payload);
-  bodyHtml = html;
-  bodyText = text;
-  bodyStored = true;
 
   const { data: msgRow } = await sb.from('email_messages').insert({
     gmail_message_id: gmailMessageId,
@@ -195,6 +198,7 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
     body_html: bodyHtml,
     body_text: bodyText,
     body_stored: bodyStored,
+    has_attachment: attachmentFlag,
     crm_record_header: crmHeader,
     is_outbound: isOutbound,
     is_latest_in_thread: true,
@@ -288,6 +292,13 @@ function extractBody(payload) {
     return { html, text };
   }
   return { html: null, text: null };
+}
+
+function hasAttachment(payload) {
+  if (!payload) return false;
+  if (payload.filename && payload.filename.length > 0 && payload.body?.attachmentId) return true;
+  if (payload.parts) return payload.parts.some(p => hasAttachment(p));
+  return false;
 }
 
 function parseAddressHeader(raw) {

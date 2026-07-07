@@ -166,6 +166,7 @@ pages/api/gmail/
   - EmailInbox prev/next nav (2026-07-07): ‹ › buttons + ArrowLeft/Right keyboard nav in thread detail; steps through in-memory threads array
   - EmailInbox batch select (2026-07-07): checkboxes on thread rows + batch toolbar (Archive/Spam/Delete); batch-action.js calls Gmail API for each action
   - handleArchive bug fix (2026-07-07): single-thread Archive now also calls Gmail API (removeLabelIds INBOX) via batch-action endpoint
+  - EmailInbox compact rows (2026-07-07): single-line ThreadListItem with sender name (130px col, hidden mobile), subject+snippet combined, paperclip icon, small indicator badges; shift-click range select; row height ~32px
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -348,6 +349,8 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `inquiry_drafts`: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status
 - `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ⚠️ migration SQL pending (see Known Gaps)
 - `email_threads`: added `is_deleted boolean DEFAULT false` (2026-07-07) — set by batch-action delete action
+- `email_threads`: added `last_sender_name text`, `last_sender_address text`, `has_attachment boolean DEFAULT false` (2026-07-07) — populated by webhook.js + sync-now.js on every new message; old threads show null/false until re-synced
+- `email_messages`: added `has_attachment boolean DEFAULT false` (2026-07-07)
 
 ## Drive Folder Architecture (permanent)
 
