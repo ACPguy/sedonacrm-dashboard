@@ -34,6 +34,19 @@ const relativeTime = d => {
   return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric' });
 };
 
+const formatSmartTime = d => {
+  if (!d) return '';
+  const date = new Date(d);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) {
+    return date.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+  }
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString('en-US',
+    sameYear ? { month:'short', day:'numeric' } : { month:'short', day:'numeric', year:'2-digit' });
+};
+
 const stripHtml = html => (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 const FILTER_TABS = [
@@ -84,32 +97,46 @@ const ActionBtn = ({ label, icon, onClick, disabled, variant, color }) => {
 const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick, index, isMobile }) => {
   const isUnread = !thread.is_read;
   const senderDisplay = thread.last_sender_name || thread.last_sender_address || '(unknown)';
+  const [hovered, setHovered] = useState(false);
+
+  const bg = selected ? T.bg2 : (hovered ? 'rgba(255,255,255,0.025)' : 'transparent');
+  const cellStyle = {
+    background: bg,
+    borderBottom: `0.5px solid ${T.border}`,
+    padding: '6px 0',
+    display: 'flex',
+    alignItems: 'center',
+    cursor: 'pointer',
+    transition: 'background 0.12s',
+    minHeight: '32px',
+    boxSizing: 'border-box',
+  };
+  const cellHandlers = {
+    onClick,
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+  };
 
   return (
-    <div onClick={onClick}
-      style={{
-        padding:'6px 12px', borderBottom:`0.5px solid ${T.border}`,
-        background: selected ? T.bg2 : 'transparent',
-        cursor:'pointer', transition:'background 0.12s',
-      }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; }}
-      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
-    >
-      <div style={{ display:'flex', alignItems:'center', gap:'7px', minHeight:'32px' }}>
+    <>
+      <div style={{ ...cellStyle, paddingLeft:'12px' }} {...cellHandlers}>
         <input
           type="checkbox"
           checked={isChecked}
           onChange={() => {}}
           onClick={e => onCheckboxClick(index, thread, e)}
-          style={{ flexShrink:0, cursor:'pointer', width:'14px', height:'14px', accentColor: T.accent }}
+          style={{ cursor:'pointer', width:'14px', height:'14px', accentColor: T.accent }}
         />
+      </div>
+      <div style={cellStyle} {...cellHandlers}>
         {isUnread
-          ? <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:T.accent, flexShrink:0 }}/>
-          : <div style={{ width:'7px', height:'7px', flexShrink:0 }}/>
+          ? <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:T.accent }}/>
+          : <div style={{ width:'7px', height:'7px' }}/>
         }
+      </div>
+      <div style={cellStyle} {...cellHandlers}>
         {!isMobile && (
           <span style={{
-            flex:'0 0 clamp(70px, 28%, 200px)',
             fontSize:F.xs, fontWeight: isUnread ? '700' : '400',
             color: isUnread ? T.text0 : T.text1,
             overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
@@ -117,7 +144,9 @@ const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick,
             {senderDisplay}
           </span>
         )}
-        <span style={{ flex:1, minWidth:0, fontSize:F.xs, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+      </div>
+      <div style={{ ...cellStyle, minWidth:0 }} {...cellHandlers}>
+        <span style={{ minWidth:0, fontSize:F.xs, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', width:'100%' }}>
           <span style={{ fontWeight: isUnread ? '600' : '400', color: isUnread ? T.text0 : T.text1 }}>
             {thread.subject || '(no subject)'}
           </span>
@@ -125,20 +154,22 @@ const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick,
             <span style={{ color:T.text2 }}> — {thread.snippet}</span>
           )}
         </span>
-        <div style={{ display:'flex', alignItems:'center', gap:'5px', flexShrink:0 }}>
-          {thread.linked_record_type && (
-            <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>
-              {thread.linked_record_type.toUpperCase().slice(0, 3)}
-            </span>
-          )}
-          {thread.link_status === 'flagged' && (
-            <span style={{ width:'6px', height:'6px', borderRadius:'1px', background:T.danger, flexShrink:0, display:'inline-block' }}/>
-          )}
-          {thread.has_attachment && <Paperclip size={13} color={T.text2}/>}
-          <span style={{ fontSize:'11px', color:T.text3, minWidth:'32px', textAlign:'right' }}>{relativeTime(thread.last_message_at)}</span>
-        </div>
       </div>
-    </div>
+      <div style={{ ...cellStyle, gap:'5px' }} {...cellHandlers}>
+        {thread.linked_record_type && (
+          <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>
+            {thread.linked_record_type.toUpperCase().slice(0, 3)}
+          </span>
+        )}
+        {thread.link_status === 'flagged' && (
+          <span style={{ width:'6px', height:'6px', borderRadius:'1px', background:T.danger, display:'inline-block' }}/>
+        )}
+        {thread.has_attachment && <Paperclip size={13} color={T.text2}/>}
+      </div>
+      <div style={{ ...cellStyle, paddingRight:'12px', justifyContent:'flex-end' }} {...cellHandlers}>
+        <span style={{ fontSize:'11px', color:T.text3, whiteSpace:'nowrap' }}>{formatSmartTime(thread.last_message_at)}</span>
+      </div>
+    </>
   );
 };
 
@@ -755,7 +786,20 @@ export default function EmailInbox() {
                 }
               </button>
           </div>
-          <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' }}>
+            <input
+              type="checkbox"
+              ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < threads.length; }}
+              checked={threads.length > 0 && selectedIds.size === threads.length}
+              onChange={() => {
+                if (selectedIds.size === threads.length) {
+                  setSelectedIds(new Set());
+                } else {
+                  setSelectedIds(new Set(threads.map(t => t.id)));
+                }
+              }}
+              style={{ cursor:'pointer', width:'14px', height:'14px', accentColor:T.accent, marginRight:'6px' }}
+            />
             {FILTER_TABS.map(({ key, label }) => (
               <FilterPill key={key} label={label} active={filter === key} onClick={() => setFilter(key)}/>
             ))}
@@ -777,12 +821,12 @@ export default function EmailInbox() {
         )}
 
         {/* Thread list */}
-        <div style={{ flex:1, overflowY:'auto' }}>
+        <div style={{ flex:1, overflowY:'auto', display:'grid', gridTemplateColumns:'32px 20px fit-content(180px) minmax(0,1fr) auto 60px', columnGap:'6px', alignContent:'start' }}>
           {loading && (
-            <div style={{ padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading…</div>
+            <div style={{ gridColumn:'1 / -1', padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading…</div>
           )}
           {!loading && threads.length === 0 && (
-            <div style={{ padding:'40px 20px', textAlign:'center' }}>
+            <div style={{ gridColumn:'1 / -1', padding:'40px 20px', textAlign:'center' }}>
               <div style={{ fontSize:'28px', color:T.bg3, marginBottom:'8px' }}>✉</div>
               <div style={{ fontSize:F.sm, color:T.text2 }}>
                 {filter === 'unread' ? 'No unread messages.'
