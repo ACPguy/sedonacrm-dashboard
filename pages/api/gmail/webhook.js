@@ -54,6 +54,8 @@ async function processWebhook(body) {
 
   for (const item of historyItems) {
     for (const msg of (item.messagesAdded || [])) {
+      const labelIds = msg.message.labelIds || [];
+      if (labelIds.includes('SPAM') || labelIds.includes('TRASH')) continue;
       await processNewMessage(gmailClient, sb, account, msg.message.id);
     }
   }
@@ -103,19 +105,23 @@ async function processNewMessage(gmailClient, sb, account, gmailMessageId) {
       linkedRecordId = rid;
       linkStatus = 'auto_linked';
     }
-  } else if (!isOutbound) {
-    const { data: contact } = await sb
-      .from('contacts')
-      .select('id')
-      .ilike('email', fromAddress)
-      .single();
+  } else {
+    const lookupEmail = isOutbound ? parseFirstEmail(headers['to']) : fromAddress;
 
-    if (contact) {
-      linkedRecordType = 'contact';
-      linkedRecordId = contact.id;
-      linkStatus = 'auto_linked';
-    } else {
-      linkStatus = 'flagged';
+    if (lookupEmail) {
+      const { data: contact } = await sb
+        .from('contacts')
+        .select('id')
+        .ilike('email', lookupEmail)
+        .single();
+
+      if (contact) {
+        linkedRecordType = 'contact';
+        linkedRecordId = contact.id;
+        linkStatus = 'auto_linked';
+      } else if (!isOutbound) {
+        linkStatus = 'flagged';
+      }
     }
   }
 

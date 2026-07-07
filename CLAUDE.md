@@ -201,7 +201,7 @@ pages/api/gmail/
 ## Current Git State
 
 - main: `c6182d1` — session close 2026-07-03
-- preview: this session close commit
+- preview: Gmail sync fixes (2026-07-07) — spam/trash skip + outbound contact matching
 
 ---
 
