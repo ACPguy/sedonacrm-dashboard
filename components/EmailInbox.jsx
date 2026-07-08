@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, MagnifyingGlass } from '@phosphor-icons/react';
+import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, Trash, X, MagnifyingGlass, Paperclip } from '@phosphor-icons/react';
 import EmailCompose from './EmailCompose';
 
 const SUPABASE_URL  = 'https://edxcvyleielzevpappui.supabase.co';
@@ -34,9 +34,23 @@ const relativeTime = d => {
   return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric' });
 };
 
+const formatSmartTime = d => {
+  if (!d) return '';
+  const date = new Date(d);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) {
+    return date.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+  }
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString('en-US',
+    sameYear ? { month:'short', day:'numeric' } : { month:'short', day:'numeric', year:'2-digit' });
+};
+
 const stripHtml = html => (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 const FILTER_TABS = [
+  { key:'inbox',   label:'Inbox' },
   { key:'unread',  label:'Unread' },
   { key:'all',     label:'All' },
   { key:'linked',  label:'Linked' },
@@ -81,59 +95,82 @@ const ActionBtn = ({ label, icon, onClick, disabled, variant, color }) => {
 };
 
 // ── Thread List Item ───────────────────────────────────────────────────────────
-const ThreadListItem = ({ thread, selected, onClick }) => {
-  const isUnread  = !thread.is_read;
-  const sender    = thread.snippet_from || thread.linked_record_type || '—';
+const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick, index, isMobile }) => {
+  const isUnread = !thread.is_read;
+  const senderDisplay = thread.last_sender_name || thread.last_sender_address || '(unknown)';
+  const [hovered, setHovered] = useState(false);
+
+  const bg = selected ? T.bg2 : (hovered ? 'rgba(255,255,255,0.025)' : 'transparent');
+  const cellStyle = {
+    background: bg,
+    borderBottom: `0.5px solid ${T.border}`,
+    padding: '6px 0',
+    display: 'flex',
+    alignItems: 'center',
+    cursor: 'pointer',
+    transition: 'background 0.12s',
+    minHeight: '32px',
+    boxSizing: 'border-box',
+  };
+  const cellHandlers = {
+    onClick,
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+  };
 
   return (
-    <div onClick={onClick}
-      style={{
-        padding:'10px 14px', borderBottom:`0.5px solid ${T.border}`,
-        background: selected ? T.bg2 : 'transparent',
-        cursor:'pointer', transition:'background 0.12s',
-      }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; }}
-      onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
-    >
-      <div style={{ display:'flex', alignItems:'flex-start', gap:'8px' }}>
-        {isUnread
-          ? <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:T.accent, flexShrink:0, marginTop:'5px' }}/>
-          : <div style={{ width:'7px', height:'7px', flexShrink:0 }}/>
-        }
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'6px', marginBottom:'2px' }}>
-            <span style={{
-              fontSize:F.sm, fontWeight: isUnread ? '700' : '500',
-              color: isUnread ? T.text0 : T.text1,
-              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1,
-            }}>
-              {thread.subject || '(no subject)'}
-            </span>
-            <span style={{ fontSize:'11px', color:T.text3, flexShrink:0 }}>{relativeTime(thread.last_message_at)}</span>
-          </div>
-          <div style={{ fontSize:F.xs, color:T.text2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:'4px' }}>
-            {thread.snippet || ''}
-          </div>
-          <div style={{ display:'flex', gap:'4px', alignItems:'center', flexWrap:'wrap' }}>
-            {thread.linked_record_type && (
-              <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'3px', background:`${T.warn}22`, color:T.warn, fontWeight:'600' }}>
-                {thread.linked_record_type}
-              </span>
-            )}
-            {thread.link_status === 'flagged' && (
-              <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'3px', background:`${T.danger}22`, color:T.danger, fontWeight:'600' }}>
-                Unlinked
-              </span>
-            )}
-            {thread.unread_count > 0 && (
-              <span style={{ fontSize:'10px', padding:'1px 5px', borderRadius:'3px', background:`${T.accent}22`, color:T.accent }}>
-                {thread.unread_count} unread
-              </span>
-            )}
-          </div>
-        </div>
+    <>
+      <div style={{ ...cellStyle, paddingLeft:'12px' }} {...cellHandlers}>
+        <input
+          type="checkbox"
+          checked={isChecked}
+          onChange={() => {}}
+          onClick={e => onCheckboxClick(index, thread, e)}
+          style={{ cursor:'pointer', width:'14px', height:'14px', accentColor: T.accent }}
+        />
       </div>
-    </div>
+      <div style={cellStyle} {...cellHandlers}>
+        {isUnread
+          ? <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:T.accent }}/>
+          : <div style={{ width:'7px', height:'7px' }}/>
+        }
+      </div>
+      <div style={{ ...cellStyle, minWidth:0 }} {...cellHandlers}>
+        {!isMobile && (
+          <span style={{
+            fontSize:F.xs, fontWeight: isUnread ? '700' : '400',
+            color: isUnread ? T.text0 : T.text1,
+            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+          }}>
+            {senderDisplay}
+          </span>
+        )}
+      </div>
+      <div style={{ ...cellStyle, minWidth:0 }} {...cellHandlers}>
+        <span style={{ minWidth:0, fontSize:F.xs, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', width:'100%' }}>
+          <span style={{ fontWeight: isUnread ? '600' : '400', color: isUnread ? T.text0 : T.text1 }}>
+            {thread.subject || '(no subject)'}
+          </span>
+          {thread.snippet && (
+            <span style={{ color:T.text2 }}> — {thread.snippet}</span>
+          )}
+        </span>
+      </div>
+      <div style={{ ...cellStyle, gap:'4px', overflow:'hidden', justifyContent:'flex-end' }} {...cellHandlers}>
+        {thread.linked_record_type && (
+          <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>
+            {thread.linked_record_type.toUpperCase().slice(0, 3)}
+          </span>
+        )}
+        {thread.link_status === 'flagged' && (
+          <span style={{ width:'6px', height:'6px', borderRadius:'1px', background:T.danger, display:'inline-block' }}/>
+        )}
+        {thread.has_attachment && <Paperclip size={13} color={T.text2}/>}
+      </div>
+      <div style={{ ...cellStyle, paddingRight:'12px', justifyContent:'flex-end' }} {...cellHandlers}>
+        <span style={{ fontSize:'11px', color:T.text3, whiteSpace:'nowrap' }}>{formatSmartTime(thread.last_message_at)}</span>
+      </div>
+    </>
   );
 };
 
@@ -216,7 +253,7 @@ const MessageRow = ({ msg, defaultExpanded }) => {
 };
 
 // ── Thread Detail Panel ────────────────────────────────────────────────────────
-const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply, onThreadUpdate, onLink }) => {
+const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply, onThreadUpdate, onLink, navigateThread, hasPrev, hasNext }) => {
   const [messages,     setMessages]     = useState([]);
   const [loadingMsgs,  setLoadingMsgs]  = useState(true);
   const [aiSummary,    setAiSummary]    = useState('');
@@ -391,6 +428,8 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply,
             icon={thread.is_read ? <Circle size={13}/> : <CheckCircle size={13}/>}
             onClick={() => onMarkRead(thread.id, !thread.is_read)}
           />
+          <ActionBtn label="‹" disabled={!hasPrev} onClick={() => navigateThread('prev')}/>
+          <ActionBtn label="›" disabled={!hasNext} onClick={() => navigateThread('next')}/>
           {linkFlash ? (
             <span style={{ fontSize:F.xs, color:T.success, fontWeight:'600', padding:'5px 10px', border:`0.5px solid ${T.success}`, borderRadius:'4px' }}>✓ Linked</span>
           ) : linkSuccess ? (
@@ -537,15 +576,37 @@ export default function EmailInbox() {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 640;
 
-  const [filter,         setFilter]         = useState('unread');
+  const [filter,         setFilter]         = useState('inbox');
   const [threads,        setThreads]        = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [selectedThread, setSelectedThread] = useState(null);
   const [refreshKey,     setRefreshKey]     = useState(0);
   const [isSyncing,      setIsSyncing]      = useState(false);
+  const [selectedIds,    setSelectedIds]    = useState(new Set());
+  const [lastCheckedIndex, setLastCheckedIndex] = useState(null);
+  const [listWidth, setListWidth] = useState(() => {
+    if (typeof window === 'undefined') return 340;
+    const saved = localStorage.getItem('sedonacrm_inbox_list_width');
+    return saved ? parseInt(saved) : 340;
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef(null);
+  const listWidthRef = useRef(listWidth);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sedonacrm_inbox_list_width');
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!Number.isNaN(parsed)) {
+        setListWidth(parsed);
+        listWidthRef.current = parsed;
+      }
+    }
+  }, []);
 
   const buildQuery = useCallback((f) => {
-    let params = `order=last_message_at.desc&limit=100&select=*`;
+    let params = `order=last_message_at.desc.nullslast&limit=100&select=*`;
+    if (f === 'inbox')   params = `is_archived=eq.false&is_deleted=eq.false&${params}`;
     if (f === 'unread')  params = `is_read=eq.false&${params}`;
     if (f === 'linked')  params = `link_status=eq.auto_linked&${params}`;
     if (f === 'flagged') params = `link_status=eq.flagged&${params}`;
@@ -555,6 +616,8 @@ export default function EmailInbox() {
   useEffect(() => {
     setLoading(true);
     setSelectedThread(null);
+    setSelectedIds(new Set());
+    setLastCheckedIndex(null);
     sbFetch('email_threads', buildQuery(filter))
       .then(setThreads)
       .catch(() => setThreads([]))
@@ -587,10 +650,10 @@ export default function EmailInbox() {
   const handleArchive = async (threadId) => {
     setThreads(ts => ts.filter(t => t.id !== threadId));
     if (selectedThread?.id === threadId) setSelectedThread(null);
-    await fetch('/api/gmail/thread-update', {
+    await fetch('/api/gmail/batch-action', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ threadId, updates: { is_archived: true } }),
+      headers: { 'Content-Type': 'application/json', 'x-briefing-secret': process.env.NEXT_PUBLIC_BRIEFING_SECRET },
+      body: JSON.stringify({ threadIds: [threadId], action: 'archive' }),
     }).catch(() => {});
   };
 
@@ -610,6 +673,70 @@ export default function EmailInbox() {
     setThreads(ts => ts.map(t => t.id === selectedThread.id ? { ...t, ...updates } : t));
   };
 
+  const toggleSelect = (threadId) => {
+    setSelectedIds(ids => {
+      const next = new Set(ids);
+      if (next.has(threadId)) next.delete(threadId);
+      else next.add(threadId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => { setSelectedIds(new Set()); setLastCheckedIndex(null); };
+
+  const handleCheckboxClick = (index, thread, e) => {
+    e.stopPropagation();
+    if (e.shiftKey && lastCheckedIndex !== null) {
+      const [start, end] = [lastCheckedIndex, index].sort((a, b) => a - b);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) next.add(threads[i].id);
+        return next;
+      });
+    } else {
+      toggleSelect(thread.id);
+    }
+    setLastCheckedIndex(index);
+  };
+
+  const handleDividerMouseDown = (e) => {
+    e.preventDefault();
+    listWidthRef.current = listWidth;
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleMouseMove = (e) => {
+      const left = containerRef.current?.getBoundingClientRect().left || 0;
+      const newWidth = Math.max(280, Math.min(700, e.clientX - left));
+      setListWidth(newWidth);
+      listWidthRef.current = newWidth;
+    };
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      localStorage.setItem('sedonacrm_inbox_list_width', String(listWidthRef.current));
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
+  const handleBatchAction = async (action) => {
+    const ids = Array.from(selectedIds);
+    setThreads(ts => ts.filter(t => !ids.includes(t.id)));
+    if (selectedThread && ids.includes(selectedThread.id)) setSelectedThread(null);
+    clearSelection();
+    await fetch('/api/gmail/batch-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-briefing-secret': process.env.NEXT_PUBLIC_BRIEFING_SECRET },
+      body: JSON.stringify({ threadIds: ids, action }),
+    }).catch(() => {});
+  };
+
   const handleSelectThread = async (thread) => {
     setSelectedThread(thread);
     if (!thread.is_read) {
@@ -622,12 +749,37 @@ export default function EmailInbox() {
     }
   };
 
+  const navigateThread = (direction) => {
+    if (!selectedThread) return;
+    const idx = threads.findIndex(t => t.id === selectedThread.id);
+    if (idx === -1) return;
+    const nextIdx = direction === 'next' ? idx + 1 : idx - 1;
+    if (nextIdx < 0 || nextIdx >= threads.length) return;
+    handleSelectThread(threads[nextIdx]);
+  };
+
+  const selectedIdx = selectedThread ? threads.findIndex(t => t.id === selectedThread.id) : -1;
+  const hasPrev = selectedIdx > 0;
+  const hasNext = selectedIdx !== -1 && selectedIdx < threads.length - 1;
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (!selectedThread) return;
+      const tag = document.activeElement?.tagName;
+      const isEditable = document.activeElement?.isContentEditable;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || isEditable) return;
+      if (e.key === 'ArrowLeft') navigateThread('prev');
+      if (e.key === 'ArrowRight') navigateThread('next');
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedThread, threads]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ display:'flex', height:'100%', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden' }}>
+    <div ref={containerRef} style={{ display:'flex', height:'100%', background:T.bg1, fontFamily:'var(--font-sans)', color:T.text0, fontSize:F.base, overflow:'hidden', userSelect: isDragging ? 'none' : 'auto' }}>
 
       {/* Left panel — thread list */}
-      <div style={{ width:isMobile?'100%':'340px', flexShrink:0, display:isMobile&&selectedThread?'none':'flex', flexDirection:'column', borderRight:`0.5px solid ${T.border}`, overflow:'hidden' }}>
+      <div style={{ width:isMobile?'100%':listWidth+'px', flexShrink:0, display:isMobile&&selectedThread?'none':'flex', flexDirection:'column', borderRight:isMobile?`0.5px solid ${T.border}`:'none', overflow:'hidden' }}>
         {/* Header */}
         <div style={{ padding:'12px 16px', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
@@ -648,38 +800,84 @@ export default function EmailInbox() {
                 }
               </button>
           </div>
-          <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' }}>
+            <input
+              type="checkbox"
+              ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < threads.length; }}
+              checked={threads.length > 0 && selectedIds.size === threads.length}
+              onChange={() => {
+                if (selectedIds.size === threads.length) {
+                  setSelectedIds(new Set());
+                } else {
+                  setSelectedIds(new Set(threads.map(t => t.id)));
+                }
+              }}
+              style={{ cursor:'pointer', width:'14px', height:'14px', accentColor:T.accent, marginRight:'6px' }}
+            />
             {FILTER_TABS.map(({ key, label }) => (
               <FilterPill key={key} label={label} active={filter === key} onClick={() => setFilter(key)}/>
             ))}
           </div>
         </div>
 
+        {/* Batch action toolbar */}
+        {selectedIds.size > 0 && (
+          <div style={{ padding:'7px 12px', background:T.bg3, borderBottom:`0.5px solid ${T.border}`, display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', flexShrink:0 }}>
+            <span style={{ fontSize:F.xs, color:T.text1, fontWeight:'600', marginRight:'4px' }}>{selectedIds.size} selected</span>
+            <ActionBtn label="Archive" icon={<Archive size={13}/>} onClick={() => handleBatchAction('archive')}/>
+            <ActionBtn label="Spam" icon={<span>🚫</span>} color={T.warn} onClick={() => handleBatchAction('spam')}/>
+            <ActionBtn label="Delete" icon={<Trash size={13}/>} color={T.danger} onClick={() => handleBatchAction('delete')}/>
+            <button type="button" onClick={clearSelection}
+              style={{ marginLeft:'auto', background:'transparent', border:'none', color:T.text2, cursor:'pointer', fontSize:F.xs, display:'flex', alignItems:'center', gap:'3px', padding:'2px 4px' }}>
+              <X size={13}/> Cancel
+            </button>
+          </div>
+        )}
+
         {/* Thread list */}
-        <div style={{ flex:1, overflowY:'auto' }}>
+        <div style={{ flex:1, overflowY:'auto', display:'grid', gridTemplateColumns:'32px 20px fit-content(130px) minmax(0,1fr) 64px 60px', columnGap:'6px', alignContent:'start' }}>
           {loading && (
-            <div style={{ padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading…</div>
+            <div style={{ gridColumn:'1 / -1', padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading…</div>
           )}
           {!loading && threads.length === 0 && (
-            <div style={{ padding:'40px 20px', textAlign:'center' }}>
+            <div style={{ gridColumn:'1 / -1', padding:'40px 20px', textAlign:'center' }}>
               <div style={{ fontSize:'28px', color:T.bg3, marginBottom:'8px' }}>✉</div>
               <div style={{ fontSize:F.sm, color:T.text2 }}>
-                {filter === 'unread' ? 'No unread messages.'
+                {filter === 'inbox'   ? 'Inbox is empty.'
+                  : filter === 'unread' ? 'No unread messages.'
                   : filter === 'flagged' ? 'No flagged messages.'
                   : 'No messages found.'}
               </div>
             </div>
           )}
-          {!loading && threads.map(thread => (
+          {!loading && threads.map((thread, index) => (
             <ThreadListItem
               key={thread.id}
               thread={thread}
               selected={selectedThread?.id === thread.id}
               onClick={() => handleSelectThread(thread)}
+              isChecked={selectedIds.has(thread.id)}
+              onCheckboxClick={handleCheckboxClick}
+              index={index}
+              isMobile={isMobile}
             />
           ))}
         </div>
       </div>
+
+      {/* Resizable divider */}
+      {!isMobile && (
+        <div
+          onMouseDown={handleDividerMouseDown}
+          style={{
+            width:'4px', flexShrink:0, cursor:'col-resize',
+            background: isDragging ? T.accent : T.border,
+            transition: isDragging ? 'none' : 'background 0.15s ease',
+          }}
+          onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = T.accent; }}
+          onMouseLeave={e => { if (!isDragging) e.currentTarget.style.background = T.border; }}
+        />
+      )}
 
       {/* Right panel — thread detail */}
       <div style={{ flex:1, overflow:'hidden', display:isMobile&&!selectedThread?'none':'flex', flexDirection:'column' }}>
@@ -700,6 +898,9 @@ export default function EmailInbox() {
               onReply={() => {}}
               onThreadUpdate={() => setRefreshKey(k => k + 1)}
               onLink={handleLink}
+              navigateThread={navigateThread}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
             />
           </>
         ) : (

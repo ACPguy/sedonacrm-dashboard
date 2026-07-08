@@ -140,6 +140,8 @@ pages/api/agents/
 pages/api/gmail/
   renew-watch.js      — POST/GET renews Gmail Pub/Sub watch; cron every 6 days
   webhook.js          — processes Pub/Sub push notifications, syncs email_threads + email_messages
+  sync-now.js         — POST syncs Gmail history + polls INBOX; GET returns current state
+  batch-action.js     — POST { threadIds, action: archive|spam|delete } — calls Gmail API + updates Supabase; auth: x-briefing-secret
 ```
 
 ## Phase Status
@@ -160,6 +162,16 @@ pages/api/gmail/
   - BriefingView: ↻ dropdown (Refresh + Re-run), Expand/Collapse All; all 5 sections default closed
   - Cron auth fixes (2026-07-03): all 5 cron routes now accept GET (Vercel sends GET) + CRON_SECRET Bearer header
   - Home URL (2026-07-03): clean `/home` route; `/?view=morning-briefing` 307-redirects to `/home`
+  - Gmail sync fixes (2026-07-07): skip SPAM/TRASH in history.list loop; outbound emails matched to contacts via "to" header
+  - EmailInbox prev/next nav (2026-07-07): ‹ › buttons + ArrowLeft/Right keyboard nav in thread detail; steps through in-memory threads array
+  - EmailInbox batch select (2026-07-07): checkboxes on thread rows + batch toolbar (Archive/Spam/Delete); batch-action.js calls Gmail API for each action
+  - handleArchive bug fix (2026-07-07): single-thread Archive now also calls Gmail API (removeLabelIds INBOX) via batch-action endpoint
+  - EmailInbox compact rows (2026-07-07): single-line ThreadListItem with sender name (130px col, hidden mobile), subject+snippet combined, paperclip icon, small indicator badges; shift-click range select; row height ~32px
+  - EmailInbox resizable list panel (2026-07-07): draggable 4px divider between list and detail; width persists to localStorage (key: sedonacrm_inbox_list_width); bounds 280–700px; offset calculated via containerRef.getBoundingClientRect().left (works with variable sidebar width); sender col uses flex clamp(70px,28%,200px) for proportional growth
+  - EmailInbox grid columns (2026-07-07): ThreadListItem refactored to Fragment of 6 cells (no wrapper div); grid container uses `gridTemplateColumns:'32px 20px fit-content(180px) minmax(0,1fr) 64px 60px'`; sender col auto-sizes to content (no dead space); formatSmartTime shows clock time today, short date otherwise; select-all checkbox inline with filter pills (indeterminate when partial)
+  - EmailInbox fixes (2026-07-07): indicator col fixed to 64px (was auto — could spill), overflow:hidden + justifyContent:flex-end on cell; listWidthRef now initialised from listWidth (not hardcoded 340); mount-time useEffect re-reads localStorage after hydration; handleDividerMouseDown syncs ref to current state before starting drag
+  - EmailInbox Inbox tab (2026-07-07): added 'inbox' as first/default filter tab; buildQuery filters `is_archived=eq.false&is_deleted=eq.false`; replaces 'unread' as default; empty-state reads "Inbox is empty."
+  - EmailInbox sender col + sort (2026-07-07): sender column cap tightened 180px→130px; buildQuery base uses `order=last_message_at.desc.nullslast` so NULL timestamps always sort to bottom on all tabs
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -170,6 +182,27 @@ pages/api/gmail/
 ## Monthly Cost
 
 - Vercel Pro: $20/mo | Claude API: ~$10–15/mo | Supabase: $0 | Total: ~$30–35/mo
+
+## Gmail Inbox — Session Summary (2026-07-07)
+
+Extensive session, ~10 commits on preview, none yet merged to main. In order:
+
+1. Spam/Trash exclusion — webhook.js + sync-now.js history.list loops now skip messages labeled SPAM/TRASH (previously synced into inbox unfiltered)
+2. Outbound contact linking — matching logic extended to check the "to" address for outbound mail (previously only inbound sender was checked)
+3. Prev/Next thread navigation — buttons + arrow keys, steps through in-memory thread list
+4. Batch select + batch actions — checkboxes, Archive/Spam/Delete via new pages/api/gmail/batch-action.js (also fixed a pre-existing bug where Archive only updated the DB and never actually archived in Gmail)
+5. Compact single-line inbox rows — CSS Grid layout (6 columns: checkbox, unread dot, sender, subject+snippet, indicators, time) replacing the old 3-line stacked card design
+6. Sender name + attachment display — new email_threads columns (last_sender_name, last_sender_address, has_attachment) populated on every sync; paperclip icon shown when has_attachment is true
+7. Shift-click range select — matches Gmail's range-selection behavior
+8. Resizable divider between thread list and detail pane — width saved to localStorage (persistence still has a known bug, see Known Gaps)
+9. Grid column dead-space fix — sender column uses fit-content(130px) instead of a fixed percentage, so short names don't leave wasted space
+10. Gmail-style time format — clock time for today's mail, short date otherwise
+11. Select-all checkbox with indeterminate state
+12. New default "Inbox" filter tab — excludes archived/deleted, shows read+unread (mirrors actual Gmail Inbox); tab order is now Inbox, Unread, All, Linked, Flagged
+13. Defensive nullslast ordering on all filter queries — prevents any future NULL last_message_at row from sorting to the top
+14. One-time data cleanup — deleted a single junk test row (id c77641cc-077f-44c7-9ef0-6b9d6528483d, gmail_thread_id 'test-123') that had no real Gmail data and was causing incorrect sort order
+
+New schema this session: email_threads gained last_sender_name, last_sender_address, has_attachment, is_deleted; email_messages gained has_attachment. New endpoint: pages/api/gmail/batch-action.js.
 
 ## Known Gaps
 
@@ -190,18 +223,22 @@ pages/api/gmail/
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
 - **PENDING: WorkOrderAgentDrafts UI card** — wire nudge + high-cost items into BriefingView after migration SQL runs
 - **PENDING: BriefingView propCode embed** — wire `<BriefingView propCode={data.prop_code} />` into Property detail Operations tab
+- **Inbox divider width does not reliably persist across a hard refresh.** Root cause not yet fully found — a prior fix (syncing listWidthRef to listWidth, adding a mount-time localStorage re-read effect) did not fully resolve it per Scott's testing. Needs further investigation next session — check for a possible race between the mount effect and the lazy useState initializer both writing to listWidth, or a Vercel/browser caching factor.
+- **Inbox indicator badges (CON/LEA/red dot) have no legend or tooltip.** They're understandable to Claude/CC but not self-explanatory to Scott day-to-day. Needs a small legend, tooltip on hover, or expanded labels next session.
 
 ## Next Priorities
 
-1. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
-3. Wire WorkOrderAgentDrafts UI card into BriefingView
-4. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-5. Phase 5: Leasing Pipeline
+1. Fix inbox divider width persistence (see Known Gaps — real bug, not yet resolved)
+2. Add a legend/tooltip for inbox indicator badges (CON/LEA/flagged dot/paperclip meaning)
+3. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
+4. Wire WorkOrderAgentDrafts UI card into BriefingView
+5. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
+6. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
-- main: `c6182d1` — session close 2026-07-03
-- preview: this session close commit
+- main: `2012119` — unchanged, session close 2026-07-03 (preview not yet merged — Scott has not said "approved, merge to main" for the Gmail work)
+- preview: `e828176` — "fix: tighter sender column cap + defensive nullslast ordering" (most recent commit; note the junk-row deletion after this was a data-only change with no commit)
 
 ---
 
@@ -341,6 +378,9 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `lease_watch_drafts`: tenant_id + milestone (UNIQUE pair), subject, body, status
 - `inquiry_drafts`: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status
 - `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ⚠️ migration SQL pending (see Known Gaps)
+- `email_threads`: added `is_deleted boolean DEFAULT false` (2026-07-07) — set by batch-action delete action
+- `email_threads`: added `last_sender_name text`, `last_sender_address text`, `has_attachment boolean DEFAULT false` (2026-07-07) — populated by webhook.js + sync-now.js on every new message; old threads show null/false until re-synced
+- `email_messages`: added `has_attachment boolean DEFAULT false` (2026-07-07)
 
 ## Drive Folder Architecture (permanent)
 
