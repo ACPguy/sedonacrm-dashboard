@@ -134,7 +134,7 @@ const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick,
           : <div style={{ width:'7px', height:'7px' }}/>
         }
       </div>
-      <div style={cellStyle} {...cellHandlers}>
+      <div style={{ ...cellStyle, minWidth:0 }} {...cellHandlers}>
         {!isMobile && (
           <span style={{
             fontSize:F.xs, fontWeight: isUnread ? '700' : '400',

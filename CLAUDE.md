@@ -211,7 +211,7 @@ pages/api/gmail/
 ## Current Git State
 
 - main: `c6182d1` — session close 2026-07-03
-- preview: EmailInbox prev/next nav + batch select/archive/spam/delete (2026-07-07)
+- preview: fix sender column grid blowout on long names (2026-07-07)
 
 ---
 
