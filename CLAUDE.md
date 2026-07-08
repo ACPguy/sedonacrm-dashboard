@@ -171,6 +171,7 @@ pages/api/gmail/
   - EmailInbox grid columns (2026-07-07): ThreadListItem refactored to Fragment of 6 cells (no wrapper div); grid container uses `gridTemplateColumns:'32px 20px fit-content(180px) minmax(0,1fr) 64px 60px'`; sender col auto-sizes to content (no dead space); formatSmartTime shows clock time today, short date otherwise; select-all checkbox inline with filter pills (indeterminate when partial)
   - EmailInbox fixes (2026-07-07): indicator col fixed to 64px (was auto — could spill), overflow:hidden + justifyContent:flex-end on cell; listWidthRef now initialised from listWidth (not hardcoded 340); mount-time useEffect re-reads localStorage after hydration; handleDividerMouseDown syncs ref to current state before starting drag
   - EmailInbox Inbox tab (2026-07-07): added 'inbox' as first/default filter tab; buildQuery filters `is_archived=eq.false&is_deleted=eq.false`; replaces 'unread' as default; empty-state reads "Inbox is empty."
+  - EmailInbox sender col + sort (2026-07-07): sender column cap tightened 180px→130px; buildQuery base uses `order=last_message_at.desc.nullslast` so NULL timestamps always sort to bottom on all tabs
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -212,7 +213,7 @@ pages/api/gmail/
 ## Current Git State
 
 - main: `c6182d1` — session close 2026-07-03
-- preview: add default Inbox filter tab to EmailInbox (2026-07-07)
+- preview: tighter sender column cap + nullslast ordering (2026-07-07)
 
 ---
 

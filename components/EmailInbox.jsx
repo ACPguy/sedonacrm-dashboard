@@ -605,7 +605,7 @@ export default function EmailInbox() {
   }, []);
 
   const buildQuery = useCallback((f) => {
-    let params = `order=last_message_at.desc&limit=100&select=*`;
+    let params = `order=last_message_at.desc.nullslast&limit=100&select=*`;
     if (f === 'inbox')   params = `is_archived=eq.false&is_deleted=eq.false&${params}`;
     if (f === 'unread')  params = `is_read=eq.false&${params}`;
     if (f === 'linked')  params = `link_status=eq.auto_linked&${params}`;
@@ -835,7 +835,7 @@ export default function EmailInbox() {
         )}
 
         {/* Thread list */}
-        <div style={{ flex:1, overflowY:'auto', display:'grid', gridTemplateColumns:'32px 20px fit-content(180px) minmax(0,1fr) 64px 60px', columnGap:'6px', alignContent:'start' }}>
+        <div style={{ flex:1, overflowY:'auto', display:'grid', gridTemplateColumns:'32px 20px fit-content(130px) minmax(0,1fr) 64px 60px', columnGap:'6px', alignContent:'start' }}>
           {loading && (
             <div style={{ gridColumn:'1 / -1', padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading…</div>
           )}
