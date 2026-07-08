@@ -170,6 +170,7 @@ pages/api/gmail/
   - EmailInbox resizable list panel (2026-07-07): draggable 4px divider between list and detail; width persists to localStorage (key: sedonacrm_inbox_list_width); bounds 280–700px; offset calculated via containerRef.getBoundingClientRect().left (works with variable sidebar width); sender col uses flex clamp(70px,28%,200px) for proportional growth
   - EmailInbox grid columns (2026-07-07): ThreadListItem refactored to Fragment of 6 cells (no wrapper div); grid container uses `gridTemplateColumns:'32px 20px fit-content(180px) minmax(0,1fr) 64px 60px'`; sender col auto-sizes to content (no dead space); formatSmartTime shows clock time today, short date otherwise; select-all checkbox inline with filter pills (indeterminate when partial)
   - EmailInbox fixes (2026-07-07): indicator col fixed to 64px (was auto — could spill), overflow:hidden + justifyContent:flex-end on cell; listWidthRef now initialised from listWidth (not hardcoded 340); mount-time useEffect re-reads localStorage after hydration; handleDividerMouseDown syncs ref to current state before starting drag
+  - EmailInbox Inbox tab (2026-07-07): added 'inbox' as first/default filter tab; buildQuery filters `is_archived=eq.false&is_deleted=eq.false`; replaces 'unread' as default; empty-state reads "Inbox is empty."
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -204,14 +205,14 @@ pages/api/gmail/
 ## Next Priorities
 
 1. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
-3. Wire WorkOrderAgentDrafts UI card into BriefingView
-4. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-5. Phase 5: Leasing Pipeline
+2. Wire WorkOrderAgentDrafts UI card into BriefingView
+3. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
+4. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
 - main: `c6182d1` — session close 2026-07-03
-- preview: fix sender column grid blowout on long names (2026-07-07)
+- preview: add default Inbox filter tab to EmailInbox (2026-07-07)
 
 ---
 

@@ -50,6 +50,7 @@ const formatSmartTime = d => {
 const stripHtml = html => (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 const FILTER_TABS = [
+  { key:'inbox',   label:'Inbox' },
   { key:'unread',  label:'Unread' },
   { key:'all',     label:'All' },
   { key:'linked',  label:'Linked' },
@@ -575,7 +576,7 @@ export default function EmailInbox() {
   const windowWidth = useWindowWidth();
   const isMobile = windowWidth < 640;
 
-  const [filter,         setFilter]         = useState('unread');
+  const [filter,         setFilter]         = useState('inbox');
   const [threads,        setThreads]        = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [selectedThread, setSelectedThread] = useState(null);
@@ -605,6 +606,7 @@ export default function EmailInbox() {
 
   const buildQuery = useCallback((f) => {
     let params = `order=last_message_at.desc&limit=100&select=*`;
+    if (f === 'inbox')   params = `is_archived=eq.false&is_deleted=eq.false&${params}`;
     if (f === 'unread')  params = `is_read=eq.false&${params}`;
     if (f === 'linked')  params = `link_status=eq.auto_linked&${params}`;
     if (f === 'flagged') params = `link_status=eq.flagged&${params}`;
@@ -841,7 +843,8 @@ export default function EmailInbox() {
             <div style={{ gridColumn:'1 / -1', padding:'40px 20px', textAlign:'center' }}>
               <div style={{ fontSize:'28px', color:T.bg3, marginBottom:'8px' }}>✉</div>
               <div style={{ fontSize:F.sm, color:T.text2 }}>
-                {filter === 'unread' ? 'No unread messages.'
+                {filter === 'inbox'   ? 'Inbox is empty.'
+                  : filter === 'unread' ? 'No unread messages.'
                   : filter === 'flagged' ? 'No flagged messages.'
                   : 'No messages found.'}
               </div>
