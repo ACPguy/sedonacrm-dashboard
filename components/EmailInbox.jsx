@@ -155,7 +155,7 @@ const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick,
           )}
         </span>
       </div>
-      <div style={{ ...cellStyle, gap:'5px' }} {...cellHandlers}>
+      <div style={{ ...cellStyle, gap:'4px', overflow:'hidden', justifyContent:'flex-end' }} {...cellHandlers}>
         {thread.linked_record_type && (
           <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>
             {thread.linked_record_type.toUpperCase().slice(0, 3)}
@@ -590,7 +590,18 @@ export default function EmailInbox() {
   });
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef(null);
-  const listWidthRef = useRef(340);
+  const listWidthRef = useRef(listWidth);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sedonacrm_inbox_list_width');
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!Number.isNaN(parsed)) {
+        setListWidth(parsed);
+        listWidthRef.current = parsed;
+      }
+    }
+  }, []);
 
   const buildQuery = useCallback((f) => {
     let params = `order=last_message_at.desc&limit=100&select=*`;
@@ -688,6 +699,7 @@ export default function EmailInbox() {
 
   const handleDividerMouseDown = (e) => {
     e.preventDefault();
+    listWidthRef.current = listWidth;
     setIsDragging(true);
   };
 
@@ -821,7 +833,7 @@ export default function EmailInbox() {
         )}
 
         {/* Thread list */}
-        <div style={{ flex:1, overflowY:'auto', display:'grid', gridTemplateColumns:'32px 20px fit-content(180px) minmax(0,1fr) auto 60px', columnGap:'6px', alignContent:'start' }}>
+        <div style={{ flex:1, overflowY:'auto', display:'grid', gridTemplateColumns:'32px 20px fit-content(180px) minmax(0,1fr) 64px 60px', columnGap:'6px', alignContent:'start' }}>
           {loading && (
             <div style={{ gridColumn:'1 / -1', padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm }}>Loading…</div>
           )}
