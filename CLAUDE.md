@@ -183,6 +183,27 @@ pages/api/gmail/
 
 - Vercel Pro: $20/mo | Claude API: ~$10–15/mo | Supabase: $0 | Total: ~$30–35/mo
 
+## Gmail Inbox — Session Summary (2026-07-07)
+
+Extensive session, ~10 commits on preview, none yet merged to main. In order:
+
+1. Spam/Trash exclusion — webhook.js + sync-now.js history.list loops now skip messages labeled SPAM/TRASH (previously synced into inbox unfiltered)
+2. Outbound contact linking — matching logic extended to check the "to" address for outbound mail (previously only inbound sender was checked)
+3. Prev/Next thread navigation — buttons + arrow keys, steps through in-memory thread list
+4. Batch select + batch actions — checkboxes, Archive/Spam/Delete via new pages/api/gmail/batch-action.js (also fixed a pre-existing bug where Archive only updated the DB and never actually archived in Gmail)
+5. Compact single-line inbox rows — CSS Grid layout (6 columns: checkbox, unread dot, sender, subject+snippet, indicators, time) replacing the old 3-line stacked card design
+6. Sender name + attachment display — new email_threads columns (last_sender_name, last_sender_address, has_attachment) populated on every sync; paperclip icon shown when has_attachment is true
+7. Shift-click range select — matches Gmail's range-selection behavior
+8. Resizable divider between thread list and detail pane — width saved to localStorage (persistence still has a known bug, see Known Gaps)
+9. Grid column dead-space fix — sender column uses fit-content(130px) instead of a fixed percentage, so short names don't leave wasted space
+10. Gmail-style time format — clock time for today's mail, short date otherwise
+11. Select-all checkbox with indeterminate state
+12. New default "Inbox" filter tab — excludes archived/deleted, shows read+unread (mirrors actual Gmail Inbox); tab order is now Inbox, Unread, All, Linked, Flagged
+13. Defensive nullslast ordering on all filter queries — prevents any future NULL last_message_at row from sorting to the top
+14. One-time data cleanup — deleted a single junk test row (id c77641cc-077f-44c7-9ef0-6b9d6528483d, gmail_thread_id 'test-123') that had no real Gmail data and was causing incorrect sort order
+
+New schema this session: email_threads gained last_sender_name, last_sender_address, has_attachment, is_deleted; email_messages gained has_attachment. New endpoint: pages/api/gmail/batch-action.js.
+
 ## Known Gaps
 
 - **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
@@ -202,18 +223,22 @@ pages/api/gmail/
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
 - **PENDING: WorkOrderAgentDrafts UI card** — wire nudge + high-cost items into BriefingView after migration SQL runs
 - **PENDING: BriefingView propCode embed** — wire `<BriefingView propCode={data.prop_code} />` into Property detail Operations tab
+- **Inbox divider width does not reliably persist across a hard refresh.** Root cause not yet fully found — a prior fix (syncing listWidthRef to listWidth, adding a mount-time localStorage re-read effect) did not fully resolve it per Scott's testing. Needs further investigation next session — check for a possible race between the mount effect and the lazy useState initializer both writing to listWidth, or a Vercel/browser caching factor.
+- **Inbox indicator badges (CON/LEA/red dot) have no legend or tooltip.** They're understandable to Claude/CC but not self-explanatory to Scott day-to-day. Needs a small legend, tooltip on hover, or expanded labels next session.
 
 ## Next Priorities
 
-1. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
-2. Wire WorkOrderAgentDrafts UI card into BriefingView
-3. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-4. Phase 5: Leasing Pipeline
+1. Fix inbox divider width persistence (see Known Gaps — real bug, not yet resolved)
+2. Add a legend/tooltip for inbox indicator badges (CON/LEA/flagged dot/paperclip meaning)
+3. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
+4. Wire WorkOrderAgentDrafts UI card into BriefingView
+5. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
+6. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
-- main: `c6182d1` — session close 2026-07-03
-- preview: tighter sender column cap + nullslast ordering (2026-07-07)
+- main: `2012119` — unchanged, session close 2026-07-03 (preview not yet merged — Scott has not said "approved, merge to main" for the Gmail work)
+- preview: `e828176` — "fix: tighter sender column cap + defensive nullslast ordering" (most recent commit; note the junk-row deletion after this was a data-only change with no commit)
 
 ---
 
