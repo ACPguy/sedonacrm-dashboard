@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET' && !isCron) {
     const { data, error } = await sb
       .from('inquiry_drafts')
-      .select('id, prospect_name, prospect_email, subject, body, status, created_at')
+      .select('id, prospect_name, prospect_email, subject, body, status, created_at, leasing_pipeline(prop_code)')
       .in('status', ['draft', 'edited'])
       .order('created_at', { ascending: false })
       .limit(20);

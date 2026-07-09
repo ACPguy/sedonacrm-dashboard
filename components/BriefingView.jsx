@@ -114,16 +114,6 @@ function CollapsibleSection({ dotColor, title, items, open, onToggle, isMobile }
   );
 }
 
-// ── Snapshot stat pill ────────────────────────────────────────────────────────
-function StatPill({ label, value }) {
-  return (
-    <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '6px', padding: '8px 16px', textAlign: 'center', minWidth: '120px', flexShrink: 0 }}>
-      <div style={{ fontSize: F.xl, fontWeight: '700', color: T.text0 }}>{value}</div>
-      <div style={{ fontSize: F.xs, color: T.text2, marginTop: '2px' }}>{label}</div>
-    </div>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 export default function BriefingView({ propCode, embedded }) {
   const w = useWindowWidth();
@@ -212,7 +202,6 @@ export default function BriefingView({ propCode, embedded }) {
   const urgent    = briefing?.urgent    || [];
   const attention = briefing?.attention || [];
   const fyi       = briefing?.fyi       || [];
-  const snapshot  = briefing?.snapshot  || {};
 
   const urgentTagged    = urgent.map(i => ({ ...i, _src: 'urgent' }));
   const attentionTagged = attention.map(i => ({ ...i, _src: 'attention' }));
@@ -348,10 +337,10 @@ export default function BriefingView({ propCode, embedded }) {
 
         {!loading && briefing?.status === 'complete' && (
           <>
-            {/* Draft agent cards — portfolio home only */}
-            {!propCode && <LeaseWatchDrafts compact={true} expanded={cardsExpanded} />}
-            {!propCode && <NewInquiryDrafts expanded={cardsExpanded} />}
-            {!propCode && <WorkOrderAgentDrafts expanded={cardsExpanded} />}
+            {/* Draft agent cards */}
+            <LeaseWatchDrafts compact={true} expanded={cardsExpanded} propCode={propCode} />
+            <NewInquiryDrafts expanded={cardsExpanded} propCode={propCode} />
+            <WorkOrderAgentDrafts expanded={cardsExpanded} propCode={propCode} />
 
             {/* Collapsible agent sections */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -368,23 +357,6 @@ export default function BriefingView({ propCode, embedded }) {
               ))}
             </div>
 
-            {/* Portfolio snapshot strip — home view only */}
-            {!propCode && (
-              <div style={{
-                display: 'flex',
-                gap: '10px',
-                overflowX: isMobile ? 'auto' : 'visible',
-                flexWrap: isMobile ? 'nowrap' : 'wrap',
-                WebkitOverflowScrolling: 'touch',
-                paddingBottom: isMobile ? '4px' : '0',
-              }}>
-                <StatPill label="Active Properties" value={snapshot.activePropertiesCount ?? '—'} />
-                <StatPill label="Active Tenants"    value={snapshot.activeTenantsCount ?? '—'} />
-                <StatPill label="Open Tasks"        value={snapshot.openTasksCount ?? '—'} />
-                <StatPill label="Urgent Items"      value={snapshot.urgentCount ?? 0} />
-                <StatPill label="Attention Items"   value={snapshot.attentionCount ?? 0} />
-              </div>
-            )}
           </>
         )}
       </div>
