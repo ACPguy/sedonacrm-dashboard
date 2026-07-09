@@ -210,19 +210,18 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 - **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
-- **Inbox divider width does not reliably persist across a hard refresh.** Root cause not yet fully found — a prior fix (syncing listWidthRef to listWidth, adding a mount-time localStorage re-read effect) did not fully resolve it per Scott's testing. Needs further investigation next session — check for a possible race between the mount effect and the lazy useState initializer both writing to listWidth, or a Vercel/browser caching factor.
-- **Inbox indicator badges (CON/LEA/red dot) have no legend or tooltip.** They're understandable to Claude/CC but not self-explanatory to Scott day-to-day. Needs a small legend, tooltip on hover, or expanded labels next session.
+- **Inbox divider width persistence — NOT resolved, deprioritized with a workaround (2026-07-09 session).** Confirmed root cause of one failure mode: window-level mousemove/mouseup listeners never fire if the mouse is released outside page content (e.g. over the browser address bar), leaving drag state stuck and silently re-saving a wrong width before refresh. Fixed via Pointer Events API + setPointerCapture/releasePointerCapture (commit `1b4f799`), confirmed via console logging to correctly fire pointerdown/pointerup and save/read the right value in a full successful test. However, Scott's later retest still showed the width snapping back on hard refresh in the same "release over address bar" scenario. Second root cause not identified — do not assume the pointer-capture fix is sufficient. Workaround shipped instead: default width hardcoded to 570px (commit `019d6c8`), so the inbox looks reasonable on load regardless of whether persistence holds. The pointer-capture drag mechanism is still live and works correctly within a session; only cross-refresh persistence is unreliable. If revisiting: do NOT re-attempt blind fixes — re-instrument with console logging first (pattern used this session) and get real evidence before changing code.
+- **Inbox indicator badges (CON/LEA/WOR/ISS/TEN/TAS/red dot/paperclip) — RESOLVED (2026-07-09 session).** Legend added via a "?" info button next to the Sync button in the Inbox header; toggles a panel listing all badge meanings. Commit `f19fe66`. Confirmed working via screenshot.
 
 ## Next Priorities
 
-1. Fix inbox divider width persistence (see Known Gaps — real bug, not yet resolved)
-2. Add a legend/tooltip for inbox indicator badges (CON/LEA/flagged dot/paperclip meaning)
-3. Phase 5: Leasing Pipeline
+1. Phase 5: Leasing Pipeline
+2. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
 
 ## Current Git State
 
-- main: `6cf5580` — fix: match Property Dashboard stat cards to Suites tab canonical compact style (2026-07-09)
-- preview: `6cf5580` — same (in sync post-merge)
+- main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
+- preview: `019d6c8` — same (in sync; branches diverged mid-session from accidental direct-to-main pushes during troubleshooting, reconciled via verified force-push)
 
 ---
 
