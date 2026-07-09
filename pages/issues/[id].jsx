@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
-import { sbFetch, T, F, IssueDetail } from '../../components/IssuesView';
+import { sbFetch, F, IssueDetail } from '../../components/IssuesView';
+import { T } from '../../lib/theme';
 
 export default function IssueDetailPage() {
   const router = useRouter();

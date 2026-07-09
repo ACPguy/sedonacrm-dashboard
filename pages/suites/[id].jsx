@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
-import { sbFetch, T, F, SuiteDetail } from '../../components/SuitesView';
+import { sbFetch, F, SuiteDetail } from '../../components/SuitesView';
+import { T } from '../../lib/theme';
 
 export default function SuiteDetailPage() {
   const router = useRouter();

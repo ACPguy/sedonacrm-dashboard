@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
-import { sbFetch, T, F, VendorDetail } from '../../components/VendorsView';
+import { sbFetch, F, VendorDetail } from '../../components/VendorsView';
+import { T } from '../../lib/theme';
 
 export default function VendorDetailPage() {
   const router = useRouter();

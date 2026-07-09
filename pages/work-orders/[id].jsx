@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
-import { sbFetch, T, F, WorkOrderDetail } from '../../components/WorkOrdersView';
+import { sbFetch, F, WorkOrderDetail } from '../../components/WorkOrdersView';
+import { T } from '../../lib/theme';
 
 export default function WorkOrderDetailPage() {
   const router = useRouter();

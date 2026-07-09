@@ -1,14 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { T } from '../lib/theme';
 
 const MDEditor  = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
 const MDPreview = dynamic(() => import('@uiw/react-markdown-preview'), { ssr: false });
 
-const T = {
-  bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
-  text0:'#c9cdd6', text1:'#8a95a8', text2:'#5a6272', text3:'#4a5264',
-  accent:'#6e9fd8', border:'#2e3240', success:'#6ab06a',
-};
 const F = { xs:'12px', sm:'13px', base:'14px' };
 
 export default function MarkdownField({ label, value, onSave }) {

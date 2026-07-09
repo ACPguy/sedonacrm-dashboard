@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
-import { sbFetch, T, F, PropertyDetail } from '../../components/SedonaCRM';
+import { sbFetch, F, PropertyDetail } from '../../components/SedonaCRM';
+import { T } from '../../lib/theme';
 
 export default function PropertyDetailPage() {
   const router = useRouter();
