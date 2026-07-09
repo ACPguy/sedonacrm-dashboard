@@ -222,7 +222,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `cf849dd` — docs: update git state — Agent 4 + WorkOrderAgentDrafts merged to main (2026-07-09)
-- preview: pending commit — feat: add propCode filtering to agent cards, remove snapshot strip from BriefingView (2026-07-09)
+- preview: `40e6bb1` — feat: add propCode filtering to agent cards, remove snapshot strip from BriefingView (2026-07-09)
 
 ---
 
