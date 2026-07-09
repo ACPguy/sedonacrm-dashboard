@@ -222,7 +222,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `cf849dd` — docs: update git state — Agent 4 + WorkOrderAgentDrafts merged to main (2026-07-09)
-- preview: pending commit — feat: embed BriefingView with propCode filtering into Property Dashboard tab (2026-07-09)
+- preview: `8a5af67` — feat: embed BriefingView with propCode filtering into Property Dashboard tab (2026-07-09)
 
 ---
 
