@@ -845,6 +845,9 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                     );
                   })()}
                 </div>
+                <div style={{marginTop:'20px'}}>
+                  <BriefingView propCode={data.prop_code} embedded={true} />
+                </div>
               </div>
             )}
 

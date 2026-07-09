@@ -172,6 +172,8 @@ pages/api/gmail/
   - EmailInbox fixes (2026-07-07): indicator col fixed to 64px (was auto — could spill), overflow:hidden + justifyContent:flex-end on cell; listWidthRef now initialised from listWidth (not hardcoded 340); mount-time useEffect re-reads localStorage after hydration; handleDividerMouseDown syncs ref to current state before starting drag
   - EmailInbox Inbox tab (2026-07-07): added 'inbox' as first/default filter tab; buildQuery filters `is_archived=eq.false&is_deleted=eq.false`; replaces 'unread' as default; empty-state reads "Inbox is empty."
   - EmailInbox sender col + sort (2026-07-07): sender column cap tightened 180px→130px; buildQuery base uses `order=last_message_at.desc.nullslast` so NULL timestamps always sort to bottom on all tabs
+  - Agent cards propCode filtering (2026-07-09): LeaseWatchDrafts, NewInquiryDrafts, WorkOrderAgentDrafts all accept propCode prop and filter client-side; new-inquiry GET joins leasing_pipeline(prop_code); snapshot strip removed from BriefingView
+  - BriefingView embedded in Property Dashboard tab (2026-07-09): `<BriefingView propCode={data.prop_code} embedded={true} />` inserted below stat card grid in SedonaCRM.jsx dashboard tab
 - **Phase 5+:** Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -208,7 +210,6 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 - **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
-- **PENDING: BriefingView propCode embed** — wire `<BriefingView propCode={data.prop_code} />` into Property detail Operations tab
 - **Inbox divider width does not reliably persist across a hard refresh.** Root cause not yet fully found — a prior fix (syncing listWidthRef to listWidth, adding a mount-time localStorage re-read effect) did not fully resolve it per Scott's testing. Needs further investigation next session — check for a possible race between the mount effect and the lazy useState initializer both writing to listWidth, or a Vercel/browser caching factor.
 - **Inbox indicator badges (CON/LEA/red dot) have no legend or tooltip.** They're understandable to Claude/CC but not self-explanatory to Scott day-to-day. Needs a small legend, tooltip on hover, or expanded labels next session.
 
@@ -216,13 +217,12 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 1. Fix inbox divider width persistence (see Known Gaps — real bug, not yet resolved)
 2. Add a legend/tooltip for inbox indicator badges (CON/LEA/flagged dot/paperclip meaning)
-3. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-4. Phase 5: Leasing Pipeline
+3. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
 - main: `cf849dd` — docs: update git state — Agent 4 + WorkOrderAgentDrafts merged to main (2026-07-09)
-- preview: `40e6bb1` — feat: add propCode filtering to agent cards, remove snapshot strip from BriefingView (2026-07-09)
+- preview: pending commit — feat: embed BriefingView with propCode filtering into Property Dashboard tab (2026-07-09)
 
 ---
 
