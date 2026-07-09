@@ -152,7 +152,7 @@ pages/api/gmail/
   - Agent 1 Lease Watch: Complete (cron `0 13 * * *` = 6am AZ)
   - Agent 3 New Inquiry: Complete (cron `0 15,17,19,21,23,1 * * *` = 8am–6pm AZ, 6x/day)
   - Gmail Watch Auto-Renewal: Complete (cron `0 11 */6 * *` = every 6 days; renewed 2026-06-26, expires 2026-07-03)
-  - Agent 4 Work Order Agent: API complete (`/api/agents/work-order-agent`) — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; pending: UI card, cron
+  - Agent 4 Work Order Agent: Complete — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; WorkOrderAgentDrafts card in BriefingView; cron `0 14 * * *` (7am AZ, daily)
   - Remaining Phase 4: Agent 9
 - **Phase 4 Supporting work (complete):**
   - BriefingView: 5 collapsible agent sections, `propCode` prop, mobile pass, `embedded` prop
@@ -222,7 +222,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `38d10b5` — docs: update git state — theme consolidation merged to main (2026-07-09)
-- preview: `b4bfd04` + pending commit — feat: add WorkOrderAgentDrafts card, remove duplicate WO section from Agent 7 sweep (2026-07-09)
+- preview: `db641b6` + pending commit — chore: trigger Agent 4 first run, add missing cron schedule, mark Agent 4 complete (2026-07-09)
 
 ---
 
