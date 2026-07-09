@@ -237,8 +237,12 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 ## Current Git State
 
-- main: `2012119` — unchanged, session close 2026-07-03 (preview not yet merged — Scott has not said "approved, merge to main" for the Gmail work)
-- preview: `e828176` — "fix: tighter sender column cap + defensive nullslast ordering" (most recent commit; note the junk-row deletion after this was a data-only change with no commit)
+- main: `a9e8d36` — Merge branch 'preview' (theme consolidation; lib/theme.js created, 21 components + 10 pages/[id].jsx migrated to shared T import, zero visual change)
+- preview: `b62dc3a` — in sync with main post-merge
+
+History:
+- `daaedf8` — Merge preview into main: Gmail inbox overhaul (spam filter, contact linking, full UI redesign)
+- `a9e8d36` — Merge branch 'preview': theme consolidation (lib/theme.js)
 
 ---
 
