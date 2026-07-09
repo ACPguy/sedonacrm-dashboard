@@ -222,7 +222,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `38d10b5` — docs: update git state — theme consolidation merged to main (2026-07-09)
-- preview: `d791fc0` — docs: fix stale git state placeholder, add permanent rule against it (2026-07-09)
+- preview: `8ff8ad3` — docs: update git state to d791fc0 (2026-07-09)
 
 ---
 
