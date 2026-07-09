@@ -582,23 +582,20 @@ export default function EmailInbox() {
   const [lastCheckedIndex, setLastCheckedIndex] = useState(null);
   const [listWidth, setListWidth] = useState(() => {
     if (typeof window === 'undefined') return 340;
-    const saved = localStorage.getItem('sedonacrm_inbox_list_width');
-    return saved ? parseInt(saved) : 340;
+    try {
+      const saved = localStorage.getItem('sedonacrm_inbox_list_width');
+      const parsed = saved ? parseInt(saved, 10) : 340;
+      console.log('[inbox-divider] INIT READ', { saved, parsed });
+      return Number.isNaN(parsed) ? 340 : parsed;
+    } catch (err) {
+      console.log('[inbox-divider] INIT READ FAILED', err);
+      return 340;
+    }
   });
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef(null);
   const listWidthRef = useRef(listWidth);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('sedonacrm_inbox_list_width');
-    if (saved) {
-      const parsed = parseInt(saved, 10);
-      if (!Number.isNaN(parsed)) {
-        setListWidth(parsed);
-        listWidthRef.current = parsed;
-      }
-    }
-  }, []);
 
   const buildQuery = useCallback((f) => {
     let params = `order=last_message_at.desc.nullslast&limit=100&select=*`;
@@ -711,7 +708,12 @@ export default function EmailInbox() {
     };
     const handleMouseUp = () => {
       setIsDragging(false);
-      localStorage.setItem('sedonacrm_inbox_list_width', String(listWidthRef.current));
+      try {
+        localStorage.setItem('sedonacrm_inbox_list_width', String(listWidthRef.current));
+        console.log('[inbox-divider] SAVED', listWidthRef.current, '-> readback:', localStorage.getItem('sedonacrm_inbox_list_width'));
+      } catch (err) {
+        console.log('[inbox-divider] SAVE FAILED', err);
+      }
     };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
