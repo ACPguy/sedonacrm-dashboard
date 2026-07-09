@@ -208,7 +208,6 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 - **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
-- **PENDING: WorkOrderAgentDrafts UI card** — wire nudge + high-cost items into BriefingView after migration SQL runs
 - **PENDING: BriefingView propCode embed** — wire `<BriefingView propCode={data.prop_code} />` into Property detail Operations tab
 - **Inbox divider width does not reliably persist across a hard refresh.** Root cause not yet fully found — a prior fix (syncing listWidthRef to listWidth, adding a mount-time localStorage re-read effect) did not fully resolve it per Scott's testing. Needs further investigation next session — check for a possible race between the mount effect and the lazy useState initializer both writing to listWidth, or a Vercel/browser caching factor.
 - **Inbox indicator badges (CON/LEA/red dot) have no legend or tooltip.** They're understandable to Claude/CC but not self-explanatory to Scott day-to-day. Needs a small legend, tooltip on hover, or expanded labels next session.
@@ -217,14 +216,13 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 1. Fix inbox divider width persistence (see Known Gaps — real bug, not yet resolved)
 2. Add a legend/tooltip for inbox indicator badges (CON/LEA/flagged dot/paperclip meaning)
-3. Wire WorkOrderAgentDrafts UI card into BriefingView
-4. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-5. Phase 5: Leasing Pipeline
+3. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
+4. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
 - main: `38d10b5` — docs: update git state — theme consolidation merged to main (2026-07-09)
-- preview: `b4bfd04` — chore: run wo_agent_runs migration SQL, table + RLS policy live (2026-07-09)
+- preview: `b4bfd04` + pending commit — feat: add WorkOrderAgentDrafts card, remove duplicate WO section from Agent 7 sweep (2026-07-09)
 
 ---
 
