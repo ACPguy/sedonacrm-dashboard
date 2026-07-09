@@ -222,7 +222,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `38d10b5` — docs: update git state — theme consolidation merged to main (2026-07-09)
-- preview: `db641b6` + pending commit — chore: trigger Agent 4 first run, add missing cron schedule, mark Agent 4 complete (2026-07-09)
+- preview: `1b165bc` — chore: trigger Agent 4 first run, add missing cron schedule, mark Agent 4 complete (2026-07-09)
 
 ---
 
@@ -274,7 +274,8 @@ Use `psql` only — `export DB='postgresql://postgres.edxcvyleielzevpappui:Sedon
 13. **Claude.ai single instruction rule** — give one clear instruction at a time. Never counter an instruction with an alternative in the same response.
 14. **AI agents draft only — Scott approves everything. Nothing sends autonomously, ever.** Applies to all agents (Lease Watch, CAM Reconciliation, New Inquiry, Work Order, Rent Collection, Insurance Cert, Morning Briefing, Owner Reporting, Re-Engagement, Portfolio Analyst).
 15. **Every record requires:** unique URL, copy-link button, communication thread, audit log, AI summarize button, Drive file attachments. Audit log and AI summarize are not yet built on most record types — treat as an open build item per module, not as already satisfied.
-16. **Vercel Cron auth — CRON_SECRET is required.** All cron routes must check `req.headers['authorization'] === \`Bearer ${process.env.CRON_SECRET}\`` in addition to `x-vercel-cron`. Vercel's documented method is the Bearer token; `x-vercel-cron` alone is unreliable. Pattern: `isCron = x-vercel-cron === '1' || authorization === Bearer CRON_SECRET`. Plain GET (no cron header) returns existing data for UI polls. Never remove the Bearer check.
+16. **CLAUDE.md Current Git State must always reflect the ACTUAL commit hash after pushing, never a placeholder.** If the hash isn't known yet when drafting CLAUDE.md changes, leave the update for a final follow-up commit after confirming via `git log -1`. Never write "pending commit" as a permanent value.
+17. **Vercel Cron auth — CRON_SECRET is required.** All cron routes must check `req.headers['authorization'] === \`Bearer ${process.env.CRON_SECRET}\`` in addition to `x-vercel-cron`. Vercel's documented method is the Bearer token; `x-vercel-cron` alone is unreliable. Pattern: `isCron = x-vercel-cron === '1' || authorization === Bearer CRON_SECRET`. Plain GET (no cron header) returns existing data for UI polls. Never remove the Bearer check.
 
 ---
 
