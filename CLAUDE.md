@@ -152,7 +152,7 @@ pages/api/gmail/
   - Agent 1 Lease Watch: Complete (cron `0 13 * * *` = 6am AZ)
   - Agent 3 New Inquiry: Complete (cron `0 15,17,19,21,23,1 * * *` = 8am–6pm AZ, 6x/day)
   - Gmail Watch Auto-Renewal: Complete (cron `0 11 */6 * *` = every 6 days; renewed 2026-06-26, expires 2026-07-03)
-  - Agent 4 Work Order Agent: API complete (`/api/agents/work-order-agent`) — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; pending: migration SQL, UI card, cron
+  - Agent 4 Work Order Agent: Complete — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; WorkOrderAgentDrafts card in BriefingView; cron `0 14 * * *` (7am AZ, daily)
   - Remaining Phase 4: Agent 9
 - **Phase 4 Supporting work (complete):**
   - BriefingView: 5 collapsible agent sections, `propCode` prop, mobile pass, `embedded` prop
@@ -207,21 +207,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Known Gaps
 
 - **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
-- **PENDING: `wo_agent_runs` migration SQL** — must run before Agent 4 UI works:
-  ```sql
-  CREATE TABLE IF NOT EXISTS wo_agent_runs (
-    id uuid default gen_random_uuid() primary key,
-    run_date date not null unique,
-    status text not null default 'none',
-    nudge_items jsonb default '[]',
-    high_cost_items jsonb default '[]',
-    updated_at timestamptz default now()
-  );
-  ALTER TABLE wo_agent_runs ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "anon_select" ON wo_agent_runs FOR SELECT TO anon USING (true);
-  ```
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
-- **PENDING: WorkOrderAgentDrafts UI card** — wire nudge + high-cost items into BriefingView after migration SQL runs
 - **PENDING: BriefingView propCode embed** — wire `<BriefingView propCode={data.prop_code} />` into Property detail Operations tab
 - **Inbox divider width does not reliably persist across a hard refresh.** Root cause not yet fully found — a prior fix (syncing listWidthRef to listWidth, adding a mount-time localStorage re-read effect) did not fully resolve it per Scott's testing. Needs further investigation next session — check for a possible race between the mount effect and the lazy useState initializer both writing to listWidth, or a Vercel/browser caching factor.
 - **Inbox indicator badges (CON/LEA/red dot) have no legend or tooltip.** They're understandable to Claude/CC but not self-explanatory to Scott day-to-day. Needs a small legend, tooltip on hover, or expanded labels next session.
@@ -230,19 +216,13 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 1. Fix inbox divider width persistence (see Known Gaps — real bug, not yet resolved)
 2. Add a legend/tooltip for inbox indicator badges (CON/LEA/flagged dot/paperclip meaning)
-3. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
-4. Wire WorkOrderAgentDrafts UI card into BriefingView
-5. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-6. Phase 5: Leasing Pipeline
+3. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
+4. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
-- main: `a9e8d36` — Merge branch 'preview' (theme consolidation; lib/theme.js created, 21 components + 10 pages/[id].jsx migrated to shared T import, zero visual change)
-- preview: `b62dc3a` — in sync with main post-merge
-
-History:
-- `daaedf8` — Merge preview into main: Gmail inbox overhaul (spam filter, contact linking, full UI redesign)
-- `a9e8d36` — Merge branch 'preview': theme consolidation (lib/theme.js)
+- main: `38d10b5` — docs: update git state — theme consolidation merged to main (2026-07-09)
+- preview: `1b165bc` — chore: trigger Agent 4 first run, add missing cron schedule, mark Agent 4 complete (2026-07-09)
 
 ---
 
@@ -294,7 +274,8 @@ Use `psql` only — `export DB='postgresql://postgres.edxcvyleielzevpappui:Sedon
 13. **Claude.ai single instruction rule** — give one clear instruction at a time. Never counter an instruction with an alternative in the same response.
 14. **AI agents draft only — Scott approves everything. Nothing sends autonomously, ever.** Applies to all agents (Lease Watch, CAM Reconciliation, New Inquiry, Work Order, Rent Collection, Insurance Cert, Morning Briefing, Owner Reporting, Re-Engagement, Portfolio Analyst).
 15. **Every record requires:** unique URL, copy-link button, communication thread, audit log, AI summarize button, Drive file attachments. Audit log and AI summarize are not yet built on most record types — treat as an open build item per module, not as already satisfied.
-16. **Vercel Cron auth — CRON_SECRET is required.** All cron routes must check `req.headers['authorization'] === \`Bearer ${process.env.CRON_SECRET}\`` in addition to `x-vercel-cron`. Vercel's documented method is the Bearer token; `x-vercel-cron` alone is unreliable. Pattern: `isCron = x-vercel-cron === '1' || authorization === Bearer CRON_SECRET`. Plain GET (no cron header) returns existing data for UI polls. Never remove the Bearer check.
+16. **CLAUDE.md Current Git State must always reflect the ACTUAL commit hash of the last real code/feature commit AFTER it has been pushed — never a placeholder written before the commit exists, and never the hash of the CLAUDE.md-only housekeeping commit that follows it (since that commit's own hash isn't known until after it's made).** If uncertain, leave it for a small final follow-up commit once the real hash is confirmed via `git log -1`.
+17. **Vercel Cron auth — CRON_SECRET is required.** All cron routes must check `req.headers['authorization'] === \`Bearer ${process.env.CRON_SECRET}\`` in addition to `x-vercel-cron`. Vercel's documented method is the Bearer token; `x-vercel-cron` alone is unreliable. Pattern: `isCron = x-vercel-cron === '1' || authorization === Bearer CRON_SECRET`. Plain GET (no cron header) returns existing data for UI polls. Never remove the Bearer check.
 
 ---
 
@@ -381,7 +362,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `briefings`: run_date (UNIQUE), status, urgent/attention/fyi/snapshot (jsonb)
 - `lease_watch_drafts`: tenant_id + milestone (UNIQUE pair), subject, body, status
 - `inquiry_drafts`: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status
-- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ⚠️ migration SQL pending (see Known Gaps)
+- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ✅ migration run 2026-07-09, table + RLS live
 - `email_threads`: added `is_deleted boolean DEFAULT false` (2026-07-07) — set by batch-action delete action
 - `email_threads`: added `last_sender_name text`, `last_sender_address text`, `has_attachment boolean DEFAULT false` (2026-07-07) — populated by webhook.js + sync-now.js on every new message; old threads show null/false until re-synced
 - `email_messages`: added `has_attachment boolean DEFAULT false` (2026-07-07)

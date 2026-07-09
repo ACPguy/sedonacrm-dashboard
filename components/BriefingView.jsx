@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sun } from '@phosphor-icons/react';
 import LeaseWatchDrafts from './LeaseWatchDrafts';
 import NewInquiryDrafts from './NewInquiryDrafts';
+import WorkOrderAgentDrafts from './WorkOrderAgentDrafts';
 import { T } from '../lib/theme';
 const F = { xs:'12px', sm:'13px', base:'14px', md:'15px', lg:'17px', xl:'22px' };
 
@@ -221,7 +222,6 @@ export default function BriefingView({ propCode, embedded }) {
     ? (item) => item.meta?.includes(propCode)
     : () => true;
 
-  const woItems        = allActionable.filter(i => i.type === 'task' && i.label?.includes('WO') && filterFn(i));
   const taskItems      = allActionable.filter(i => i.type === 'task' && !i.label?.includes('WO') && filterFn(i));
   const insuranceItems = allActionable.filter(i => (i.type === 'coi' || i.type === 'property_insurance') && filterFn(i));
   const fyiItems       = fyi.filter(filterFn);
@@ -233,7 +233,6 @@ export default function BriefingView({ propCode, embedded }) {
   };
 
   const sections = [
-    { key: 'wo',        title: 'Work Orders',  items: woItems,        color: dotColor(woItems) },
     { key: 'tasks',     title: 'Tasks',        items: taskItems,      color: dotColor(taskItems) },
     { key: 'insurance', title: 'Insurance',    items: insuranceItems, color: dotColor(insuranceItems) },
     { key: 'fyi',       title: 'FYI',          items: fyiItems,       color: T.success },
@@ -265,7 +264,7 @@ export default function BriefingView({ propCode, embedded }) {
             <>
               <button
                 onClick={() => {
-                  setOpenSections({ wo: true, tasks: true, insurance: true, fyi: true });
+                  setOpenSections({ tasks: true, insurance: true, fyi: true });
                   setCardsExpanded(true);
                 }}
                 style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
@@ -273,7 +272,7 @@ export default function BriefingView({ propCode, embedded }) {
               </button>
               <button
                 onClick={() => {
-                  setOpenSections({ wo: false, tasks: false, insurance: false, fyi: false });
+                  setOpenSections({ tasks: false, insurance: false, fyi: false });
                   setCardsExpanded(false);
                 }}
                 style={{ background: 'none', border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '3px 10px', fontSize: F.xs, color: T.text1, cursor: 'pointer' }}>
@@ -352,6 +351,7 @@ export default function BriefingView({ propCode, embedded }) {
             {/* Draft agent cards — portfolio home only */}
             {!propCode && <LeaseWatchDrafts compact={true} expanded={cardsExpanded} />}
             {!propCode && <NewInquiryDrafts expanded={cardsExpanded} />}
+            {!propCode && <WorkOrderAgentDrafts expanded={cardsExpanded} />}
 
             {/* Collapsible agent sections */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
