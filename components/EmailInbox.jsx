@@ -581,15 +581,13 @@ export default function EmailInbox() {
   const [selectedIds,    setSelectedIds]    = useState(new Set());
   const [lastCheckedIndex, setLastCheckedIndex] = useState(null);
   const [listWidth, setListWidth] = useState(() => {
-    if (typeof window === 'undefined') return 340;
+    if (typeof window === 'undefined') return 570;
     try {
       const saved = localStorage.getItem('sedonacrm_inbox_list_width');
-      const parsed = saved ? parseInt(saved, 10) : 340;
-      console.log('[inbox-divider] INIT READ', { saved, parsed });
-      return Number.isNaN(parsed) ? 340 : parsed;
+      const parsed = saved ? parseInt(saved, 10) : 570;
+      return Number.isNaN(parsed) ? 570 : parsed;
     } catch (err) {
-      console.log('[inbox-divider] INIT READ FAILED', err);
-      return 340;
+      return 570;
     }
   });
   const [isDragging, setIsDragging] = useState(false);
@@ -692,36 +690,39 @@ export default function EmailInbox() {
     setLastCheckedIndex(index);
   };
 
-  const handleDividerMouseDown = (e) => {
+  const handleDividerPointerDown = (e) => {
     e.preventDefault();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (err) {
+      // capture not supported — drag still works, just without out-of-window guarantee
+    }
     listWidthRef.current = listWidth;
     setIsDragging(true);
   };
 
-  useEffect(() => {
+  const handleDividerPointerMove = (e) => {
     if (!isDragging) return;
-    const handleMouseMove = (e) => {
-      const left = containerRef.current?.getBoundingClientRect().left || 0;
-      const newWidth = Math.max(280, Math.min(700, e.clientX - left));
-      setListWidth(newWidth);
-      listWidthRef.current = newWidth;
-    };
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      try {
-        localStorage.setItem('sedonacrm_inbox_list_width', String(listWidthRef.current));
-        console.log('[inbox-divider] SAVED', listWidthRef.current, '-> readback:', localStorage.getItem('sedonacrm_inbox_list_width'));
-      } catch (err) {
-        console.log('[inbox-divider] SAVE FAILED', err);
-      }
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);
+    const left = containerRef.current?.getBoundingClientRect().left || 0;
+    const newWidth = Math.max(280, Math.min(700, e.clientX - left));
+    setListWidth(newWidth);
+    listWidthRef.current = newWidth;
+  };
+
+  const handleDividerPointerUp = (e) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (err) {
+      // non-fatal
+    }
+    try {
+      localStorage.setItem('sedonacrm_inbox_list_width', String(listWidthRef.current));
+    } catch (err) {
+      // localStorage unavailable — width won't persist this session, non-fatal
+    }
+  };
 
   const handleBatchAction = async (action) => {
     const ids = Array.from(selectedIds);
@@ -918,9 +919,12 @@ export default function EmailInbox() {
       {/* Resizable divider */}
       {!isMobile && (
         <div
-          onMouseDown={handleDividerMouseDown}
+          onPointerDown={handleDividerPointerDown}
+          onPointerMove={handleDividerPointerMove}
+          onPointerUp={handleDividerPointerUp}
+          onPointerCancel={(e) => { handleDividerPointerUp(e); }}
           style={{
-            width:'4px', flexShrink:0, cursor:'col-resize',
+            width:'4px', flexShrink:0, cursor:'col-resize', touchAction:'none',
             background: isDragging ? T.accent : T.border,
             transition: isDragging ? 'none' : 'background 0.15s ease',
           }}
