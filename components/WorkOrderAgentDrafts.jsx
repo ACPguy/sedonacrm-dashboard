@@ -84,7 +84,7 @@ function SubHeading({ label }) {
   );
 }
 
-export default function WorkOrderAgentDrafts({ compact = false, expanded }) {
+export default function WorkOrderAgentDrafts({ compact = false, expanded, propCode }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -102,8 +102,10 @@ export default function WorkOrderAgentDrafts({ compact = false, expanded }) {
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
-  const nudgeItems    = data?.nudge_items     || [];
-  const highCostItems = data?.high_cost_items || [];
+  const allNudge     = data?.nudge_items     || [];
+  const allHighCost  = data?.high_cost_items || [];
+  const nudgeItems    = propCode ? allNudge.filter(i => i.prop_code === propCode)    : allNudge;
+  const highCostItems = propCode ? allHighCost.filter(i => i.prop_code === propCode) : allHighCost;
   const totalCount    = nudgeItems.length + highCostItems.length;
   const showSubheads  = nudgeItems.length > 0 && highCostItems.length > 0;
 
@@ -153,7 +155,7 @@ export default function WorkOrderAgentDrafts({ compact = false, expanded }) {
           )}
           {!loading && !error && totalCount === 0 && (
             <div style={{ padding: '16px', fontSize: F.sm, color: T.text3, textAlign: 'center' }}>
-              No work order alerts
+              {propCode ? `No work order alerts for ${propCode}` : 'No work order alerts'}
             </div>
           )}
           {!loading && !error && totalCount > 0 && (

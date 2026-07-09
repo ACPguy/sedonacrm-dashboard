@@ -221,8 +221,8 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 ## Current Git State
 
-- main: `38d10b5` — docs: update git state — theme consolidation merged to main (2026-07-09)
-- preview: `1b165bc` — chore: trigger Agent 4 first run, add missing cron schedule, mark Agent 4 complete (2026-07-09)
+- main: `cf849dd` — docs: update git state — Agent 4 + WorkOrderAgentDrafts merged to main (2026-07-09)
+- preview: pending commit — feat: add propCode filtering to agent cards, remove snapshot strip from BriefingView (2026-07-09)
 
 ---
 

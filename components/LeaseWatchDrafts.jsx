@@ -74,7 +74,7 @@ function DraftRow({ draft }) {
   );
 }
 
-export default function LeaseWatchDrafts({ compact = false, expanded }) {
+export default function LeaseWatchDrafts({ compact = false, expanded, propCode }) {
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -106,10 +106,11 @@ export default function LeaseWatchDrafts({ compact = false, expanded }) {
     return () => clearInterval(pollRef.current);
   }, []);
 
-  const pendingDrafts = drafts.filter(d => d.status === 'draft' || d.status === 'edited');
+  const filteredDrafts = propCode ? drafts.filter(d => d.prop_code === propCode) : drafts;
+  const pendingDrafts  = filteredDrafts.filter(d => d.status === 'draft' || d.status === 'edited');
 
   // Sort by milestone urgency then lease_ends
-  const sortedDrafts = [...drafts].sort((a, b) => {
+  const sortedDrafts = [...filteredDrafts].sort((a, b) => {
     const ao = MILESTONE_ORDER.indexOf(a.milestone);
     const bo = MILESTONE_ORDER.indexOf(b.milestone);
     if (ao !== bo) return ao - bo;
@@ -162,7 +163,7 @@ export default function LeaseWatchDrafts({ compact = false, expanded }) {
           )}
           {!loading && !error && sortedDrafts.length === 0 && (
             <div style={{ padding: '16px', fontSize: F.sm, color: T.text3, textAlign: 'center' }}>
-              No pending lease notices
+              {propCode ? `No pending lease notices for ${propCode}` : 'No pending lease notices'}
             </div>
           )}
           <div style={{ maxHeight: '320px', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>

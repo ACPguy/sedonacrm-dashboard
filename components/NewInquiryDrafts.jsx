@@ -110,7 +110,7 @@ function DraftRow({ draft, onDismiss, dismissingId }) {
   );
 }
 
-export default function NewInquiryDrafts({ expanded }) {
+export default function NewInquiryDrafts({ expanded, propCode }) {
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dismissingId, setDismissingId] = useState(null);
@@ -157,6 +157,10 @@ export default function NewInquiryDrafts({ expanded }) {
     }
   };
 
+  const visibleDrafts = propCode
+    ? drafts.filter(d => d.leasing_pipeline?.prop_code === propCode)
+    : drafts;
+
   return (
     <div style={{ background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '8px', overflow: 'visible' }}>
       {/* Card header */}
@@ -185,7 +189,7 @@ export default function NewInquiryDrafts({ expanded }) {
           borderRadius: '10px',
           fontWeight: '600',
         }}>
-          {loading ? '…' : drafts.length}
+          {loading ? '…' : visibleDrafts.length}
         </span>
         <span style={{ fontSize: F.xs, color: T.text2, flexShrink: 0, marginLeft: 'auto' }}>
           {collapsed ? '▶' : '▼'}
@@ -201,13 +205,13 @@ export default function NewInquiryDrafts({ expanded }) {
           {error && !loading && (
             <div style={{ padding: '12px 16px', fontSize: F.sm, color: T.danger }}>{error}</div>
           )}
-          {!loading && !error && drafts.length === 0 && (
+          {!loading && !error && visibleDrafts.length === 0 && (
             <div style={{ padding: '16px', fontSize: F.sm, color: T.text3, textAlign: 'center' }}>
-              No new inquiries
+              {propCode ? `No new inquiries for ${propCode}` : 'No new inquiries'}
             </div>
           )}
           <div style={{ maxHeight: '320px', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            {!loading && drafts.map(d => (
+            {!loading && visibleDrafts.map(d => (
               <DraftRow key={d.id} draft={d} onDismiss={handleDismiss} dismissingId={dismissingId} />
             ))}
           </div>
