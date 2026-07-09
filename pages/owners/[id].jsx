@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
-import { sbFetch, T, F, OwnerDetail } from '../../components/OwnersView';
+import { sbFetch, F, OwnerDetail } from '../../components/OwnersView';
+import { T } from '../../lib/theme';
 
 export default function OwnerDetailPage() {
   const router = useRouter();

@@ -7,12 +7,7 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Link from '@tiptap/extension-link';
-
-const T = {
-  bg0:'#161920', bg1:'#1e2128', bg2:'#252930', bg3:'#2e3240',
-  text0:'#c9cdd6', text1:'#8a95a8', text2:'#5a6272', text3:'#4a5264',
-  accent:'#6e9fd8', border:'#2e3240', success:'#6ab06a',
-};
+import { T } from '../lib/theme';
 const F = { xs:'12px', sm:'13px', base:'14px' };
 
 const Btn = ({ onAction, title, active, children }) => (

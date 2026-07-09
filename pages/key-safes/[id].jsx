@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AppShell from '../../components/AppShell';
-import { sbFetch, T, F, KeySafeDetail } from '../../components/KeySafesView';
+import { sbFetch, F, KeySafeDetail } from '../../components/KeySafesView';
+import { T } from '../../lib/theme';
 
 export default function KeySafeDetailPage() {
   const router = useRouter();
