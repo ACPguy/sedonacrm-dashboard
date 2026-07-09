@@ -152,7 +152,7 @@ pages/api/gmail/
   - Agent 1 Lease Watch: Complete (cron `0 13 * * *` = 6am AZ)
   - Agent 3 New Inquiry: Complete (cron `0 15,17,19,21,23,1 * * *` = 8am–6pm AZ, 6x/day)
   - Gmail Watch Auto-Renewal: Complete (cron `0 11 */6 * *` = every 6 days; renewed 2026-06-26, expires 2026-07-03)
-  - Agent 4 Work Order Agent: API complete (`/api/agents/work-order-agent`) — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; pending: migration SQL, UI card, cron
+  - Agent 4 Work Order Agent: API complete (`/api/agents/work-order-agent`) — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; pending: UI card, cron
   - Remaining Phase 4: Agent 9
 - **Phase 4 Supporting work (complete):**
   - BriefingView: 5 collapsible agent sections, `propCode` prop, mobile pass, `embedded` prop
@@ -207,19 +207,6 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Known Gaps
 
 - **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
-- **PENDING: `wo_agent_runs` migration SQL** — must run before Agent 4 UI works:
-  ```sql
-  CREATE TABLE IF NOT EXISTS wo_agent_runs (
-    id uuid default gen_random_uuid() primary key,
-    run_date date not null unique,
-    status text not null default 'none',
-    nudge_items jsonb default '[]',
-    high_cost_items jsonb default '[]',
-    updated_at timestamptz default now()
-  );
-  ALTER TABLE wo_agent_runs ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY "anon_select" ON wo_agent_runs FOR SELECT TO anon USING (true);
-  ```
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
 - **PENDING: WorkOrderAgentDrafts UI card** — wire nudge + high-cost items into BriefingView after migration SQL runs
 - **PENDING: BriefingView propCode embed** — wire `<BriefingView propCode={data.prop_code} />` into Property detail Operations tab
@@ -230,15 +217,14 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 1. Fix inbox divider width persistence (see Known Gaps — real bug, not yet resolved)
 2. Add a legend/tooltip for inbox indicator badges (CON/LEA/flagged dot/paperclip meaning)
-3. Run `wo_agent_runs` migration SQL in psql (SQL in Known Gaps above)
-4. Wire WorkOrderAgentDrafts UI card into BriefingView
-5. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
-6. Phase 5: Leasing Pipeline
+3. Wire WorkOrderAgentDrafts UI card into BriefingView
+4. Wire `<BriefingView propCode={...} />` into Property detail Operations tab
+5. Phase 5: Leasing Pipeline
 
 ## Current Git State
 
-- main: `2012119` — unchanged, session close 2026-07-03 (preview not yet merged — Scott has not said "approved, merge to main" for the Gmail work)
-- preview: `e828176` — "fix: tighter sender column cap + defensive nullslast ordering" (most recent commit; note the junk-row deletion after this was a data-only change with no commit)
+- main: `38d10b5` — docs: update git state — theme consolidation merged to main (2026-07-09)
+- preview: pending commit — wo_agent_runs migration SQL run, CLAUDE.md updated
 
 ---
 
@@ -377,7 +363,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `briefings`: run_date (UNIQUE), status, urgent/attention/fyi/snapshot (jsonb)
 - `lease_watch_drafts`: tenant_id + milestone (UNIQUE pair), subject, body, status
 - `inquiry_drafts`: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status
-- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ⚠️ migration SQL pending (see Known Gaps)
+- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ✅ migration run 2026-07-09, table + RLS live
 - `email_threads`: added `is_deleted boolean DEFAULT false` (2026-07-07) — set by batch-action delete action
 - `email_threads`: added `last_sender_name text`, `last_sender_address text`, `has_attachment boolean DEFAULT false` (2026-07-07) — populated by webhook.js + sync-now.js on every new message; old threads show null/false until re-synced
 - `email_messages`: added `has_attachment boolean DEFAULT false` (2026-07-07)
