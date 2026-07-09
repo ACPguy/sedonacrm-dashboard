@@ -224,7 +224,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `38d10b5` — docs: update git state — theme consolidation merged to main (2026-07-09)
-- preview: pending commit — wo_agent_runs migration SQL run, CLAUDE.md updated
+- preview: `b4bfd04` — chore: run wo_agent_runs migration SQL, table + RLS policy live (2026-07-09)
 
 ---
 
