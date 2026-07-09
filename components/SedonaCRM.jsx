@@ -814,55 +814,52 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
                   {insurance.length>0&&(()=>{const ins=insurance[0];return(<div className="stat-pill"><span className="stat-label">Insurance Exp</span><span className="stat-value" style={{color:moLeftColor(calcMoLeft(ins.expiry_date))}}>{fmtDate(ins.expiry_date)}</span></div>);})()}
                   {agreement&&(<div className="stat-pill"><span className="stat-label">Listing Exp</span><span className="stat-value" style={{color:moLeftColor(calcMoLeft(agreement.listing_expiry_date))}}>{fmtDate(agreement.listing_expiry_date)}</span></div>)}
                 </div>
-                {/* Desktop stat grid */}
-                <div className="mobile-hidden" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:'8px',marginBottom:'20px'}}>
-                  <div style={{...css.card,padding:'8px 10px'}}>
-                    <div style={css.secTitle}>Occupancy</div>
-                    <div style={{fontSize:F.lg,fontWeight:'700',color:occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger}}>{occupancy.occ_pct}%</div>
-                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{fmtNum(occupancy.occupied_sf)} / {fmtNum(occupancy.gross_sf)} sf</div>
-                    <div style={{fontSize:F.xs,color:T.text3}}>{rentRows.length} tenant{rentRows.length!==1?'s':''} · {suites.length} suite{suites.length!==1?'s':''}</div>
+                {/* Desktop stat cards — compact Suites-tab style */}
+                <div className="mobile-hidden" style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'20px'}}>
+                  <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 12px',minWidth:'90px'}}>
+                    <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Occupancy</div>
+                    <div style={{fontSize:F.lg,fontWeight:'700',color:occupancy.occ_pct>=90?T.success:occupancy.occ_pct>=70?T.warn:T.danger,marginTop:'1px'}}>{occupancy.occ_pct}%</div>
                   </div>
-                  <div style={{...css.card,padding:'8px 10px'}}>
-                    <div style={css.secTitle}>Monthly Rent</div>
-                    <div style={{fontSize:F.lg,fontWeight:'700',color:T.accent}}>{fmtMoney(occupancy.monthly_total)}</div>
-                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>Current rent roll total</div>
+                  <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 12px',minWidth:'90px'}}>
+                    <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Monthly Rent</div>
+                    <div style={{fontSize:F.lg,fontWeight:'700',color:T.accent,marginTop:'1px'}}>{fmtMoney(occupancy.monthly_total)}</div>
                   </div>
-                  <div style={{...css.card,cursor:'pointer',padding:'8px 10px'}} onClick={()=>setTab('tasks')}
+                  <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 12px',minWidth:'90px',cursor:'pointer'}}
+                    onClick={()=>setTab('tasks')}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                    <div style={css.secTitle}>Work Orders</div>
-                    <div style={{fontSize:F.lg,fontWeight:'700',color:openWOs>0?T.warn:T.text3}}>{openWOs}</div>
-                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>open</div>
+                    <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Work Orders</div>
+                    <div style={{fontSize:F.lg,fontWeight:'700',color:openWOs>0?T.warn:T.text3,marginTop:'1px'}}>{openWOs}</div>
                   </div>
-                  <div style={{...css.card,cursor:'pointer',padding:'8px 10px'}} onClick={()=>setTab('tasks')}
+                  <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 12px',minWidth:'90px',cursor:'pointer'}}
+                    onClick={()=>setTab('tasks')}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                    <div style={css.secTitle}>Issues</div>
-                    <div style={{fontSize:F.lg,fontWeight:'700',color:openIssues>0?T.danger:T.text3}}>{openIssues}</div>
-                    <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>open</div>
+                    <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Issues</div>
+                    <div style={{fontSize:F.lg,fontWeight:'700',color:openIssues>0?T.danger:T.text3,marginTop:'1px'}}>{openIssues}</div>
                   </div>
                   {insurance.length>0&&(()=>{
                     const ins=insurance[0];
                     const mo=calcMoLeft(ins.expiry_date);
                     return (
-                      <div style={{...css.card,cursor:'pointer',padding:'8px 10px'}} onClick={()=>setTab('insurance')}
+                      <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 12px',minWidth:'90px',cursor:'pointer'}}
+                        onClick={()=>setTab('insurance')}
                         onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                         onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                        <div style={css.secTitle}>Insurance Expiry</div>
-                        <div style={{fontSize:F.md,fontWeight:'600',color:moLeftColor(mo)}}>{fmtDate(ins.expiry_date)}</div>
-                        <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{ins.insurance_co||'—'}</div>
+                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Insurance Exp</div>
+                        <div style={{fontSize:F.lg,fontWeight:'700',color:moLeftColor(mo),marginTop:'1px'}}>{fmtDate(ins.expiry_date)}</div>
                       </div>
                     );
                   })()}
                   {agreement&&(()=>{
                     const mo=calcMoLeft(agreement.listing_expiry_date);
                     return (
-                      <div style={{...css.card,cursor:'pointer',padding:'8px 10px'}} onClick={()=>setTab('listing')}
+                      <div style={{background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'5px',padding:'5px 12px',minWidth:'90px',cursor:'pointer'}}
+                        onClick={()=>setTab('listing')}
                         onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                         onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                        <div style={css.secTitle}>Listing Expiry</div>
-                        <div style={{fontSize:F.md,fontWeight:'600',color:moLeftColor(mo)}}>{fmtDate(agreement.listing_expiry_date)}</div>
-                        <div style={{fontSize:F.xs,color:T.text2,marginTop:'4px'}}>{agreement.listing_agreement_type||'—'}</div>
+                        <div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Listing Exp</div>
+                        <div style={{fontSize:F.lg,fontWeight:'700',color:moLeftColor(mo),marginTop:'1px'}}>{fmtDate(agreement.listing_expiry_date)}</div>
                       </div>
                     );
                   })()}
