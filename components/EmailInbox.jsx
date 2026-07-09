@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, Trash, X, MagnifyingGlass, Paperclip } from '@phosphor-icons/react';
+import { EnvelopeSimple, CheckCircle, Circle, Spinner, Robot, Archive, Trash, X, MagnifyingGlass, Paperclip, Info } from '@phosphor-icons/react';
 import EmailCompose from './EmailCompose';
 import { T } from '../lib/theme';
 
@@ -577,6 +577,7 @@ export default function EmailInbox() {
   const [selectedThread, setSelectedThread] = useState(null);
   const [refreshKey,     setRefreshKey]     = useState(0);
   const [isSyncing,      setIsSyncing]      = useState(false);
+  const [showLegend,     setShowLegend]     = useState(false);
   const [selectedIds,    setSelectedIds]    = useState(new Set());
   const [lastCheckedIndex, setLastCheckedIndex] = useState(null);
   const [listWidth, setListWidth] = useState(() => {
@@ -782,18 +783,70 @@ export default function EmailInbox() {
               <EnvelopeSimple size={18} weight="bold" color={T.accent}/>
               <span style={{ fontSize:F.md, fontWeight:'700', color:T.text0 }}>Inbox</span>
             </div>
-              <button type="button"
-                onClick={handleSyncNow}
-                disabled={isSyncing}
-                title="Sync new mail from Gmail"
-                style={{ background:'transparent', border:`1px solid ${T.border}`, color: isSyncing ? T.text3 : T.accent, cursor: isSyncing ? 'not-allowed' : 'pointer', padding:'3px 8px', borderRadius:'4px', display:'flex', alignItems:'center', gap:'4px', fontSize:'11px', fontWeight:'600' }}
-                onMouseEnter={e => { if (!isSyncing) e.currentTarget.style.borderColor = T.accent; }}
-                onMouseLeave={e => { if (!isSyncing) e.currentTarget.style.borderColor = T.border; }}>
-                {isSyncing
-                  ? <><Spinner size={13} className="spin"/> <span>Syncing…</span></>
-                  : <span>Sync</span>
-                }
-              </button>
+              <div style={{ display:'flex', alignItems:'center', gap:'6px', position:'relative' }}>
+                <button type="button"
+                  onClick={() => setShowLegend(v => !v)}
+                  title="What do these icons mean?"
+                  style={{ background:'transparent', border:`1px solid ${T.border}`, color: showLegend ? T.accent : T.text2, cursor:'pointer', width:'22px', height:'22px', borderRadius:'4px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <Info size={13}/>
+                </button>
+                <button type="button"
+                  onClick={handleSyncNow}
+                  disabled={isSyncing}
+                  title="Sync new mail from Gmail"
+                  style={{ background:'transparent', border:`1px solid ${T.border}`, color: isSyncing ? T.text3 : T.accent, cursor: isSyncing ? 'not-allowed' : 'pointer', padding:'3px 8px', borderRadius:'4px', display:'flex', alignItems:'center', gap:'4px', fontSize:'11px', fontWeight:'600' }}
+                  onMouseEnter={e => { if (!isSyncing) e.currentTarget.style.borderColor = T.accent; }}
+                  onMouseLeave={e => { if (!isSyncing) e.currentTarget.style.borderColor = T.border; }}>
+                  {isSyncing
+                    ? <><Spinner size={13} className="spin"/> <span>Syncing…</span></>
+                    : <span>Sync</span>
+                  }
+                </button>
+                {showLegend && (
+                  <div style={{ position:'absolute', top:'26px', right:0, zIndex:20, width:'240px', maxWidth:'80vw', background:T.bg2, border:`0.5px solid ${T.border}`, borderRadius:'6px', padding:'10px 12px', boxShadow:'0 4px 16px rgba(0,0,0,0.35)' }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px' }}>
+                      <span style={{ fontSize:F.xs, fontWeight:'700', color:T.text0 }}>Icon legend</span>
+                      <button type="button" onClick={() => setShowLegend(false)} style={{ background:'transparent', border:'none', color:T.text2, cursor:'pointer', padding:'2px' }}>
+                        <X size={12}/>
+                      </button>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:'6px', fontSize:'11px', color:T.text1 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>CON</span>
+                        <span>Linked to a Contact</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>LEA</span>
+                        <span>Linked to a Leasing Pipeline lead</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>WOR</span>
+                        <span>Linked to a Work Order</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>ISS</span>
+                        <span>Linked to an Issue</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>TEN</span>
+                        <span>Linked to a Tenant</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span style={{ fontSize:'10px', padding:'1px 4px', borderRadius:'2px', background:`${T.warn}22`, color:T.warn, fontWeight:'700' }}>TAS</span>
+                        <span>Linked to a Task</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span style={{ width:'6px', height:'6px', borderRadius:'1px', background:T.danger, display:'inline-block', flexShrink:0 }}/>
+                        <span>Flagged — sender not recognized, needs review</span>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <Paperclip size={12} color={T.text2}/>
+                        <span>Message has an attachment</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:'5px', flexWrap:'wrap' }}>
             <input
