@@ -239,7 +239,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: Phase 5 Stage 4 (part 1) — PipelineView.jsx list+board, /pipeline route, dual nav, .crm-mobile-only CSS (2026-07-11)
+- preview: `95266f2` — Phase 5 Stage 4 (part 1) — PipelineView.jsx list+board, /pipeline route, dual nav (2026-07-11)
 
 ---
 
