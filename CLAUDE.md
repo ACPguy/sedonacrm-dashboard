@@ -142,6 +142,14 @@ pages/api/gmail/
   webhook.js          — processes Pub/Sub push notifications, syncs email_threads + email_messages
   sync-now.js         — POST syncs Gmail history + polls INBOX; GET returns current state
   batch-action.js     — POST { threadIds, action: archive|spam|delete } — calls Gmail API + updates Supabase; auth: x-briefing-secret
+
+pages/api/pipeline/
+  lead-capture.js       — POST: create leasing_pipeline at New Inquiry (inbound lead)
+  transition.js         — POST: advance/exit stage; handles NA-skip for stage_5_state/stage_7_state
+  submit-application.js — POST: write lease_applications row + link via pipeline_id FK
+  loi-draft.js          — POST: Claude API LOI draft (draft only, no auto-send)
+  movein-clearance.js   — GET: check 5 clearance gates (lease signed, invoices, COI, blocking WOs)
+  notice-to-vacate.js   — POST: set suite "Vacant / For Lease — Pending" + auto-create notice_triggered pipeline record
 ```
 
 ## Phase Status
@@ -176,7 +184,8 @@ pages/api/gmail/
   - BriefingView embedded in Property Dashboard tab (2026-07-09): `<BriefingView propCode={data.prop_code} embedded={true} />` inserted below stat card grid in SedonaCRM.jsx dashboard tab
 - **Phase 5:** IN PROGRESS
   - Stage 1 — DB Schema: Complete (2026-07-11)
-  - Stages 2–7: Pending
+  - Stage 2 — Pipeline API routes: Complete (2026-07-11)
+  - Stages 3–7: Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
 
@@ -217,14 +226,14 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 ## Next Priorities
 
-1. Phase 5 Stage 2: Pipeline API routes (lead capture, stage transitions, application submission, AI LOI drafting, move-in clearance checks)
+1. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
 2. Phase 5 Stage 4: Pipeline UI (10-stage kanban/list view, intake form, qualification gate UI, LOI drafting UI, suite status badges)
 3. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
 
 ## Current Git State
 
 - main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: `d757879` — feat: Phase 5 Stage 1 — leasing pipeline DB schema (2026-07-11)
+- preview: TBD after Stage 2 commit (2026-07-11)
 
 ---
 
