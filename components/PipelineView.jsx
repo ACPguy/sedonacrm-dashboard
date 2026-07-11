@@ -23,28 +23,22 @@ const css = {
 
 const STAGE_GROUP_MAP = {
   // Early
-  Untouched: 'Early', Inquiry: 'Early', 'New Inquiry': 'Early',
-  'Info Sent': 'Early', Replied: 'Early',
+  'New Inquiry': 'Early', 'Info Sent': 'Early',
   'Showing Scheduled': 'Early', 'Showing Complete': 'Early',
   // Mid
-  Showing: 'Mid', 'Application Sent': 'Mid', 'LS APP': 'Mid',
-  'Qualifying / Screening': 'Mid', LOI: 'Mid',
+  'Application Sent': 'Mid', 'Qualifying / Screening': 'Mid', LOI: 'Mid',
   // Late
-  'LS - Out For Sigs': 'Late', 'Lease Drafting': 'Late',
-  'LS - Signed': 'Late', 'Fully Executed': 'Late',
-  Lease: 'Late', 'Move-In': 'Late',
+  'Lease Drafting': 'Late', 'Fully Executed': 'Late', 'Move-In': 'Late',
   // Exited
   Dead: 'Exited', 'On Hold': 'Exited', 'Landlord Declined Use': 'Exited',
-  'CLOSED-New TNT': 'Exited', 'CLOSED-Hang-up': 'Exited',
-  'Closed - Hang-up': 'Exited', Duplicate: 'Exited',
 };
 
 // Stage display order within each section for board columns
 const SECTION_STAGE_ORDER = {
-  Early:  ['Untouched', 'Inquiry', 'New Inquiry', 'Info Sent', 'Replied', 'Showing Scheduled', 'Showing Complete'],
-  Mid:    ['Showing', 'Application Sent', 'LS APP', 'Qualifying / Screening', 'LOI'],
-  Late:   ['LS - Out For Sigs', 'Lease Drafting', 'LS - Signed', 'Fully Executed', 'Lease', 'Move-In'],
-  Exited: ['On Hold', 'Dead', 'Landlord Declined Use', 'CLOSED-New TNT', 'CLOSED-Hang-up', 'Closed - Hang-up', 'Duplicate'],
+  Early:  ['New Inquiry', 'Info Sent', 'Showing Scheduled', 'Showing Complete'],
+  Mid:    ['Application Sent', 'Qualifying / Screening', 'LOI'],
+  Late:   ['Lease Drafting', 'Fully Executed', 'Move-In'],
+  Exited: ['On Hold', 'Dead', 'Landlord Declined Use'],
 };
 
 const GROUP_STYLE = {
@@ -54,12 +48,7 @@ const GROUP_STYLE = {
   Exited: { color: T.text2,   bg: T.bg3 },
 };
 
-const getDisplayGroup = r => {
-  const mapped = STAGE_GROUP_MAP[r.stage];
-  // Any closed/on-hold record is treated as Exited regardless of stage
-  if (mapped !== 'Exited' && (r.status === 'Closed' || r.status === 'On Hold')) return 'Exited';
-  return mapped || 'Early';
-};
+const getDisplayGroup = r => STAGE_GROUP_MAP[r.stage] || 'Early';
 
 const daysInStage = r => {
   const ref = r.updated_at || r.created_at;

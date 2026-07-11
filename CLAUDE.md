@@ -239,7 +239,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: `95266f2` — Phase 5 Stage 4 (part 1) — PipelineView.jsx list+board, /pipeline route, dual nav (2026-07-11)
+- preview: stage data migration + PipelineView grouping fix (2026-07-11)
 
 ---
 
@@ -390,6 +390,8 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `lease_amendments` + `tenants`: added `restoration_obligations text` (filled at move-out from lease review, per spec item #15)
 - `key_handovers`: NEW table — one row per key type per move-in (key_type: suite/dumpster/restroom/key_safe/other); FKs to leasing_pipeline + tenants + properties; RLS (employee/admin only, no anon read)
 - `lease_applications`: NEW table — 106-column prospect self-submit intake form; FK to leasing_pipeline; includes computed GENERATED STORED columns for total_assets/total_liabilities/net_worth; consent fields normalized to boolean+timestamp; RLS (employee/admin only, no anon read — contains SSN, financial data)
+- **Stage data migration — 2026-07-11:** `leasing_pipeline.stage` was raw Podio placeholder data (Untouched/Replied/Showing/LS APP/LOI/Lease + status field for closed records) until 2026-07-11, when it was mapped to the real 10-stage model. Original raw values preserved in `stage_raw_podio` (text column, added same session) for audit. `dead_reason` backfilled: 'unresponsive' (684 hang-up records), 'duplicate' (8 duplicate records). CHECK constraint `leasing_pipeline_stage_check` added covering all 13 valid stage values. Mapping: Untouched/Inquiry→New Inquiry, Replied→Info Sent, Showing→Showing Scheduled, LS APP→Application Sent, LOI→LOI, LS-Out For Sigs→Lease Drafting, LS-Signed/Lease→Fully Executed, CLOSED-New TNT→Move-In, Closed-Hang-up/CLOSED-Hang-up/Duplicate→Dead.
+- **Post-migration stage counts (2026-07-11):** New Inquiry=833, Info Sent=399, Showing Scheduled=37, Application Sent=22, LOI=11, Lease Drafting=1, Fully Executed=75, Move-In=433, Dead=692 — total 2503.
 
 ## Drive Folder Architecture (permanent)
 
