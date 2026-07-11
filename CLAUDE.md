@@ -237,7 +237,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: TBD — fix: loi-draft model string updated to claude-sonnet-5 (2026-07-11)
+- preview: `218e5d3` — fix: loi-draft model string updated to claude-sonnet-5 (2026-07-11)
 
 ---
 
