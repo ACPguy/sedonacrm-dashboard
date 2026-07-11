@@ -174,7 +174,9 @@ pages/api/gmail/
   - EmailInbox sender col + sort (2026-07-07): sender column cap tightened 180px→130px; buildQuery base uses `order=last_message_at.desc.nullslast` so NULL timestamps always sort to bottom on all tabs
   - Agent cards propCode filtering (2026-07-09): LeaseWatchDrafts, NewInquiryDrafts, WorkOrderAgentDrafts all accept propCode prop and filter client-side; new-inquiry GET joins leasing_pipeline(prop_code); snapshot strip removed from BriefingView
   - BriefingView embedded in Property Dashboard tab (2026-07-09): `<BriefingView propCode={data.prop_code} embedded={true} />` inserted below stat card grid in SedonaCRM.jsx dashboard tab
-- **Phase 5+:** Pending
+- **Phase 5:** IN PROGRESS
+  - Stage 1 — DB Schema: Complete (2026-07-11)
+  - Stages 2–7: Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
 
@@ -215,13 +217,14 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 ## Next Priorities
 
-1. Phase 5: Leasing Pipeline
-2. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
+1. Phase 5 Stage 2: Pipeline API routes (lead capture, stage transitions, application submission, AI LOI drafting, move-in clearance checks)
+2. Phase 5 Stage 4: Pipeline UI (10-stage kanban/list view, intake form, qualification gate UI, LOI drafting UI, suite status badges)
+3. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
 
 ## Current Git State
 
 - main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: `019d6c8` — same (in sync; branches diverged mid-session from accidental direct-to-main pushes during troubleshooting, reconciled via verified force-push)
+- preview: `d757879` — feat: Phase 5 Stage 1 — leasing pipeline DB schema (2026-07-11)
 
 ---
 
@@ -365,6 +368,12 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `email_threads`: added `is_deleted boolean DEFAULT false` (2026-07-07) — set by batch-action delete action
 - `email_threads`: added `last_sender_name text`, `last_sender_address text`, `has_attachment boolean DEFAULT false` (2026-07-07) — populated by webhook.js + sync-now.js on every new message; old threads show null/false until re-synced
 - `email_messages`: added `has_attachment boolean DEFAULT false` (2026-07-07)
+- **Phase 5 Stage 1 — 2026-07-11:**
+- `leasing_pipeline`: +30 columns — stage_5_state/stage_7_state (pending/complete/NA 3-way), pipeline_source (inbound/notice_triggered), departing_tenant_id FK→tenants, dead_reason/dead_notes, landlord_declined_reason/landlord_declined_notes, on_hold_date/on_hold_notes, qual_business_type/qual_credit_indication/qual_capital/qual_notes/qual_passed/qual_passed_date, app_sent_date/app_received_date, loi_submitted_at/loi_proposed_rent/loi_proposed_term/loi_proposed_start_date/loi_counter_at/loi_counter_rent/loi_counter_term/loi_approved_at/loi_notes, broker_contact_id FK→contacts/broker_commission_pct/broker_commission_note
+- `suites`: status CHECK extended with 6th value `'Vacant / For Lease — Pending'` (auto-triggered by notice-to-vacate, internal-only status while current tenancy still active)
+- `lease_amendments` + `tenants`: added `restoration_obligations text` (filled at move-out from lease review, per spec item #15)
+- `key_handovers`: NEW table — one row per key type per move-in (key_type: suite/dumpster/restroom/key_safe/other); FKs to leasing_pipeline + tenants + properties; RLS (employee/admin only, no anon read)
+- `lease_applications`: NEW table — 106-column prospect self-submit intake form; FK to leasing_pipeline; includes computed GENERATED STORED columns for total_assets/total_liabilities/net_worth; consent fields normalized to boolean+timestamp; RLS (employee/admin only, no anon read — contains SSN, financial data)
 
 ## Drive Folder Architecture (permanent)
 
