@@ -72,7 +72,7 @@ git push
 - Gmail, Google Calendar, Google Drive (MCP connected)
 - Twilio for SMS (Phase 6)
 - Dropbox Sign (two-part sequential signing) for e-signature — Phase 5 Stage 3, ~$75/mo, for lease + lease amendment signing. Not yet built.
-- Claude API — Sonnet 4.6 for AI agents (Phase 4+)
+- Claude API — `claude-sonnet-5` for AI agents (Phase 4+). **Model strings need periodic review against Anthropic's deprecation schedule** (docs.anthropic.com/en/docs/about-claude/models/overview). `claude-sonnet-4-20250514` was hardcoded in loi-draft.js and retired June 15, 2026 — caught and fixed 2026-07-11.
 
 ## Supabase
 
@@ -237,7 +237,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: `bd1d37c` — fix: loi-draft PostgREST join + lead-capture proposed_use field (2026-07-11)
+- preview: TBD — fix: loi-draft model string updated to claude-sonnet-5 (2026-07-11)
 
 ---
 
