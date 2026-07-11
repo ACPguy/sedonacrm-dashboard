@@ -24,8 +24,7 @@ export default async function handler(req, res) {
       ls_type, proposed_use, additional_terms,
       loi_proposed_rent, loi_proposed_term, loi_proposed_start_date,
       security_deposit_terms, rent_due_at_signing,
-      internal_notes,
-      properties(address, city, state)
+      internal_notes
     `)
     .eq('id', pipeline_id)
     .single();
@@ -34,8 +33,16 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'Pipeline record not found' });
   }
 
-  const prop = deal.properties || {};
-  const propAddress = [prop.address, prop.city, prop.state].filter(Boolean).join(', ');
+  // leasing_pipeline has no FK to properties — query separately by prop_code
+  const { data: prop } = await sb
+    .from('properties')
+    .select('address, city, state')
+    .eq('prop_code', deal.prop_code)
+    .maybeSingle();
+
+  const propAddress = prop
+    ? [prop.address, prop.city, prop.state].filter(Boolean).join(', ')
+    : '';
 
   const dealContext = [
     `Property: ${deal.prop_code}${propAddress ? ` — ${propAddress}` : ''}`,

@@ -29,6 +29,7 @@ export default async function handler(req, res) {
     need_when,
     ls_length_interest,
     other_needs,
+    proposed_use,
     contact_id,
   } = req.body || {};
 
@@ -59,6 +60,7 @@ export default async function handler(req, res) {
   if (need_when)           insert.need_when           = need_when;
   if (ls_length_interest)  insert.ls_length_interest  = ls_length_interest;
   if (other_needs)         insert.other_needs         = other_needs;
+  if (proposed_use)        insert.proposed_use        = proposed_use;
   if (contact_id)          insert.contact_id          = contact_id;
 
   const { data, error } = await sb

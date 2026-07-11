@@ -184,7 +184,7 @@ pages/api/pipeline/
   - BriefingView embedded in Property Dashboard tab (2026-07-09): `<BriefingView propCode={data.prop_code} embedded={true} />` inserted below stat card grid in SedonaCRM.jsx dashboard tab
 - **Phase 5:** IN PROGRESS
   - Stage 1 — DB Schema: Complete (2026-07-11)
-  - Stage 2 — Pipeline API routes: Complete (2026-07-11)
+  - Stage 2 — Pipeline API routes: Complete (2026-07-11); bug fixes in same session: loi-draft.js (broken PostgREST join — leasing_pipeline has no FK to properties; fixed with separate query by prop_code), lead-capture.js (proposed_use field not wired; fixed)
   - Stages 3–7: Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
@@ -229,6 +229,10 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 1. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
 2. Phase 5 Stage 4: Pipeline UI (10-stage kanban/list view, intake form, qualification gate UI, LOI drafting UI, suite status badges)
 3. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
+
+## Schema Notes — leasing_pipeline FK gap (permanent)
+
+`leasing_pipeline` has NO FK to `properties`. It links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline queries. Always query properties separately by prop_code when needed.
 
 ## Current Git State
 
