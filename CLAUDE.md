@@ -184,8 +184,9 @@ pages/api/pipeline/
   - BriefingView embedded in Property Dashboard tab (2026-07-09): `<BriefingView propCode={data.prop_code} embedded={true} />` inserted below stat card grid in SedonaCRM.jsx dashboard tab
 - **Phase 5:** IN PROGRESS
   - Stage 1 — DB Schema: Complete (2026-07-11)
-  - Stage 2 — Pipeline API routes: Complete (2026-07-11); bug fixes in same session: loi-draft.js (broken PostgREST join — leasing_pipeline has no FK to properties; fixed with separate query by prop_code), lead-capture.js (proposed_use field not wired; fixed)
-  - Stages 3–7: Pending
+  - Stage 2 — Pipeline API routes: Complete (2026-07-11)
+  - Stage 4 (part 1) — PipelineView.jsx: Complete (2026-07-11); list+board view, dual nav, /pipeline route, mobile responsive, .crm-mobile-only CSS added
+  - Stage 3 (Dropbox Sign) + Stage 4 parts 2–3 (detail panel, prop embed): Pending
 
 ## Agents Env Vars (Vercel) — all set ✅
 
@@ -226,9 +227,10 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 ## Next Priorities
 
-1. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
-2. Phase 5 Stage 4: Pipeline UI (10-stage kanban/list view, intake form, qualification gate UI, LOI drafting UI, suite status badges)
-3. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
+1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
+2. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
+3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
+4. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
 
 ## Schema Notes — leasing_pipeline FK gap (permanent)
 
@@ -237,7 +239,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: `218e5d3` — fix: loi-draft model string updated to claude-sonnet-5 (2026-07-11)
+- preview: Phase 5 Stage 4 (part 1) — PipelineView.jsx list+board, /pipeline route, dual nav, .crm-mobile-only CSS (2026-07-11)
 
 ---
 
@@ -301,6 +303,7 @@ Use `psql` only — `export DB='postgresql://postgres.edxcvyleielzevpappui:Sedon
 **Breakpoints:**
 - Mobile: `max-width: 639px` (use `.mobile-hidden` to hide on mobile, `.md-hidden` to hide on desktop)
 - Desktop: `min-width: 768px`
+- Additional CSS classes: `.crm-desktop-only` (hidden at ≤639px), `.crm-mobile-only` (hidden at ≥640px — added 2026-07-11 for board view mobile/desktop split)
 
 **Patterns by UI type:**
 

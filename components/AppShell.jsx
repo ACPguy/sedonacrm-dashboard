@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key, EnvelopeSimple, SquaresFour } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, List, Gear, Key, EnvelopeSimple, SquaresFour, Funnel } from '@phosphor-icons/react';
 import GlobalSearch from './GlobalSearch';
 import { T } from '../lib/theme';
 
@@ -163,7 +163,7 @@ export default function AppShell({ children, activeView }) {
       <NavBtn label="Suites"      href="/suites"       active={is('suites')}      onClick={()=>go('/suites')}       collapsed={effectiveCollapsed} icon={<Cube size={18} weight="bold"/>}/>
       <NavBtn label="Key Safes"   href="/key-safes"    active={is('key-safes')}   onClick={()=>go('/key-safes')}    collapsed={effectiveCollapsed} icon={<Key size={18} weight="bold"/>}/>
       <SectionLabel label="Leasing" collapsed={effectiveCollapsed}/>
-      <NavBtn label="Pipeline"      href="/?view=leasing"       active={is('leasing')}       onClick={()=>go('/?view=leasing')}       collapsed={effectiveCollapsed}/>
+      <NavBtn label="Pipeline"      href="/pipeline"       active={is('pipeline')}       onClick={()=>go('/pipeline')}       collapsed={effectiveCollapsed} icon={<Funnel size={18} weight="bold"/>}/>
       <NavBtn label="Leases"        href="/?view=leases"        active={is('leases')}        onClick={()=>go('/?view=leases')}        collapsed={effectiveCollapsed}/>
       <NavBtn label="Rents"         href="/rent-schedule"       active={is('rent-schedule')} onClick={()=>go('/rent-schedule')}       collapsed={effectiveCollapsed} icon={<ChartBar size={18} weight="bold"/>}/>
       <SectionLabel label="Compliance" collapsed={effectiveCollapsed}/>

@@ -12,7 +12,7 @@ import GlobalSearch from './GlobalSearch';
 import BriefingView from './BriefingView';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { HouseLine, BuildingOffice, Buildings, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple, SquaresFour, List } from '@phosphor-icons/react';
+import { HouseLine, BuildingOffice, Buildings, Storefront, CheckFat, Wrench, Cube, UserCircle, Truck, Briefcase, ChartBar, Umbrella, ClipboardText, Gear, Key, CaretLeft, CaretRight, EnvelopeSimple, SquaresFour, List, Funnel } from '@phosphor-icons/react';
 import { T } from '../lib/theme';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -885,6 +885,10 @@ export const PropertyDetail = ({ property, onBack, onUpdate, initialTab }) => {
             )}
 
             {/* LEASING PIPELINE */}
+            {/* TODO Phase 5 Stage 4: Replace the inline pipeline tab below with:
+                <PipelineView propCode={data.prop_code} />
+                Import: import PipelineView from './PipelineView';
+                This will embed the full PipelineView with propCode filter in the Leasing tab. */}
             {tab==='pipeline'&&(()=>{
               const stageColor = s => {
                 if(!s) return [T.text2,T.bg3];
@@ -2294,7 +2298,7 @@ export default function SedonaCRM() {
       <NavItem iconComp={<Cube size={18} weight="bold"/>} label="Suites"      href="/suites"             active={currentView==='suites'}      onClick={()=>handleNav('/suites')}       {...navProps}/>
       <NavItem iconComp={<Key size={18} weight="bold"/>} label="Key Safes"   href="/key-safes"          active={currentView==='key-safes'}   onClick={()=>handleNav('/key-safes')}    {...navProps}/>
       {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Leasing</div>}
-      <NavItem label="Pipeline" href="/?view=leasing"       active={currentView==='leasing'}       onClick={()=>navTo('leasing')}             {...navProps}/>
+      <NavItem iconComp={<Funnel size={18} weight="bold"/>} label="Pipeline" href="/pipeline" active={currentView==='pipeline'} onClick={()=>handleNav('/pipeline')} {...navProps}/>
       <NavItem label="Leases"   href="/?view=leases"        active={currentView==='leases'}        onClick={()=>navTo('leases')}              {...navProps}/>
       <NavItem iconComp={<ChartBar size={18} weight="bold"/>} label="Rents"    href="/rent-schedule"       active={currentView==='rent-schedule'} onClick={()=>handleNav('/rent-schedule')} {...navProps}/>
       {!sidebarCollapsed&&<div style={{fontSize:F.xs,color:T.text3,textTransform:'uppercase',letterSpacing:'0.08em',padding:'10px 4px 4px',fontWeight:'600'}}>Compliance</div>}
