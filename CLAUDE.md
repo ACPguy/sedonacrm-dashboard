@@ -163,25 +163,11 @@ pages/api/pipeline/
   - Agent 4 Work Order Agent: Complete — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; WorkOrderAgentDrafts card in BriefingView; cron `0 14 * * *` (7am AZ, daily)
   - Remaining Phase 4: Agent 9
 - **Phase 4 Supporting work (complete):**
-  - BriefingView: 5 collapsible agent sections, `propCode` prop, mobile pass, `embedded` prop
-  - Drive folders: date-first naming, auto-create on save for ALL task types
-  - LeaseWatchDrafts + NewInquiryDrafts: collapsible headers + scrollable bodies
-  - HomeView: "Home" header + HouseLine icon, collapsible weather strip, larger fonts
-  - BriefingView: ↻ dropdown (Refresh + Re-run), Expand/Collapse All; all 5 sections default closed
-  - Cron auth fixes (2026-07-03): all 5 cron routes now accept GET (Vercel sends GET) + CRON_SECRET Bearer header
-  - Home URL (2026-07-03): clean `/home` route; `/?view=morning-briefing` 307-redirects to `/home`
-  - Gmail sync fixes (2026-07-07): skip SPAM/TRASH in history.list loop; outbound emails matched to contacts via "to" header
-  - EmailInbox prev/next nav (2026-07-07): ‹ › buttons + ArrowLeft/Right keyboard nav in thread detail; steps through in-memory threads array
-  - EmailInbox batch select (2026-07-07): checkboxes on thread rows + batch toolbar (Archive/Spam/Delete); batch-action.js calls Gmail API for each action
-  - handleArchive bug fix (2026-07-07): single-thread Archive now also calls Gmail API (removeLabelIds INBOX) via batch-action endpoint
-  - EmailInbox compact rows (2026-07-07): single-line ThreadListItem with sender name (130px col, hidden mobile), subject+snippet combined, paperclip icon, small indicator badges; shift-click range select; row height ~32px
-  - EmailInbox resizable list panel (2026-07-07): draggable 4px divider between list and detail; width persists to localStorage (key: sedonacrm_inbox_list_width); bounds 280–700px; offset calculated via containerRef.getBoundingClientRect().left (works with variable sidebar width); sender col uses flex clamp(70px,28%,200px) for proportional growth
-  - EmailInbox grid columns (2026-07-07): ThreadListItem refactored to Fragment of 6 cells (no wrapper div); grid container uses `gridTemplateColumns:'32px 20px fit-content(180px) minmax(0,1fr) 64px 60px'`; sender col auto-sizes to content (no dead space); formatSmartTime shows clock time today, short date otherwise; select-all checkbox inline with filter pills (indeterminate when partial)
-  - EmailInbox fixes (2026-07-07): indicator col fixed to 64px (was auto — could spill), overflow:hidden + justifyContent:flex-end on cell; listWidthRef now initialised from listWidth (not hardcoded 340); mount-time useEffect re-reads localStorage after hydration; handleDividerMouseDown syncs ref to current state before starting drag
-  - EmailInbox Inbox tab (2026-07-07): added 'inbox' as first/default filter tab; buildQuery filters `is_archived=eq.false&is_deleted=eq.false`; replaces 'unread' as default; empty-state reads "Inbox is empty."
-  - EmailInbox sender col + sort (2026-07-07): sender column cap tightened 180px→130px; buildQuery base uses `order=last_message_at.desc.nullslast` so NULL timestamps always sort to bottom on all tabs
-  - Agent cards propCode filtering (2026-07-09): LeaseWatchDrafts, NewInquiryDrafts, WorkOrderAgentDrafts all accept propCode prop and filter client-side; new-inquiry GET joins leasing_pipeline(prop_code); snapshot strip removed from BriefingView
-  - BriefingView embedded in Property Dashboard tab (2026-07-09): `<BriefingView propCode={data.prop_code} embedded={true} />` inserted below stat card grid in SedonaCRM.jsx dashboard tab
+  - BriefingView: 5 collapsible agent sections, `propCode` + `embedded` props, Expand/Collapse All, ↻ (Refresh + Re-run) dropdown; all sections default closed; embedded in Property Dashboard tab
+  - Drive folders: date-first naming (`[YYYY-MM-DD] — [displayId] — [title]`), auto-create on save for ALL task types
+  - Home URL: `/home` canonical route; `/?view=morning-briefing` 307-redirects; cron routes accept GET + CRON_SECRET Bearer (2026-07-03)
+  - EmailInbox (2026-07-07): compact CSS Grid rows (6-col), batch select + Archive/Spam/Delete, ‹ › prev/next nav, resizable divider (localStorage, default 570px), Inbox default tab (excludes archived/deleted), SPAM/TRASH exclusion in sync, shift-click range select, formatSmartTime, select-all w/ indeterminate state
+  - Agent cards propCode filtering: LeaseWatchDrafts, NewInquiryDrafts, WorkOrderAgentDrafts all filter client-side by propCode
 - **Phase 5:** IN PROGRESS
   - Stage 1 — DB Schema: Complete (2026-07-11)
   - Stage 2 — Pipeline API routes: Complete (2026-07-11)
@@ -197,36 +183,13 @@ pages/api/pipeline/
 
 - Vercel Pro: $20/mo | Claude API: ~$10–15/mo | Supabase: $0 | Total: ~$30–35/mo
 
-## Gmail Inbox — Session Summary (2026-07-07)
-
-Extensive session, ~10 commits on preview, none yet merged to main. In order:
-
-1. Spam/Trash exclusion — webhook.js + sync-now.js history.list loops now skip messages labeled SPAM/TRASH (previously synced into inbox unfiltered)
-2. Outbound contact linking — matching logic extended to check the "to" address for outbound mail (previously only inbound sender was checked)
-3. Prev/Next thread navigation — buttons + arrow keys, steps through in-memory thread list
-4. Batch select + batch actions — checkboxes, Archive/Spam/Delete via new pages/api/gmail/batch-action.js (also fixed a pre-existing bug where Archive only updated the DB and never actually archived in Gmail)
-5. Compact single-line inbox rows — CSS Grid layout (6 columns: checkbox, unread dot, sender, subject+snippet, indicators, time) replacing the old 3-line stacked card design
-6. Sender name + attachment display — new email_threads columns (last_sender_name, last_sender_address, has_attachment) populated on every sync; paperclip icon shown when has_attachment is true
-7. Shift-click range select — matches Gmail's range-selection behavior
-8. Resizable divider between thread list and detail pane — width saved to localStorage (persistence still has a known bug, see Known Gaps)
-9. Grid column dead-space fix — sender column uses fit-content(130px) instead of a fixed percentage, so short names don't leave wasted space
-10. Gmail-style time format — clock time for today's mail, short date otherwise
-11. Select-all checkbox with indeterminate state
-12. New default "Inbox" filter tab — excludes archived/deleted, shows read+unread (mirrors actual Gmail Inbox); tab order is now Inbox, Unread, All, Linked, Flagged
-13. Defensive nullslast ordering on all filter queries — prevents any future NULL last_message_at row from sorting to the top
-14. One-time data cleanup — deleted a single junk test row (id c77641cc-077f-44c7-9ef0-6b9d6528483d, gmail_thread_id 'test-123') that had no real Gmail data and was causing incorrect sort order
-
-New schema this session: email_threads gained last_sender_name, last_sender_address, has_attachment, is_deleted; email_messages gained has_attachment. New endpoint: pages/api/gmail/batch-action.js.
-
 ## Known Gaps
 
 - **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
-- **Inbox divider width persistence — NOT resolved, deprioritized with a workaround (2026-07-09 session).** Confirmed root cause of one failure mode: window-level mousemove/mouseup listeners never fire if the mouse is released outside page content (e.g. over the browser address bar), leaving drag state stuck and silently re-saving a wrong width before refresh. Fixed via Pointer Events API + setPointerCapture/releasePointerCapture (commit `1b4f799`), confirmed via console logging to correctly fire pointerdown/pointerup and save/read the right value in a full successful test. However, Scott's later retest still showed the width snapping back on hard refresh in the same "release over address bar" scenario. Second root cause not identified — do not assume the pointer-capture fix is sufficient. Workaround shipped instead: default width hardcoded to 570px (commit `019d6c8`), so the inbox looks reasonable on load regardless of whether persistence holds. The pointer-capture drag mechanism is still live and works correctly within a session; only cross-refresh persistence is unreliable. If revisiting: do NOT re-attempt blind fixes — re-instrument with console logging first (pattern used this session) and get real evidence before changing code.
-- **Inbox indicator badges (CON/LEA/WOR/ISS/TEN/TAS/red dot/paperclip) — RESOLVED (2026-07-09 session).** Legend added via a "?" info button next to the Sync button in the Inbox header; toggles a panel listing all badge meanings. Commit `f19fe66`. Confirmed working via screenshot.
-- **New Inquiry agent (Agent 3) — auto-create scope finalized 2026-07-11 (second pass).** Weak-phrase tier (2+ weak matches = pass) and known-contact bypass (matched contacts skipped phrase check) both removed after causing false positives in testing. Agent now auto-creates only on: (1) NumberBarn hotline voicemail (voicemail@numberbarn.com + "399-4040"/"FOR LEASE LINE"), (2) automation.podio.com + "New Leasing Call" subject, (3) STRONG_PHRASES match. Known-contact lookup still runs but only as a tag (source_note) on records that already passed — never as a pass reason. Manual **+LSG** button added to EmailInbox for ambiguous cases — one-click pipeline creation from an email thread; source='manual_lsg' to distinguish from agent-created ('email') records. lead-capture.js accepts thread_id param and links the email_thread on create (link_status='manual_linked'). Future: if manual +LSG usage exceeds ~10/day, revisit with a Claude-API-based classifier using +LSG-confirmed examples as reference data instead of further keyword tuning.
-- **EmailInbox.jsx +LSG modal caused a ReferenceError (lsgThread out of scope) that crashed the whole inbox on thread click — fixed 2026-07-11, was a scoping issue from the +LSG feature added earlier same day.** Modal JSX had been placed inside `ThreadDetail`'s return instead of `EmailInbox`'s return; all `lsg*` state lives in `EmailInbox`.
-- **75 email_threads rows had dangling leasing_pipeline links after the Agent 3 false-positive cleanup (2026-07-11) — link fields cleared same day so +LSG button and LEA badge display correctly again.** Cleared via UPDATE setting linked_record_type/linked_record_id/link_status = NULL where linked_record_id NOT IN leasing_pipeline; 20 legitimate links verified untouched.
+- **Inbox divider width persistence — NOT resolved, deprioritized.** Workaround: default width hardcoded to 570px. Pointer Events API fix (setPointerCapture) is live but persistence across hard refresh still unreliable in "release over address bar" scenario. If revisiting: re-instrument with console logging first — do NOT attempt blind fixes.
+- **Inbox indicator badges (CON/LEA/WOR/ISS/TEN/TAS/red dot/paperclip) — RESOLVED.** Legend "?" info button next to Sync button in Inbox header.
+- **New Inquiry agent (Agent 3) — uses broad LEASING_KEYWORDS filter (2026-07-11).** Manual **+LSG** button in EmailInbox for ambiguous cases — one-click pipeline creation; source='manual_lsg'. lead-capture.js accepts thread_id and links the email_thread on create (link_status='manual_linked'). Agent auto-creates on keyword match; +LSG handles cases that are real but don't hit keywords. Future: if +LSG usage exceeds ~10/day, revisit with Claude-API classifier using confirmed examples as training data.
 - **+LSG modal property dropdown scoped to Scott's confirmed 14 active properties (CR1, DCM, LAP, LEEN, LPP, MYN, OMP, PWP, RHS, SAC, SSB, VDN, VVP, WSP) — NOT the same as properties.status='active' (16 rows, includes OLY/WNT which are excluded per Scott 2026-07-11). Property field is optional for general inquiries with no specific building.** Hardcoded as `LSG_PROPERTIES` array with code+name in EmailInbox.jsx; lead-capture.js now allows null prop_code.
 - **PipelineView.jsx fetch bug fixed 2026-07-11 — was filtering on stale `status` field instead of `stage`, and had no row limit (silently capped at PostgREST's 1000-row default). Both fixed.** Filter now uses `stage=not.in.(Dead,On Hold,Landlord Declined Use)`; limit set to 5000. Revisit with real pagination if leasing_pipeline approaches 5000 rows.
 - **leasing_pipeline reset 2026-07-11 — bulk Podio xlsx import (2408 rows) and non-leasing agent false-positives (16 rows) deleted, leaving 5 real records + 13 seeded 'TEST — ' records spanning all pipeline stages for UI testing.** Full historical Podio data remains untouched in Podio itself and the original xlsx in Drive; this was disposable placeholder data only, never production data. Delete all 'TEST — ' prefixed records before go-live.
@@ -244,8 +207,8 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 
 ## Current Git State
 
-- main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: `f79c976` — data: reset leasing_pipeline to clean testable working set (2026-07-11)
+- main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved); all session work
+- preview: `9ce6031` — same as main; CLAUDE.md session-close housekeeping commit will push ahead
 
 ---
 
@@ -396,8 +359,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `lease_amendments` + `tenants`: added `restoration_obligations text` (filled at move-out from lease review, per spec item #15)
 - `key_handovers`: NEW table — one row per key type per move-in (key_type: suite/dumpster/restroom/key_safe/other); FKs to leasing_pipeline + tenants + properties; RLS (employee/admin only, no anon read)
 - `lease_applications`: NEW table — 106-column prospect self-submit intake form; FK to leasing_pipeline; includes computed GENERATED STORED columns for total_assets/total_liabilities/net_worth; consent fields normalized to boolean+timestamp; RLS (employee/admin only, no anon read — contains SSN, financial data)
-- **Stage data migration — 2026-07-11:** `leasing_pipeline.stage` was raw Podio placeholder data (Untouched/Replied/Showing/LS APP/LOI/Lease + status field for closed records) until 2026-07-11, when it was mapped to the real 10-stage model. Original raw values preserved in `stage_raw_podio` (text column, added same session) for audit. `dead_reason` backfilled: 'unresponsive' (684 hang-up records), 'duplicate' (8 duplicate records). CHECK constraint `leasing_pipeline_stage_check` added covering all 13 valid stage values. Mapping: Untouched/Inquiry→New Inquiry, Replied→Info Sent, Showing→Showing Scheduled, LS APP→Application Sent, LOI→LOI, LS-Out For Sigs→Lease Drafting, LS-Signed/Lease→Fully Executed, CLOSED-New TNT→Move-In, Closed-Hang-up/CLOSED-Hang-up/Duplicate→Dead.
-- **Post-migration stage counts (2026-07-11):** New Inquiry=833, Info Sent=399, Showing Scheduled=37, Application Sent=22, LOI=11, Lease Drafting=1, Fully Executed=75, Move-In=433, Dead=692 — total 2503.
+- **Stage data migration — 2026-07-11:** `leasing_pipeline.stage` migrated from raw Podio values to the 13-value stage model. Original values preserved in `stage_raw_podio` for audit. CHECK constraint `leasing_pipeline_stage_check` added. After migration: 2503 rows total (New Inquiry=833, Info Sent=399, Showing Scheduled=37, Application Sent=22, LOI=11, Lease Drafting=1, Fully Executed=75, Move-In=433, Dead=692). Then reset to 18-record working set for UI testing (see Known Gaps).
 
 ## Drive Folder Architecture (permanent)
 
