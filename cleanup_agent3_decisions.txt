@@ -1,0 +1,109 @@
+# Agent 3 New Inquiry — leasing_pipeline cleanup decisions
+# Generated: 2026-07-11 (v2 — corrected automation.podio.com rule)
+# Logic:
+#   HARD-KEEP:   sender=automation.podio.com AND subject contains "New Leasing Call" (case-insensitive)
+#   HARD-DELETE: sender domain intuit.com or quickbooks.com
+#   HARD-DELETE: Google Workspace Updates (noreply@workspaceupdates.withgoogle.com)
+#   HARD-DELETE: Google Alerts (googlealerts-noreply@google.com)
+#   Google Voice (voice-noreply@google.com) → normal phrase check (not hard-excluded)
+#   Known contact (any contacts.email match, any category) → MANUAL_REVIEW regardless of phrase signal
+#   No contact match + no/weak leasing phrase signal → DELETE
+#   No contact match + strong leasing phrase + real prospect content → KEEP
+#
+# Format: pipeline_id | prospect_name | subject | decision | reason
+#
+6c5dbed0-56c0-4d9a-9d87-649046c20242|Dropbox Sign|Anne Lantry has viewed LAP - Body Alchemy - Suite Expansion|DELETE|Dropbox Sign transactional signing notification; operational, not a leasing prospect inquiry
+19e4db26-a318-486a-8e0c-044fab89b05e|Property Restoration and Maintenance|Your estimate 913 from Property Restoration and Maintenance|DELETE|Vendor estimate notification (Joist app); no leasing content
+87c97e26-560d-46e9-aa20-f9a575f79038|Property Restoration and Maintenance|Invoice 1787 from Property Restoration and Maintenance|DELETE|Vendor invoice notification (Joist app); no leasing content
+fd099b69-6ff3-4361-b066-0128f3124528|Property Restoration and Maintenance|Your estimate 4845 from Property Restoration and Maintenance|DELETE|Vendor estimate notification (Joist app); no leasing content
+5cf022c7-f602-4188-ad32-e8b68d8cb35f|Heather Cole|Re: Yavapai County Sheriff - LS Amend (M) - [#618]|MANUAL_REVIEW|Known contact (Tenant); lease amendment discussion with existing tenant
+ade3ca1d-e2a7-4ba3-a168-0f58f194e9b6|Keysafe Codes|🔑 - PM Keysafe Codes (2026-07-08)|DELETE|automation.podio.com but subject does NOT contain "New Leasing Call"; ops keysafe notification; reply@automation.podio.com not in contacts; no leasing content
+dbdc65bb-055e-4a42-8d0e-c3708c773cbc|Leasing Call|🎯 New Leasing Call 🎯 (Podio item 2708)|KEEP|Hard-include: automation.podio.com + subject contains "New Leasing Call"; real Podio leasing-call notification
+66067ecc-5413-40dc-aa6e-a06ea9270c2f|Ray Valencia|Re: (LAP #3734) - Ray - Tree Work 2026 - (La Pasada Plaza)|MANUAL_REVIEW|Known contact (Vendor); contractor invoice follow-up, not a leasing inquiry
+59c15c92-6287-4144-9507-87ff381f7dc0|Google Workspace Updates blog|Google Workspace updates from July 8|DELETE|Hard-exclude: Google Workspace Updates notification sender (noreply@workspaceupdates.withgoogle.com)
+12be6892-4a3b-4b08-92a0-44654d825e4e|Chase|Your latest statement is now available|DELETE|Bank statement notification; no leasing content; no contact match
+4ad5196f-01b1-4153-bb5a-197204e5c51b|Keysafe Codes|🔑 - PM Keysafe Codes (2026-07-09)|DELETE|automation.podio.com but subject does NOT contain "New Leasing Call"; ops keysafe notification; reply@automation.podio.com not in contacts; no leasing content
+9c3d07de-1b7e-4a9c-a0fe-1dc5985a15c0|Ed Schreiber|Re: (VVP) - Awaken Body Arts - P-Lot Sealcoat Incident - PRAM|MANUAL_REVIEW|Known contact (Vendor/Attorney); legal/tenant matter, not a new leasing inquiry
+0a2e83e3-32a8-4831-a3bc-34487d53f114|Adams Habern & Gray CPAs|File uploaded by Admin - Adams Habern & Gray CPAs|DELETE|CPA firm secure portal notification; no leasing content; no contact match on portal-notification@securefirmportal.com
+b959e225-de87-4525-a741-ef53e59371bb|(VVP) Verde Valley Plaza LLC|New payment request from (VVP) Verde Valley Plaza LLC for $6508.91|DELETE|Hard-exclude: quickbooks@notification.intuit.com (intuit/QuickBooks domain)
+c24d085b-dc42-4418-890e-d13ae6dac297|Google Workspace Updates blog|Google Workspace updates from July 7|DELETE|Hard-exclude: Google Workspace Updates notification sender
+835f6b61-4ce5-4e57-832e-a37990359e4d|(OMP) Old Marketplace LLC|OMP - LATE RENTS (new QBO)|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+8305d615-ee3a-4630-baf7-b477917e957c|(MYN) Mayan 89A LLC|MYN - LATE RENTS|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+c1890b45-04ff-44f1-9264-d4f4847d9257|(PWP) MP Ferris LLC|PWP - LATE RENTS|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+64def5e9-019f-4a65-84e9-799237c9be0f|(RHS) Brierra Enterprises LLC|RHS - LATE RENTS|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+84b23b17-bdc1-48c6-8047-1c9044c572c9|(LPP) Lakeside Partners|LPP - LATE RENTS|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+789f9cba-d5fc-4dc8-b5a9-e65c4af6c8e5|(LEEN) Ponderay Partners|LEEN - LATE RENTS|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+13bad2fe-4f62-4bb0-85b5-97f34d807395|Google Voice (Josh Favrow)|New voicemail from Josh Favrow|MANUAL_REVIEW|Google Voice voicemail (not hard-excluded per refinement); real person mentioning "that rental in Sedona" + "rent" phrase hit; ambiguous — could be existing tenant asking about invoices vs. new prospect
+5384434a-2da2-4a0f-96d8-4aef7c6bcecb|(LEEN) Ponderay Partners|PAST DUE: Invoice 1330 from (LEEN) Leenhouts Plaza|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+3a38aec6-47b9-497e-bece-aca7ac923d11|Lucy Davis|👉 Where AI actually works today|DELETE|Cold sales/marketing email (AI services pitch); no leasing content; no contact match
+c20860cc-91da-40bf-9376-45ba40e16e0a|Cafiero Team|NEW PRICE! - Wawa Ground Lease - Collingdale PA - 13 Years Remaining|DELETE|CRE broker outbound listing marketing (selling property to Scott); not a leasing inquiry for ACP properties
+79c944af-dcda-4439-aa57-52cdbf9d4852|Team Cooper (Cooper Victory Fund)|Outspent|DELETE|Political fundraising email; no leasing content; no contact match
+b046cce5-3bb4-4990-bb18-d63f0c29e163|Marlon Thompson|re: quick question|DELETE|Cold sales/spam email (customer acquisition pitch); suspicious domain vlc.gombfy.com; no leasing content
+a143ebed-53d6-4f6b-a2f3-76ca825a5b9c|Arizona School of Real Estate & Business|Certificate|MANUAL_REVIEW|Known contact (Other — quality@asreb.com in contacts); CE certificate notification; not a leasing inquiry but known contact per rule
+e097fd59-49d9-4079-92ba-244ddc3807f7|Wholesale Brothers Inventory|Wholesale Brothers Available Inventory|DELETE|Real estate wholesale property marketing; not a leasing inquiry for ACP; no contact match
+103b0e0f-7e64-4c54-aaae-6aeb714c8169|Addison Williams|New to Market | 2.3 AC on Hard Corner | 1 Hour from DFW Airport|DELETE|CRE broker land-sale marketing (Savills); not a leasing inquiry for ACP; no contact match
+38227fe0-920f-44df-86f1-93b3238e952c|Heidi Sedona Skin & Wax|Re: (RHS) Sedona Skin and Wax - early move out request|MANUAL_REVIEW|Known contact (Tenant — Heidi Kenney); discussing prospects interested in taking over her suite — legitimately leasing-adjacent
+c811352d-dcb2-49a0-8010-efadca0a784a|Addison Williams|Industrial Service Building | Easy Highway Access | Bryans Road MD|DELETE|CRE broker industrial property-sale marketing (Savills); not a leasing inquiry for ACP
+e687fe0f-12a1-4ae4-a86f-4e1606b92877|Leasing Call|🎯 New Leasing Call 🎯 (Podio item 2707)|KEEP|Hard-include: automation.podio.com + subject contains "New Leasing Call"; real Podio leasing-call notification
+10d42274-6f41-4ab9-9c2c-199c09ac4673|Landscape Magic|Estimate 13783 from Landscape Magic: Castle Rock - Valve + Timer Replace|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+d74bba7e-4707-46df-a1e9-e261e6acc4e0|Keysafe Codes|🔑 - PM Keysafe Codes (2026-07-07)|DELETE|automation.podio.com but subject does NOT contain "New Leasing Call"; ops keysafe notification; reply@automation.podio.com not in contacts; no leasing content
+e4644aec-5012-4294-a37a-505abb92b0e3|Prop. Insur.|Prop. Insur. removed you as Assigned To on (LEEN-pin) [#175]|DELETE|Podio system notification from noreply@podio.com (NOT automation.podio.com); insurance assignment change; no leasing content
+0fc28a80-1230-4774-8ace-0cc2b42b79a5|NNN Investment Group|Just Listed | PNC Bank | New 15 Year Abs. NNN Lease | Charlotte MSA|DELETE|CRE broker NNN property-sale marketing (Lee & Associates); not a leasing inquiry for ACP
+8977a176-9c98-4c85-af06-b14e02c974e6|(VVP) Verde Valley Plaza LLC|$ - VVP - PM FEE CALC Report|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+2a4980bb-566c-4403-bc3e-c46e81e7d8f5|(OMP) Old Marketplace LLC|$ - OMP - PM FEE CALC Report|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+8598355f-d2a1-4feb-b1af-e431af2c799c|Move Out App|Security Deposit Reminder - Fay Cafe|MANUAL_REVIEW|automation.podio.com but subject does NOT contain "New Leasing Call"; however sender no-reply@automation.podio.com IS in contacts (Podio Automation EMails / Other) → MANUAL_REVIEW per known-contact rule
+65e44505-b245-4b1e-afd5-60122aaa1a8c|Google Workspace Updates blog|Google Workspace updates from July 6|DELETE|Hard-exclude: Google Workspace Updates notification sender
+4608b8ac-71b5-4411-a8c7-e98460243f12|Mike Funk|Re: (RHS #3751) - Wilson - Firecreek HVAC - no AC office suite|MANUAL_REVIEW|Known contact (Tenant — Mike Funk, Firecreek Coffee); HVAC work order resolution follow-up; not a new leasing inquiry
+9e82a676-24f7-4a07-a50c-551bfda1d723|ScanSnap Cloud|Scheduled ScanSnap Cloud Maintenance Notification|MANUAL_REVIEW|Known contact (ScanSnap / Other in contacts); software maintenance notification; not leasing but known contact per rule
+db8862d4-6408-4284-9285-74bac5e3a73a|Bahman Shahlori|Re: (LPP #3752) - Wilson - HVAC - no AC - Acupuncture Tenant|MANUAL_REVIEW|Known contact (Tenant — Bahman Shahlori); HVAC/lease-terms dispute with existing tenant; not a new leasing inquiry
+4c39172c-f52a-471e-93a9-62d6e736b3d3|Prop. Insur.|Prop. Insur. removed you as Assigned To on (PWP-pin) [#176]|DELETE|Podio system notification from noreply@podio.com (NOT automation.podio.com); insurance assignment; no leasing content
+78920290-76c1-423d-916a-177338e1f6ca|CEZoom|BMC 3B - Property Management Confirmation|DELETE|Zoom webinar registration confirmation for CE course; not a leasing inquiry; no contact match
+e5301004-da1c-42bf-a600-5b9a3eaec0a1|Wilson's heating and cooling|Invoice 4180 due from Wilson's heating and cooling - $9923.00|DELETE|Contractor invoice notification (HouseCall Pro); no leasing content; no contact match on notifications@housecallpro.com
+51103577-222d-4690-a485-0047124e1c0a|Concept Glass and Glazing|Re: (VVP #3700) - Concept Glass - Saverinos - Front Door Repair|MANUAL_REVIEW|Known contact (Vendor — Frida, Concept Glass and Glazing); work order parts follow-up; not leasing
+f6ab61c0-7b30-48f4-913f-07f292f054d6|Keysafe Codes|🔑 - PM Keysafe Codes (2026-07-06)|DELETE|automation.podio.com but subject does NOT contain "New Leasing Call"; ops keysafe notification; reply@automation.podio.com not in contacts; no leasing content
+4f1164bd-51fc-4c74-9712-750a03e5479f|Jodi Gray|FW: 2nd Quarter Payroll|MANUAL_REVIEW|Known contact (Vendor/CPA — Jodi Gray, Adams Habern & Gray); payroll tax due notification; not leasing
+408311c4-286a-43eb-a6ed-54d5ccdda894|DiDi Byars|Work Request 1163452-00000015 & 1163452-00000016 - Exterior Lighting & Lot|DELETE|Goodwill tenant maintenance work order request; no contact match on didi.byars@goodwillaz.org; no leasing content
+b2243e28-e15e-4423-9a6b-5e48e19632e4|Heather Cole|Re: Yavapai County Sheriff - LS Amend (M) - [#618]|MANUAL_REVIEW|Known contact (Tenant — Heather Cole); lease amendment thread reply (separate email from same thread as 5cf022c7)
+de5e7798-6ecd-46a8-b169-3606d99eb016|Ana Contreras|Your Weekly Market Reports!|DELETE|Altos Research automated market-data newsletter; no leasing inquiry; no contact match
+4dc111df-4c10-4d15-95c6-d1669ec4e075|John Jacko|July Mortgage Pymts|MANUAL_REVIEW|Known contact (ACP Client Primary — John Jacko); mortgage payment data for properties; not a leasing inquiry but known contact per rule
+f7362f01-83a9-4bf0-87fc-8701691fd48f|Trailforks|Add Trail Reports to Your Recent Trail Running Activity|DELETE|Trail running app activity notification; completely unrelated to leasing
+10a9fb29-be44-4025-959b-36423ce92035|Google Workspace Updates blog|Google Workspace updates from July 3|DELETE|Hard-exclude: Google Workspace Updates notification sender
+3375eaef-94a7-4652-842e-f3f847976d79|American Roofing & Waterproofing|Happy Independence Day from American Roofing & Waterproofing|DELETE|Contractor holiday marketing email; no leasing content; no contact match
+b90defec-2120-46bc-8988-0f5b046e1be3|Keysafe Codes|🔑 - PM Keysafe Codes (2026-07-04)|DELETE|automation.podio.com but subject does NOT contain "New Leasing Call"; ops keysafe notification; reply@automation.podio.com not in contacts; no leasing content
+a7aabce3-73c6-4d58-992f-959f3e96292a|Prop Insurance|TS! - PWP's Prop. Insur. Item Has Expired!|DELETE|automation.podio.com but subject does NOT contain "New Leasing Call"; reply@automation.podio.com not in contacts; insurance expiry ops alert, no leasing content
+7fdd43db-0123-4899-9c39-372016f7d2a3|Keysafe Codes|🔑 - PM Keysafe Codes (2026-07-05)|DELETE|automation.podio.com but subject does NOT contain "New Leasing Call"; ops keysafe notification; reply@automation.podio.com not in contacts; no leasing content
+6380da8d-d4f4-417c-9e66-69862a159379|Nell Barnes|Investment into Anderson Commercial Properties Inc.|DELETE|Investment solicitation spam; suspicious domain privateofficesinvestments.shop; not leasing
+199d9a20-183d-42fe-9e46-d0e66ec95b91|Joe Royer|Prime Novi Industrial Facility - 44476 SF For Sale|DELETE|CRE broker industrial property-sale marketing (Colliers); not a leasing inquiry for ACP
+8452a6dc-0ff1-4c9b-af44-bf7d438aad10|Felicia Graham|Re: right contact at Anderson Commercial Properties|DELETE|Commercial real estate financing solicitation spam; no leasing inquiry content; suspicious domain
+e14b309d-ede4-4e0f-aeb5-210055876b3c|Google Alerts|Google Alert - Sedona commercial real estate|DELETE|Hard-exclude: Google Alerts notification sender (googlealerts-noreply@google.com)
+ae7df326-046f-4436-942f-3254a08ac23d|Google Alerts|Google Alert - flagstaff commercial real estate|DELETE|Hard-exclude: Google Alerts notification sender (googlealerts-noreply@google.com)
+ed2f125b-1529-4bfe-ad81-bfc5127500cf|Xfinity|Your bill statement is ready|DELETE|Utility bill payment notification; no leasing content; no contact match
+9f2d2d21-05e9-4827-81b9-3f1d5aa2031c|URGENT - ACH Rents|IMPORTANT - Input All ACH Rents ASAP...|MANUAL_REVIEW|automation.podio.com but subject does NOT contain "New Leasing Call"; however sender no-reply@automation.podio.com IS in contacts (Podio Automation EMails / Other) → MANUAL_REVIEW per known-contact rule
+c9c195e1-9df9-4165-8bb7-aac6f2336949|Wilson's heating and cooling|Invoice 4177 due from Wilson's heating and cooling - $330.00|DELETE|Contractor invoice notification (HouseCall Pro); no leasing content; no contact match
+de9fcf95-bf41-4821-b65a-0ce7450ced22|Leslie Wager|Automatic reply: (CR1 #3769) - Phoenician Suite 210 - Yav County Corrections Required|DELETE|Yavapai County government auto-reply (office closed); no leasing content; no contact match on leslie.wager@yavapaiaz.gov
+640ebd1f-e82d-4bc3-a142-25a4809d6854|Google Voice (Christian / Body Alchemy)|New voicemail from Christian w/Anne Lantry|KEEP|Google Voice voicemail (not hard-excluded); transcription shows prospect explicitly wanting to view space ("take a look at the space"); strong leasing inquiry signal
+3fb018bf-5731-405b-8b36-802ae3309a4e|Designations for Agents|Five specialized certifications packaged for Anderson Commercial Properties agents|DELETE|Real estate agent certification marketing email; not a leasing inquiry; no contact match
+c20714e8-d71f-4ff5-881f-8eaedcb0f49e|Leasing Call|🎯 New Leasing Call 🎯 (Podio item 2706)|KEEP|Hard-include: automation.podio.com + subject contains "New Leasing Call"; real Podio leasing-call notification
+21ffea22-7d6f-41b6-b77d-68dbd83a468d|Daniel Djuric|Re: (VDN #3718) - Wilson - Suite 4 - HVAC Move-In Maint. Request|MANUAL_REVIEW|Known contact (Tenant — Daniel Djuric); HVAC maintenance follow-up; not a new leasing inquiry
+e87d19ea-23ef-49d0-87df-729b41ec18af|(VVP) Verde Valley Plaza LLC|Invoice - REMINDER - VVP-4534|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+2bd15038-ae04-40f4-8473-21388f8928c5|(VVP) Verde Valley Plaza LLC|Invoice - REMINDER - VVP-4544|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+8e309676-41af-416f-a047-2190f9563a27|(VVP) Verde Valley Plaza LLC|Invoice - REMINDER - VVP-4540|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+e93c19d7-9530-4920-b4ba-39ed6195d837|(VVP) Verde Valley Plaza LLC|Invoice - REMINDER - VVP-4531|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+de1278d0-2524-44a7-89b4-a2f24c4edf8b|(VVP) Verde Valley Plaza LLC|Invoice - REMINDER - VVP-4538|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+91376497-5ab2-48ef-bb4f-7bd7e007fb70|(VVP) Verde Valley Plaza LLC|Invoice - REMINDER - VVP-4533|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+80695f63-46f9-41a3-9f96-a49990b243e5|(VVP) Verde Valley Plaza LLC|Invoice - REMINDER - VVP-4526|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+2bf09cbc-155c-418c-b11a-99b1d64309b5|(VVP) Verde Valley Plaza LLC|Invoice - REMINDER - VVP-4527|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+18d36e5a-d611-472e-af32-1d6566820f08|(VDN) Baier Properties LLC|Reminder - Invoice 978 from VDN Vista del Norte|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+35b54f16-bd70-44c7-a66c-7bf86b90784f|(VVP) Verde Valley Plaza LLC|Invoice - REMINDER - VVP-4523|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+8468e3f8-8945-465c-a407-0590b33a714b|(VDN) Baier Properties LLC|Reminder - Invoice 976 from VDN Vista del Norte|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+5b31f7d2-f45b-418b-9462-3c11d8e437bb|(SSB) Sedona Silverado LLC|Invoice - REMINDER - SSB-378|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+186aeac3-5376-4162-aaa9-87c766c60a46|(LPP) Lakeside Partners|Invoice - REMINDER - LPP-647|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+901e535c-fd46-4ae8-8660-2a18eba94056|(LAP) La Pasada Investment Co. LLC|REMINDER - LAP-1797|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+441b8262-51ea-4f3e-9d06-e8abd865586f|(LAP) La Pasada Investment Co. LLC|REMINDER - LAP-1798|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+70dba6db-5980-47ce-a9db-80dd817f995b|(LAP) La Pasada Investment Co. LLC|REMINDER - LAP-1788|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+432ff1ee-1fe4-4edc-a58a-6fd12e2cf2f1|(LAP) La Pasada Investment Co. LLC|REMINDER - LAP-1792|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+b33a8743-9278-4255-bbe1-3aa2233f0ca3|(CR1) Castle Rock Plaza I LLC|Invoice - REMINDER - CR1-2034|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+1e698662-5c74-4165-9cca-f2a4cb6b79a8|(CR1) Castle Rock Plaza I LLC|Invoice - REMINDER - CR1-2031|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+203dcf3b-57c2-4e8b-8167-d223327528af|(CR1) Castle Rock Plaza I LLC|Invoice - REMINDER - CR1-2023|DELETE|Hard-exclude: quickbooks@notification.intuit.com
+74971ec6-3121-4a45-9857-1c7b7696bf2a|scott anderson|Membership Service Update Successfully Processed|DELETE|Phishing/scam email (fake McAfee subscription confirmation); not a leasing inquiry
+9576757f-c868-47ae-8090-5c1f35a0f029|Chloe Mitchell|Interested in 10% commission on deals we send?|DELETE|Lead generation/marketing spam (MediaBloom); not a leasing inquiry

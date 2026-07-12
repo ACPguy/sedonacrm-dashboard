@@ -2,11 +2,89 @@ export const config = { maxDuration: 120 };
 
 import { createServerClient } from '../../../lib/supabaseServer';
 
-const LEASING_KEYWORDS = [
-  'available', 'lease', 'leasing', 'space', 'sq ft', 'square feet',
-  'office', 'retail', 'suite', 'rent', 'commercial', 'inquir',
-  'interest', 'property', 'location', 'tenant', 'move in', 'moving',
+// ── Hard-exclude: skip immediately, no phrase check ──────────────────────────
+
+const HARD_EXCLUDE_DOMAINS = ['intuit.com', 'quickbooks.com'];
+
+// Specific Google notification senders (display name or known address patterns)
+const HARD_EXCLUDE_ADDRESSES = [
+  'googlealerts-noreply@google.com',           // Google Alerts
+  'noreply@workspaceupdates.withgoogle.com',   // Google Workspace Updates
+  'calendar-notification@google.com',          // Google Calendar notifications
 ];
+const HARD_EXCLUDE_NAME_PATTERNS = [
+  /^google alerts$/i,
+  /^google workspace updates/i,
+  /^google calendar$/i,
+];
+
+function isHardExcluded(address, displayName) {
+  if (!address) return false;
+  const domain = address.split('@')[1]?.toLowerCase() || '';
+  if (HARD_EXCLUDE_DOMAINS.some(d => domain === d || domain.endsWith('.' + d))) return true;
+  if (HARD_EXCLUDE_ADDRESSES.includes(address.toLowerCase())) return true;
+  if (displayName && HARD_EXCLUDE_NAME_PATTERNS.some(p => p.test(displayName))) return true;
+  return false;
+}
+
+// ── Hard-include: pass immediately regardless of phrase content ───────────────
+
+function isHardIncluded(address, subject, snippet) {
+  if (!address) return false;
+  const addrLower = address.toLowerCase();
+  const subjectLower = (subject || '').toLowerCase();
+  const bodyLower = (snippet || '').toLowerCase();
+
+  // NumberBarn hotline voicemails
+  if (addrLower === 'voicemail@numberbarn.com') {
+    const text = subjectLower + ' ' + bodyLower;
+    if (text.includes('399-4040') || text.includes('for lease line')) return true;
+  }
+
+  // Podio leasing-call notifications — narrow to "New Leasing Call" subject only
+  const domain = addrLower.split('@')[1] || '';
+  if (domain === 'automation.podio.com' && subjectLower.includes('new leasing call')) return true;
+
+  return false;
+}
+
+// ── Two-tier word-boundary phrase matching ────────────────────────────────────
+
+const STRONG_PHRASES = [
+  /\bfor lease\b/i,
+  /\bfor rent\b/i,
+  /\bspace available\b/i,
+  /\bavailable for lease\b/i,
+  /\bleasing inquiry\b/i,
+  /\binterested in leasing\b/i,
+  /\bcommercial space for\b/i,
+  /\bretail space for\b/i,
+  /\boffice space for\b/i,
+  /\bsquare feet available\b/i,
+];
+
+const WEAK_PHRASES = [
+  /\bsuite\b/i,
+  /\bsquare feet\b/i,
+  /\bsq ft\b/i,
+  /\bfloor plan\b/i,
+  /\bmove[\s-]in\b/i,
+  /\btenant improvement\b/i,
+];
+
+function checkPhrases(text) {
+  if (!text) return { pass: false, reason: 'no leasing signal' };
+
+  const strongHit = STRONG_PHRASES.some(re => re.test(text));
+  if (strongHit) return { pass: true, reason: 'strong phrase match' };
+
+  const weakCount = WEAK_PHRASES.filter(re => re.test(text)).length;
+  if (weakCount >= 2) return { pass: true, reason: `${weakCount} weak phrases matched` };
+
+  return { pass: false, reason: 'no leasing signal' };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const VALID_PROP_CODES = new Set([
   '1McC','777','ACP','ART','ARVS','ATS','CDY','CHQ','COB','CPP','CR1','CRMS','CVP',
@@ -17,16 +95,26 @@ const VALID_PROP_CODES = new Set([
 
 const SCOTT_USER_ID = '573b65b5-ba16-437b-9101-d0bff2453dde';
 
-function hasLeasingKeyword(text) {
-  if (!text) return false;
-  const lower = text.toLowerCase();
-  return LEASING_KEYWORDS.some(kw => lower.includes(kw));
+// Categories that indicate an automation/system contact, not a real person
+const AUTOMATION_CATEGORIES = ['other'];
+const AUTOMATION_NAME_HINTS = [/podio/i, /quickbooks/i, /automation/i, /scansnap/i, /google/i, /noreply/i];
+
+function isAutomationContact(name, category) {
+  if (!name && !category) return false;
+  const catLower = (category || '').toLowerCase();
+  if (AUTOMATION_CATEGORIES.includes(catLower)) {
+    // Only treat as automation if the name also looks like a system sender
+    if (name && AUTOMATION_NAME_HINTS.some(p => p.test(name))) return true;
+  }
+  return false;
 }
 
 function parseClaudeJson(raw) {
   const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
   return JSON.parse(cleaned);
 }
+
+// ── Handler ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -92,13 +180,12 @@ export default async function handler(req, res) {
   const draftedThreadIds = new Set((existingDrafts || []).map(d => d.thread_id));
 
   for (const thread of threads) {
-    // dedup
     if (draftedThreadIds.has(thread.id)) {
       results.skipped.push({ thread: thread.subject, reason: 'already drafted' });
       continue;
     }
 
-    // find first inbound message for sender info
+    // Find first inbound message for sender info
     const inbound = (thread.email_messages || [])
       .filter(m => !m.is_outbound)
       .sort((a, b) => new Date(a.received_at) - new Date(b.received_at));
@@ -111,27 +198,52 @@ export default async function handler(req, res) {
     const from_name = firstMsg.from_name || null;
     const from_address = firstMsg.from_address || null;
 
-    // 3. Keyword filter
-    const searchText = `${thread.subject || ''} ${thread.snippet || ''}`;
-    if (!hasLeasingKeyword(searchText)) {
-      results.skipped.push({ thread: thread.subject, reason: 'no leasing keywords' });
+    // 3. Hard-exclude check
+    if (isHardExcluded(from_address, from_name)) {
+      results.skipped.push({ thread: thread.subject, reason: 'hard-excluded sender' });
       continue;
     }
 
-    // 4. Known-contact check
-    let known_contact = false;
+    const searchText = `${thread.subject || ''} ${thread.snippet || ''}`;
+
+    // 4. Hard-include check
+    const hardInclude = isHardIncluded(from_address, thread.subject, thread.snippet);
+
+    // 5. Known-contact lookup
+    let contactMatch = null;
     if (from_address) {
-      const { data: contactMatch } = await sb
+      const { data: contact } = await sb
         .from('contacts')
-        .select('id')
+        .select('id, full_name, category')
         .ilike('email', from_address)
         .limit(1)
         .maybeSingle();
-      if (contactMatch) known_contact = true;
+      if (contact) contactMatch = contact;
     }
 
+    // Determine if this is an automation/system contact (treat as normal unknown)
+    const isAutomation = contactMatch
+      ? isAutomationContact(contactMatch.full_name, contactMatch.category)
+      : false;
+    const knownRealContact = contactMatch && !isAutomation;
+
+    // 6. Phrase check (runs unless hard-included or known real contact)
+    let phraseResult = { pass: true, reason: 'hard-include' };
+    if (!hardInclude && !knownRealContact) {
+      phraseResult = checkPhrases(searchText);
+      if (!phraseResult.pass) {
+        results.skipped.push({ thread: thread.subject, reason: phraseResult.reason });
+        continue;
+      }
+    }
+
+    // Build source_note for known real contacts
+    const source_note = knownRealContact
+      ? `Existing contact — verify (${contactMatch.category || 'Unknown'})`
+      : null;
+
     try {
-      // 5. Claude API — draft reply
+      // 7. Claude API — draft reply
       const prompt = `Prospect: ${from_name || 'Unknown'} <${from_address || 'unknown'}>
 Subject: ${thread.subject || '(no subject)'}
 Message: ${thread.snippet || '(no content)'}
@@ -153,7 +265,7 @@ Draft a reply email and return JSON only with these exact fields:
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
+          model: 'claude-sonnet-5',
           max_tokens: 1000,
           system: 'You are an assistant for Anderson Commercial Properties, a commercial property management company in Sedona, Arizona. Scott Anderson, CCIM manages 14 NNN commercial properties. Draft a warm, professional response to this leasing inquiry. Be specific to what they asked. Sign off as Scott Anderson, CCIM | Anderson Commercial Properties | 928-282-9400. Extract any mentioned space size, type, or timing needs. Keep response under 200 words. Return only valid JSON, no markdown.',
           messages: [{ role: 'user', content: prompt }],
@@ -183,13 +295,14 @@ Draft a reply email and return JSON only with these exact fields:
       const rawPropCode = parsed.prop_code || null;
       const propCode = rawPropCode && VALID_PROP_CODES.has(rawPropCode) ? rawPropCode : null;
 
-      // 6. Insert to leasing_pipeline
+      // 8. Insert to leasing_pipeline
       const { data: pipeline, error: pipelineErr } = await sb
         .from('leasing_pipeline')
         .insert({
-          stage: 'Inquiry',
+          stage: 'New Inquiry',
           status: 'active',
           source: 'email',
+          source_note,
           prospect_name: from_name,
           prospect_email: from_address,
           initial_message: thread.snippet,
@@ -203,7 +316,7 @@ Draft a reply email and return JSON only with these exact fields:
 
       if (pipelineErr) throw new Error(`Pipeline insert: ${pipelineErr.message}`);
 
-      // 7. Insert to inquiry_drafts
+      // 9. Insert to inquiry_drafts
       const { error: draftErr } = await sb
         .from('inquiry_drafts')
         .insert({
@@ -218,7 +331,7 @@ Draft a reply email and return JSON only with these exact fields:
 
       if (draftErr) throw new Error(`Draft insert: ${draftErr.message}`);
 
-      // 8. Update email_thread link
+      // 10. Update email_thread link
       await sb
         .from('email_threads')
         .update({
@@ -229,7 +342,13 @@ Draft a reply email and return JSON only with these exact fields:
         })
         .eq('id', thread.id);
 
-      results.generated.push({ prospect: from_name || from_address, subject: thread.subject, known_contact });
+      results.generated.push({
+        prospect: from_name || from_address,
+        subject: thread.subject,
+        known_contact: knownRealContact,
+        source_note,
+        match_reason: hardInclude ? 'hard-include' : phraseResult.reason,
+      });
       draftedThreadIds.add(thread.id);
 
     } catch (err) {
