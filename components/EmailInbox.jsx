@@ -571,85 +571,6 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply,
         />
       )}
       <style>{`.spin{animation:spin .8s linear infinite}@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
-
-      {/* +LSG modal — capture email thread as leasing inquiry */}
-      {lsgThread && (
-        <div
-          style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' }}
-          onClick={e => { if (e.target === e.currentTarget) { setLsgThread(null); setLsgError(null); } }}
-        >
-          <div style={{ background:T.bg1, border:`0.5px solid ${T.border}`, borderRadius:'8px', padding:'20px 24px', width:'100%', maxWidth:'420px', boxShadow:'0 8px 32px rgba(0,0,0,0.5)' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
-              <span style={{ fontSize:F.md, fontWeight:'700', color:T.text0 }}>Capture Leasing Inquiry</span>
-              <button type="button" onClick={() => { setLsgThread(null); setLsgError(null); }}
-                style={{ background:'transparent', border:'none', color:T.text2, cursor:'pointer', padding:'2px', display:'flex', alignItems:'center' }}>
-                <X size={14}/>
-              </button>
-            </div>
-            <div style={{ fontSize:F.xs, color:T.text2, marginBottom:'14px', padding:'7px 10px', background:T.bg2, borderRadius:'4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              {lsgThread.subject || '(no subject)'}
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-              <div>
-                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>Prospect name</label>
-                <input
-                  type="text"
-                  value={lsgForm.prospect_name}
-                  onChange={e => setLsgForm(f => ({ ...f, prospect_name: e.target.value }))}
-                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, boxSizing:'border-box' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>Prospect email</label>
-                <input
-                  type="email"
-                  value={lsgForm.prospect_email}
-                  onChange={e => setLsgForm(f => ({ ...f, prospect_email: e.target.value }))}
-                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, boxSizing:'border-box' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>
-                  Property <span style={{ color:T.danger }}>*</span>
-                </label>
-                <select
-                  value={lsgForm.prop_code}
-                  onChange={e => setLsgForm(f => ({ ...f, prop_code: e.target.value }))}
-                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color: lsgForm.prop_code ? T.text0 : T.text3, fontSize:F.sm, boxSizing:'border-box' }}
-                >
-                  <option value="">— select property —</option>
-                  {VALID_PROP_CODES_SORTED.map(code => (
-                    <option key={code} value={code}>{code}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>
-                  Initial message <span style={{ color:T.text3 }}>(optional)</span>
-                </label>
-                <textarea
-                  value={lsgForm.initial_message}
-                  onChange={e => setLsgForm(f => ({ ...f, initial_message: e.target.value }))}
-                  rows={3}
-                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, resize:'vertical', boxSizing:'border-box' }}
-                />
-              </div>
-            </div>
-            {lsgError && (
-              <div style={{ marginTop:'8px', fontSize:F.xs, color:T.danger }}>{lsgError}</div>
-            )}
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:'8px', marginTop:'16px' }}>
-              <ActionBtn label="Cancel" onClick={() => { setLsgThread(null); setLsgError(null); }}/>
-              <ActionBtn
-                label={lsgSubmitting ? 'Saving…' : 'Create Lead'}
-                variant="primary"
-                disabled={lsgSubmitting || !lsgForm.prop_code}
-                onClick={handleLsgSubmit}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -1119,6 +1040,85 @@ export default function EmailInbox() {
           </div>
         )}
       </div>
+
+      {/* +LSG modal — capture email thread as leasing inquiry */}
+      {lsgThread && (
+        <div
+          style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' }}
+          onClick={e => { if (e.target === e.currentTarget) { setLsgThread(null); setLsgError(null); } }}
+        >
+          <div style={{ background:T.bg1, border:`0.5px solid ${T.border}`, borderRadius:'8px', padding:'20px 24px', width:'100%', maxWidth:'420px', boxShadow:'0 8px 32px rgba(0,0,0,0.5)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
+              <span style={{ fontSize:F.md, fontWeight:'700', color:T.text0 }}>Capture Leasing Inquiry</span>
+              <button type="button" onClick={() => { setLsgThread(null); setLsgError(null); }}
+                style={{ background:'transparent', border:'none', color:T.text2, cursor:'pointer', padding:'2px', display:'flex', alignItems:'center' }}>
+                <X size={14}/>
+              </button>
+            </div>
+            <div style={{ fontSize:F.xs, color:T.text2, marginBottom:'14px', padding:'7px 10px', background:T.bg2, borderRadius:'4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {lsgThread.subject || '(no subject)'}
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+              <div>
+                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>Prospect name</label>
+                <input
+                  type="text"
+                  value={lsgForm.prospect_name}
+                  onChange={e => setLsgForm(f => ({ ...f, prospect_name: e.target.value }))}
+                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, boxSizing:'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>Prospect email</label>
+                <input
+                  type="email"
+                  value={lsgForm.prospect_email}
+                  onChange={e => setLsgForm(f => ({ ...f, prospect_email: e.target.value }))}
+                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, boxSizing:'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>
+                  Property <span style={{ color:T.danger }}>*</span>
+                </label>
+                <select
+                  value={lsgForm.prop_code}
+                  onChange={e => setLsgForm(f => ({ ...f, prop_code: e.target.value }))}
+                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color: lsgForm.prop_code ? T.text0 : T.text3, fontSize:F.sm, boxSizing:'border-box' }}
+                >
+                  <option value="">— select property —</option>
+                  {VALID_PROP_CODES_SORTED.map(code => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>
+                  Initial message <span style={{ color:T.text3 }}>(optional)</span>
+                </label>
+                <textarea
+                  value={lsgForm.initial_message}
+                  onChange={e => setLsgForm(f => ({ ...f, initial_message: e.target.value }))}
+                  rows={3}
+                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, resize:'vertical', boxSizing:'border-box' }}
+                />
+              </div>
+            </div>
+            {lsgError && (
+              <div style={{ marginTop:'8px', fontSize:F.xs, color:T.danger }}>{lsgError}</div>
+            )}
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:'8px', marginTop:'16px' }}>
+              <ActionBtn label="Cancel" onClick={() => { setLsgThread(null); setLsgError(null); }}/>
+              <ActionBtn
+                label={lsgSubmitting ? 'Saving…' : 'Create Lead'}
+                variant="primary"
+                disabled={lsgSubmitting || !lsgForm.prop_code}
+                onClick={handleLsgSubmit}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
