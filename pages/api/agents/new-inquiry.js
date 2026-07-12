@@ -48,7 +48,7 @@ function isHardIncluded(address, subject, snippet) {
   return false;
 }
 
-// ── Two-tier word-boundary phrase matching ────────────────────────────────────
+// ── Strong-phrase word-boundary matching (only tier — no weak-phrase bypass) ──
 
 const STRONG_PHRASES = [
   /\bfor lease\b/i,
@@ -63,24 +63,9 @@ const STRONG_PHRASES = [
   /\bsquare feet available\b/i,
 ];
 
-const WEAK_PHRASES = [
-  /\bsuite\b/i,
-  /\bsquare feet\b/i,
-  /\bsq ft\b/i,
-  /\bfloor plan\b/i,
-  /\bmove[\s-]in\b/i,
-  /\btenant improvement\b/i,
-];
-
 function checkPhrases(text) {
   if (!text) return { pass: false, reason: 'no leasing signal' };
-
-  const strongHit = STRONG_PHRASES.some(re => re.test(text));
-  if (strongHit) return { pass: true, reason: 'strong phrase match' };
-
-  const weakCount = WEAK_PHRASES.filter(re => re.test(text)).length;
-  if (weakCount >= 2) return { pass: true, reason: `${weakCount} weak phrases matched` };
-
+  if (STRONG_PHRASES.some(re => re.test(text))) return { pass: true, reason: 'strong phrase match' };
   return { pass: false, reason: 'no leasing signal' };
 }
 
@@ -94,20 +79,6 @@ const VALID_PROP_CODES = new Set([
 ]);
 
 const SCOTT_USER_ID = '573b65b5-ba16-437b-9101-d0bff2453dde';
-
-// Categories that indicate an automation/system contact, not a real person
-const AUTOMATION_CATEGORIES = ['other'];
-const AUTOMATION_NAME_HINTS = [/podio/i, /quickbooks/i, /automation/i, /scansnap/i, /google/i, /noreply/i];
-
-function isAutomationContact(name, category) {
-  if (!name && !category) return false;
-  const catLower = (category || '').toLowerCase();
-  if (AUTOMATION_CATEGORIES.includes(catLower)) {
-    // Only treat as automation if the name also looks like a system sender
-    if (name && AUTOMATION_NAME_HINTS.some(p => p.test(name))) return true;
-  }
-  return false;
-}
 
 function parseClaudeJson(raw) {
   const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -209,27 +180,9 @@ export default async function handler(req, res) {
     // 4. Hard-include check
     const hardInclude = isHardIncluded(from_address, thread.subject, thread.snippet);
 
-    // 5. Known-contact lookup
-    let contactMatch = null;
-    if (from_address) {
-      const { data: contact } = await sb
-        .from('contacts')
-        .select('id, full_name, category')
-        .ilike('email', from_address)
-        .limit(1)
-        .maybeSingle();
-      if (contact) contactMatch = contact;
-    }
-
-    // Determine if this is an automation/system contact (treat as normal unknown)
-    const isAutomation = contactMatch
-      ? isAutomationContact(contactMatch.full_name, contactMatch.category)
-      : false;
-    const knownRealContact = contactMatch && !isAutomation;
-
-    // 6. Phrase check (runs unless hard-included or known real contact)
+    // 5. Phrase check — strong phrases only, runs unless hard-included
     let phraseResult = { pass: true, reason: 'hard-include' };
-    if (!hardInclude && !knownRealContact) {
+    if (!hardInclude) {
       phraseResult = checkPhrases(searchText);
       if (!phraseResult.pass) {
         results.skipped.push({ thread: thread.subject, reason: phraseResult.reason });
@@ -237,10 +190,19 @@ export default async function handler(req, res) {
       }
     }
 
-    // Build source_note for known real contacts
-    const source_note = knownRealContact
-      ? `Existing contact — verify (${contactMatch.category || 'Unknown'})`
-      : null;
+    // 6. Known-contact lookup — tagging only, never passes or skips on its own
+    let source_note = null;
+    if (from_address) {
+      const { data: contactMatch } = await sb
+        .from('contacts')
+        .select('id, full_name, category')
+        .ilike('email', from_address)
+        .limit(1)
+        .maybeSingle();
+      if (contactMatch) {
+        source_note = `Existing contact — verify (${contactMatch.category || 'Unknown'})`;
+      }
+    }
 
     try {
       // 7. Claude API — draft reply
@@ -345,7 +307,6 @@ Draft a reply email and return JSON only with these exact fields:
       results.generated.push({
         prospect: from_name || from_address,
         subject: thread.subject,
-        known_contact: knownRealContact,
         source_note,
         match_reason: hardInclude ? 'hard-include' : phraseResult.reason,
       });

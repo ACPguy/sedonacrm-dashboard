@@ -44,6 +44,13 @@ const formatSmartTime = d => {
 
 const stripHtml = html => (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
+const VALID_PROP_CODES_SORTED = [
+  '1McC','777','ACP','ART','ARVS','ATS','CDY','CHQ','COB','CPP','CR1','CRMS','CVP',
+  'DCC','DCM','DCP','DEM','DON','FOX','KOD','KTA','LAP','LASO','LEEN','LPP','MILL',
+  'MYN','OLY','OMP','PLZ','PW213','PWP','RHS','RR','SAC','SEP','SS','SSB','STP',
+  'SUNT','SWV','SYC','VDN','VVP','WAL','WNT','WSP','YAV',
+].sort();
+
 const FILTER_TABS = [
   { key:'inbox',   label:'Inbox' },
   { key:'unread',  label:'Unread' },
@@ -90,7 +97,7 @@ const ActionBtn = ({ label, icon, onClick, disabled, variant, color }) => {
 };
 
 // ── Thread List Item ───────────────────────────────────────────────────────────
-const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick, index, isMobile }) => {
+const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick, index, isMobile, onLsgClick }) => {
   const isUnread = !thread.is_read;
   const senderDisplay = thread.last_sender_name || thread.last_sender_address || '(unknown)';
   const [hovered, setHovered] = useState(false);
@@ -161,6 +168,19 @@ const ThreadListItem = ({ thread, selected, onClick, isChecked, onCheckboxClick,
           <span style={{ width:'6px', height:'6px', borderRadius:'1px', background:T.danger, display:'inline-block' }}/>
         )}
         {thread.has_attachment && <Paperclip size={13} color={T.text2}/>}
+        {thread.linked_record_type !== 'leasing_pipeline' && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onLsgClick?.(thread, e); }}
+            title="Capture as leasing inquiry"
+            style={{
+              fontSize:'9px', padding:'1px 4px', borderRadius:'2px',
+              background:`${T.accent}22`, color:T.accent, fontWeight:'700',
+              border:`1px solid ${T.accent}44`, cursor:'pointer',
+              lineHeight:'1.4', whiteSpace:'nowrap', flexShrink:0,
+            }}
+          >+LSG</button>
+        )}
       </div>
       <div style={{ ...cellStyle, paddingRight:'12px', justifyContent:'flex-end' }} {...cellHandlers}>
         <span style={{ fontSize:'11px', color:T.text3, whiteSpace:'nowrap' }}>{formatSmartTime(thread.last_message_at)}</span>
@@ -551,6 +571,85 @@ const ThreadDetail = ({ thread, onClose, onMarkRead, onArchive, onSpam, onReply,
         />
       )}
       <style>{`.spin{animation:spin .8s linear infinite}@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
+
+      {/* +LSG modal — capture email thread as leasing inquiry */}
+      {lsgThread && (
+        <div
+          style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' }}
+          onClick={e => { if (e.target === e.currentTarget) { setLsgThread(null); setLsgError(null); } }}
+        >
+          <div style={{ background:T.bg1, border:`0.5px solid ${T.border}`, borderRadius:'8px', padding:'20px 24px', width:'100%', maxWidth:'420px', boxShadow:'0 8px 32px rgba(0,0,0,0.5)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
+              <span style={{ fontSize:F.md, fontWeight:'700', color:T.text0 }}>Capture Leasing Inquiry</span>
+              <button type="button" onClick={() => { setLsgThread(null); setLsgError(null); }}
+                style={{ background:'transparent', border:'none', color:T.text2, cursor:'pointer', padding:'2px', display:'flex', alignItems:'center' }}>
+                <X size={14}/>
+              </button>
+            </div>
+            <div style={{ fontSize:F.xs, color:T.text2, marginBottom:'14px', padding:'7px 10px', background:T.bg2, borderRadius:'4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {lsgThread.subject || '(no subject)'}
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+              <div>
+                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>Prospect name</label>
+                <input
+                  type="text"
+                  value={lsgForm.prospect_name}
+                  onChange={e => setLsgForm(f => ({ ...f, prospect_name: e.target.value }))}
+                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, boxSizing:'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>Prospect email</label>
+                <input
+                  type="email"
+                  value={lsgForm.prospect_email}
+                  onChange={e => setLsgForm(f => ({ ...f, prospect_email: e.target.value }))}
+                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, boxSizing:'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>
+                  Property <span style={{ color:T.danger }}>*</span>
+                </label>
+                <select
+                  value={lsgForm.prop_code}
+                  onChange={e => setLsgForm(f => ({ ...f, prop_code: e.target.value }))}
+                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color: lsgForm.prop_code ? T.text0 : T.text3, fontSize:F.sm, boxSizing:'border-box' }}
+                >
+                  <option value="">— select property —</option>
+                  {VALID_PROP_CODES_SORTED.map(code => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>
+                  Initial message <span style={{ color:T.text3 }}>(optional)</span>
+                </label>
+                <textarea
+                  value={lsgForm.initial_message}
+                  onChange={e => setLsgForm(f => ({ ...f, initial_message: e.target.value }))}
+                  rows={3}
+                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, resize:'vertical', boxSizing:'border-box' }}
+                />
+              </div>
+            </div>
+            {lsgError && (
+              <div style={{ marginTop:'8px', fontSize:F.xs, color:T.danger }}>{lsgError}</div>
+            )}
+            <div style={{ display:'flex', justifyContent:'flex-end', gap:'8px', marginTop:'16px' }}>
+              <ActionBtn label="Cancel" onClick={() => { setLsgThread(null); setLsgError(null); }}/>
+              <ActionBtn
+                label={lsgSubmitting ? 'Saving…' : 'Create Lead'}
+                variant="primary"
+                disabled={lsgSubmitting || !lsgForm.prop_code}
+                onClick={handleLsgSubmit}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -593,6 +692,11 @@ export default function EmailInbox() {
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef(null);
   const listWidthRef = useRef(listWidth);
+
+  const [lsgThread,     setLsgThread]     = useState(null);
+  const [lsgForm,       setLsgForm]       = useState({ prospect_name:'', prospect_email:'', prop_code:'', initial_message:'' });
+  const [lsgSubmitting, setLsgSubmitting] = useState(false);
+  const [lsgError,      setLsgError]      = useState(null);
 
 
   const buildQuery = useCallback((f) => {
@@ -662,6 +766,52 @@ export default function EmailInbox() {
     if (!selectedThread) return;
     setSelectedThread(t => ({ ...t, ...updates }));
     setThreads(ts => ts.map(t => t.id === selectedThread.id ? { ...t, ...updates } : t));
+  };
+
+  const handleLsgClick = useCallback((thread, e) => {
+    e.stopPropagation();
+    const message = [thread.subject, thread.snippet].filter(Boolean).join(' — ');
+    setLsgForm({
+      prospect_name: thread.last_sender_name || '',
+      prospect_email: thread.last_sender_address || '',
+      prop_code: '',
+      initial_message: message.slice(0, 500),
+    });
+    setLsgThread(thread);
+    setLsgError(null);
+  }, []);
+
+  const handleLsgSubmit = async () => {
+    if (!lsgForm.prop_code) return;
+    setLsgSubmitting(true);
+    setLsgError(null);
+    try {
+      const res = await fetch('/api/pipeline/lead-capture', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-briefing-secret': process.env.NEXT_PUBLIC_BRIEFING_SECRET,
+        },
+        body: JSON.stringify({
+          ...lsgForm,
+          source: 'manual_lsg',
+          thread_id: lsgThread.id,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Error ${res.status}`);
+      }
+      // Optimistic UI: show LEA badge immediately
+      const linkedUpdates = { linked_record_type: 'leasing_pipeline', link_status: 'manual_linked' };
+      setThreads(ts => ts.map(t => t.id === lsgThread.id ? { ...t, ...linkedUpdates } : t));
+      if (selectedThread?.id === lsgThread.id) setSelectedThread(t => ({ ...t, ...linkedUpdates }));
+      setLsgThread(null);
+    } catch (err) {
+      setLsgError(err.message);
+    } finally {
+      setLsgSubmitting(false);
+    }
   };
 
   const toggleSelect = (threadId) => {
@@ -846,6 +996,10 @@ export default function EmailInbox() {
                         <Paperclip size={12} color={T.text2}/>
                         <span>Message has an attachment</span>
                       </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span style={{ fontSize:'9px', padding:'1px 4px', borderRadius:'2px', background:`${T.accent}22`, color:T.accent, fontWeight:'700', border:`1px solid ${T.accent}44` }}>+LSG</span>
+                        <span>Manually capture as leasing lead</span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -911,6 +1065,7 @@ export default function EmailInbox() {
               onCheckboxClick={handleCheckboxClick}
               index={index}
               isMobile={isMobile}
+              onLsgClick={handleLsgClick}
             />
           ))}
         </div>

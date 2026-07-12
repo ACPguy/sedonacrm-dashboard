@@ -11,7 +11,10 @@ const VALID_PROP_CODES = new Set([
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const isAuth = req.headers['x-briefing-secret'] === process.env.BRIEFING_SECRET;
+  // Accept BRIEFING_SECRET (server/agent calls) or NEXT_PUBLIC_BRIEFING_SECRET (client-side calls)
+  const secret = req.headers['x-briefing-secret'];
+  const isAuth = secret === process.env.BRIEFING_SECRET ||
+                 (process.env.NEXT_PUBLIC_BRIEFING_SECRET && secret === process.env.NEXT_PUBLIC_BRIEFING_SECRET);
   if (!isAuth) return res.status(401).json({ error: 'Unauthorized' });
 
   const {
@@ -31,6 +34,7 @@ export default async function handler(req, res) {
     other_needs,
     proposed_use,
     contact_id,
+    thread_id,
   } = req.body || {};
 
   if (!prop_code) return res.status(400).json({ error: 'prop_code is required' });
@@ -72,6 +76,19 @@ export default async function handler(req, res) {
   if (error) {
     console.error('[api/pipeline/lead-capture]', error);
     return res.status(500).json({ error: error.message });
+  }
+
+  // If a thread_id was provided, link it to the new pipeline record
+  if (thread_id) {
+    await sb
+      .from('email_threads')
+      .update({
+        linked_record_type: 'leasing_pipeline',
+        linked_record_id: data.id,
+        link_status: 'manual_linked',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', thread_id);
   }
 
   return res.status(201).json(data);
