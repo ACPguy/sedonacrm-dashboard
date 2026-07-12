@@ -245,7 +245,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: `95d39d8` — fix: PipelineView fetchRows stage-based filter + 5000 row limit (2026-07-11)
+- preview: `f79c976` — data: reset leasing_pipeline to clean testable working set (2026-07-11)
 
 ---
 
