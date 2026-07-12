@@ -241,7 +241,7 @@ New schema this session: email_threads gained last_sender_name, last_sender_addr
 ## Current Git State
 
 - main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: `196fb09` — feat: high-confidence-only Agent 3 filter + +LSG manual capture button (2026-07-11)
+- preview: `2c02be7` — fix: +LSG modal scoping bug — move from ThreadDetail into EmailInbox (2026-07-11)
 
 ---
 
