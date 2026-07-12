@@ -44,12 +44,23 @@ const formatSmartTime = d => {
 
 const stripHtml = html => (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
-const VALID_PROP_CODES_SORTED = [
-  '1McC','777','ACP','ART','ARVS','ATS','CDY','CHQ','COB','CPP','CR1','CRMS','CVP',
-  'DCC','DCM','DCP','DEM','DON','FOX','KOD','KTA','LAP','LASO','LEEN','LPP','MILL',
-  'MYN','OLY','OMP','PLZ','PW213','PWP','RHS','RR','SAC','SEP','SS','SSB','STP',
-  'SUNT','SWV','SYC','VDN','VVP','WAL','WNT','WSP','YAV',
-].sort();
+// Scott's confirmed 14 managed properties — NOT properties.status='active' (that returns 16, includes OLY+WNT which are excluded)
+const LSG_PROPERTIES = [
+  { code:'CR1',  name:'Castle Rock Plaza I' },
+  { code:'DCM',  name:'Dry Creek Professional' },
+  { code:'LAP',  name:'La Pasada Plaza' },
+  { code:'LEEN', name:'Leenhouts Plaza' },
+  { code:'LPP',  name:'Lakeside Partners Property' },
+  { code:'MYN',  name:'Mayan Building' },
+  { code:'OMP',  name:'Old Marketplace' },
+  { code:'PWP',  name:'Parkway Plaza' },
+  { code:'RHS',  name:'Ranch House Square' },
+  { code:'SAC',  name:'Sacajawea Plaza' },
+  { code:'SSB',  name:'Sedona Silverado Bldg.' },
+  { code:'VDN',  name:'Vista del Norte' },
+  { code:'VVP',  name:'Verde Valley Plaza' },
+  { code:'WSP',  name:'West Sedona Plaza' },
+];
 
 const FILTER_TABS = [
   { key:'inbox',   label:'Inbox' },
@@ -703,7 +714,6 @@ export default function EmailInbox() {
   }, []);
 
   const handleLsgSubmit = async () => {
-    if (!lsgForm.prop_code) return;
     setLsgSubmitting(true);
     setLsgError(null);
     try {
@@ -1079,16 +1089,16 @@ export default function EmailInbox() {
               </div>
               <div>
                 <label style={{ fontSize:F.xs, color:T.text2, display:'block', marginBottom:'3px' }}>
-                  Property <span style={{ color:T.danger }}>*</span>
+                  Property <span style={{ color:T.text3 }}>(optional)</span>
                 </label>
                 <select
                   value={lsgForm.prop_code}
                   onChange={e => setLsgForm(f => ({ ...f, prop_code: e.target.value }))}
-                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color: lsgForm.prop_code ? T.text0 : T.text3, fontSize:F.sm, boxSizing:'border-box' }}
+                  style={{ width:'100%', padding:'6px 10px', borderRadius:'4px', border:`0.5px solid ${T.border}`, background:T.bg2, color:T.text0, fontSize:F.sm, boxSizing:'border-box' }}
                 >
-                  <option value="">— select property —</option>
-                  {VALID_PROP_CODES_SORTED.map(code => (
-                    <option key={code} value={code}>{code}</option>
+                  <option value="">— General inquiry, no specific property —</option>
+                  {LSG_PROPERTIES.map(({ code, name }) => (
+                    <option key={code} value={code}>{code} — {name}</option>
                   ))}
                 </select>
               </div>
@@ -1112,7 +1122,7 @@ export default function EmailInbox() {
               <ActionBtn
                 label={lsgSubmitting ? 'Saving…' : 'Create Lead'}
                 variant="primary"
-                disabled={lsgSubmitting || !lsgForm.prop_code}
+                disabled={lsgSubmitting}
                 onClick={handleLsgSubmit}
               />
             </div>

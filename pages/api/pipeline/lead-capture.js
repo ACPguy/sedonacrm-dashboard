@@ -37,19 +37,18 @@ export default async function handler(req, res) {
     thread_id,
   } = req.body || {};
 
-  if (!prop_code) return res.status(400).json({ error: 'prop_code is required' });
-  if (!VALID_PROP_CODES.has(prop_code)) return res.status(400).json({ error: 'Invalid prop_code' });
+  if (prop_code && !VALID_PROP_CODES.has(prop_code)) return res.status(400).json({ error: 'Invalid prop_code' });
 
   const sb = createServerClient();
 
   const insert = {
-    prop_code,
     stage: 'New Inquiry',
     status: 'Active',
     pipeline_source: 'inbound',
     stage_5_state: 'pending',
     stage_7_state: 'pending',
   };
+  if (prop_code) insert.prop_code = prop_code;
 
   if (suite_id)            insert.suite_id            = suite_id;
   if (suite_num)           insert.suite_num           = suite_num;
