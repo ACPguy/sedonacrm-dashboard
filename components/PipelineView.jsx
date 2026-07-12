@@ -491,9 +491,11 @@ export default function PipelineView({ propCode }) {
     setLoading(true);
     setError(null);
     try {
+      // NOTE: leasing_pipeline row count as of 2026-07-11 is 2503. If this table ever approaches 5000 rows, switch to real pagination (Range header / offset) instead of raising this limit further.
       let params = 'select=id,prop_code,stage,status,prospect_name,tnt_dba_name,suite_num,sqft,pipeline_source,source,qual_passed,updated_at,created_at,suite_id';
       params += '&order=updated_at.asc.nullslast';
-      if (!withExited) params += '&status=in.(Open,active,Active)';
+      params += '&limit=5000';
+      if (!withExited) params += '&stage=not.in.(Dead,On Hold,Landlord Declined Use)';
       if (propCode) params += `&prop_code=eq.${encodeURIComponent(propCode)}`;
 
       const data = await sbFetch('leasing_pipeline', params);
