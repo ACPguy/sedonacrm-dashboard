@@ -212,6 +212,7 @@ pages/api/pipeline/
 - **Session A2 follow-up fixes (2026-07-16):** (1) Linked Companies column order swapped — Contact is now LEFT, Company is RIGHT (both desktop and mobile stacking order). (2) Text link below field replaced with small circular icon-only corner badge (↗, ~18px, 44px tap target) at the right edge of the select field; appears only when a value is selected. (3) Category hidden in Core when `record_type==='work_order'` — WO Category in the Work Order Details card covers it; Category stays visible in Core for all other types.
 - **Session B — contact-first linking (2026-07-16):** Linked Companies section now uses `ContactFirstRow` (contact-first flow): user picks Contact → company auto-fills from that contact's `vendor_id`/`tenant_id` column → both saved atomically via `saveMany`. Company field is read-only display (not a selector). `FieldWithBadge` extracted to module scope (reusable corner-badge pattern for future record types). `CompanyContactRow` kept intact for NewTaskForm's WO section (company-first flow still correct there). Contact URL pattern: `/contacts/${podio_id ?? 'X'+id.slice(-6)}`.
 - **Copy Link removed (2026-07-16):** Removed from all 7 detail views: TasksView, IssuesView, WorkOrdersView, ContactsView, OwnersView, VendorsView, KeySafesView. `copied` state, `copyLink` function, and button removed from each. Feature was never needed (URL bar serves this purpose).
+- **Session C — Multi-contact linking (2026-07-16):** Added "Contacts" section card to TaskDetail (section 3, between Follow-Up and Linked Companies). `task_contacts` join table now used bidirectionally: (1) task list filtering by contact_id (existing), (2) display + management on the task detail (new). Contact chips show `full_name — company_dba`, × removes the link (deletes task_contacts row), "+ Add contact" dashed-border button opens inline search (live search on full_name/company_dba, excludes already-linked). Section identical for all record types. Added `sbPost` + `sbDelete` utility functions alongside existing `sbFetch`/`sbPatch`/`sbFetchAll`. Multi-contact chip UI is the canonical pattern for any future many-to-many contact linking elsewhere in the app.
 
 ## Schema Notes — leasing_pipeline FK gap (permanent)
 
@@ -220,7 +221,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `1bd1c83` — Session B contact-first vendor/tenant linking (Copy Link removal commit hash TBD after push)
+- preview: `a47ceda` — Copy Link removed from all 7 detail views (Session C hash TBD after commit)
 
 ---
 
