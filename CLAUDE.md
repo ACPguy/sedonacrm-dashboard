@@ -219,7 +219,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: pending — Session B contact-first linking
+- preview: `1bd1c83` — Session B contact-first vendor/tenant linking
 
 ---
 
