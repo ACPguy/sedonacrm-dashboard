@@ -153,6 +153,17 @@ export const fmtDate = d => {
   if (isNaN(dt.getTime())) return '—';
   return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
 };
+const timeAgo = d => {
+  if (!d) return '';
+  const secs = Math.floor((Date.now() - new Date(d)) / 1000);
+  if (secs < 86400)  return 'today';
+  const days = Math.floor(secs / 86400);
+  if (days < 30)  return `${days} day${days===1?'':'s'} ago`;
+  const mos = Math.floor(days / 30);
+  if (mos < 12)   return `${mos} month${mos===1?'':'s'} ago`;
+  const yrs = Math.floor(mos / 12);
+  return `${yrs} year${yrs===1?'':'s'} ago`;
+};
 const fmtNumDate = d => {
   if (!d) return '';
   const dt = new Date(d);
@@ -1682,11 +1693,12 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               parentId={data.id}
               linkedTable="contacts"
               linkedIdField="contact_id"
-              linkedFields="id,full_name,company_dba,podio_id"
+              linkedFields="id,full_name,company_dba,podio_id,category,created_at"
               searchFields={['full_name','company_dba']}
               titleField="full_name"
               titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
               summaryField={row=>row.company_dba||''}
+              metaField={row=>`Contacts${row.category?' · '+row.category:''} · Added ${timeAgo(row.created_at)}`}
               sectionLabel="contact"
               allowCreate={true}
               createFields={['full_name','company_dba','phone','email']}

@@ -236,7 +236,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `42d98d1` — LinkField canonical relationship field, pilot Task Contacts
+- preview: (post LinkField metaField fix — see git log)
 
 ---
 
