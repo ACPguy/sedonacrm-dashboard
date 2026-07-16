@@ -355,10 +355,65 @@ const CodeOnlySelect = ({ value, options, onSave }) => {
   );
 };
 
+// ── FieldWithBadge ────────────────────────────────────────────────────────────
+// Wraps any field with an optional corner icon-badge (↗) link. Badge opens the
+// linked record in a new tab. Uses a negative-margin padding trick so the
+// visual size stays ~18px while the touch target reaches 44px.
+const FieldWithBadge = ({ label, link, children }) => (
+  <div style={{ flex:1, minWidth:0 }}>
+    {label&&<div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',marginBottom:'4px'}}>{label}</div>}
+    <div style={{ position:'relative' }}>
+      {children}
+      {link&&(
+        <a href={link} target="_blank" rel="noopener noreferrer"
+          onClick={e=>e.stopPropagation()}
+          title="Open record"
+          style={{position:'absolute',top:'-6px',right:'-6px',width:'18px',height:'18px',borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',color:T.accent,textDecoration:'none',lineHeight:1,zIndex:1,
+            padding:'13px',margin:'-13px',boxSizing:'content-box'}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+          ↗
+        </a>
+      )}
+    </div>
+  </div>
+);
+
+// ── ContactFirstRow ───────────────────────────────────────────────────────────
+// Contact-first vendor/tenant linker for the Linked Companies section.
+// Pick the contact; company auto-fills from that contact's vendor_id/tenant_id
+// column. Both the contact picker and company display show a corner badge link.
+// onSave(contactId, companyId) — saves both fields atomically.
+const ContactFirstRow = ({ contactLabel, companyLabel, contactValue, companyValue, allContacts, companyName, companyLink, isMobile, onSave }) => {
+  const contactObj = allContacts.find(c => c.id === contactValue);
+  const contactLink = contactObj ? `/contacts/${contactObj.podio_id ?? 'X'+contactObj.id.slice(-6)}` : null;
+
+  const handleContactChange = async contactId => {
+    const contact = allContacts.find(c => c.id === contactId);
+    const companyId = contact ? (contact.vendor_id ?? contact.tenant_id ?? null) : null;
+    await onSave(contactId || null, companyId);
+  };
+
+  return (
+    <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
+      <FieldWithBadge label={contactLabel} link={contactLink}>
+        <InlineSelect
+          value={contactValue}
+          options={allContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')})) }
+          onSave={handleContactChange}
+        />
+      </FieldWithBadge>
+      <FieldWithBadge label={companyLabel} link={companyLink}>
+        <div style={{fontSize:F.base,color:companyName?T.text1:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6',userSelect:'none'}}>
+          {companyName||'—'}
+        </div>
+      </FieldWithBadge>
+    </div>
+  );
+};
+
 // ── CompanyContactRow ─────────────────────────────────────────────────────────
-// Paired contact + company selects (contact left, company right).
-// Icon-only corner badge (↗) appears at the right edge of the field when a
-// value is selected; tapping opens the record in a new tab.
+// Company-first contact linker — used by NewTaskForm's WO section.
 const CompanyContactRow = ({ companyLabel, contactLabel, companyValue, contactValue, companyOptions, allContacts, onSaveCompany, onSaveContact, companyLink, isMobile }) => {
   const filteredContacts = useMemo(
     () => companyValue ? allContacts.filter(c => c.vendor_id === companyValue || c.tenant_id === companyValue) : allContacts,
@@ -371,48 +426,19 @@ const CompanyContactRow = ({ companyLabel, contactLabel, companyValue, contactVa
   }, [companyValue, filteredContacts.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const contactObj = allContacts.find(c => c.id === contactValue);
   const contactLink = contactObj ? `/contacts/${contactObj.podio_id ?? 'X'+contactObj.id.slice(-6)}` : null;
-  const lbl = { fontSize:F.sm, fontWeight:'600', color:'#6B7280', marginBottom:'4px' };
-
-  // Inline select wrapper with a corner icon-badge link when a value is selected.
-  const FieldWithBadge = ({ label, link, children }) => (
-    <div style={{ flex:1, minWidth:0 }}>
-      <div style={lbl}>{label}</div>
-      <div style={{ position:'relative' }}>
-        {children}
-        {link&&(
-          <a href={link} target="_blank" rel="noopener noreferrer"
-            title="Open record"
-            style={{position:'absolute',top:'-6px',right:'-6px',width:'18px',height:'18px',borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',color:T.accent,textDecoration:'none',lineHeight:1,zIndex:1,
-              // 44px tap target via padding hack keeps visual size small
-              padding:'13px',margin:'-13px',boxSizing:'content-box'}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-            ↗
-          </a>
-        )}
-      </div>
-    </div>
-  );
-
-  const contactCol = (
-    <FieldWithBadge label={contactLabel} link={contactLink}>
-      <InlineSelect
-        value={contactValue}
-        options={filteredContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')})) }
-        onSave={onSaveContact}
-      />
-    </FieldWithBadge>
-  );
-  const companyCol = (
-    <FieldWithBadge label={companyLabel} link={companyLink}>
-      <InlineSelect value={companyValue} options={companyOptions} onSave={onSaveCompany}/>
-    </FieldWithBadge>
-  );
 
   return (
     <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-      {contactCol}
-      {companyCol}
+      <FieldWithBadge label={contactLabel} link={contactLink}>
+        <InlineSelect
+          value={contactValue}
+          options={filteredContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')})) }
+          onSave={onSaveContact}
+        />
+      </FieldWithBadge>
+      <FieldWithBadge label={companyLabel} link={companyLink}>
+        <InlineSelect value={companyValue} options={companyOptions} onSave={onSaveCompany}/>
+      </FieldWithBadge>
     </div>
   );
 };
@@ -1381,6 +1407,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     onUpdate?.(updated);
   };
 
+  const saveMany=async updates=>{
+    const patched=Object.fromEntries(Object.entries(updates).map(([k,v])=>[k,v??null]));
+    await sbPatch('tasks',data.id,patched);
+    const updated={...data,...patched};
+    setData(updated);
+    onUpdate?.(updated);
+  };
+
   const handleStatusChange=async newStatus=>{
     const updates={status:newStatus};
     const isClosed=newStatus==='Closed'||newStatus==='Cancelled';
@@ -1632,29 +1666,27 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           {/* 3 — LINKED COMPANIES */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
             <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Linked Companies</div>
-            <CompanyContactRow
-              companyLabel="Vendor Company"
+            <ContactFirstRow
               contactLabel="Vendor Contact"
-              companyValue={data.vendor_id}
+              companyLabel="Vendor Company"
               contactValue={data.vendor_contact_id}
-              companyOptions={vendors.map(v=>({value:v.id,label:v.company_dba}))}
+              companyValue={data.vendor_id}
               allContacts={vendorContacts}
-              onSaveCompany={v=>save('vendor_id',v)}
-              onSaveContact={v=>save('vendor_contact_id',v)}
+              companyName={vendors.find(v=>v.id===data.vendor_id)?.company_dba||null}
               companyLink={data.vendor_id?vendorLink(data.vendor_id):null}
               isMobile={isMobile}
+              onSave={(cId,coId)=>saveMany({vendor_contact_id:cId,vendor_id:coId})}
             />
-            <CompanyContactRow
-              companyLabel="Tenant Company"
+            <ContactFirstRow
               contactLabel="Tenant Contact"
-              companyValue={data.tenant_id}
+              companyLabel="Tenant Company"
               contactValue={data.tenant_contact_id}
-              companyOptions={tenants.map(t=>({value:t.id,label:t.tenant_dba}))}
+              companyValue={data.tenant_id}
               allContacts={tenantContacts}
-              onSaveCompany={v=>save('tenant_id',v)}
-              onSaveContact={v=>save('tenant_contact_id',v)}
+              companyName={tenants.find(t=>t.id===data.tenant_id)?.tenant_dba||null}
               companyLink={data.tenant_id?tenantLink(data.tenant_id):null}
               isMobile={isMobile}
+              onSave={(cId,coId)=>saveMany({tenant_contact_id:cId,tenant_id:coId})}
             />
           </div>
 
