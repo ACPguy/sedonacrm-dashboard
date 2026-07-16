@@ -206,15 +206,19 @@ pages/api/pipeline/
 
 `components/shared/LinkField.jsx` — canonical many-to-many relationship field. Config-driven, zero hardcoded table names. Piloted on Task ↔ Contacts via `task_contacts`.
 
-**Props:** `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`.
+**Props:** `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `subtitleField` (fn/string, optional — phone/email line), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`, `variant` ('card' default | 'chip').
+
+**variant='card' (default):** Podio-style stacked cards — UserCircle icon + title link (T.accent + ↗) + optional subtitle (phone/email) + meta line. No × on the card itself. Trigger button says "Add / remove"; opening the panel shows currently-linked items as removable chips at the top so unlinking is still possible. ContactsView "Linked Tasks" (readOnly, no subtitleField) renders as cards with just icon + title + meta, no subtitle gap.
+
+**variant='chip':** compact inline pills with × unlink. Pass `variant="chip"` explicitly on any call site that wants the old look.
 
 **Forward mode** (TaskDetail Contacts section): add/remove/search/create. Error displayed inline (not silently in console). `allowCreate=true` + `createFields` + `onCreate` enables inline create-and-link.
 
-**Reverse/read-only mode** (ContactDetail Linked Tasks section): same join table queried from the other direction; no add/create UI; chips show title + ↗ open-in-new-tab.
+**Reverse/read-only mode** (ContactDetail Linked Tasks section): same join table queried from the other direction; no add/create UI; renders as cards.
 
 **To add another relationship:** drop in `<LinkField .../>` with the correct props — no new state/effects/functions needed in the parent view.
 
-**Chip external link:** uses ↗ character inline (~11px), consistent with FieldWithBadge pattern. No circular badge.
+**External link icon:** uses ↗ character inline (~11px), consistent with FieldWithBadge pattern. No circular badge.
 
 ## TaskDetail Reorganization Notes (2026-07-16, permanent)
 
@@ -236,7 +240,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `049a5bb` — fix Task Contacts LinkField metaField (three-line search results)
+- preview: (post LinkField card variant — see git log)
 
 ---
 

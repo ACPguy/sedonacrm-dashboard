@@ -1693,10 +1693,11 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               parentId={data.id}
               linkedTable="contacts"
               linkedIdField="contact_id"
-              linkedFields="id,full_name,company_dba,podio_id,category,created_at"
+              linkedFields="id,full_name,company_dba,podio_id,category,created_at,primary_phone,email"
               searchFields={['full_name','company_dba']}
               titleField="full_name"
               titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
+              subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
               summaryField={row=>row.company_dba||''}
               metaField={row=>`Contacts${row.category?' · '+row.category:''} · Added ${timeAgo(row.created_at)}`}
               sectionLabel="contact"
