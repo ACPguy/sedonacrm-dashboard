@@ -218,7 +218,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: pending — Session A2 fixes (column swap, icon badge, Category WO exclusion)
+- preview: `17f7c4e` — Session A2 fixes (column swap, icon badge, Category WO exclusion)
 
 ---
 
