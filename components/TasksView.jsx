@@ -356,7 +356,9 @@ const CodeOnlySelect = ({ value, options, onSave }) => {
 };
 
 // ── CompanyContactRow ─────────────────────────────────────────────────────────
-// Paired company + contact selects with FK-filtered contact list and auto-select.
+// Paired contact + company selects (contact left, company right).
+// Icon-only corner badge (↗) appears at the right edge of the field when a
+// value is selected; tapping opens the record in a new tab.
 const CompanyContactRow = ({ companyLabel, contactLabel, companyValue, contactValue, companyOptions, allContacts, onSaveCompany, onSaveContact, companyLink, isMobile }) => {
   const filteredContacts = useMemo(
     () => companyValue ? allContacts.filter(c => c.vendor_id === companyValue || c.tenant_id === companyValue) : allContacts,
@@ -370,37 +372,47 @@ const CompanyContactRow = ({ companyLabel, contactLabel, companyValue, contactVa
   const contactObj = allContacts.find(c => c.id === contactValue);
   const contactLink = contactObj ? `/contacts/${contactObj.podio_id ?? 'X'+contactObj.id.slice(-6)}` : null;
   const lbl = { fontSize:F.sm, fontWeight:'600', color:'#6B7280', marginBottom:'4px' };
-  const lnk = { fontSize:F.xs, color:T.accent, marginTop:'4px', display:'block', textDecoration:'none' };
-  const companyCol = (
+
+  // Inline select wrapper with a corner icon-badge link when a value is selected.
+  const FieldWithBadge = ({ label, link, children }) => (
     <div style={{ flex:1, minWidth:0 }}>
-      <div style={lbl}>{companyLabel}</div>
-      <InlineSelect value={companyValue} options={companyOptions} onSave={onSaveCompany}/>
-      {companyLink&&<a href={companyLink} style={lnk}
-        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-        {companyOptions.find(o=>o.value===companyValue)?.label} ↗
-      </a>}
+      <div style={lbl}>{label}</div>
+      <div style={{ position:'relative' }}>
+        {children}
+        {link&&(
+          <a href={link} target="_blank" rel="noopener noreferrer"
+            title="Open record"
+            style={{position:'absolute',top:'-6px',right:'-6px',width:'18px',height:'18px',borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',color:T.accent,textDecoration:'none',lineHeight:1,zIndex:1,
+              // 44px tap target via padding hack keeps visual size small
+              padding:'13px',margin:'-13px',boxSizing:'content-box'}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+            ↗
+          </a>
+        )}
+      </div>
     </div>
   );
+
   const contactCol = (
-    <div style={{ flex:1, minWidth:0 }}>
-      <div style={lbl}>{contactLabel}</div>
+    <FieldWithBadge label={contactLabel} link={contactLink}>
       <InlineSelect
         value={contactValue}
         options={filteredContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')})) }
         onSave={onSaveContact}
       />
-      {contactLink&&<a href={contactLink} style={lnk}
-        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-        {contactObj?.full_name} ↗
-      </a>}
-    </div>
+    </FieldWithBadge>
   );
+  const companyCol = (
+    <FieldWithBadge label={companyLabel} link={companyLink}>
+      <InlineSelect value={companyValue} options={companyOptions} onSave={onSaveCompany}/>
+    </FieldWithBadge>
+  );
+
   return (
-    <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 12px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-      {companyCol}
+    <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
       {contactCol}
+      {companyCol}
     </div>
   );
 };
@@ -1596,9 +1608,11 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               </select>
             </FieldRow>
             <FieldRow label="Status"><StatusPills value={data.status} onSave={handleStatusChange}/></FieldRow>
-            <FieldRow label="Category">
-              <InlineSelect value={data.category} options={categoryOpts} onSave={v=>save('category',v)}/>
-            </FieldRow>
+            {data.record_type!=='work_order'&&(
+              <FieldRow label="Category">
+                <InlineSelect value={data.category} options={categoryOpts} onSave={v=>save('category',v)}/>
+              </FieldRow>
+            )}
           </div>
 
           {/* 2 — FOLLOW-UP */}

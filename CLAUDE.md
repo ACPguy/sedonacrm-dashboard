@@ -209,6 +209,7 @@ pages/api/pipeline/
 - **Property field** in TaskDetail closed state shows just prop_code (e.g. "CR1") via new `CodeOnlySelect` component; dropdown options still show "code — name"
 - **CompanyContactRow** (vendor + tenant) moved out of WO-only block into always-visible "Linked Companies" section
 - **System Info** collapsible block unchanged, remains last
+- **Session A2 follow-up fixes (2026-07-16):** (1) Linked Companies column order swapped — Contact is now LEFT, Company is RIGHT (both desktop and mobile stacking order). (2) Text link below field replaced with small circular icon-only corner badge (↗, ~18px, 44px tap target) at the right edge of the select field; appears only when a value is selected. (3) Category hidden in Core when `record_type==='work_order'` — WO Category in the Work Order Details card covers it; Category stays visible in Core for all other types.
 
 ## Schema Notes — leasing_pipeline FK gap (permanent)
 
@@ -217,7 +218,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `70e1cd6` — TaskDetail reorg + Note type removal (2026-07-16)
+- preview: pending — Session A2 fixes (column swap, icon badge, Category WO exclusion)
 
 ---
 
