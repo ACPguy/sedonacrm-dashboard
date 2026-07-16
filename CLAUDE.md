@@ -217,7 +217,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: pending commit this session — TaskDetail reorg + Note type removal (2026-07-16)
+- preview: `70e1cd6` — TaskDetail reorg + Note type removal (2026-07-16)
 
 ---
 
