@@ -236,7 +236,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: (post LinkField metaField fix — see git log)
+- preview: `049a5bb` — fix Task Contacts LinkField metaField (three-line search results)
 
 ---
 
