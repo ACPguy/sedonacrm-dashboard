@@ -200,6 +200,21 @@ pages/api/pipeline/
 2. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
 3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
 4. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
+5. Future: extend LinkField to Vendor/Tenant linking once those get proper join tables; and to any future relationship (Key Safes, COIs, Vendor Services)
+
+## LinkField Architecture (permanent)
+
+`components/shared/LinkField.jsx` — canonical many-to-many relationship field. Config-driven, zero hardcoded table names. Piloted on Task ↔ Contacts via `task_contacts`.
+
+**Props:** `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`.
+
+**Forward mode** (TaskDetail Contacts section): add/remove/search/create. Error displayed inline (not silently in console). `allowCreate=true` + `createFields` + `onCreate` enables inline create-and-link.
+
+**Reverse/read-only mode** (ContactDetail Linked Tasks section): same join table queried from the other direction; no add/create UI; chips show title + ↗ open-in-new-tab.
+
+**To add another relationship:** drop in `<LinkField .../>` with the correct props — no new state/effects/functions needed in the parent view.
+
+**Chip external link:** uses ↗ character inline (~11px), consistent with FieldWithBadge pattern. No circular badge.
 
 ## TaskDetail Reorganization Notes (2026-07-16, permanent)
 
@@ -221,7 +236,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `a47ceda` — Copy Link removed from all 7 detail views (Session C hash TBD after commit)
+- preview: (post LinkField session — see git log)
 
 ---
 

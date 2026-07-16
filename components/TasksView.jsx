@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/core';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
+import LinkField from './shared/LinkField';
 import { getTaskPrefix } from '../utils/taskPrefix';
 import { T } from '../lib/theme';
 
@@ -1340,13 +1341,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [sysOpen,setSysOpen] = useState(false);
   const [woFinOpen,setWoFinOpen] = useState(false);
   const [woCloseOpen,setWoCloseOpen] = useState(false);
-  const [linkedContacts,setLinkedContacts] = useState([]);
-  const [contactSearchQ,setContactSearchQ] = useState('');
-  const [contactSearchResults,setContactSearchResults] = useState([]);
-  const [contactSearchLoading,setContactSearchLoading] = useState(false);
-  const [contactSearchOpen,setContactSearchOpen] = useState(false);
   const resizingRight = useRef(false);
-  const contactSearchRef = useRef(null);
 
   useEffect(()=>{
     if (initialTask){setData(initialTask);setLoading(false);return;}
@@ -1416,36 +1411,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     return ()=>{document.title='SedonaCRM';};
   },[data?.title,data?.record_type,data?.task_num]);
 
-  useEffect(()=>{
-    if(!data?.id){setLinkedContacts([]);return;}
-    sbFetch('task_contacts',`task_id=eq.${data.id}&select=id,contact_id`)
-      .then(async rows=>{
-        if(!rows.length){setLinkedContacts([]);return;}
-        const ids=rows.map(r=>r.contact_id).join(',');
-        const contacts=await sbFetch('contacts',`id=in.(${ids})&select=id,full_name,company_dba,podio_id`);
-        const cmap=Object.fromEntries(contacts.map(c=>[c.id,c]));
-        setLinkedContacts(rows.map(r=>({...r,...(cmap[r.contact_id]||{})})));
-      })
-      .catch(()=>setLinkedContacts([]));
-  },[data?.id]);
-
-  useEffect(()=>{
-    if(!contactSearchOpen||contactSearchQ.trim().length<1){setContactSearchResults([]);return;}
-    setContactSearchLoading(true);
-    const q=encodeURIComponent(contactSearchQ.trim());
-    const linkedIds=linkedContacts.map(c=>c.contact_id);
-    sbFetch('contacts',`or=(full_name.ilike.*${q}*,company_dba.ilike.*${q}*)&status=eq.active&select=id,full_name,company_dba,podio_id&limit=10`)
-      .then(rows=>{setContactSearchResults(rows.filter(r=>!linkedIds.includes(r.id)));setContactSearchLoading(false);})
-      .catch(()=>setContactSearchLoading(false));
-  },[contactSearchQ,contactSearchOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(()=>{
-    if(!contactSearchOpen)return;
-    const handler=e=>{if(contactSearchRef.current&&!contactSearchRef.current.contains(e.target))setContactSearchOpen(false);};
-    document.addEventListener('mousedown',handler);
-    return()=>document.removeEventListener('mousedown',handler);
-  },[contactSearchOpen]);
-
   const startRightResize=useCallback(e=>{
     resizingRight.current=true;
     const startX=e.clientX,startW=rightWidth;
@@ -1471,21 +1436,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     onUpdate?.(updated);
   };
 
-  const addContact=async contact=>{
-    try{
-      const row=await sbPost('task_contacts',{task_id:data.id,contact_id:contact.id});
-      const newRow=Array.isArray(row)?row[0]:row;
-      setLinkedContacts(prev=>[...prev,{...newRow,full_name:contact.full_name,company_dba:contact.company_dba,podio_id:contact.podio_id}]);
-      setContactSearchQ('');setContactSearchResults([]);setContactSearchOpen(false);
-    }catch(e){console.error('addContact',e);}
-  };
-
-  const removeContact=async rowId=>{
-    try{
-      await sbDelete('task_contacts',`id=eq.${rowId}`);
-      setLinkedContacts(prev=>prev.filter(r=>r.id!==rowId));
-    }catch(e){console.error('removeContact',e);}
-  };
 
   const handleStatusChange=async newStatus=>{
     const updates={status:newStatus};
@@ -1726,49 +1676,22 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           {/* 3 — CONTACTS */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
             <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Contacts</div>
-            <div style={{padding:'10px 16px'}}>
-              <div style={{display:'flex',flexWrap:'wrap',gap:'6px',alignItems:'center',marginBottom:linkedContacts.length?'8px':0}}>
-                {linkedContacts.map(row=>(
-                  <span key={row.id} style={{display:'inline-flex',alignItems:'center',gap:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'20px',padding:'3px 6px 3px 10px',fontSize:F.sm,color:T.text0}}>
-                    {row.full_name}{row.company_dba?` — ${row.company_dba}`:''}
-                    <button onClick={()=>removeContact(row.id)}
-                      style={{background:'transparent',border:'none',cursor:'pointer',color:T.text2,fontSize:'12px',lineHeight:1,padding:'2px 3px',borderRadius:'50%',display:'flex',alignItems:'center',minWidth:'20px',minHeight:'20px',justifyContent:'center'}}
-                      onMouseEnter={e=>e.currentTarget.style.color=T.danger}
-                      onMouseLeave={e=>e.currentTarget.style.color=T.text2}
-                      title="Remove link">×</button>
-                  </span>
-                ))}
-              </div>
-              <div ref={contactSearchRef} style={{position:'relative',display:'inline-block',width:isMobile?'100%':'auto'}}>
-                {!contactSearchOpen?(
-                  <button onClick={()=>{setContactSearchOpen(true);setContactSearchQ('');}}
-                    style={{background:'transparent',border:`1px dashed ${T.border}`,borderRadius:'20px',padding:'3px 12px',fontSize:F.sm,color:T.text2,cursor:'pointer',whiteSpace:'nowrap',minHeight:'28px'}}
-                    onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-                    onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                    + Add contact
-                  </button>
-                ):(
-                  <div style={{width:isMobile?'100%':'280px',background:T.bg3,border:`1px solid ${T.border}`,borderRadius:'6px',boxShadow:'0 4px 12px rgba(0,0,0,0.3)',overflow:'hidden'}}>
-                    <input autoFocus value={contactSearchQ} onChange={e=>setContactSearchQ(e.target.value)}
-                      onKeyDown={e=>{if(e.key==='Escape'){setContactSearchOpen(false);setContactSearchQ('');setContactSearchResults([]);}}}
-                      placeholder="Search contacts…"
-                      style={{width:'100%',boxSizing:'border-box',padding:'7px 10px',background:'transparent',border:'none',borderBottom:`0.5px solid ${T.border}`,color:T.text0,fontSize:F.sm,outline:'none'}}/>
-                    {contactSearchLoading&&<div style={{padding:'8px 10px',color:T.text3,fontSize:F.xs}}>Searching…</div>}
-                    {!contactSearchLoading&&contactSearchQ.trim().length>0&&contactSearchResults.length===0&&(
-                      <div style={{padding:'8px 10px',color:T.text3,fontSize:F.xs}}>No contacts found</div>
-                    )}
-                    {contactSearchResults.map(c=>(
-                      <div key={c.id} onClick={()=>addContact(c)}
-                        style={{padding:'7px 10px',cursor:'pointer',fontSize:F.sm,color:T.text0,borderBottom:`0.5px solid ${T.border}`}}
-                        onMouseEnter={e=>e.currentTarget.style.background=T.bg2}
-                        onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                        {c.full_name}{c.company_dba?<span style={{color:T.text2}}> — {c.company_dba}</span>:null}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <LinkField
+              joinTable="task_contacts"
+              parentIdField="task_id"
+              parentId={data.id}
+              linkedTable="contacts"
+              linkedIdField="contact_id"
+              linkedFields="id,full_name,company_dba,podio_id"
+              searchFields={['full_name','company_dba']}
+              titleField="full_name"
+              titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
+              summaryField={row=>row.company_dba||''}
+              sectionLabel="contact"
+              allowCreate={true}
+              createFields={['full_name','company_dba','phone','email']}
+              onCreate={async fields=>{const r=await sbPost('contacts',fields);return Array.isArray(r)?r[0]:r;}}
+            />
           </div>
 
           {/* 4 — LINKED COMPANIES */}

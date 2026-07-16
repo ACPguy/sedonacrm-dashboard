@@ -7,6 +7,7 @@ import { UserCircle, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icon
 import TasksView from './TasksView';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
+import LinkField from './shared/LinkField';
 import { T } from '../lib/theme';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -896,6 +897,24 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
             <div style={{...css.card, gridColumn:'1 / -1'}}>
               <div style={css.secTitle}>Notes</div>
               <EditableField label="" value={data.notes} onSave={v => save('notes', v)} type="textarea"/>
+            </div>
+
+            {/* Linked Tasks — full width, reverse read-only direction */}
+            <div style={{...css.card, gridColumn:'1 / -1'}}>
+              <div style={css.secTitle}>Linked Tasks</div>
+              <LinkField
+                joinTable="task_contacts"
+                parentIdField="contact_id"
+                parentId={data.id}
+                linkedTable="tasks"
+                linkedIdField="task_id"
+                linkedFields="id,title,task_num,record_type,prop_code"
+                searchFields={[]}
+                titleField={row => row.title || 'Untitled'}
+                titleHref={row => `/tasks/${row.task_num}`}
+                summaryField={row => [row.record_type, row.prop_code].filter(Boolean).join(' · ')}
+                readOnly
+              />
             </div>
           </div>
         )}
