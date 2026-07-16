@@ -201,14 +201,23 @@ pages/api/pipeline/
 3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
 4. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
 
+## TaskDetail Reorganization Notes (2026-07-16, permanent)
+
+- **Note record type removed** — zero rows existed; TYPE_PREFIX, REVERSE_PREFIX, TYPE_LABEL, TYPE_COLOR, TYPE_ICON_MAP, CATEGORY_OPTIONS, typeCounts, TYPE_PILLS, and TYPE_SHORT all cleaned. `NotePencil` import removed.
+- **TaskDetail Details tab reorganized into 7 labeled section cards:** Core (title, property, priority, assigned to, status, category) → Follow-Up (alert, FU date, FU notes) → Linked Companies (vendor + tenant, always visible for all record types) → Work Order Details (WO only; Financials and Closeout are collapsed sub-panels defaulting closed) → Notes & Relationships (details, internal notes, depends on, project fields) → Documents (drive folder + podio link, always visible) → Dates (created, last updated, close date — close date always rendered, em dash when empty)
+- **Category field** now shows for ALL record types (removed `record_type!=='work_order'` condition)
+- **Property field** in TaskDetail closed state shows just prop_code (e.g. "CR1") via new `CodeOnlySelect` component; dropdown options still show "code — name"
+- **CompanyContactRow** (vendor + tenant) moved out of WO-only block into always-visible "Linked Companies" section
+- **System Info** collapsible block unchanged, remains last
+
 ## Schema Notes — leasing_pipeline FK gap (permanent)
 
 `leasing_pipeline` has NO FK to `properties`. It links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline queries. Always query properties separately by prop_code when needed.
 
 ## Current Git State
 
-- main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved); all session work
-- preview: `9ce6031` — same as main; CLAUDE.md session-close housekeeping commit will push ahead
+- main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
+- preview: pending commit this session — TaskDetail reorg + Note type removal (2026-07-16)
 
 ---
 
