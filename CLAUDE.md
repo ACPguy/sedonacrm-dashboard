@@ -240,7 +240,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: (post LinkField card variant — see git log)
+- preview: `b0159af` — LinkField card variant + subtitleField; Task Contacts updated
 
 ---
 
