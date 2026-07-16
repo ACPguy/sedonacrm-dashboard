@@ -555,7 +555,6 @@ const leaseUrgStyle = d => {
 export const ContactDetail = ({ contact, onBack, onUpdate }) => {
   const [tab,  setTab]  = useState('tasks');
   const [data, setData] = useState(contact);
-  const [copied, setCopied] = useState(false);
   const [navList, setNavList] = useState(null);
   const [navIdx, setNavIdx] = useState(-1);
   const [navLoading, setNavLoading] = useState(false);
@@ -678,13 +677,6 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
     onUpdate?.(updated);
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    }).catch(() => {});
-  };
-
   const TABS = ['Tasks', 'Contact Info', 'Comms'];
   const tk = t => t.toLowerCase().replace(/ /g, '-');
 
@@ -713,7 +705,7 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
       {/* ── Header ── */}
       <div style={{padding:'10px 16px 0', borderBottom:`0.5px solid ${T.border}`, background:T.bg0, flexShrink:0}}>
 
-        {/* Row 1: Back + Copy Link */}
+        {/* Row 1: Back + nav */}
         <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'5px'}}>
           <button onClick={onBack}
             style={{background:'transparent', border:`0.5px solid ${T.border}`, borderRadius:'4px', padding:'4px 10px', color:T.text1, fontSize:F.sm, cursor:'pointer', flexShrink:0, display:'inline-flex', alignItems:'center', gap:'5px'}}
@@ -721,15 +713,6 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
             onMouseLeave={e => e.currentTarget.style.color = T.text1}>
             <UserCircle size={14} weight="bold"/>← Contacts
           </button>
-          <div style={{marginLeft:'auto', display:'flex', gap:'6px', alignItems:'center'}}>
-            <button onClick={copyLink}
-              style={{padding:'3px 10px', borderRadius:'4px', fontSize:F.xs, cursor:'pointer',
-                border:`0.5px solid ${copied ? T.success : T.border}`,
-                background:'transparent',
-                color: copied ? T.success : T.text2}}>
-              {copied ? 'Copied!' : 'Copy Link'}
-            </button>
-          </div>
 
           {/* Prev/Next nav */}
           {navList&&navList.length>1&&(

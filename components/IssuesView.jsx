@@ -1145,7 +1145,6 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
   const [activeProps, setActiveProps] = useState([]);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [rightWidth, setRightWidth] = useState(300);
-  const [copied, setCopied] = useState(false);
   const [navList, setNavList]   = useState(null);
   const [navIdx, setNavIdx]     = useState(-1);
   const [navLoading, setNavLoading] = useState(false);
@@ -1255,11 +1254,6 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
     onUpdate?.(updated);
   };
 
-  const copyLink = () => {
-    const url = `${window.location.origin}/issues/${data.podio_id ?? 'X'+data.id.slice(-6)}`;
-    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
-  };
-
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
@@ -1275,12 +1269,6 @@ export const IssueDetail = ({ issue, onBack, onUpdate }) => {
             {data.prop_code||'—'}
           </span>
           {data.podio_id && <span style={{fontSize:F.xs,color:T.text3}}>#{data.podio_id}</span>}
-          <button onClick={copyLink}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',flexShrink:0,transition:'color 0.2s'}}
-            onMouseEnter={e=>{ if(!copied) e.currentTarget.style.color=T.text0; }}
-            onMouseLeave={e=>{ if(!copied) e.currentTarget.style.color=T.text2; }}>
-            {copied ? '✓ Copied' : '⧉ Copy Link'}
-          </button>
           <div style={{marginLeft:'auto',display:'flex',gap:'6px',alignItems:'center',flexShrink:0}}>
             <StatusBadge status={data.priority}/>
             <StatusBadge status={data.status}/>

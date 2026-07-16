@@ -1311,7 +1311,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [isMobile,setIsMobile] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   const [rightCollapsed,setRightCollapsed] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   const [rightWidth,setRightWidth] = useState(300);
-  const [copied,setCopied]       = useState(false);
   const [detailTab,setDetailTab] = useState('details');
   const [navList,setNavList]     = useState(null);
   const [navIdx,setNavIdx]       = useState(-1);
@@ -1438,12 +1437,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     onUpdate?.(updated);
   };
 
-  const copyLink=()=>{
-    if(!data)return;
-    const url=`${window.location.origin}/tasks/${data.task_num}`;
-    navigator.clipboard.writeText(url).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);});
-  };
-
   const createDriveFolder=async()=>{
     if(!data||driveFolderLoading)return;
     setDriveFolderLoading(true);
@@ -1529,12 +1522,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           {data.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'2px 8px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>{data.prop_code}</span>}
           <StatusBadge status={data.priority}/>
           <StatusBadge status={data.status}/>
-          <button onClick={copyLink}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',transition:'color 0.2s',flexShrink:0}}
-            onMouseEnter={e=>{if(!copied)e.currentTarget.style.color=T.text0;}}
-            onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
-            {copied?'✓ Copied':'⧉ Copy Link'}
-          </button>
           {data.record_type==='work_order'&&(
             data.drive_folder_id
               ? <a href={data.drive_folder_url} target="_blank" rel="noopener noreferrer"

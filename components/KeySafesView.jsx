@@ -360,7 +360,6 @@ export const KeySafeDetail = ({ keySafe: initialItem, itemId, onBack, onUpdate }
   const [loading,setLoading] = useState(!initialItem);
   const [notFound,setNotFound] = useState(false);
   const [activeProps,setActiveProps] = useState([]);
-  const [copied,setCopied]   = useState(false);
   const [navList,setNavList] = useState(null);
   const [navIdx,setNavIdx]   = useState(-1);
   const [navLoading,setNavLoading] = useState(false);
@@ -478,12 +477,6 @@ export const KeySafeDetail = ({ keySafe: initialItem, itemId, onBack, onUpdate }
     return ()=>window.removeEventListener('keydown',onKey);
   },[]);
 
-  const copyLink = () => {
-    if (!data) return;
-    const url = `${window.location.origin}/key-safes/X${data.id.slice(-6)}`;
-    navigator.clipboard.writeText(url).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);});
-  };
-
   if (loading) return <div style={{padding:'40px',textAlign:'center',color:T.text3}}>Loading…</div>;
   if (notFound) return <div style={{padding:'40px',textAlign:'center',color:T.danger}}>Key safe not found.</div>;
   if (!data) return null;
@@ -501,12 +494,6 @@ export const KeySafeDetail = ({ keySafe: initialItem, itemId, onBack, onUpdate }
           </button>
           {data.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'2px 8px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>{data.prop_code}</span>}
           <StatusBadge status={data.status||'In Use'}/>
-          <button onClick={copyLink}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',transition:'color 0.2s',flexShrink:0}}
-            onMouseEnter={e=>{if(!copied)e.currentTarget.style.color=T.text0;}}
-            onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
-            {copied?'✓ Copied':'⧉ Copy Link'}
-          </button>
           {navList&&navList.length>1&&(
             <div style={{display:'flex',alignItems:'center',gap:'4px',marginLeft:'auto',flexShrink:0}}>
               <button onClick={()=>goNav(-1)} disabled={navIdx<=0||navLoading}

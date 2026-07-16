@@ -580,7 +580,6 @@ export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
   const [linkedProp, setLinkedProp]           = useState(null);
   const [rightCollapsed, setRightCollapsed]   = useState(false);
   const [rightWidth, setRightWidth]           = useState(300);
-  const [copied, setCopied]                   = useState(false);
   const [ownerTab, setOwnerTab]               = useState('properties');
   const [agmtData, setAgmtData]               = useState(null);
   const [agmtLoading, setAgmtLoading]         = useState(false);
@@ -699,11 +698,6 @@ export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
     onUpdate?.(updated);
   };
 
-  const copyLink = () => {
-    const url = `${window.location.origin}/owners/${data.podio_id ?? 'X'+data.id.slice(-6)}`;
-    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
-  };
-
   const expiryStyle = d => {
     if (!d) return {};
     const days = Math.round((new Date(d) - new Date()) / (1000*60*60*24));
@@ -734,12 +728,6 @@ export const OwnerDetail = ({ owner, onBack, onUpdate }) => {
           </button>
           {data.category && <span style={owCatBadge(data.category)}>{data.category}</span>}
           {data.entity_type && <span style={css.badge(T.text2, T.bg3)}>{data.entity_type}</span>}
-          <button onClick={copyLink}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',flexShrink:0,transition:'color 0.2s'}}
-            onMouseEnter={e=>{if(!copied)e.currentTarget.style.color=T.text0;}}
-            onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
-            {copied ? '✓ Copied' : '⧉ Copy Link'}
-          </button>
 
           {/* Prev/Next nav */}
           {navList&&navList.length>1&&(
