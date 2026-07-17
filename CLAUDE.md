@@ -210,7 +210,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `(pending — will update after push)`
+- preview: `3f545ec` — bug fix: LinkField mode='single' duplicate render panels (mode !== 'single' guard on card/chip blocks)
 
 ---
 
