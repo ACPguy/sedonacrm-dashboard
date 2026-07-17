@@ -226,7 +226,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: TBD after this commit — fix "Create new contact" 400 (wrong column + missing RLS)
+- preview: `56c7a4a` — fix "Create new contact" 400 (wrong column name + missing contacts anon INSERT RLS)
 
 ---
 
