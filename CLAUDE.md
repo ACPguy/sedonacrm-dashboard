@@ -228,7 +228,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: TBD after this commit — StackedFormModal shell (Stage 2 of Contact-creation redesign, no consumers wired yet)
+- preview: `e56be02` — StackedFormModal shell (Stage 2 of Contact-creation redesign, no consumers wired yet)
 
 ---
 
