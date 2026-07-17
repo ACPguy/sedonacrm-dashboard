@@ -120,6 +120,7 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   shared/
     TasksTable.jsx     — reference only (no longer used in embedded contexts)
     WorkOrdersTable.jsx, TenantsTable.jsx, SuitesTable.jsx, IssuesTable.jsx, ContactsTable.jsx
+    StackedFormModal.jsx — generic overlay shell for full-form create flows (Contact, Vendor, future). Props: title, onClose, children, footer, maxWidth, zIndex. No backdrop/Escape-to-close. Caller passes increasing zIndex for stacked modals. No consumers wired yet — shell-only as of 2026-07-17.
 
 lib/
   gmail.js               — getGmailClient(), setupWatch()
@@ -227,7 +228,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `c87ca4a` — fix X-prefix lookup for large tables via Postgres RPC (contacts + issues)
+- preview: TBD after this commit — StackedFormModal shell (Stage 2 of Contact-creation redesign, no consumers wired yet)
 
 ---
 
