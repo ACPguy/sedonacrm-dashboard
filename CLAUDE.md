@@ -197,11 +197,15 @@ pages/api/pipeline/
 
 `components/shared/LinkField.jsx` — canonical many-to-many relationship field. Config-driven, zero hardcoded table names. Piloted on Task ↔ Contacts via `task_contacts`.
 
-**Props:** `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `subtitleField` (fn/string, optional — phone/email line), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`, `variant` ('card' default | 'chip').
+**Props:** `mode` ('multi' default | 'single'), `value` (single mode: current FK id), `onChange` (single mode: (row|null)=>void — caller persists), `onCreateNew` (single mode: ()=>void — caller opens modal), `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `subtitleField` (fn/string, optional — phone/email line), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`, `variant` ('card' default | 'chip').
 
 **variant='card' (default):** Podio-style stacked cards — UserCircle icon + title link (T.accent + ↗) + optional subtitle (phone/email) + meta line. No × on the card itself. Trigger button says "Add / remove"; opening the panel shows currently-linked items as removable chips at the top so unlinking is still possible. ContactsView "Linked Tasks" (readOnly, no subtitleField) renders as cards with just icon + title + meta, no subtitle gap.
 
 **variant='chip':** compact inline pills with × unlink. Pass `variant="chip"` explicitly on any call site that wants the old look.
+
+**mode='multi' (default):** self-persisting join-table mode. Inserts/deletes join rows; caller owns nothing.
+
+**mode='single':** pure controlled picker. Does NOT write to any table. `onChange(row|null)` fires on pick/clear — caller saves to DB. `onCreateNew()` fires on "+ Create new" — caller opens StackedFormModal and then calls onChange with the new row. `joinTable`/`parentIdField`/`parentId`/`linkedIdField` unused. Card with × clear button shown when value set; dashed trigger button always visible (label: "Change …" vs "+ Add …"). No consumers wired yet — TasksView.jsx wiring comes next session.
 
 **Forward mode** (TaskDetail Contacts section): add/remove/search/create. Error displayed inline (not silently in console). `allowCreate=true` + `createFields` + `onCreate` enables inline create-and-link.
 
@@ -228,7 +232,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `e56be02` — StackedFormModal shell (Stage 2 of Contact-creation redesign, no consumers wired yet)
+- preview: TBD after this commit — LinkField mode='single' (additive; multi untouched; no consumers wired yet)
 
 ---
 

@@ -47,12 +47,33 @@ const lfDelete = async (table, params) => {
 const resolve = (fn, row) => (typeof fn === 'function' ? fn(row) : (row?.[fn] ?? ''));
 
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// MODE SEMANTICS
+//   mode='multi' (default): self-persisting join-table mode. Requires joinTable,
+//     parentIdField, parentId, linkedIdField. Inserts/deletes join-table rows on
+//     every pick/clear; the caller does nothing extra.
+//
+//   mode='single': pure controlled picker — does NOT write to any table itself.
+//     The caller owns the FK column and all side effects. onChange(row|null) fires
+//     on every pick or clear; the caller saves to DB. onCreateNew() fires when the
+//     user clicks "+ Create new"; the caller opens its own modal (e.g.
+//     StackedFormModal) and then calls onChange with the newly-created row.
+//     joinTable/parentIdField/parentId/linkedIdField are unused in single mode.
+//
+// ─────────────────────────────────────────────────────────────────────────────
 export default function LinkField({
-  joinTable,
-  parentIdField,
-  parentId,
+  // mode — see comment above
+  mode = 'multi',   // 'multi' | 'single'
+  // single-mode props (ignored when mode='multi')
+  value = null,     // current FK id, or null
+  onChange,         // (row|null) => void — caller persists to DB
+  onCreateNew,      // () => void — caller opens its own creation flow
+  // shared props
+  joinTable,        // required in multi mode
+  parentIdField,    // required in multi mode
+  parentId,         // required in multi mode
   linkedTable,
-  linkedIdField,
+  linkedIdField,    // required in multi mode
   linkedFields = '*',
   searchFields = [],
   titleField,
@@ -77,6 +98,7 @@ export default function LinkField({
   const [createForm,   setCreateForm]   = useState({});
   const [creating,     setCreating]     = useState(false);
   const [error,        setError]        = useState('');
+  const [singleValue,  setSingleValue]  = useState(null); // single mode: resolved row
   const [isMobile,     setIsMobile]     = useState(
     () => typeof window !== 'undefined' && window.innerWidth < 640
   );
@@ -88,7 +110,16 @@ export default function LinkField({
     return () => window.removeEventListener('resize', h);
   }, []);
 
-  // ── Load linked records ────────────────────────────────────────────────────
+  // ── Single mode: resolve value → row ──────────────────────────────────────
+  useEffect(() => {
+    if (mode !== 'single') return;
+    if (!value || !linkedTable) { setSingleValue(null); return; }
+    lfFetch(linkedTable, `id=eq.${value}&select=${linkedFields}`)
+      .then(rows => setSingleValue(rows?.[0] || null))
+      .catch(() => setSingleValue(null));
+  }, [mode, value, linkedTable, linkedFields]);
+
+  // ── Load linked records (multi mode only) ─────────────────────────────────
   const loadLinked = useCallback(async () => {
     if (!parentId) { setLinked([]); return; }
     setLoadingLinks(true);
@@ -112,7 +143,10 @@ export default function LinkField({
     setLoadingLinks(false);
   }, [parentId, joinTable, parentIdField, linkedIdField, linkedTable, linkedFields]);
 
-  useEffect(() => { loadLinked(); }, [loadLinked]);
+  useEffect(() => {
+    if (mode === 'single') return;
+    loadLinked();
+  }, [loadLinked, mode]);
 
   // ── Search ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -122,7 +156,7 @@ export default function LinkField({
     }
     setSearching(true);
     const q         = encodeURIComponent(query.trim());
-    const linkedIds = linked.map(r => r.id);
+    const linkedIds = mode === 'single' ? (value ? [value] : []) : linked.map(r => r.id);
     const filter    = searchFields.length === 1
       ? `${searchFields[0]}.ilike.*${q}*`
       : `or=(${searchFields.map(f => `${f}.ilike.*${q}*`).join(',')})`;
@@ -269,7 +303,14 @@ export default function LinkField({
         return (
           <div
             key={row.id}
-            onClick={() => link(row)}
+            onClick={() => {
+              if (mode === 'single') {
+                onChange?.(row);
+                setSearchOpen(false); setQuery(''); setResults([]);
+              } else {
+                link(row);
+              }
+            }}
             style={{
               padding: '8px 10px', cursor: 'pointer',
               borderBottom: `0.5px solid ${T.border}`,
@@ -298,25 +339,38 @@ export default function LinkField({
         <div style={{ padding: '8px 10px', color: T.text3, fontSize: F.xs }}>No results found</div>
       )}
 
-      {!searching && query.trim().length > 0 && results.length === 0 && allowCreate && !createOpen && (
-        <div
-          onClick={() => {
-            const prefill = {};
-            if (createFields.length > 0) prefill[createFields[0]] = query;
-            setCreateOpen(true);
-            setCreateForm(prefill);
-          }}
-          style={{
-            padding: '8px 10px', cursor: 'pointer', color: T.accent,
-            fontSize: F.sm, minHeight: '44px', display: 'flex', alignItems: 'center', gap: '5px',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = T.bg2}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-          + Create new &ldquo;{query}&rdquo;
-        </div>
+      {!searching && query.trim().length > 0 && results.length === 0 && allowCreate && (
+        mode === 'single' ? (
+          <div
+            onClick={() => { onCreateNew?.(); setSearchOpen(false); setQuery(''); setResults([]); }}
+            style={{
+              padding: '8px 10px', cursor: 'pointer', color: T.accent,
+              fontSize: F.sm, minHeight: '44px', display: 'flex', alignItems: 'center', gap: '5px',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            + Create new {sectionLabel || (linkedTable ? linkedTable.replace(/_/g, ' ') : '')}
+          </div>
+        ) : !createOpen && (
+          <div
+            onClick={() => {
+              const prefill = {};
+              if (createFields.length > 0) prefill[createFields[0]] = query;
+              setCreateOpen(true);
+              setCreateForm(prefill);
+            }}
+            style={{
+              padding: '8px 10px', cursor: 'pointer', color: T.accent,
+              fontSize: F.sm, minHeight: '44px', display: 'flex', alignItems: 'center', gap: '5px',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            + Create new &ldquo;{query}&rdquo;
+          </div>
+        )
       )}
 
-      {createOpen && (
+      {mode !== 'single' && createOpen && (
         <div style={{ padding: '10px', borderTop: `0.5px solid ${T.border}` }}>
           {createFields.map(f => (
             <input
@@ -513,6 +567,87 @@ export default function LinkField({
           )}
 
           {readOnly && linked.length === 0 && (
+            <div style={{ fontSize: F.xs, color: T.text3, fontStyle: 'italic' }}>None</div>
+          )}
+        </>
+      )}
+
+      {/* ── SINGLE mode ───────────────────────────────────────────────────── */}
+      {mode === 'single' && (
+        <>
+          {singleValue && (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{
+                background: T.bg3, border: `0.5px solid ${T.border}`,
+                borderRadius: '6px', padding: '10px 12px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <UserCircle size={20} weight="bold" style={{ color: T.text2, flexShrink: 0, marginTop: '1px' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {titleHref?.(singleValue) ? (
+                      <a href={titleHref(singleValue)} target="_blank" rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          color: T.accent, fontSize: F.sm, fontWeight: '500',
+                          textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px',
+                        }}>
+                        {resolve(titleField, singleValue)}
+                        <span style={{ fontSize: '11px', color: T.text2, lineHeight: 1 }}>↗</span>
+                      </a>
+                    ) : (
+                      <span style={{ color: T.accent, fontSize: F.sm, fontWeight: '500' }}>{resolve(titleField, singleValue)}</span>
+                    )}
+                    {subtitleField && resolve(subtitleField, singleValue) && (
+                      <div style={{ fontSize: F.xs, color: T.text2, marginTop: '2px' }}>{resolve(subtitleField, singleValue)}</div>
+                    )}
+                  </div>
+                  {!readOnly && (
+                    <button
+                      onClick={() => onChange?.(null)}
+                      style={{
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        color: T.text2, fontSize: '14px', lineHeight: 1,
+                        padding: '2px 4px', borderRadius: '50%', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        minWidth: '22px', minHeight: '22px', flexShrink: 0,
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.color = T.danger}
+                      onMouseLeave={e => e.currentTarget.style.color = T.text2}
+                      title="Clear">×</button>
+                  )}
+                </div>
+                {metaField && resolve(metaField, singleValue) && (
+                  <div style={{ fontSize: '11px', color: T.text3, marginTop: '5px' }}>{resolve(metaField, singleValue)}</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ fontSize: F.xs, color: T.danger, marginBottom: '6px' }}>{error}</div>
+          )}
+
+          {!readOnly && (
+            <div ref={panelRef} style={{ position: 'relative', display: 'inline-block', width: isMobile ? '100%' : 'auto' }}>
+              {!searchOpen ? (
+                <button
+                  onClick={() => { setSearchOpen(true); setQuery(''); setError(''); }}
+                  style={{
+                    background: 'transparent', border: `1px dashed ${T.border}`,
+                    borderRadius: '20px', padding: '3px 12px', fontSize: F.sm,
+                    color: T.text2, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: '32px',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = T.accent}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
+                  {singleValue
+                    ? (sectionLabel ? `Change ${sectionLabel}` : 'Change')
+                    : (sectionLabel ? `+ Add ${sectionLabel}` : `+ Add ${linkedTable?.replace(/_/g, ' ') || ''}`)}
+                </button>
+              ) : renderPanel()}
+            </div>
+          )}
+
+          {readOnly && !singleValue && (
             <div style={{ fontSize: F.xs, color: T.text3, fontStyle: 'italic' }}>None</div>
           )}
         </>
