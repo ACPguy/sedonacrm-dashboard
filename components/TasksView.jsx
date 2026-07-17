@@ -1702,7 +1702,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               metaField={row=>`Contacts${row.category?' · '+row.category:''} · Added ${timeAgo(row.created_at)}`}
               sectionLabel="contact"
               allowCreate={true}
-              createFields={['full_name','company_dba','phone','email']}
+              createFields={['full_name','company_dba','primary_phone','email']}
               onCreate={async fields=>{const r=await sbPost('contacts',fields);return Array.isArray(r)?r[0]:r;}}
             />
           </div>

@@ -187,6 +187,10 @@ pages/api/pipeline/
 4. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
 5. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
 
+## Schema Notes — contacts RLS (permanent)
+
+`contacts` table anon INSERT policy added 2026-07-17: `"anon can insert contacts"` WITH CHECK (true). Required for LinkField `allowCreate` (create-and-link from TaskDetail Contacts section). Without it, the POST 400ed even with a correct request body.
+
 ## LinkField Architecture (permanent)
 
 `components/shared/LinkField.jsx` — canonical many-to-many relationship field. Config-driven, zero hardcoded table names. Piloted on Task ↔ Contacts via `task_contacts`.
@@ -222,7 +226,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `b0159af` — LinkField card variant + subtitleField; Task Contacts updated
+- preview: TBD after this commit — fix "Create new contact" 400 (wrong column + missing RLS)
 
 ---
 
