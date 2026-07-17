@@ -15,6 +15,7 @@ import {
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
 import LinkField from './shared/LinkField';
+import StackedFormModal from './shared/StackedFormModal';
 import { getTaskPrefix } from '../utils/taskPrefix';
 import { T } from '../lib/theme';
 
@@ -411,39 +412,6 @@ const FieldWithBadge = ({ label, link, children }) => (
     </div>
   </div>
 );
-
-// ── ContactFirstRow ───────────────────────────────────────────────────────────
-// Contact-first vendor/tenant linker for the Linked Companies section.
-// Pick the contact; company auto-fills from that contact's vendor_id/tenant_id
-// column. Both the contact picker and company display show a corner badge link.
-// onSave(contactId, companyId) — saves both fields atomically.
-const ContactFirstRow = ({ contactLabel, companyLabel, contactValue, companyValue, allContacts, companyName, companyLink, isMobile, onSave }) => {
-  const contactObj = allContacts.find(c => c.id === contactValue);
-  const contactLink = contactObj ? `/contacts/${contactObj.podio_id ?? 'X'+contactObj.id.slice(-6)}` : null;
-
-  const handleContactChange = async contactId => {
-    const contact = allContacts.find(c => c.id === contactId);
-    const companyId = contact ? (contact.vendor_id ?? contact.tenant_id ?? null) : null;
-    await onSave(contactId || null, companyId);
-  };
-
-  return (
-    <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-      <FieldWithBadge label={contactLabel} link={contactLink}>
-        <InlineSelect
-          value={contactValue}
-          options={allContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')})) }
-          onSave={handleContactChange}
-        />
-      </FieldWithBadge>
-      <FieldWithBadge label={companyLabel} link={companyLink}>
-        <div style={{fontSize:F.base,color:companyName?T.text1:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6',userSelect:'none'}}>
-          {companyName||'—'}
-        </div>
-      </FieldWithBadge>
-    </div>
-  );
-};
 
 // ── CompanyContactRow ─────────────────────────────────────────────────────────
 // Company-first contact linker — used by NewTaskForm's WO section.
@@ -1352,6 +1320,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [sysOpen,setSysOpen] = useState(false);
   const [woFinOpen,setWoFinOpen] = useState(false);
   const [woCloseOpen,setWoCloseOpen] = useState(false);
+  const [contactModalType,setContactModalType] = useState(null); // 'vendor' | 'tenant' | null
+  const [contactModalForm,setContactModalForm] = useState({});
+  const [contactModalSaving,setContactModalSaving] = useState(false);
+  const [contactModalError,setContactModalError] = useState('');
   const resizingRight = useRef(false);
 
   useEffect(()=>{
@@ -1447,6 +1419,42 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     onUpdate?.(updated);
   };
 
+  const handleContactChange=(type,row)=>{
+    const companyId=row?(row.vendor_id??row.tenant_id??null):null;
+    saveMany({[`${type}_contact_id`]:row?row.id:null,[`${type}_id`]:companyId});
+  };
+
+  const openContactModal=type=>{
+    setContactModalType(type);
+    setContactModalForm({full_name:'',company_dba:'',primary_phone:'',email:''});
+    setContactModalError('');
+  };
+
+  const handleContactModalSave=async()=>{
+    if(!contactModalForm.full_name?.trim()){setContactModalError('Name is required.');return;}
+    setContactModalSaving(true);
+    setContactModalError('');
+    try{
+      const isVendor=contactModalType==='vendor';
+      const payload={
+        full_name:contactModalForm.full_name,
+        company_dba:contactModalForm.company_dba||null,
+        primary_phone:contactModalForm.primary_phone||null,
+        email:contactModalForm.email||null,
+        category:isVendor?'Vendor':'Tenant',
+        vendor_id:isVendor?(data.vendor_id||null):null,
+        tenant_id:!isVendor?(data.tenant_id||null):null,
+      };
+      const r=await sbPost('contacts',payload);
+      const newRow=Array.isArray(r)?r[0]:r;
+      handleContactChange(contactModalType,newRow);
+      setContactModalType(null);
+    }catch(e){
+      setContactModalError('Could not create contact. '+(e?.message||''));
+    }finally{
+      setContactModalSaving(false);
+    }
+  };
 
   const handleStatusChange=async newStatus=>{
     const updates={status:newStatus};
@@ -1710,28 +1718,52 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           {/* 4 — LINKED COMPANIES */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
             <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Linked Companies</div>
-            <ContactFirstRow
-              contactLabel="Vendor Contact"
-              companyLabel="Vendor Company"
-              contactValue={data.vendor_contact_id}
-              companyValue={data.vendor_id}
-              allContacts={vendorContacts}
-              companyName={vendors.find(v=>v.id===data.vendor_id)?.company_dba||null}
-              companyLink={data.vendor_id?vendorLink(data.vendor_id):null}
-              isMobile={isMobile}
-              onSave={(cId,coId)=>saveMany({vendor_contact_id:cId,vendor_id:coId})}
-            />
-            <ContactFirstRow
-              contactLabel="Tenant Contact"
-              companyLabel="Tenant Company"
-              contactValue={data.tenant_contact_id}
-              companyValue={data.tenant_id}
-              allContacts={tenantContacts}
-              companyName={tenants.find(t=>t.id===data.tenant_id)?.tenant_dba||null}
-              companyLink={data.tenant_id?tenantLink(data.tenant_id):null}
-              isMobile={isMobile}
-              onSave={(cId,coId)=>saveMany({tenant_contact_id:cId,tenant_id:coId})}
-            />
+            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
+              <FieldWithBadge label="Vendor Contact" link={data.vendor_contact_id?`/contacts/${vendorContacts.find(c=>c.id===data.vendor_contact_id)?.podio_id??'X'+data.vendor_contact_id.slice(-6)}`:null}>
+                <LinkField
+                  mode="single"
+                  value={data.vendor_contact_id}
+                  onChange={row=>handleContactChange('vendor',row)}
+                  onCreateNew={()=>openContactModal('vendor')}
+                  linkedTable="contacts"
+                  linkedFields="id,full_name,company_dba,podio_id,vendor_id,tenant_id,primary_phone,email"
+                  searchFields={['full_name','company_dba']}
+                  titleField="full_name"
+                  titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
+                  subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+                  allowCreate={true}
+                  sectionLabel="contact"
+                />
+              </FieldWithBadge>
+              <FieldWithBadge label="Vendor Company" link={data.vendor_id?vendorLink(data.vendor_id):null}>
+                <div style={{fontSize:F.base,color:vendors.find(v=>v.id===data.vendor_id)?.company_dba?T.text1:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6',userSelect:'none'}}>
+                  {vendors.find(v=>v.id===data.vendor_id)?.company_dba||'—'}
+                </div>
+              </FieldWithBadge>
+            </div>
+            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
+              <FieldWithBadge label="Tenant Contact" link={data.tenant_contact_id?`/contacts/${tenantContacts.find(c=>c.id===data.tenant_contact_id)?.podio_id??'X'+data.tenant_contact_id.slice(-6)}`:null}>
+                <LinkField
+                  mode="single"
+                  value={data.tenant_contact_id}
+                  onChange={row=>handleContactChange('tenant',row)}
+                  onCreateNew={()=>openContactModal('tenant')}
+                  linkedTable="contacts"
+                  linkedFields="id,full_name,company_dba,podio_id,vendor_id,tenant_id,primary_phone,email"
+                  searchFields={['full_name','company_dba']}
+                  titleField="full_name"
+                  titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
+                  subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+                  allowCreate={true}
+                  sectionLabel="contact"
+                />
+              </FieldWithBadge>
+              <FieldWithBadge label="Tenant Company" link={data.tenant_id?tenantLink(data.tenant_id):null}>
+                <div style={{fontSize:F.base,color:tenants.find(t=>t.id===data.tenant_id)?.tenant_dba?T.text1:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6',userSelect:'none'}}>
+                  {tenants.find(t=>t.id===data.tenant_id)?.tenant_dba||'—'}
+                </div>
+              </FieldWithBadge>
+            </div>
           </div>
 
           {/* 4 — WORK ORDER DETAILS (WO only) */}
@@ -1937,6 +1969,49 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           style={{position:'fixed',bottom:'16px',right:'16px',zIndex:50,background:'#E8630A',color:'#fff',border:'none',borderRadius:'50%',width:'56px',height:'56px',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.4)'}}>
           <ChatCircle size={26} weight="fill" color="white"/>
         </button>
+      )}
+      {/* Create contact modal — opened from Linked Companies LinkField single mode */}
+      {contactModalType&&(
+        <StackedFormModal
+          title={`New ${contactModalType==='vendor'?'Vendor':'Tenant'} Contact`}
+          onClose={()=>!contactModalSaving&&setContactModalType(null)}
+          zIndex={310}
+          footer={
+            <div style={{display:'flex',justifyContent:'flex-end',gap:'8px'}}>
+              <button
+                onClick={()=>setContactModalType(null)}
+                disabled={contactModalSaving}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 12px',color:T.text1,fontSize:F.sm,cursor:'pointer',minHeight:'32px'}}>
+                Cancel
+              </button>
+              <button
+                onClick={handleContactModalSave}
+                disabled={contactModalSaving}
+                style={{background:'#E8630A',border:'none',borderRadius:'4px',padding:'5px 12px',color:'#fff',fontSize:F.sm,cursor:contactModalSaving?'wait':'pointer',minHeight:'32px'}}>
+                {contactModalSaving?'Saving…':'Save'}
+              </button>
+            </div>
+          }
+        >
+          {contactModalError&&<div style={{fontSize:F.xs,color:T.danger,marginBottom:'10px'}}>{contactModalError}</div>}
+          {[
+            {key:'full_name',label:'Name *',required:true},
+            {key:'company_dba',label:'Company'},
+            {key:'primary_phone',label:'Phone'},
+            {key:'email',label:'Email'},
+          ].map(({key,label})=>(
+            <div key={key} style={{marginBottom:'12px'}}>
+              <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',marginBottom:'4px'}}>{label}</div>
+              <input
+                type={key==='email'?'email':key==='primary_phone'?'tel':'text'}
+                value={contactModalForm[key]||''}
+                onChange={e=>setContactModalForm(p=>({...p,[key]:e.target.value}))}
+                onKeyDown={e=>{if(e.key==='Enter'&&key==='email')handleContactModalSave();}}
+                style={{display:'block',width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',minHeight:'36px'}}
+              />
+            </div>
+          ))}
+        </StackedFormModal>
       )}
     </div>
   );

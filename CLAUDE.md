@@ -182,12 +182,11 @@ pages/api/pipeline/
 
 ## Next Priorities
 
-1. **Wire LinkField mode='single' + StackedFormModal into TasksView.jsx** — Stage 3 of Contact-creation redesign: replace the Contacts section's allowCreate inline mini-form with single-mode picker + StackedFormModal create flow. onCreateNew opens the modal; modal's Save calls onChange with the new row.
-2. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
-3. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
-4. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
-5. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
-6. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
+1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
+2. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
+3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
+4. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
+5. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
 
 ## LinkField Architecture (permanent)
 
@@ -201,7 +200,7 @@ pages/api/pipeline/
 
 **mode='multi' (default):** self-persisting join-table mode. Inserts/deletes join rows; caller owns nothing.
 
-**mode='single':** pure controlled picker — no table writes. `onChange(row|null)` on pick/clear (caller persists). `onCreateNew()` on "+ Create new" (caller opens StackedFormModal then calls onChange). joinTable/parentId fields unused. Card + × clear shown when value set; dashed trigger always visible ("Change …" / "+ Add …"). Wiring into TasksView.jsx is next session (Priority #1).
+**mode='single':** pure controlled picker — no table writes. `onChange(row|null)` on pick/clear (caller persists). `onCreateNew()` on "+ Create new" (caller opens StackedFormModal then calls onChange). joinTable/parentId fields unused. Card + × clear shown when value set; dashed trigger always visible ("Change …" / "+ Add …"). First production consumer: TaskDetail Linked Companies card (Vendor Contact + Tenant Contact pickers).
 
 **Forward mode** (TaskDetail Contacts section): add/remove/search/create. Error displayed inline (not silently in console). `allowCreate=true` + `createFields` + `onCreate` enables inline create-and-link.
 
@@ -213,10 +212,10 @@ pages/api/pipeline/
 
 ## TaskDetail Architecture Notes (permanent)
 
-- **Details tab — 7 section cards (in order):** Core → Follow-Up → Contacts (LinkField, all types) → Linked Companies (ContactFirstRow, always visible) → Work Order Details (WO only; Financials + Closeout collapsed sub-panels) → Notes & Relationships → Documents → Dates. System Info collapsible block at end.
+- **Details tab — 7 section cards (in order):** Core → Follow-Up → Contacts (LinkField, all types) → Linked Companies (LinkField mode='single', always visible) → Work Order Details (WO only; Financials + Closeout collapsed sub-panels) → Notes & Relationships → Documents → Dates. System Info collapsible block at end.
 - **Category:** shown in Core for all record types EXCEPT `work_order` (WO has its own WO Category field in the WO Details card).
 - **Property field** in TaskDetail closed state: `CodeOnlySelect` component shows just prop_code; dropdown options show "code — name".
-- **Linked Companies:** uses `ContactFirstRow` — user picks Contact → company auto-fills from `vendor_id`/`tenant_id` FK on the contact row → both saved atomically via `saveMany`. Company is read-only display. `FieldWithBadge` (module scope) provides the ↗ corner-badge pattern for FK fields.
+- **Linked Companies:** uses `LinkField mode='single'` for both Vendor Contact and Tenant Contact. Picking a contact auto-fills the read-only Company box via `handleContactChange` (reads `vendor_id`/`tenant_id` FK from the contact row, saves both fields via `saveMany`). "+ Create new" opens `StackedFormModal` (zIndex 310) with a 4-field form (name/company/phone/email); on save, new contact row is created via `sbPost`, then wired through `handleContactChange`. Company display is still a read-only `<div>` — unchanged. `ContactFirstRow` was retired; `CompanyContactRow` kept for NewTaskForm WO section (company-first flow).
 - **`CompanyContactRow`** kept intact for NewTaskForm WO section (company-first flow).
 
 ## Current Git State
