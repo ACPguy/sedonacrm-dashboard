@@ -178,6 +178,7 @@ pages/api/pipeline/
 - **Inbox divider width persistence — NOT resolved, deprioritized.** Workaround: default width hardcoded to 570px. Pointer Events API fix (setPointerCapture) is live but persistence across hard refresh still unreliable in "release over address bar" scenario. If revisiting: re-instrument with console logging first — do NOT attempt blind fixes.
 - **New Inquiry agent (Agent 3)** — uses LEASING_KEYWORDS filter. Manual **+LSG** button in EmailInbox for ambiguous cases (source='manual_lsg'). `LSG_PROPERTIES` array hardcoded in EmailInbox.jsx with 14 active properties (OLY/WNT excluded per Scott). lead-capture.js allows null prop_code. Future: Claude-API classifier if +LSG usage exceeds ~10/day.
 - **leasing_pipeline working set** — 18 records (5 real + 13 'TEST — ' seeded) after 2026-07-11 reset. Delete all 'TEST — ' prefixed records before go-live. Stage filter: `stage=not.in.(Dead,On Hold,Landlord Declined Use)`; limit 5000.
+- **X-prefix lookup on large tables (contacts, issues)** — Supabase PostgREST has a hardcoded max-rows=1000; fetch-all-then-filter-client-side cannot work for tables >1000 rows. Fixed 2026-07-17 via Postgres RPC functions `find_contact_by_id_suffix(p_suffix text)` and `find_issue_by_id_suffix(p_suffix text)` (both granted to anon). If other tables ever grow past 1000 rows and need X-prefix lookup, add a matching RPC function rather than using the fetch-all pattern. Longer-term: consider an indexed short-id column to avoid RPC overhead.
 
 ## Next Priorities
 
@@ -226,7 +227,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `52e6e12` — fix X-prefix placeholder lookup in contacts/tenants/issues/properties detail routes
+- preview: TBD after this commit — fix X-prefix lookup for large tables via Postgres RPC
 
 ---
 

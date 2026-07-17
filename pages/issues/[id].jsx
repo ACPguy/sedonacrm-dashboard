@@ -20,9 +20,15 @@ export default function IssueDetailPage() {
       fetchPromise = sbFetch('issues', `select=*&id=eq.${id}`);
     } else if (id.startsWith('X')) {
       const suffix = id.slice(1);
-      fetchPromise = sbFetch('issues', 'select=*').then(rows =>
-        (rows || []).filter(i => i.id && i.id.slice(-6) === suffix)
-      );
+      fetchPromise = fetch('https://edxcvyleielzevpappui.supabase.co/rest/v1/rpc/find_issue_by_id_suffix', {
+        method: 'POST',
+        headers: {
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_suffix: suffix }),
+      }).then(r => r.json());
     } else {
       fetchPromise = sbFetch('issues', `select=*&podio_id=eq.${id}`);
     }
