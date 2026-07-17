@@ -15,10 +15,20 @@ export default function IssueDetailPage() {
     const { id } = router.query;
     if (!id) return;
     setLoading(true);
-    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
-    sbFetch('issues', `${filter}&select=*`)
+    let fetchPromise;
+    if (id.includes('-')) {
+      fetchPromise = sbFetch('issues', `select=*&id=eq.${id}`);
+    } else if (id.startsWith('X')) {
+      const suffix = id.slice(1);
+      fetchPromise = sbFetch('issues', 'select=*').then(rows =>
+        (rows || []).filter(i => i.id && i.id.slice(-6) === suffix)
+      );
+    } else {
+      fetchPromise = sbFetch('issues', `select=*&podio_id=eq.${id}`);
+    }
+    fetchPromise
       .then(data => {
-        if (data.length === 0) { setError('Issue not found'); setLoading(false); return; }
+        if (!Array.isArray(data) || data.length === 0) { setError('Issue not found'); setLoading(false); return; }
         setIssue(data[0]);
         setLoading(false);
       })

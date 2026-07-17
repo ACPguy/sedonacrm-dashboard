@@ -16,8 +16,18 @@ export default function ContactDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
-    sbFetch('contacts', `select=*&${filter}`)
+    let fetchPromise;
+    if (id.includes('-')) {
+      fetchPromise = sbFetch('contacts', `select=*&id=eq.${id}`);
+    } else if (id.startsWith('X')) {
+      const suffix = id.slice(1);
+      fetchPromise = sbFetch('contacts', 'select=*').then(rows =>
+        (rows || []).filter(c => c.id && c.id.slice(-6) === suffix)
+      );
+    } else {
+      fetchPromise = sbFetch('contacts', `select=*&podio_id=eq.${id}`);
+    }
+    fetchPromise
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Contact not found');
