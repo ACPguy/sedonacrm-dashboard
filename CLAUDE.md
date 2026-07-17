@@ -222,7 +222,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: TBD after this session-close commit — see Rule 16
+- preview: `e042541` — session close 2026-07-17 (bug fixes, StackedFormModal shell, LinkField mode='single')
 
 ---
 
