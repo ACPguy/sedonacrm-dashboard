@@ -422,7 +422,7 @@ export default function LinkField({
       )}
 
       {/* ── CARD variant ──────────────────────────────────────────────────── */}
-      {!loadingLinks && variant === 'card' && (
+      {!loadingLinks && variant === 'card' && mode !== 'single' && (
         <>
           {linked.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
@@ -498,7 +498,7 @@ export default function LinkField({
       )}
 
       {/* ── CHIP variant ──────────────────────────────────────────────────── */}
-      {!loadingLinks && variant === 'chip' && (
+      {!loadingLinks && variant === 'chip' && mode !== 'single' && (
         <>
           <div style={{
             display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center',

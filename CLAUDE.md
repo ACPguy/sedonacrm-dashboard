@@ -133,24 +133,13 @@ pages/
   home.jsx               — renders <SedonaCRM /> at clean /home URL (HomeView by default)
 
 pages/api/agents/
-  morning-briefing.js  — GET today's briefing; cron/POST runs 14 parallel queries, saves to briefings table
-  lease-watch.js       — GET active drafts; cron/POST iterates tenants, calls Claude API, saves drafts
-  new-inquiry.js       — GET active drafts; cron/POST keyword filter → Claude draft → pipeline insert → thread link; dismiss action
-  work-order-agent.js  — GET today's wo_agent_runs row; cron/POST nudges (past-due + no-activity) + high-cost flags (≥$2,500)
+  morning-briefing.js, lease-watch.js, new-inquiry.js, work-order-agent.js
 
 pages/api/gmail/
-  renew-watch.js      — POST/GET renews Gmail Pub/Sub watch; cron every 6 days
-  webhook.js          — processes Pub/Sub push notifications, syncs email_threads + email_messages
-  sync-now.js         — POST syncs Gmail history + polls INBOX; GET returns current state
-  batch-action.js     — POST { threadIds, action: archive|spam|delete } — calls Gmail API + updates Supabase; auth: x-briefing-secret
+  renew-watch.js, webhook.js, sync-now.js, batch-action.js
 
 pages/api/pipeline/
-  lead-capture.js       — POST: create leasing_pipeline at New Inquiry (inbound lead)
-  transition.js         — POST: advance/exit stage; handles NA-skip for stage_5_state/stage_7_state
-  submit-application.js — POST: write lease_applications row + link via pipeline_id FK
-  loi-draft.js          — POST: Claude API LOI draft (draft only, no auto-send)
-  movein-clearance.js   — GET: check 5 clearance gates (lease signed, invoices, COI, blocking WOs)
-  notice-to-vacate.js   — POST: set suite "Vacant / For Lease — Pending" + auto-create notice_triggered pipeline record
+  lead-capture.js, transition.js, submit-application.js, loi-draft.js, movein-clearance.js, notice-to-vacate.js
 ```
 
 ## Phase Status
@@ -176,7 +165,7 @@ pages/api/pipeline/
 
 - **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
-- **Inbox divider width persistence — NOT resolved, deprioritized.** Workaround: default width hardcoded to 570px. Pointer Events API fix (setPointerCapture) is live but persistence across hard refresh still unreliable in "release over address bar" scenario. If revisiting: re-instrument with console logging first — do NOT attempt blind fixes.
+- **Inbox divider width persistence — NOT resolved, deprioritized.** Default width hardcoded to 570px. setPointerCapture fix is live but persistence still unreliable on hard refresh. If revisiting: re-instrument with console logging first — do NOT attempt blind fixes.
 - **New Inquiry agent (Agent 3)** — uses LEASING_KEYWORDS filter. Manual **+LSG** button in EmailInbox for ambiguous cases (source='manual_lsg'). `LSG_PROPERTIES` array hardcoded in EmailInbox.jsx with 14 active properties (OLY/WNT excluded per Scott). lead-capture.js allows null prop_code. Future: Claude-API classifier if +LSG usage exceeds ~10/day.
 - **leasing_pipeline working set** — 18 records (5 real + 13 'TEST — ' seeded) after 2026-07-11 reset. Delete all 'TEST — ' prefixed records before go-live. Stage filter: `stage=not.in.(Dead,On Hold,Landlord Declined Use)`; limit 5000.
 
@@ -202,9 +191,9 @@ pages/api/pipeline/
 
 **mode='single':** pure controlled picker — no table writes. `onChange(row|null)` on pick/clear (caller persists). `onCreateNew()` on "+ Create new" (caller opens StackedFormModal then calls onChange). joinTable/parentId fields unused. Card + × clear shown when value set; dashed trigger always visible ("Change …" / "+ Add …"). First production consumer: TaskDetail Linked Companies card (Vendor Contact + Tenant Contact pickers).
 
-**Forward mode** (TaskDetail Contacts section): add/remove/search/create. Error displayed inline (not silently in console). `allowCreate=true` + `createFields` + `onCreate` enables inline create-and-link.
+**⚠️ Rendering guard rule:** The `variant='card'` and `variant='chip'` render blocks MUST include `mode !== 'single'` in their condition. The dedicated `{mode === 'single' && (...)}` block handles single mode entirely on its own. Without the guard, both the card/chip block AND the single block mount simultaneously, sharing `panelRef` and `searchOpen` state — panelRef.current gets overwritten by whichever div renders last, breaking the outside-click listener (it fires before onClick, swallowing the pick). Caught in production 2026-07-18 when mode='single' was first wired into TaskDetail. Correct conditions: `{!loadingLinks && variant === 'card' && mode !== 'single' && (` and `{!loadingLinks && variant === 'chip' && mode !== 'single' && (`.
 
-**Reverse/read-only mode** (ContactDetail Linked Tasks section): same join table queried from the other direction; no add/create UI; renders as cards.
+**Forward mode** (TaskDetail Contacts, allowCreate=true): add/remove/search/create inline. **Reverse/read-only** (ContactDetail Linked Tasks): same join table, opposite direction; no add/create UI.
 
 **To add another relationship:** drop in `<LinkField .../>` with the correct props — no new state/effects/functions needed in the parent view.
 
@@ -221,7 +210,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `190d219` — Contact-creation redesign Stage 3: ContactFirstRow retired, LinkField mode='single' + StackedFormModal wired into TaskDetail Linked Companies
+- preview: `(pending — will update after push)`
 
 ---
 
@@ -362,10 +351,9 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `briefings`: run_date (UNIQUE), status, urgent/attention/fyi/snapshot (jsonb)
 - `lease_watch_drafts`: tenant_id + milestone (UNIQUE pair), subject, body, status
 - `inquiry_drafts`: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status
-- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ✅ migration run 2026-07-09, table + RLS live
-- `email_threads`: added `is_deleted boolean DEFAULT false` (2026-07-07) — set by batch-action delete action
-- `email_threads`: added `last_sender_name text`, `last_sender_address text`, `has_attachment boolean DEFAULT false` (2026-07-07) — populated by webhook.js + sync-now.js on every new message; old threads show null/false until re-synced
-- `email_messages`: added `has_attachment boolean DEFAULT false` (2026-07-07)
+- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — table + RLS live
+- `email_threads`: `is_deleted boolean DEFAULT false` (batch-action delete); `last_sender_name`, `last_sender_address`, `has_attachment boolean DEFAULT false` (populated by webhook + sync-now; old threads null/false until re-synced)
+- `email_messages`: `has_attachment boolean DEFAULT false`
 - **Phase 5 Stage 1 — 2026-07-11:** `leasing_pipeline` +30 cols (stage_5/7_state, pipeline_source, LOI negotiation fields, qual fields, broker fields, on_hold/dead fields). `suites` status CHECK +6th value `'Vacant / For Lease — Pending'`. `key_handovers` NEW table (employee/admin RLS only). `lease_applications` NEW table 106-col (employee/admin RLS only — contains SSN/financial data). `leasing_pipeline.stage` migrated from Podio values to 13-value model; original in `stage_raw_podio`; CHECK constraint added.
 - **`task_contacts` RLS (confirmed 2026-07-16):** Anon key has SELECT (already listed above) + INSERT + DELETE. Intentional — CRM is internal; LinkField uses anon key client-side for link/unlink. If tightening needed, add service-role API routes.
 - **`contacts` anon INSERT policy (2026-07-17):** `"anon can insert contacts"` WITH CHECK (true). Required for LinkField `allowCreate` (create-and-link from TaskDetail). Without it, the create POST 400s.
