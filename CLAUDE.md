@@ -221,7 +221,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `e042541` — session close 2026-07-17 (bug fixes, StackedFormModal shell, LinkField mode='single')
+- preview: `190d219` — Contact-creation redesign Stage 3: ContactFirstRow retired, LinkField mode='single' + StackedFormModal wired into TaskDetail Linked Companies
 
 ---
 
