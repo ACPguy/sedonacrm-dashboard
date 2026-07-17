@@ -179,19 +179,15 @@ pages/api/pipeline/
 - **Inbox divider width persistence — NOT resolved, deprioritized.** Workaround: default width hardcoded to 570px. Pointer Events API fix (setPointerCapture) is live but persistence across hard refresh still unreliable in "release over address bar" scenario. If revisiting: re-instrument with console logging first — do NOT attempt blind fixes.
 - **New Inquiry agent (Agent 3)** — uses LEASING_KEYWORDS filter. Manual **+LSG** button in EmailInbox for ambiguous cases (source='manual_lsg'). `LSG_PROPERTIES` array hardcoded in EmailInbox.jsx with 14 active properties (OLY/WNT excluded per Scott). lead-capture.js allows null prop_code. Future: Claude-API classifier if +LSG usage exceeds ~10/day.
 - **leasing_pipeline working set** — 18 records (5 real + 13 'TEST — ' seeded) after 2026-07-11 reset. Delete all 'TEST — ' prefixed records before go-live. Stage filter: `stage=not.in.(Dead,On Hold,Landlord Declined Use)`; limit 5000.
-- **X-prefix lookup on large tables (contacts, issues)** — Supabase PostgREST has a hardcoded max-rows=1000; fetch-all-then-filter-client-side cannot work for tables >1000 rows. Fixed 2026-07-17 via Postgres RPC functions `find_contact_by_id_suffix(p_suffix text)` and `find_issue_by_id_suffix(p_suffix text)` (both granted to anon). If other tables ever grow past 1000 rows and need X-prefix lookup, add a matching RPC function rather than using the fetch-all pattern. Longer-term: consider an indexed short-id column to avoid RPC overhead.
 
 ## Next Priorities
 
-1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
-2. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
-3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
-4. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
-5. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
-
-## Schema Notes — contacts RLS (permanent)
-
-`contacts` table anon INSERT policy added 2026-07-17: `"anon can insert contacts"` WITH CHECK (true). Required for LinkField `allowCreate` (create-and-link from TaskDetail Contacts section). Without it, the POST 400ed even with a correct request body.
+1. **Wire LinkField mode='single' + StackedFormModal into TasksView.jsx** — Stage 3 of Contact-creation redesign: replace the Contacts section's allowCreate inline mini-form with single-mode picker + StackedFormModal create flow. onCreateNew opens the modal; modal's Save calls onChange with the new row.
+2. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
+3. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
+4. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
+5. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
+6. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
 
 ## LinkField Architecture (permanent)
 
@@ -205,7 +201,7 @@ pages/api/pipeline/
 
 **mode='multi' (default):** self-persisting join-table mode. Inserts/deletes join rows; caller owns nothing.
 
-**mode='single':** pure controlled picker. Does NOT write to any table. `onChange(row|null)` fires on pick/clear — caller saves to DB. `onCreateNew()` fires on "+ Create new" — caller opens StackedFormModal and then calls onChange with the new row. `joinTable`/`parentIdField`/`parentId`/`linkedIdField` unused. Card with × clear button shown when value set; dashed trigger button always visible (label: "Change …" vs "+ Add …"). No consumers wired yet — TasksView.jsx wiring comes next session.
+**mode='single':** pure controlled picker — no table writes. `onChange(row|null)` on pick/clear (caller persists). `onCreateNew()` on "+ Create new" (caller opens StackedFormModal then calls onChange). joinTable/parentId fields unused. Card + × clear shown when value set; dashed trigger always visible ("Change …" / "+ Add …"). Wiring into TasksView.jsx is next session (Priority #1).
 
 **Forward mode** (TaskDetail Contacts section): add/remove/search/create. Error displayed inline (not silently in console). `allowCreate=true` + `createFields` + `onCreate` enables inline create-and-link.
 
@@ -222,17 +218,11 @@ pages/api/pipeline/
 - **Property field** in TaskDetail closed state: `CodeOnlySelect` component shows just prop_code; dropdown options show "code — name".
 - **Linked Companies:** uses `ContactFirstRow` — user picks Contact → company auto-fills from `vendor_id`/`tenant_id` FK on the contact row → both saved atomically via `saveMany`. Company is read-only display. `FieldWithBadge` (module scope) provides the ↗ corner-badge pattern for FK fields.
 - **`CompanyContactRow`** kept intact for NewTaskForm WO section (company-first flow).
-- **Copy Link removed** from all 7 detail views (TasksView, IssuesView, WorkOrdersView, ContactsView, OwnersView, VendorsView, KeySafesView) — URL bar is sufficient.
-- **Note record type** removed (zero rows ever existed).
-
-## Schema Notes — leasing_pipeline FK gap (permanent)
-
-`leasing_pipeline` has NO FK to `properties`. It links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline queries. Always query properties separately by prop_code when needed.
 
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `5f69981` — LinkField mode='single' additive (multi untouched; no consumers wired yet)
+- preview: TBD after this session-close commit — see Rule 16
 
 ---
 
@@ -378,30 +368,22 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `email_threads`: added `last_sender_name text`, `last_sender_address text`, `has_attachment boolean DEFAULT false` (2026-07-07) — populated by webhook.js + sync-now.js on every new message; old threads show null/false until re-synced
 - `email_messages`: added `has_attachment boolean DEFAULT false` (2026-07-07)
 - **Phase 5 Stage 1 — 2026-07-11:** `leasing_pipeline` +30 cols (stage_5/7_state, pipeline_source, LOI negotiation fields, qual fields, broker fields, on_hold/dead fields). `suites` status CHECK +6th value `'Vacant / For Lease — Pending'`. `key_handovers` NEW table (employee/admin RLS only). `lease_applications` NEW table 106-col (employee/admin RLS only — contains SSN/financial data). `leasing_pipeline.stage` migrated from Podio values to 13-value model; original in `stage_raw_podio`; CHECK constraint added.
-- **`task_contacts` RLS (confirmed 2026-07-16):** Anon key has SELECT (already listed above) + INSERT + DELETE. This is intentional — the CRM is an internal tool and LinkField uses the anon key client-side for link/unlink operations. If access scope ever needs tightening, add service-role API routes instead.
+- **`task_contacts` RLS (confirmed 2026-07-16):** Anon key has SELECT (already listed above) + INSERT + DELETE. Intentional — CRM is internal; LinkField uses anon key client-side for link/unlink. If tightening needed, add service-role API routes.
+- **`contacts` anon INSERT policy (2026-07-17):** `"anon can insert contacts"` WITH CHECK (true). Required for LinkField `allowCreate` (create-and-link from TaskDetail). Without it, the create POST 400s.
+- **`leasing_pipeline` has NO FK to `properties`** — links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline. Query properties separately by prop_code.
+- **Postgres RPC suffix-lookup functions (2026-07-17):** `find_contact_by_id_suffix(p_suffix text)` and `find_issue_by_id_suffix(p_suffix text)` — both SECURITY INVOKER, granted to anon. Used by X-prefix detail-page lookup for tables >1000 rows (Supabase max-rows=1000 cap prevents fetch-all). Add similar functions for any other large table needing X-prefix lookup.
 
 ## Drive Folder Architecture (permanent)
 
 - Trigger: auto-created on task save (fire-and-forget) for ALL record types; also manual `+ Drive Folder` button in WO header
 - Structure: `[Property Root]/Work History/[YYYY-MM-DD] — [displayId] — [title]/`
 - Hardcoded in `lib/drivePropertyFolders.js` (14 active properties; S&G folder ID pending)
-- Index PDF upload silently failing (pdf-lib issue) — independent of folder creation
 
 ## Embedded TasksView Architecture (permanent)
 
-All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills filterXxx={...}/>`:
-| Context | Props |
-|---|---|
-| Property detail (SedonaCRM.jsx) | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
-| Owner detail (OwnersView.jsx) | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
-| Tenant detail (TenantsView.jsx) | `filterTenantId={data.id} hidePropertyPills embeddedMode` |
-| Vendor detail (VendorsView.jsx) | `filterVendorId={data.id} hidePropertyPills embeddedMode` |
-| Contact detail (ContactsView.jsx) | `filterContactId={data.id} hidePropertyPills embeddedMode` |
+All 5 contexts use `<TasksView embeddedMode hidePropertyPills filterXxx={...}/>`:
+Property/Owner → `filterPropCode={data.prop_code}` | Tenant → `filterTenantId={data.id}` | Vendor → `filterVendorId={data.id}` | Contact → `filterContactId={data.id}`
 
-## Valid prop_codes (48 total, 14 active)
+## Valid prop_codes
 
-```
-1McC, 777, ACP, ART, ARVS, ATS, CDY, CHQ, COB, CPP, CR1, CRMS, CVP, DCC, DCM, DCP,
-DEM, DON, FOX, KOD, KTA, LAP, LASO, LEEN, LPP, MILL, MYN, OLY, OMP, PLZ, PW213, PWP,
-RHS, RR, SAC, SEP, SS, SSB, STP, SUNT, SWV, SYC, VDN, VVP, WAL, WNT, WSP, YAV
-```
+48 total (14 active). Full list: `drivePropertyFolders.js` and Supabase `properties` table.
