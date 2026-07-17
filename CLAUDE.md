@@ -232,7 +232,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: TBD after this commit — LinkField mode='single' (additive; multi untouched; no consumers wired yet)
+- preview: `5f69981` — LinkField mode='single' additive (multi untouched; no consumers wired yet)
 
 ---
 
