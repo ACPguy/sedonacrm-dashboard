@@ -1436,13 +1436,34 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     setContactModalError('');
     try{
       const isVendor=contactModalType==='vendor';
+      // Vendor-side: resolve or auto-create a vendor row when a company name was typed.
+      // Tenant-side intentionally excluded — new tenants must go through the leasing pipeline,
+      // not be created ad hoc from a task detail page.
+      let vendorId=isVendor?(data.vendor_id||null):null;
+      if(isVendor&&contactModalForm.company_dba?.trim()){
+        const trimmedName=contactModalForm.company_dba.trim();
+        try{
+          const existing=await sbFetch('vendors',`company_dba=ilike.${encodeURIComponent(trimmedName)}&select=id,company_dba,podio_id&limit=1`);
+          if(existing&&existing.length>0){
+            vendorId=existing[0].id;
+          }else{
+            const created=await sbPost('vendors',{company_dba:trimmedName,vendor_status:'Active'});
+            const newVendorRow=Array.isArray(created)?created[0]:created;
+            vendorId=newVendorRow.id;
+            setVendors(prev=>[...prev,newVendorRow]);
+          }
+        }catch(e){
+          setContactModalError('Could not create/find vendor company. '+(e?.message||''));
+          return;
+        }
+      }
       const payload={
         full_name:contactModalForm.full_name,
         company_dba:contactModalForm.company_dba||null,
         primary_phone:contactModalForm.primary_phone||null,
         email:contactModalForm.email||null,
         category:isVendor?'Vendor':'Tenant',
-        vendor_id:isVendor?(data.vendor_id||null):null,
+        vendor_id:vendorId,
         tenant_id:!isVendor?(data.tenant_id||null):null,
       };
       const r=await sbPost('contacts',payload);
