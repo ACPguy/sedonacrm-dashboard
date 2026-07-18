@@ -208,7 +208,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `(pending — will update after push)`
+- preview: `ae2e934` — fix: tasks RLS (anon_update_tasks added), sbPatch empty-array guard, save/saveMany error surface, duplicate badge, result-row click priority
 
 ---
 
