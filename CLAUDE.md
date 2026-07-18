@@ -146,11 +146,7 @@ pages/api/pipeline/
 
 - **Phases 0–3:** Complete
 - **Phase 4:** Complete except Agent 9. All agents, BriefingView, EmailInbox, Drive folders, Home URL canonical route, cron auth — all done.
-- **Phase 5:** IN PROGRESS
-  - Stage 1 — DB Schema: Complete (2026-07-11)
-  - Stage 2 — Pipeline API routes: Complete (2026-07-11)
-  - Stage 4 (part 1) — PipelineView.jsx: Complete (2026-07-11); list+board view, dual nav, /pipeline route, mobile responsive, .crm-mobile-only CSS added
-  - Stage 3 (Dropbox Sign) + Stage 4 parts 2–3 (detail panel, prop embed): Pending
+- **Phase 5:** IN PROGRESS — Stages 1 (DB), 2 (API routes), 4-part-1 (PipelineView list+board) complete. Stage 3 (Dropbox Sign) + Stage 4 parts 2–3 (detail panel, prop embed) pending.
 
 ## Agents Env Vars (Vercel) — all set ✅
 
@@ -163,7 +159,7 @@ pages/api/pipeline/
 
 ## Known Gaps
 
-- **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
+- **CRITICAL — Podio migration status:** All Supabase data is placeholder/xlsx-import only. Podio is the live system of record. Two-stage sync planned: (1) parallel test sync, (2) final cutover + go-live. Never treat xlsx-imported data as production-ready; never suggest CRM is ready to cut over until the final Podio API sync is verified complete.
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
 - **Inbox divider width persistence — NOT resolved, deprioritized.** Default width hardcoded to 570px. setPointerCapture fix is live but persistence still unreliable on hard refresh. If revisiting: re-instrument with console logging first — do NOT attempt blind fixes.
 - **New Inquiry agent (Agent 3)** — uses LEASING_KEYWORDS filter. Manual **+LSG** button in EmailInbox for ambiguous cases (source='manual_lsg'). `LSG_PROPERTIES` array hardcoded in EmailInbox.jsx with 14 active properties (OLY/WNT excluded per Scott). lead-capture.js allows null prop_code. Future: Claude-API classifier if +LSG usage exceeds ~10/day.
@@ -191,13 +187,15 @@ pages/api/pipeline/
 
 **mode='single':** pure controlled picker — no table writes. `onChange(row|null)` on pick/clear (caller persists). `onCreateNew()` on "+ Create new" (caller opens StackedFormModal then calls onChange). joinTable/parentId fields unused. Card + × clear shown when value set; dashed trigger always visible ("Change …" / "+ Add …"). First production consumer: TaskDetail Linked Companies card (Vendor Contact + Tenant Contact pickers).
 
-**⚠️ Rendering guard rule:** The `variant='card'` and `variant='chip'` render blocks MUST include `mode !== 'single'` in their condition. The dedicated `{mode === 'single' && (...)}` block handles single mode entirely on its own. Without the guard, both the card/chip block AND the single block mount simultaneously, sharing `panelRef` and `searchOpen` state — panelRef.current gets overwritten by whichever div renders last, breaking the outside-click listener (it fires before onClick, swallowing the pick). Caught in production 2026-07-18 when mode='single' was first wired into TaskDetail. Correct conditions: `{!loadingLinks && variant === 'card' && mode !== 'single' && (` and `{!loadingLinks && variant === 'chip' && mode !== 'single' && (`.
+**⚠️ Rendering guard rule:** `variant='card'` and `variant='chip'` blocks MUST include `mode !== 'single'`. Without it, both blocks mount alongside the dedicated `{mode === 'single' && (...)}` block, sharing `panelRef`/`searchOpen` — panelRef.current gets overwritten, breaking the outside-click listener (fires before onClick, swallowing picks). Correct: `{!loadingLinks && variant === 'card' && mode !== 'single' && (` / `{!loadingLinks && variant === 'chip' && mode !== 'single' && (`.
 
 **Forward mode** (TaskDetail Contacts, allowCreate=true): add/remove/search/create inline. **Reverse/read-only** (ContactDetail Linked Tasks): same join table, opposite direction; no add/create UI.
 
 **To add another relationship:** drop in `<LinkField .../>` with the correct props — no new state/effects/functions needed in the parent view.
 
 **External link icon:** uses ↗ character inline (~11px), consistent with FieldWithBadge pattern. No circular badge.
+
+**Search result row click priority:** In `renderPanel()` (shared by all card/chip/single call sites), the result row's outer `div onClick` is the primary "select/link this" action. The contact name is rendered as a plain colored `<span>` — NOT an anchor — so clicking it selects the result. A small secondary `↗` anchor after the name (with `onClick stopPropagation`) opens the record in a new tab without triggering the row's select. Do NOT regress this to the old pattern where the name was the anchor — that made clicking the most prominent element open a new tab instead of linking.
 
 ## TaskDetail Architecture Notes (permanent)
 
@@ -210,7 +208,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `dbd19b0` — feat: Vendor Contact modal auto-creates/matches vendor company; anon INSERT added to vendors
+- preview: `(pending — will update after push)`
 
 ---
 
@@ -358,6 +356,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - **`task_contacts` RLS (confirmed 2026-07-16):** Anon key has SELECT (already listed above) + INSERT + DELETE. Intentional — CRM is internal; LinkField uses anon key client-side for link/unlink. If tightening needed, add service-role API routes.
 - **`contacts` anon INSERT policy (2026-07-17):** `"anon can insert contacts"` WITH CHECK (true). Required for LinkField `allowCreate` (create-and-link from TaskDetail). Without it, the create POST 400s.
 - **`vendors` anon INSERT policy (2026-07-18):** `"anon can insert vendors"` WITH CHECK (true). Required for Vendor Contact modal auto-create-company in `handleContactModalSave`. Previously anon had SELECT only.
+- **`tasks` anon UPDATE policy (2026-07-18):** `"anon_update_tasks"` USING (true) WITH CHECK (true). **Critical — was missing, causing ALL task field saves (every InlineBlurField, saveMany, etc.) to silently return 200 + empty array without touching any row.** Root cause: only `authenticated` roles had UPDATE. `sbPatch` now also throws explicitly if response array is empty, so this class of failure is no longer silent. `save` and `saveMany` in TaskDetail now catch errors and surface them via a visible banner below the tab bar. Future direct-write helpers must follow the same "throw if 0 rows" convention.
 - **`leasing_pipeline` has NO FK to `properties`** — links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline. Query properties separately by prop_code.
 - **Postgres RPC suffix-lookup functions (2026-07-17):** `find_contact_by_id_suffix(p_suffix text)` and `find_issue_by_id_suffix(p_suffix text)` — both SECURITY INVOKER, granted to anon. Used by X-prefix detail-page lookup for tables >1000 rows (Supabase max-rows=1000 cap prevents fetch-all). Add similar functions for any other large table needing X-prefix lookup.
 

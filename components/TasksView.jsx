@@ -40,7 +40,11 @@ export const sbPatch = async (table, id, updates) => {
     body: JSON.stringify(updates),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.json();
+  const rows = await res.json();
+  // PostgREST returns 200 + empty array when RLS filters out the row — treat as an error
+  // so callers never silently swallow a write that didn't actually land.
+  if (Array.isArray(rows) && rows.length === 0) throw new Error('Update matched 0 rows — check RLS or that the record still exists');
+  return rows;
 };
 
 // Paginates through all rows 1000 at a time (Supabase anon cap = 1000/request).
@@ -1324,6 +1328,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [contactModalForm,setContactModalForm] = useState({});
   const [contactModalSaving,setContactModalSaving] = useState(false);
   const [contactModalError,setContactModalError] = useState('');
+  const [saveError,setSaveError] = useState(null);
   const resizingRight = useRef(false);
 
   useEffect(()=>{
@@ -1405,23 +1410,34 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
 
   const save=async(field,val)=>{
     const updates={[field]:val??null};
-    await sbPatch('tasks',data.id,updates);
-    const updated={...data,...updates};
-    setData(updated);
-    onUpdate?.(updated);
+    try{
+      await sbPatch('tasks',data.id,updates);
+      const updated={...data,...updates};
+      setData(updated);
+      onUpdate?.(updated);
+      setSaveError(null);
+    }catch(e){
+      setSaveError(e.message);
+      throw e; // re-throw so InlineBlurField can revert the displayed value
+    }
   };
 
   const saveMany=async updates=>{
     const patched=Object.fromEntries(Object.entries(updates).map(([k,v])=>[k,v??null]));
-    await sbPatch('tasks',data.id,patched);
-    const updated={...data,...patched};
-    setData(updated);
-    onUpdate?.(updated);
+    try{
+      await sbPatch('tasks',data.id,patched);
+      const updated={...data,...patched};
+      setData(updated);
+      onUpdate?.(updated);
+      setSaveError(null);
+    }catch(e){
+      setSaveError(e.message);
+    }
   };
 
-  const handleContactChange=(type,row)=>{
+  const handleContactChange=async(type,row)=>{
     const companyId=row?(row.vendor_id??row.tenant_id??null):null;
-    saveMany({[`${type}_contact_id`]:row?row.id:null,[`${type}_id`]:companyId});
+    await saveMany({[`${type}_contact_id`]:row?row.id:null,[`${type}_id`]:companyId});
   };
 
   const openContactModal=type=>{
@@ -1468,7 +1484,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
       };
       const r=await sbPost('contacts',payload);
       const newRow=Array.isArray(r)?r[0]:r;
-      handleContactChange(contactModalType,newRow);
+      await handleContactChange(contactModalType,newRow);
       setContactModalType(null);
     }catch(e){
       setContactModalError('Could not create contact. '+(e?.message||''));
@@ -1658,6 +1674,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             </button>
           ))}
         </div>
+        {saveError&&<div style={{padding:'6px 16px',background:'rgba(220,38,38,0.1)',borderBottom:`0.5px solid ${T.danger}`,fontSize:F.xs,color:T.danger,flexShrink:0}}>{saveError}</div>}
         {/* Content row */}
         <div style={{display:'flex',flex:1,overflow:'hidden'}}>
           {detailTab!=='comms'&&<div style={{flex:1,overflowY:'auto',minWidth:0}}>
@@ -1740,7 +1757,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
             <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Linked Companies</div>
             <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-              <FieldWithBadge label="Vendor Contact" link={data.vendor_contact_id?`/contacts/${vendorContacts.find(c=>c.id===data.vendor_contact_id)?.podio_id??'X'+data.vendor_contact_id.slice(-6)}`:null}>
+              <FieldWithBadge label="Vendor Contact" link={null}>
                 <LinkField
                   mode="single"
                   value={data.vendor_contact_id}
@@ -1763,7 +1780,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               </FieldWithBadge>
             </div>
             <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-              <FieldWithBadge label="Tenant Contact" link={data.tenant_contact_id?`/contacts/${tenantContacts.find(c=>c.id===data.tenant_contact_id)?.podio_id??'X'+data.tenant_contact_id.slice(-6)}`:null}>
+              <FieldWithBadge label="Tenant Contact" link={null}>
                 <LinkField
                   mode="single"
                   value={data.tenant_contact_id}

@@ -319,14 +319,13 @@ export default function LinkField({
             onMouseEnter={e => e.currentTarget.style.background = T.bg2}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              {href ? (
+              <span style={{ color: T.accent, fontSize: F.sm, fontWeight: '500' }}>{title}</span>
+              {href && (
                 <a href={href} target="_blank" rel="noopener noreferrer"
                   onClick={e => e.stopPropagation()}
-                  style={{ color: T.accent, fontSize: F.sm, fontWeight: '500', textDecoration: 'none' }}>
-                  {title}
+                  style={{ color: T.text2, fontSize: '11px', lineHeight: 1, textDecoration: 'none', flexShrink: 0 }}>
+                  ↗
                 </a>
-              ) : (
-                <span style={{ color: T.accent, fontSize: F.sm, fontWeight: '500' }}>{title}</span>
               )}
             </div>
             {summary && <div style={{ fontSize: F.xs, color: T.text2, marginTop: '1px' }}>{summary}</div>}
