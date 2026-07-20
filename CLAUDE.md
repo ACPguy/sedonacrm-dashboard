@@ -228,8 +228,8 @@ pages/api/pipeline/
 
 ## Current Git State
 
-- main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `6e0ea88` — feat: unify linker template — click-outside fix, 32px icons, trash-on-card for Vendor/Tenant Contact
+- main: `0735e52` — merge: automations registry, Podio contact/vendor linking fix, canonical linker template (Scott-approved 2026-07-20)
+- preview: `5a8065e` — in sync with main
 
 ---
 
