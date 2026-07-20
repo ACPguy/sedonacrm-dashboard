@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router';
 import {
   Wrench, CheckFat, FolderOpen, Buildings, House, Star, ClipboardText, ChatCircle,
-  CaretLeft, CaretRight,
+  CaretLeft, CaretRight, Truck, Storefront,
 } from '@phosphor-icons/react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -1773,11 +1773,31 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                   sectionLabel="contact"
                 />
               </FieldWithBadge>
-              <FieldWithBadge label="Vendor Company" link={data.vendor_id?vendorLink(data.vendor_id):null}>
-                <div style={{fontSize:F.base,color:vendors.find(v=>v.id===data.vendor_id)?.company_dba?T.text1:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6',userSelect:'none'}}>
-                  {vendors.find(v=>v.id===data.vendor_id)?.company_dba||'—'}
-                </div>
-              </FieldWithBadge>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',marginBottom:'4px'}}>Vendor Company</div>
+                {(() => {
+                  const v = vendors.find(x=>x.id===data.vendor_id);
+                  const link = data.vendor_id ? vendorLink(data.vendor_id) : null;
+                  return v ? (
+                    <div style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'10px 12px',display:'flex',alignItems:'flex-start',gap:'10px'}}>
+                      <Truck size={20} weight="bold" style={{color:T.text2,flexShrink:0,marginTop:'1px'}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        {link ? (
+                          <a href={link} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
+                            style={{color:T.accent,fontSize:F.sm,fontWeight:'500',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:'3px'}}>
+                            {v.company_dba}
+                            <span style={{fontSize:'11px',color:T.text2,lineHeight:1}}>↗</span>
+                          </a>
+                        ) : (
+                          <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{v.company_dba}</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{fontSize:F.base,color:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6'}}>—</div>
+                  );
+                })()}
+              </div>
             </div>
             <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
               <FieldWithBadge label="Tenant Contact" link={null}>
@@ -1796,11 +1816,31 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                   sectionLabel="contact"
                 />
               </FieldWithBadge>
-              <FieldWithBadge label="Tenant Company" link={data.tenant_id?tenantLink(data.tenant_id):null}>
-                <div style={{fontSize:F.base,color:tenants.find(t=>t.id===data.tenant_id)?.tenant_dba?T.text1:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6',userSelect:'none'}}>
-                  {tenants.find(t=>t.id===data.tenant_id)?.tenant_dba||'—'}
-                </div>
-              </FieldWithBadge>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',marginBottom:'4px'}}>Tenant Company</div>
+                {(() => {
+                  const t = tenants.find(x=>x.id===data.tenant_id);
+                  const link = data.tenant_id ? tenantLink(data.tenant_id) : null;
+                  return t ? (
+                    <div style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'10px 12px',display:'flex',alignItems:'flex-start',gap:'10px'}}>
+                      <Storefront size={20} weight="bold" style={{color:T.text2,flexShrink:0,marginTop:'1px'}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        {link ? (
+                          <a href={link} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
+                            style={{color:T.accent,fontSize:F.sm,fontWeight:'500',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:'3px'}}>
+                            {t.tenant_dba}
+                            <span style={{fontSize:'11px',color:T.text2,lineHeight:1}}>↗</span>
+                          </a>
+                        ) : (
+                          <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{t.tenant_dba}</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{fontSize:F.base,color:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6'}}>—</div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
 
