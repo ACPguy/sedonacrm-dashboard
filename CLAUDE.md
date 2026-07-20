@@ -184,7 +184,11 @@ pages/api/pipeline/
 
 **variant='card' (default):** Podio-style stacked cards — UserCircle icon + title link (T.accent + ↗) + optional subtitle (phone/email) + meta line. No × on the card itself. Trigger button says "Add / remove"; opening the panel shows currently-linked items as removable chips at the top so unlinking is still possible. ContactsView "Linked Tasks" (readOnly, no subtitleField) renders as cards with just icon + title + meta, no subtitle gap.
 
-**compact prop (default false):** When true — reduced card padding (7px 10px vs 10px 12px), icon size 16 vs 20, "Add / remove" / "Change" / "+ Add" dashed button is replaced by a `PencilSimple` icon (position:absolute top:0 right:0 of the outer position:relative div, 44×44px touch target, zero height contribution — this is the fix for grid column height drift). In single mode, the inline × button is removed from the card; a "✕ Remove" row appears at the top of the search panel instead. `paddingRight:'36px'` on the card text div prevents text/title overlapping the pencil. When false (default): renders exactly as today — no existing call site is affected. Currently used on: TaskDetail Contacts card, Vendor Contact, Tenant Contact (compact=true).
+**compact prop (default false):** When true — reduced card padding (7px 10px vs 10px 12px), icon size 16 vs 20, `paddingRight:'36px'` on card text div. In single mode, the inline × clear button is removed from the card; a "✕ Remove" row appears at the top of the search panel instead. When false (default): renders exactly as before — no existing call site is affected. Currently used on: TaskDetail Contacts card, Vendor Contact, Tenant Contact (compact=true).
+
+**hideTrigger prop (default false, requires compact=true):** When true, LinkField renders NO trigger button when closed — the parent is fully responsible for opening the panel. The parent must hold a `ref` to the LinkField and call `ref.current.openPanel()` (exposed via `useImperativeHandle`). Use this when the "Add / Remove" button needs to live outside the LinkField's layout (e.g., inline next to a label on the same row). When searchOpen becomes true, the panel renders in-flow regardless of hideTrigger. LinkField is a `React.forwardRef` component; all existing JSX call sites (`<LinkField ... />`) are unaffected — forwardRef only changes direct static-property access, which doesn't exist.
+
+**Flat-grid alignment pattern for 2-column label+card layouts:** Use a single `display:grid, gridTemplateColumns:'1fr 1fr', gridAutoRows:'auto'` parent with 4 direct children: [label1 div, label2 div, card1 (LinkField), card2 (company card)]. CSS grid auto-sizes each row to its tallest cell, so both label divs share row height and both cards start together — alignment is enforced structurally, not by matching heights manually. The old nested-div-per-column approach (label + card in independent column divs) breaks if one label is taller than the other.
 
 **variant='chip':** compact inline pills with × unlink. Pass `variant="chip"` explicitly on any call site that wants the old look.
 
@@ -216,7 +220,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `98d82b1` — feat: add prop_code badge to Tenant Company field in TaskDetail Linked Companies
+- preview: `[pending commit]`
 
 ---
 

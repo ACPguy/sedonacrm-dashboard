@@ -2,8 +2,8 @@
 // LinkField.jsx — generic many-to-many relationship field
 // Canonical implementation; pilot: Task <-> Contacts via task_contacts
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { UserCircle, PencilSimple } from '@phosphor-icons/react';
+import React, { useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react';
+import { UserCircle } from '@phosphor-icons/react';
 import { T } from '../../lib/theme';
 
 const SUPABASE_URL      = 'https://edxcvyleielzevpappui.supabase.co';
@@ -61,15 +61,17 @@ const resolve = (fn, row) => (typeof fn === 'function' ? fn(row) : (row?.[fn] ??
 //     joinTable/parentIdField/parentId/linkedIdField are unused in single mode.
 //
 // compact PROP
-//   When true: reduced card padding (7px 10px vs 10px 12px), smaller icon (16 vs 20),
-//   pencil icon trigger (position:absolute, zero height contribution) replaces the
-//   dashed "Add / remove" / "Change" / "+ Add" button. In single mode, the inline ×
-//   clear button is removed from the card; a "Remove" row is added to the search panel
-//   instead. When false (default): renders exactly as before — no existing call sites
-//   are affected.
+//   When true: reduced card padding (7px 10px vs 10px 12px), smaller icon (16 vs 20).
+//   In single mode, the inline × clear button is removed from the card; a "Remove" row
+//   is added to the search panel instead. When false (default): renders exactly as before.
+//
+// hideTrigger PROP (requires compact=true)
+//   When true, LinkField renders NO trigger button when closed. The parent is responsible
+//   for opening the panel by calling ref.current.openPanel(). Use when the trigger button
+//   needs to live outside LinkField's layout (e.g. next to a label on the same row).
 //
 // ─────────────────────────────────────────────────────────────────────────────
-export default function LinkField({
+const LinkField = React.forwardRef(function LinkField({
   // mode — see comment above
   mode = 'multi',   // 'multi' | 'single'
   // single-mode props (ignored when mode='multi')
@@ -95,8 +97,9 @@ export default function LinkField({
   onCreate,
   sectionLabel,
   variant = 'card',   // 'card' | 'chip'
-  compact = false,    // compact card style with pencil trigger
-}) {
+  compact = false,    // compact card style
+  hideTrigger = false, // when true, no trigger button rendered — parent drives openPanel() via ref
+}, ref) {
   const [linked,       setLinked]       = useState([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
   const [searchOpen,   setSearchOpen]   = useState(false);
@@ -112,6 +115,10 @@ export default function LinkField({
     () => typeof window !== 'undefined' && window.innerWidth < 640
   );
   const panelRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    openPanel: () => { setSearchOpen(true); setQuery(''); setError(''); },
+  }));
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 640);
@@ -436,27 +443,6 @@ export default function LinkField({
     </div>
   );
 
-  // ── Compact pencil trigger (position:absolute, zero height contribution) ───
-  // Sits at top:0 right:0 of the outer position:relative div.
-  // Does NOT add height — both grid columns stay top-aligned regardless of
-  // whether a contact is selected.
-  const compactPencil = !readOnly && !searchOpen && (
-    <button
-      onClick={() => { setSearchOpen(true); setQuery(''); setError(''); }}
-      style={{
-        position: 'absolute', top: 0, right: 0,
-        width: '44px', height: '44px',
-        background: 'transparent', border: 'none', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: '4px',
-      }}
-      onMouseEnter={e => e.currentTarget.style.opacity = '0.6'}
-      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-      title={`Edit ${sectionLabel || ''}`}>
-      <PencilSimple size={14} color={T.text2} />
-    </button>
-  );
-
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     // compact: position:relative so pencil can be position:absolute inside;
@@ -541,8 +527,9 @@ export default function LinkField({
             </div>
           )}
 
-          {/* Compact: pencil (absolute) + panel (in-flow) */}
-          {!readOnly && compact && (searchOpen ? renderPanel() : compactPencil)}
+          {/* Compact: panel in-flow when open; trigger is external (hideTrigger) or absent */}
+          {!readOnly && compact && !hideTrigger && (searchOpen ? renderPanel() : null)}
+          {!readOnly && compact && hideTrigger && searchOpen && renderPanel()}
 
           {readOnly && linked.length === 0 && (
             <div style={{ fontSize: F.xs, color: T.text3, fontStyle: 'italic' }}>None</div>
@@ -711,8 +698,9 @@ export default function LinkField({
             </div>
           )}
 
-          {/* Compact: pencil (absolute) + panel (in-flow) */}
-          {!readOnly && compact && (searchOpen ? renderPanel() : compactPencil)}
+          {/* Compact: panel in-flow when open; trigger is external (hideTrigger) or absent */}
+          {!readOnly && compact && !hideTrigger && (searchOpen ? renderPanel() : null)}
+          {!readOnly && compact && hideTrigger && searchOpen && renderPanel()}
 
           {readOnly && !singleValue && (
             <div style={{ fontSize: F.xs, color: T.text3, fontStyle: 'italic' }}>None</div>
@@ -721,4 +709,5 @@ export default function LinkField({
       )}
     </div>
   );
-}
+});
+export default LinkField;
