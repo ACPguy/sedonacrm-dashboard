@@ -215,7 +215,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: TBD after this commit
+- preview: `792df04` — feat: compact contact cards with pencil trigger — Contacts + Linked Companies (TaskDetail)
 
 ---
 
