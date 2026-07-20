@@ -167,15 +167,37 @@ pages/api/pipeline/
 
 ## Next Priorities
 
-1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
-2. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency
-3. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
-4. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
-5. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
+1. Add `icon` prop to LinkField before first non-contact use — icon is currently hardcoded to UserCircle. Design schema (FK or join table) for next linker target before wiring it up.
+2. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
+3. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
+4. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
+5. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency
 6. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
 7. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
-8. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
+8. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
 9. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
+
+## Canonical Linker Architecture (permanent — locked in 2026-07-20)
+
+LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any interactive relationship field anywhere in SedonaCRM — not just contacts/companies. This is the universal relationship layer for the whole database: Work Orders/Tasks ↔ Projects, Insurance ↔ Properties/Tenants/Vendors, Key Safes ↔ Work Orders, Reports ↔ Properties, and every future relationship. Single-select or multi-select, any table, any relationship. Do NOT build a new picker/connector/linker component for any future module — extend LinkField's props instead.
+
+CompanyLinkCard.jsx (`components/shared/CompanyLinkCard.jsx`) is the ONLY component for read-only derived entity display cards (e.g. Vendor Company, Tenant Company) — same "build once" rule applies as new derived-display use cases come up.
+
+Full prop reference: `mode` ('multi'|'single'), `compact`, `hideTrigger`, `badgeField`, `excludeRef`, `variant` ('card'|'chip'), `allowCreate`, `titleField`, `titleHref`, `subtitleField`, `sectionLabel`, `onCreate`. See existing TaskDetail Vendor/Tenant Contact + Contacts usage as the reference implementation.
+
+**Compact-mode linker template (as of 2026-07-20, current standard look/behavior):**
+- 32px icon, centered row alignment
+- Trash icon (absolute, top:50%, right:6px, 32×32 hit target) on each card — removes immediately, no confirm
+- Plus icon button (not text) next to the field label — opens the search panel via `ref.openPanel()`
+- `badgeField` renders a small property-code-style pill after the title when applicable
+- Click-outside-to-close is scoped to the panel itself via `panelRef` on `renderPanel`'s own root — NOT the whole field — so clicking other cards/content correctly closes an open panel
+
+If this template needs to change in the future: change `LinkField.jsx` / `CompanyLinkCard.jsx` ONCE. Every call site inherits it. Do not patch individual call sites.
+
+**Three things to handle BEFORE pointing LinkField at a new relationship type:**
+1. Icon is currently hardcoded to `UserCircle` inside LinkField — not yet a prop. Needs an `icon` prop added before use on non-contact entities (Properties, Insurance, Projects, etc.) so each linker shows the right glyph instead of always a person icon.
+2. LinkField is the UI/interaction layer only — it does not create the underlying relationship. Each new linker target (Insurance↔Properties, Key Safes↔Work Orders, etc.) needs its own schema decision first (direct FK for one-to-many, join table for many-to-many), same pattern as `task_contacts`. Design the relationship, then wire LinkField to it — two steps, not one.
+3. LinkField currently reads/writes via the anon Supabase key. Fine for contacts/vendors/tenants (anon-readable tables). Any future linker target that's deliberately RLS-locked (e.g. `automation_agents`, or future sensitive/financial tables) will NOT be reachable by LinkField as-is — it would need a server-route mode instead of direct anon calls. Check RLS/anon grants on the target table before wiring a new linker to it.
 
 ## LinkField Architecture (permanent)
 
@@ -228,8 +250,8 @@ pages/api/pipeline/
 
 ## Current Git State
 
-- main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `6e0ea88` — feat: unify linker template — click-outside fix, 32px icons, trash-on-card for Vendor/Tenant Contact
+- main: `0735e52` — merge: automations registry, Podio contact/vendor linking fix, canonical linker template (Scott-approved 2026-07-20)
+- preview: `ca5cbe3` — docs: add Canonical Linker Architecture permanent section
 
 ---
 
