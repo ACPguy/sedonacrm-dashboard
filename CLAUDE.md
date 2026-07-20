@@ -208,7 +208,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: (commit pending this session)
+- preview: `b901970` — feat: automations registry Settings UI (read-only)
 
 ---
 
