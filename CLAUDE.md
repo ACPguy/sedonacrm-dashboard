@@ -251,7 +251,7 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 ## Current Git State
 
 - main: `0735e52` — merge: automations registry, Podio contact/vendor linking fix, canonical linker template (Scott-approved 2026-07-20)
-- preview: `5a8065e` — in sync with main
+- preview: `ca5cbe3` — docs: add Canonical Linker Architecture permanent section
 
 ---
 
