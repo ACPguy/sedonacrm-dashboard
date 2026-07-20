@@ -1586,6 +1586,16 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const vendorLink=vid=>{const v=vendors.find(x=>x.id===vid);if(!v)return null;return v.podio_id?`/vendors/${v.podio_id}`:`/vendors/X${v.id.slice(-6)}`;};
   const tenantLink=tid=>{const t=tenants.find(x=>x.id===tid);if(!t)return null;return t.podio_id?`/tenants/${t.podio_id}`:`/tenants/X${t.id.slice(-6)}`;};
 
+  const contactCompanyName = row => {
+    if (row.vendor_id) return vendors.find(v=>v.id===row.vendor_id)?.company_dba;
+    if (row.tenant_id) return tenants.find(t=>t.id===row.tenant_id)?.tenant_dba;
+    return null;
+  };
+  const contactTitle = row => {
+    const co = contactCompanyName(row);
+    return co ? `${row.full_name} — ${co}` : row.full_name;
+  };
+
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
@@ -1731,33 +1741,37 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           </div>
 
           {/* 3 — CONTACTS */}
-          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
-            <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Contacts</div>
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden',padding:'10px 16px 14px'}}>
+            <div style={{position:'relative',display:'inline-block',marginBottom:'6px'}}>
+              <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Contacts</span>
+            </div>
             <LinkField
               joinTable="task_contacts"
               parentIdField="task_id"
               parentId={data.id}
               linkedTable="contacts"
               linkedIdField="contact_id"
-              linkedFields="id,full_name,company_dba,podio_id,category,created_at,primary_phone,email"
+              linkedFields="id,full_name,company_dba,podio_id,category,created_at,primary_phone,email,vendor_id,tenant_id"
               searchFields={['full_name','company_dba']}
-              titleField="full_name"
+              titleField={contactTitle}
               titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
               subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
-              summaryField={row=>row.company_dba||''}
-              metaField={row=>`Contacts${row.category?' · '+row.category:''} · Added ${timeAgo(row.created_at)}`}
               sectionLabel="contact"
               allowCreate={true}
               createFields={['full_name','company_dba','primary_phone','email']}
               onCreate={async fields=>{const r=await sbPost('contacts',fields);return Array.isArray(r)?r[0]:r;}}
+              compact={true}
             />
           </div>
 
           {/* 4 — LINKED COMPANIES */}
-          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
-            <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Linked Companies</div>
-            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-              <FieldWithBadge label="Vendor Contact" link={null}>
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden',padding:'10px 16px 14px'}}>
+            <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Linked Companies</div>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'12px',alignItems:'start',marginBottom:'12px'}}>
+              <div>
+                <div style={{position:'relative',display:'inline-block',marginBottom:'4px'}}>
+                  <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Contact</span>
+                </div>
                 <LinkField
                   mode="single"
                   value={data.vendor_contact_id}
@@ -1766,41 +1780,43 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                   linkedTable="contacts"
                   linkedFields="id,full_name,company_dba,podio_id,vendor_id,tenant_id,primary_phone,email"
                   searchFields={['full_name','company_dba']}
-                  titleField="full_name"
+                  titleField={contactTitle}
                   titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
                   subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
                   allowCreate={true}
                   sectionLabel="contact"
+                  compact={true}
                 />
-              </FieldWithBadge>
-              <div style={{flex:1,minWidth:0}}>
+              </div>
+              <div>
                 <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',marginBottom:'4px'}}>Vendor Company</div>
                 {(() => {
                   const v = vendors.find(x=>x.id===data.vendor_id);
                   const link = data.vendor_id ? vendorLink(data.vendor_id) : null;
                   return v ? (
-                    <div style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'10px 12px',display:'flex',alignItems:'flex-start',gap:'10px'}}>
-                      <Truck size={20} weight="bold" style={{color:T.text2,flexShrink:0,marginTop:'1px'}}/>
+                    <div style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'8px'}}>
+                      <Truck size={16} weight="bold" style={{color:T.text2,flexShrink:0}}/>
                       <div style={{flex:1,minWidth:0}}>
                         {link ? (
                           <a href={link} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
                             style={{color:T.accent,fontSize:F.sm,fontWeight:'500',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:'3px'}}>
                             {v.company_dba}
-                            <span style={{fontSize:'11px',color:T.text2,lineHeight:1}}>↗</span>
+                            <span style={{fontSize:'10px',color:T.text2,lineHeight:1}}>↗</span>
                           </a>
-                        ) : (
-                          <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{v.company_dba}</span>
-                        )}
+                        ) : <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{v.company_dba}</span>}
                       </div>
                     </div>
                   ) : (
-                    <div style={{fontSize:F.base,color:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6'}}>—</div>
+                    <div style={{fontSize:F.sm,color:T.text3,padding:'7px 10px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px'}}>—</div>
                   );
                 })()}
               </div>
             </div>
-            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-              <FieldWithBadge label="Tenant Contact" link={null}>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'12px',alignItems:'start'}}>
+              <div>
+                <div style={{position:'relative',display:'inline-block',marginBottom:'4px'}}>
+                  <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Contact</span>
+                </div>
                 <LinkField
                   mode="single"
                   value={data.tenant_contact_id}
@@ -1809,35 +1825,34 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                   linkedTable="contacts"
                   linkedFields="id,full_name,company_dba,podio_id,vendor_id,tenant_id,primary_phone,email"
                   searchFields={['full_name','company_dba']}
-                  titleField="full_name"
+                  titleField={contactTitle}
                   titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
                   subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
                   allowCreate={true}
                   sectionLabel="contact"
+                  compact={true}
                 />
-              </FieldWithBadge>
-              <div style={{flex:1,minWidth:0}}>
+              </div>
+              <div>
                 <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',marginBottom:'4px'}}>Tenant Company</div>
                 {(() => {
                   const t = tenants.find(x=>x.id===data.tenant_id);
                   const link = data.tenant_id ? tenantLink(data.tenant_id) : null;
                   return t ? (
-                    <div style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'10px 12px',display:'flex',alignItems:'flex-start',gap:'10px'}}>
-                      <Storefront size={20} weight="bold" style={{color:T.text2,flexShrink:0,marginTop:'1px'}}/>
+                    <div style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'8px'}}>
+                      <Storefront size={16} weight="bold" style={{color:T.text2,flexShrink:0}}/>
                       <div style={{flex:1,minWidth:0}}>
                         {link ? (
                           <a href={link} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
                             style={{color:T.accent,fontSize:F.sm,fontWeight:'500',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:'3px'}}>
                             {t.tenant_dba}
-                            <span style={{fontSize:'11px',color:T.text2,lineHeight:1}}>↗</span>
+                            <span style={{fontSize:'10px',color:T.text2,lineHeight:1}}>↗</span>
                           </a>
-                        ) : (
-                          <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{t.tenant_dba}</span>
-                        )}
+                        ) : <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{t.tenant_dba}</span>}
                       </div>
                     </div>
                   ) : (
-                    <div style={{fontSize:F.base,color:T.text3,padding:'5px 8px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',minHeight:'32px',lineHeight:'1.6'}}>—</div>
+                    <div style={{fontSize:F.sm,color:T.text3,padding:'7px 10px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px'}}>—</div>
                   );
                 })()}
               </div>

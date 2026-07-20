@@ -167,7 +167,8 @@ pages/api/pipeline/
 
 ## Next Priorities
 
-1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
+1. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency, once Scott confirms this look on the WO/task page
+2. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
 2. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
 3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
 4. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
@@ -182,6 +183,8 @@ pages/api/pipeline/
 **Props:** `mode` ('multi' default | 'single'), `value` (single mode: current FK id), `onChange` (single mode: (row|null)=>void — caller persists), `onCreateNew` (single mode: ()=>void — caller opens modal), `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `subtitleField` (fn/string, optional — phone/email line), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`, `variant` ('card' default | 'chip').
 
 **variant='card' (default):** Podio-style stacked cards — UserCircle icon + title link (T.accent + ↗) + optional subtitle (phone/email) + meta line. No × on the card itself. Trigger button says "Add / remove"; opening the panel shows currently-linked items as removable chips at the top so unlinking is still possible. ContactsView "Linked Tasks" (readOnly, no subtitleField) renders as cards with just icon + title + meta, no subtitle gap.
+
+**compact prop (default false):** When true — reduced card padding (7px 10px vs 10px 12px), icon size 16 vs 20, "Add / remove" / "Change" / "+ Add" dashed button is replaced by a `PencilSimple` icon (position:absolute top:0 right:0 of the outer position:relative div, 44×44px touch target, zero height contribution — this is the fix for grid column height drift). In single mode, the inline × button is removed from the card; a "✕ Remove" row appears at the top of the search panel instead. `paddingRight:'36px'` on the card text div prevents text/title overlapping the pencil. When false (default): renders exactly as today — no existing call site is affected. Currently used on: TaskDetail Contacts card, Vendor Contact, Tenant Contact (compact=true).
 
 **variant='chip':** compact inline pills with × unlink. Pass `variant="chip"` explicitly on any call site that wants the old look.
 
@@ -212,7 +215,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `5d48d30` — feat: Vendor/Tenant Company fields — icon + clickable link card style (Truck/Storefront)
+- preview: TBD after this commit
 
 ---
 

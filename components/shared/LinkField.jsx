@@ -3,7 +3,7 @@
 // Canonical implementation; pilot: Task <-> Contacts via task_contacts
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { UserCircle } from '@phosphor-icons/react';
+import { UserCircle, PencilSimple } from '@phosphor-icons/react';
 import { T } from '../../lib/theme';
 
 const SUPABASE_URL      = 'https://edxcvyleielzevpappui.supabase.co';
@@ -60,6 +60,14 @@ const resolve = (fn, row) => (typeof fn === 'function' ? fn(row) : (row?.[fn] ??
 //     StackedFormModal) and then calls onChange with the newly-created row.
 //     joinTable/parentIdField/parentId/linkedIdField are unused in single mode.
 //
+// compact PROP
+//   When true: reduced card padding (7px 10px vs 10px 12px), smaller icon (16 vs 20),
+//   pencil icon trigger (position:absolute, zero height contribution) replaces the
+//   dashed "Add / remove" / "Change" / "+ Add" button. In single mode, the inline ×
+//   clear button is removed from the card; a "Remove" row is added to the search panel
+//   instead. When false (default): renders exactly as before — no existing call sites
+//   are affected.
+//
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LinkField({
   // mode — see comment above
@@ -87,6 +95,7 @@ export default function LinkField({
   onCreate,
   sectionLabel,
   variant = 'card',   // 'card' | 'chip'
+  compact = false,    // compact card style with pencil trigger
 }) {
   const [linked,       setLinked]       = useState([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
@@ -238,8 +247,23 @@ export default function LinkField({
       border: `1px solid ${T.border}`, borderRadius: '6px',
       boxShadow: '0 4px 12px rgba(0,0,0,0.3)', overflow: 'hidden', zIndex: 10, position: 'relative',
     }}>
-      {/* Currently-linked chips with unlink — card variant only */}
-      {variant === 'card' && linked.length > 0 && (
+      {/* Compact single-mode: "Remove" row at top when a value is set */}
+      {mode === 'single' && compact && singleValue && (
+        <div
+          onClick={() => { onChange?.(null); setSearchOpen(false); setQuery(''); setResults([]); }}
+          style={{
+            padding: '8px 10px', cursor: 'pointer', color: T.danger,
+            fontSize: F.sm, minHeight: '44px', display: 'flex', alignItems: 'center', gap: '5px',
+            borderBottom: `0.5px solid ${T.border}`,
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+          ✕ Remove {sectionLabel || ''}
+        </div>
+      )}
+
+      {/* Currently-linked chips with unlink — card variant multi mode only */}
+      {variant === 'card' && mode !== 'single' && linked.length > 0 && (
         <div style={{
           padding: '8px 10px', borderBottom: `0.5px solid ${T.border}`,
           display: 'flex', flexWrap: 'wrap', gap: '5px',
@@ -412,10 +436,39 @@ export default function LinkField({
     </div>
   );
 
+  // ── Compact pencil trigger (position:absolute, zero height contribution) ───
+  // Sits at top:0 right:0 of the outer position:relative div.
+  // Does NOT add height — both grid columns stay top-aligned regardless of
+  // whether a contact is selected.
+  const compactPencil = !readOnly && !searchOpen && (
+    <button
+      onClick={() => { setSearchOpen(true); setQuery(''); setError(''); }}
+      style={{
+        position: 'absolute', top: 0, right: 0,
+        width: '44px', height: '44px',
+        background: 'transparent', border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: '4px',
+      }}
+      onMouseEnter={e => e.currentTarget.style.opacity = '0.6'}
+      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+      title={`Edit ${sectionLabel || ''}`}>
+      <PencilSimple size={14} color={T.text2} />
+    </button>
+  );
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: '10px 16px' }}>
-
+    // compact: position:relative so pencil can be position:absolute inside;
+    // panelRef on outer div so outside-click handler covers full area.
+    // non-compact: no position, no panelRef here (panelRef stays on trigger wrapper).
+    <div
+      ref={compact ? panelRef : undefined}
+      style={{
+        padding: compact ? 0 : '10px 16px',
+        position: compact ? 'relative' : undefined,
+      }}
+    >
       {loadingLinks && (
         <div style={{ color: T.text3, fontSize: F.xs, paddingBottom: '4px' }}>Loading…</div>
       )}
@@ -424,7 +477,7 @@ export default function LinkField({
       {!loadingLinks && variant === 'card' && mode !== 'single' && (
         <>
           {linked.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: compact ? 0 : '10px' }}>
               {linked.map(row => {
                 const title    = resolve(titleField, row);
                 const subtitle = subtitleField ? resolve(subtitleField, row) : '';
@@ -433,12 +486,11 @@ export default function LinkField({
                 return (
                   <div key={row._joinId} style={{
                     background: T.bg3, border: `0.5px solid ${T.border}`,
-                    borderRadius: '6px', padding: '10px 12px',
+                    borderRadius: '6px', padding: compact ? '7px 10px' : '10px 12px',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <UserCircle size={20} weight="bold" style={{ color: T.text2, flexShrink: 0, marginTop: '1px' }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {/* Title link */}
+                      <UserCircle size={compact ? 16 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0, marginTop: '1px' }} />
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: compact ? '36px' : 0 }}>
                         {href ? (
                           <a href={href} target="_blank" rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
@@ -452,14 +504,12 @@ export default function LinkField({
                         ) : (
                           <span style={{ color: T.accent, fontSize: F.sm, fontWeight: '500' }}>{title}</span>
                         )}
-                        {/* Subtitle (phone / email) — omit when empty */}
                         {subtitle && (
                           <div style={{ fontSize: F.xs, color: T.text2, marginTop: '2px' }}>{subtitle}</div>
                         )}
                       </div>
                     </div>
-                    {/* Meta line — omit when empty */}
-                    {meta && (
+                    {meta && !compact && (
                       <div style={{ fontSize: '11px', color: T.text3, marginTop: '5px' }}>{meta}</div>
                     )}
                   </div>
@@ -472,7 +522,8 @@ export default function LinkField({
             <div style={{ fontSize: F.xs, color: T.danger, marginBottom: '6px' }}>{error}</div>
           )}
 
-          {!readOnly && (
+          {/* Non-compact: dashed trigger button */}
+          {!readOnly && !compact && (
             <div ref={panelRef} style={{ position: 'relative', display: 'inline-block', width: isMobile ? '100%' : 'auto' }}>
               {!searchOpen ? (
                 <button
@@ -489,6 +540,9 @@ export default function LinkField({
               ) : renderPanel()}
             </div>
           )}
+
+          {/* Compact: pencil (absolute) + panel (in-flow) */}
+          {!readOnly && compact && (searchOpen ? renderPanel() : compactPencil)}
 
           {readOnly && linked.length === 0 && (
             <div style={{ fontSize: F.xs, color: T.text3, fontStyle: 'italic' }}>None</div>
@@ -574,15 +628,15 @@ export default function LinkField({
       {/* ── SINGLE mode ───────────────────────────────────────────────────── */}
       {mode === 'single' && (
         <>
-          {singleValue && (
-            <div style={{ marginBottom: '10px' }}>
+          {singleValue ? (
+            <div style={{ marginBottom: compact ? 0 : '10px' }}>
               <div style={{
                 background: T.bg3, border: `0.5px solid ${T.border}`,
-                borderRadius: '6px', padding: '10px 12px',
+                borderRadius: '6px', padding: compact ? '7px 10px' : '10px 12px',
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <UserCircle size={20} weight="bold" style={{ color: T.text2, flexShrink: 0, marginTop: '1px' }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <UserCircle size={compact ? 16 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0, marginTop: '1px' }} />
+                  <div style={{ flex: 1, minWidth: 0, paddingRight: compact ? '36px' : 0 }}>
                     {titleHref?.(singleValue) ? (
                       <a href={titleHref(singleValue)} target="_blank" rel="noopener noreferrer"
                         onClick={e => e.stopPropagation()}
@@ -600,7 +654,8 @@ export default function LinkField({
                       <div style={{ fontSize: F.xs, color: T.text2, marginTop: '2px' }}>{resolve(subtitleField, singleValue)}</div>
                     )}
                   </div>
-                  {!readOnly && (
+                  {/* × clear button — non-compact only; compact uses "Remove" in panel */}
+                  {!readOnly && !compact && (
                     <button
                       onClick={() => onChange?.(null)}
                       style={{
@@ -615,18 +670,28 @@ export default function LinkField({
                       title="Clear">×</button>
                   )}
                 </div>
-                {metaField && resolve(metaField, singleValue) && (
+                {metaField && !compact && resolve(metaField, singleValue) && (
                   <div style={{ fontSize: '11px', color: T.text3, marginTop: '5px' }}>{resolve(metaField, singleValue)}</div>
                 )}
               </div>
             </div>
+          ) : (
+            /* Empty state */
+            <div style={{
+              fontSize: F.sm, color: T.text3,
+              padding: compact ? '7px 10px' : '5px 8px',
+              background: T.bg3, border: `0.5px solid ${T.border}`,
+              borderRadius: compact ? '6px' : '4px',
+              marginBottom: compact ? 0 : undefined,
+            }}>—</div>
           )}
 
           {error && (
             <div style={{ fontSize: F.xs, color: T.danger, marginBottom: '6px' }}>{error}</div>
           )}
 
-          {!readOnly && (
+          {/* Non-compact: dashed trigger button */}
+          {!readOnly && !compact && (
             <div ref={panelRef} style={{ position: 'relative', display: 'inline-block', width: isMobile ? '100%' : 'auto' }}>
               {!searchOpen ? (
                 <button
@@ -645,6 +710,9 @@ export default function LinkField({
               ) : renderPanel()}
             </div>
           )}
+
+          {/* Compact: pencil (absolute) + panel (in-flow) */}
+          {!readOnly && compact && (searchOpen ? renderPanel() : compactPencil)}
 
           {readOnly && !singleValue && (
             <div style={{ fontSize: F.xs, color: T.text3, fontStyle: 'italic' }}>None</div>
