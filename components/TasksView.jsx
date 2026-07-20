@@ -836,8 +836,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   },[filtersReady,statusFilter,typeFilter,propFilter.join(','),filterPropCode,filterVendorId,filterTenantId,filterContactId,search,refreshKey]);
 
   useEffect(()=>{
-    sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
-    sbFetch('tenants','select=id,tenant_dba&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+    sbFetch('vendors','select=id,company_dba&order=company_dba.asc').then(setVendors).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     if (!filterPropCode) {
       sbFetch('properties','select=prop_code&status=eq.active&order=prop_code.asc')
         .then(d=>setPropCodes(d.map(r=>r.prop_code)))
@@ -1360,8 +1360,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
 
   useEffect(()=>{
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
-    sbFetch('vendors','select=id,company_dba,podio_id&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
-    sbFetch('tenants','select=id,tenant_dba,podio_id&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+    sbFetch('vendors','select=id,company_dba,podio_id&order=company_dba.asc').then(setVendors).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba,podio_id&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
@@ -2104,8 +2104,8 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const [tenantContacts,setTenantContacts] = useState([]);
   const [activeProps,setActiveProps] = useState([]);
   useEffect(()=>{
-    sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
-    sbFetch('tenants','select=id,tenant_dba&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+    sbFetch('vendors','select=id,company_dba&order=company_dba.asc').then(setVendors).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('properties','select=prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});

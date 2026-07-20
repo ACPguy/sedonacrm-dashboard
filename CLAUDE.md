@@ -206,11 +206,12 @@ pages/api/pipeline/
 - **Property field** in TaskDetail closed state: `CodeOnlySelect` component shows just prop_code; dropdown options show "code — name".
 - **Linked Companies:** uses `LinkField mode='single'` for both Vendor Contact and Tenant Contact. Picking a contact auto-fills the read-only Company box via `handleContactChange` (reads `vendor_id`/`tenant_id` FK from the contact row, saves both fields via `saveMany`). "+ Create new" opens `StackedFormModal` (zIndex 310) with a 4-field form (name/company/phone/email). **Deliberate asymmetry:** Vendor Contact modal auto-creates (or reuses via case-insensitive exact ilike match on company_dba) a `vendors` row when a company name is typed — new vendor row appended to local state immediately so Company box fills without refresh. Tenant Contact modal intentionally does NOT create a `tenants` row — new tenants must go through the leasing pipeline; company_dba is free-text only on the contact. `ContactFirstRow` was retired; `CompanyContactRow` kept for NewTaskForm WO section (company-first flow).
 - **`CompanyContactRow`** kept intact for NewTaskForm WO section (company-first flow).
+- **Vendor/Tenant Company lookups** (TasksList rows, TaskDetail display, NewTaskForm picker) load ALL vendors/tenants regardless of status — do NOT add an Active-only filter back. A prior version filtered to `vendor_status=eq.Active` / `tenant_status=eq.Active`, which silently blanked out correctly-linked companies whenever the linked vendor/tenant wasn't Active (affected ~74% of vendors, ~65% of tenants). Fixed 2026-07-20.
 
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `1a2a8b5` — feat: contacts vendor_id/tenant_id backfill via Podio relationship fields (740 rows)
+- preview: TBD after this commit
 
 ---
 
