@@ -167,7 +167,7 @@ pages/api/pipeline/
 
 ## Next Priorities
 
-1. **Port Contacts linker template to Vendor/Tenant Contact single-mode fields** — once Scott confirms Contacts version (trash icon on card, icon + button, click-outside excludeRef). Deliberate follow-up session.
+1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
 2. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency
 3. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
 4. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
@@ -185,7 +185,9 @@ pages/api/pipeline/
 
 **variant='card' (default):** Podio-style stacked cards — UserCircle icon + title link (T.accent + ↗) + optional badge pill + optional subtitle (phone/email) + meta line. Each multi-mode card has a Trash icon button (absolute-positioned right, 32×32 hit target) that removes the link immediately on click — no confirm dialog. Trigger button says "Add / remove"; in multi mode the panel no longer shows chips at the top (removed — unlinking is via the trash icon on the card instead). ContactsView "Linked Tasks" (readOnly, no subtitleField) renders as cards with just icon + title + meta, no subtitle gap.
 
-**compact prop (default false):** When true — reduced card padding (7px 10px vs 10px 12px), icon size 16 vs 20, `paddingRight:'36px'` on card text div. In single mode, the inline × clear button is removed from the card; a "✕ Remove" row appears at the top of the search panel instead. When false (default): renders exactly as before — no existing call site is affected. Currently used on: TaskDetail Contacts card, Vendor Contact, Tenant Contact (compact=true).
+**compact prop (default false):** When true — reduced card padding (7px 10px vs 10px 12px), icon size 32px (2×, both multi and single mode cards), `paddingRight:'36px'` on card text div, `alignItems:'center'` on the row. Removal is via Trash icon button (absolute-positioned right, 32×32 hit target) on the card itself — applies to both multi mode (calls unlink) and single mode (calls onChange(null)). The old in-panel "✕ Remove" row in compact single mode is gone. Non-compact single mode still uses the inline × clear button on the right of the card. When false (default): renders exactly as before. Currently used on: TaskDetail Contacts card, Vendor Contact, Tenant Contact (compact=true).
+
+**Outside-click boundary (compact mode):** `panelRef` is attached to the panel root div itself (via `renderPanel`), not the outer compact wrapper. This means clicking on linked cards while the panel is open correctly closes it, because the cards are outside the panel. The outer compact wrapper no longer holds `ref={panelRef}`.
 
 **hideTrigger prop (default false, requires compact=true):** When true, LinkField renders NO trigger button when closed — the parent is fully responsible for opening the panel. The parent must hold a `ref` to the LinkField and call `ref.current.openPanel()` (exposed via `useImperativeHandle`). Use this when the "Add / Remove" button needs to live outside the LinkField's layout (e.g., inline next to a label on the same row). When searchOpen becomes true, the panel renders in-flow regardless of hideTrigger. LinkField is a `React.forwardRef` component; all existing JSX call sites (`<LinkField ... />`) are unaffected — forwardRef only changes direct static-property access, which doesn't exist.
 
@@ -219,8 +221,10 @@ pages/api/pipeline/
 - **Vendor/Tenant Company lookups** (TasksList rows, TaskDetail display, NewTaskForm picker) load ALL vendors/tenants regardless of status — do NOT add an Active-only filter back. A prior version filtered to `vendor_status=eq.Active` / `tenant_status=eq.Active`, which silently blanked out correctly-linked companies whenever the linked vendor/tenant wasn't Active (affected ~74% of vendors, ~65% of tenants). Fixed 2026-07-20.
 - **Vendor Company / Tenant Company fields** (Linked Companies card) rendered via `CompanyLinkCard` — icon (Truck/Storefront) + clickable company name with ↗ + optional badge. Blank state shows '—'. Do not re-inline this JSX.
 - **Tenant Company** shows a `prop_code` badge (sourced from `tenants.prop_code`). Vendor Company intentionally has no badge — vendors aren't tied to a single property.
-- **Contacts section trigger button** is now a `Plus` icon (14px) with `title="Add new item"`. Uses `contactsBtnRef` passed as `excludeRef` to `LinkField` so clicking the button while the panel is open doesn't immediately re-close it.
-- **Contacts section panel (multi-mode card):** removable chips in the panel header are gone. Removal is via Trash icon button (absolute-positioned, right edge of each card). Linked contacts show a `badgeField` prop_code pill when the contact's `tenant_id` resolves to a tenant with a `prop_code`.
+- **Contacts, Vendor Contact, Tenant Contact trigger buttons** are all `Plus` icon (14px) with a `title` tooltip. Each button ref is passed as `excludeRef` to its LinkField so clicking the button while the panel is open doesn't immediately re-close it (`contactsBtnRef`, `vendorContactBtnRef`, `tenantContactBtnRef`).
+- **Contacts section panel (multi-mode card):** removable chips in the panel header are gone. Removal is via Trash icon (absolute-positioned right, 32×32) on each card. All contacts show a `badgeField` prop_code pill when `tenant_id` resolves to a tenant with a `prop_code`.
+- **Vendor Contact / Tenant Contact single-mode cards:** also use Trash icon (compact mode — replaces the old "✕ Remove" panel row). Both also pass `badgeField={contactPropCode}` — shows prop_code pill when the selected contact has a `tenant_id`.
+- **CompanyLinkCard icon** is 32px to match the unified contact icon size across all three fields.
 
 ## Current Git State
 

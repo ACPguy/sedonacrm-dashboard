@@ -1559,10 +1559,12 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const goNavRef = useRef(goNav);
   goNavRef.current = goNav;
 
-  const contactsFieldRef  = useRef(null);
-  const contactsBtnRef    = useRef(null);
-  const vendorContactRef  = useRef(null);
-  const tenantContactRef  = useRef(null);
+  const contactsFieldRef     = useRef(null);
+  const contactsBtnRef       = useRef(null);
+  const vendorContactRef     = useRef(null);
+  const vendorContactBtnRef  = useRef(null);
+  const tenantContactRef     = useRef(null);
+  const tenantContactBtnRef  = useRef(null);
 
   useEffect(()=>{
     const onArrow=e=>{
@@ -1792,7 +1794,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gridAutoRows:'auto',gap:'6px 12px',marginBottom:'12px'}}>
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                 <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Contact</span>
-                <button onClick={()=>vendorContactRef.current?.openPanel()}
+                <button ref={vendorContactBtnRef} onClick={()=>vendorContactRef.current?.openPanel()}
                   title="Change vendor contact"
                   style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
@@ -1805,6 +1807,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               </div>
               <LinkField
                 ref={vendorContactRef}
+                excludeRef={vendorContactBtnRef}
                 mode="single"
                 hideTrigger={true}
                 value={data.vendor_contact_id}
@@ -1816,6 +1819,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 titleField={contactTitle}
                 titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
                 subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+                badgeField={contactPropCode}
                 allowCreate={true}
                 sectionLabel="contact"
                 compact={true}
@@ -1829,7 +1833,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gridAutoRows:'auto',gap:'6px 12px'}}>
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                 <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Contact</span>
-                <button onClick={()=>tenantContactRef.current?.openPanel()}
+                <button ref={tenantContactBtnRef} onClick={()=>tenantContactRef.current?.openPanel()}
                   title="Change tenant contact"
                   style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
@@ -1842,6 +1846,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               </div>
               <LinkField
                 ref={tenantContactRef}
+                excludeRef={tenantContactBtnRef}
                 mode="single"
                 hideTrigger={true}
                 value={data.tenant_contact_id}
@@ -1853,6 +1858,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 titleField={contactTitle}
                 titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
                 subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+                badgeField={contactPropCode}
                 allowCreate={true}
                 sectionLabel="contact"
                 compact={true}

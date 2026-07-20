@@ -16,7 +16,7 @@ export default function CompanyLinkCard({ icon: Icon, name, link, badge }) {
   }
   return (
     <div style={{ background: T.bg3, border: `0.5px solid ${T.border}`, borderRadius: '6px', padding: '7px 10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-      {Icon && <Icon size={16} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />}
+      {Icon && <Icon size={32} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
         {link ? (
           <a href={link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}

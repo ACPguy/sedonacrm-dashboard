@@ -253,26 +253,11 @@ const LinkField = React.forwardRef(function LinkField({
 
   // ── Shared: search panel ───────────────────────────────────────────────────
   const renderPanel = () => (
-    <div style={{
+    <div ref={panelRef} style={{
       width: isMobile ? '100%' : '300px', background: T.bg3,
       border: `1px solid ${T.border}`, borderRadius: '6px',
       boxShadow: '0 4px 12px rgba(0,0,0,0.3)', overflow: 'hidden', zIndex: 10, position: 'relative',
     }}>
-      {/* Compact single-mode: "Remove" row at top when a value is set */}
-      {mode === 'single' && compact && singleValue && (
-        <div
-          onClick={() => { onChange?.(null); setSearchOpen(false); setQuery(''); setResults([]); }}
-          style={{
-            padding: '8px 10px', cursor: 'pointer', color: T.danger,
-            fontSize: F.sm, minHeight: '44px', display: 'flex', alignItems: 'center', gap: '5px',
-            borderBottom: `0.5px solid ${T.border}`,
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = T.bg2}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-          ✕ Remove {sectionLabel || ''}
-        </div>
-      )}
-
       <input
         autoFocus
         value={query}
@@ -419,7 +404,6 @@ const LinkField = React.forwardRef(function LinkField({
     // panelRef on outer div so outside-click handler covers full area.
     // non-compact: no position, no panelRef here (panelRef stays on trigger wrapper).
     <div
-      ref={compact ? panelRef : undefined}
       style={{
         padding: compact ? 0 : '10px 16px',
         position: compact ? 'relative' : undefined,
@@ -445,8 +429,8 @@ const LinkField = React.forwardRef(function LinkField({
                     borderRadius: '6px', padding: compact ? '7px 10px' : '10px 12px',
                     position: 'relative',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <UserCircle size={compact ? 16 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0, marginTop: '1px' }} />
+                    <div style={{ display: 'flex', alignItems: compact ? 'center' : 'flex-start', gap: '10px' }}>
+                      <UserCircle size={compact ? 32 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0, paddingRight: compact ? '36px' : 0 }}>
                         {href ? (
                           <a href={href} target="_blank" rel="noopener noreferrer"
@@ -612,9 +596,10 @@ const LinkField = React.forwardRef(function LinkField({
               <div style={{
                 background: T.bg3, border: `0.5px solid ${T.border}`,
                 borderRadius: '6px', padding: compact ? '7px 10px' : '10px 12px',
+                position: 'relative',
               }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <UserCircle size={compact ? 16 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0, marginTop: '1px' }} />
+                <div style={{ display: 'flex', alignItems: compact ? 'center' : 'flex-start', gap: '10px' }}>
+                  <UserCircle size={compact ? 32 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0, paddingRight: compact ? '36px' : 0 }}>
                     {titleHref?.(singleValue) ? (
                       <a href={titleHref(singleValue)} target="_blank" rel="noopener noreferrer"
@@ -638,7 +623,7 @@ const LinkField = React.forwardRef(function LinkField({
                       <div style={{ fontSize: F.xs, color: T.text2, marginTop: '2px' }}>{resolve(subtitleField, singleValue)}</div>
                     )}
                   </div>
-                  {/* × clear button — non-compact only; compact uses "Remove" in panel */}
+                  {/* × clear button — non-compact only */}
                   {!readOnly && !compact && (
                     <button
                       onClick={() => onChange?.(null)}
@@ -656,6 +641,22 @@ const LinkField = React.forwardRef(function LinkField({
                 </div>
                 {metaField && !compact && resolve(metaField, singleValue) && (
                   <div style={{ fontSize: '11px', color: T.text3, marginTop: '5px' }}>{resolve(metaField, singleValue)}</div>
+                )}
+                {!readOnly && compact && (
+                  <button
+                    onClick={() => onChange?.(null)}
+                    title={`Remove ${resolve(titleField, singleValue)}`}
+                    style={{
+                      position: 'absolute', top: '50%', right: '6px', transform: 'translateY(-50%)',
+                      width: '32px', height: '32px', padding: '8px', margin: '-6px',
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      color: T.text2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: '4px',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = T.danger; e.currentTarget.style.background = T.bg2; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = T.text2; e.currentTarget.style.background = 'transparent'; }}>
+                    <Trash size={18} weight="bold" />
+                  </button>
                 )}
               </div>
             </div>
