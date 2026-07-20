@@ -211,11 +211,12 @@ pages/api/pipeline/
 - **`CompanyContactRow`** kept intact for NewTaskForm WO section (company-first flow).
 - **Vendor/Tenant Company lookups** (TasksList rows, TaskDetail display, NewTaskForm picker) load ALL vendors/tenants regardless of status — do NOT add an Active-only filter back. A prior version filtered to `vendor_status=eq.Active` / `tenant_status=eq.Active`, which silently blanked out correctly-linked companies whenever the linked vendor/tenant wasn't Active (affected ~74% of vendors, ~65% of tenants). Fixed 2026-07-20.
 - **Vendor Company / Tenant Company fields** (Linked Companies card) match the Contact card visual pattern — icon (Truck/Storefront, same as AppShell nav) + clickable company name with ↗ (opens `/vendors/[podio_id]` or `/tenants/[podio_id]`) instead of the old FieldWithBadge corner-badge pattern. Blank state still shows '—' in a plain box.
+- **Tenant Company** shows a `prop_code` badge after the company name (sourced from `tenants.prop_code`). Vendor Company intentionally has no equivalent badge — vendors aren't tied to a single property.
 
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `792df04` — feat: compact contact cards with pencil trigger — Contacts + Linked Companies (TaskDetail)
+- preview: TBD after this commit
 
 ---
 

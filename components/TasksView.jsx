@@ -1361,7 +1361,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   useEffect(()=>{
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('vendors','select=id,company_dba,podio_id&order=company_dba.asc').then(setVendors).catch(()=>{});
-    sbFetch('tenants','select=id,tenant_dba,podio_id&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba,podio_id,prop_code&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
@@ -1841,7 +1841,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                   return t ? (
                     <div style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'8px'}}>
                       <Storefront size={16} weight="bold" style={{color:T.text2,flexShrink:0}}/>
-                      <div style={{flex:1,minWidth:0}}>
+                      <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
                         {link ? (
                           <a href={link} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
                             style={{color:T.accent,fontSize:F.sm,fontWeight:'500',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:'3px'}}>
@@ -1849,6 +1849,11 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                             <span style={{fontSize:'10px',color:T.text2,lineHeight:1}}>↗</span>
                           </a>
                         ) : <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{t.tenant_dba}</span>}
+                        {t.prop_code && (
+                          <span style={{fontSize:'10px',fontWeight:'600',color:T.text1,background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'1px 6px'}}>
+                            {t.prop_code}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ) : (
