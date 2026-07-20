@@ -5,7 +5,7 @@
  * Dry run (default):  node scripts/podio-vendors-backfill.js
  * Write mode:         node scripts/podio-vendors-backfill.js --write
  *
- * Requires in .env.local: PODIO_CLIENT_ID, PODIO_CLIENT_SECRET, PODIO_APP_ID, PODIO_APP_TOKEN
+ * Requires in .env.local: PODIO_CLIENT_ID, PODIO_CLIENT_SECRET, PODIO_VENDORS_APP_ID, PODIO_VENDORS_APP_TOKEN
  * Also reads: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
@@ -30,13 +30,19 @@ const { createClient } = require(path.join(__dirname, '../node_modules/@supabase
 const WRITE_MODE = process.argv.includes('--write');
 
 const {
-  PODIO_CLIENT_ID, PODIO_CLIENT_SECRET, PODIO_APP_ID, PODIO_APP_TOKEN,
+  PODIO_CLIENT_ID, PODIO_CLIENT_SECRET, PODIO_VENDORS_APP_ID, PODIO_VENDORS_APP_TOKEN,
   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 } = process.env;
 
-for (const [k, v] of Object.entries({ PODIO_CLIENT_ID, PODIO_CLIENT_SECRET, PODIO_APP_ID, PODIO_APP_TOKEN, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY })) {
+// Support old name alias for backwards compat during transition
+const PODIO_APP_ID = PODIO_VENDORS_APP_ID || process.env.PODIO_APP_ID;
+const PODIO_APP_TOKEN = PODIO_VENDORS_APP_TOKEN || process.env.PODIO_APP_TOKEN;
+
+for (const [k, v] of Object.entries({ PODIO_CLIENT_ID, PODIO_CLIENT_SECRET, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY })) {
   if (!v) { console.error(`Missing env var: ${k}`); process.exit(1); }
 }
+if (!PODIO_APP_ID) { console.error('Missing env var: PODIO_VENDORS_APP_ID'); process.exit(1); }
+if (!PODIO_APP_TOKEN) { console.error('Missing env var: PODIO_VENDORS_APP_TOKEN'); process.exit(1); }
 
 // ── Podio auth (app authentication) ─────────────────────────────────────────
 
