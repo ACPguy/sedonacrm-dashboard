@@ -791,7 +791,6 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
   const [serviceProps, setServiceProps]       = useState({});
   const [rightCollapsed, setRightCollapsed]   = useState(false);
   const [rightWidth, setRightWidth]           = useState(300);
-  const [copied, setCopied]                   = useState(false);
   const [referSearch, setReferSearch]         = useState('');
   const [referResults, setReferResults]       = useState([]);
   const [referLoading, setReferLoading]       = useState(false);
@@ -932,11 +931,6 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
     onUpdate?.(updated);
   };
 
-  const copyLink = () => {
-    const url = `${window.location.origin}/vendors/${data.podio_id ?? 'X'+data.id.slice(-6)}`;
-    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(()=>setCopied(false), 1500); });
-  };
-
   const selectReferredBy = async contact => {
     await sbPatch('vendors', data.id, { referred_by_contact_id: contact.id });
     const updated = { ...data, referred_by_contact_id: contact.id };
@@ -978,12 +972,6 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
               )}
             </>
           )}
-          <button onClick={copyLink}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',flexShrink:0,transition:'color 0.2s'}}
-            onMouseEnter={e=>{if(!copied)e.currentTarget.style.color=T.text0;}}
-            onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
-            {copied ? '✓ Copied' : '⧉ Copy Link'}
-          </button>
           <div style={{marginLeft:'auto',display:'flex',gap:'6px',alignItems:'center',flexShrink:0}}>
             {data.vendor_status && <span style={statusBadgeStyle(data.vendor_status)}>{data.vendor_status}</span>}
           </div>

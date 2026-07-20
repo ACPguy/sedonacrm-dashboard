@@ -5,8 +5,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
-  Wrench, CheckFat, NotePencil, FolderOpen, Buildings, House, Star, ClipboardText, ChatCircle,
-  CaretLeft, CaretRight,
+  Wrench, CheckFat, FolderOpen, Buildings, House, Star, ClipboardText, ChatCircle,
+  CaretLeft, CaretRight, Truck, Storefront, Plus,
 } from '@phosphor-icons/react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -14,6 +14,9 @@ import {
 } from '@dnd-kit/core';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
+import LinkField from './shared/LinkField';
+import StackedFormModal from './shared/StackedFormModal';
+import CompanyLinkCard from './shared/CompanyLinkCard';
 import { getTaskPrefix } from '../utils/taskPrefix';
 import { T } from '../lib/theme';
 
@@ -38,7 +41,11 @@ export const sbPatch = async (table, id, updates) => {
     body: JSON.stringify(updates),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.json();
+  const rows = await res.json();
+  // PostgREST returns 200 + empty array when RLS filters out the row — treat as an error
+  // so callers never silently swallow a write that didn't actually land.
+  if (Array.isArray(rows) && rows.length === 0) throw new Error('Update matched 0 rows — check RLS or that the record still exists');
+  return rows;
 };
 
 // Paginates through all rows 1000 at a time (Supabase anon cap = 1000/request).
@@ -53,6 +60,27 @@ export const sbFetchAll = async (table, baseParams = '') => {
     offset += PAGE;
   }
   return all;
+};
+
+export const sbPost = async (table, body) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+};
+
+export const sbDelete = async (table, params) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Prefer': 'return=minimal' },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 };
 
 const isFuOverdue = (d, task) => {
@@ -84,16 +112,16 @@ export const css = {
 
 // ── Type prefix / icon helpers ────────────────────────────────────────────────
 export const TYPE_PREFIX = {
-  work_order:'WO', task:'TSK', note:'NOTE', project:'PRJ', acp_task:'ACP', sg_task:'SG',
+  work_order:'WO', task:'TSK', project:'PRJ', acp_task:'ACP', sg_task:'SG',
 };
-const REVERSE_PREFIX = { WO:'work_order', TSK:'task', NOTE:'note', PRJ:'project', ACP:'acp_task', SG:'sg_task' };
-const TYPE_LABEL = { work_order:'Work Order', task:'Task', note:'Note', project:'Project', acp_task:'ACP Task', sg_task:'S&G Task' };
+const REVERSE_PREFIX = { WO:'work_order', TSK:'task', PRJ:'project', ACP:'acp_task', SG:'sg_task' };
+const TYPE_LABEL = { work_order:'Work Order', task:'Task', project:'Project', acp_task:'ACP Task', sg_task:'S&G Task' };
 const TYPE_COLOR = {
-  work_order:'#EF4444', task:'#06B6D4', note:'#64748B',
+  work_order:'#EF4444', task:'#06B6D4',
   project:'#8B5CF6', acp_task:'#E8630A', sg_task:'#84CC16',
 };
 const TYPE_ICON_MAP = {
-  work_order:Wrench, task:CheckFat, note:NotePencil,
+  work_order:Wrench, task:CheckFat,
   project:FolderOpen, acp_task:Buildings, sg_task:House,
 };
 
@@ -130,6 +158,17 @@ export const fmtDate = d => {
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '—';
   return `${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}-${dt.getUTCFullYear()}`;
+};
+const timeAgo = d => {
+  if (!d) return '';
+  const secs = Math.floor((Date.now() - new Date(d)) / 1000);
+  if (secs < 86400)  return 'today';
+  const days = Math.floor(secs / 86400);
+  if (days < 30)  return `${days} day${days===1?'':'s'} ago`;
+  const mos = Math.floor(days / 30);
+  if (mos < 12)   return `${mos} month${mos===1?'':'s'} ago`;
+  const yrs = Math.floor(mos / 12);
+  return `${yrs} year${yrs===1?'':'s'} ago`;
 };
 const fmtNumDate = d => {
   if (!d) return '';
@@ -194,7 +233,6 @@ const STATUS_OPTIONS   = ['Open','In Progress','On Hold','Closed','Cancelled'];
 const CATEGORY_OPTIONS = {
   work_order:['Roof','Plumbing','HVAC','Lighting',"TI's",'Common Area','Bldg. Shell','Landscape','P-Lot','Signs','Electrical','Pest Control','Fire / Security','Restroom','Trash','Utilities','Windows/Doors','Flooring','Keys','Other'],
   task:      ['$$ Issue','Insurance','LS Violation','LS Violation ?','Incident','Note','Lender','Taxes','Move In','Move Out','LATE RENT','- PROJECT -','DONE','Legal','Adjust Rent','TNT Estoppels','ACP Training','GOAL','C-19','???','Other'],
-  note:      ['General','Follow-Up','FYI','Reference','Other'],
   project:   ['Bid','Renovation','Maintenance','Administrative','Other'],
   acp_task:  ['Legal','IT','Taxes','Financial','HR','Marketing','Other'],
   sg_task:   ['FIN$','WNT','JMZ','*HLTH','CARS','??','Mom','OLY','JMZ REMOD.','OTHER','Trip','*GOAL','FOX'],
@@ -332,8 +370,56 @@ const InlineSelect = ({ value, options, onSave }) => (
   </select>
 );
 
+// ── CodeOnlySelect ────────────────────────────────────────────────────────────
+// Closed state shows just the code value; dropdown shows full "code — name" labels.
+const CodeOnlySelect = ({ value, options, onSave }) => {
+  const [open,setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(()=>{ if(open) ref.current?.focus(); },[open]);
+  return open ? (
+    <select ref={ref} value={value||''} autoFocus
+      onChange={async e=>{ await onSave(e.target.value||null); setOpen(false); }}
+      onBlur={()=>setOpen(false)}
+      style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
+      <option value="">—</option>
+      {options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  ) : (
+    <div onClick={()=>setOpen(true)} title="Click to edit"
+      style={{fontSize:F.base,color:value?T.text0:T.text3,cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
+      onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
+      onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
+      {value||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
+    </div>
+  );
+};
+
+// ── FieldWithBadge ────────────────────────────────────────────────────────────
+// Wraps any field with an optional corner icon-badge (↗) link. Badge opens the
+// linked record in a new tab. Uses a negative-margin padding trick so the
+// visual size stays ~18px while the touch target reaches 44px.
+const FieldWithBadge = ({ label, link, children }) => (
+  <div style={{ flex:1, minWidth:0 }}>
+    {label&&<div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',marginBottom:'4px'}}>{label}</div>}
+    <div style={{ position:'relative' }}>
+      {children}
+      {link&&(
+        <a href={link} target="_blank" rel="noopener noreferrer"
+          onClick={e=>e.stopPropagation()}
+          title="Open record"
+          style={{position:'absolute',top:'-6px',right:'-6px',width:'18px',height:'18px',borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',color:T.accent,textDecoration:'none',lineHeight:1,zIndex:1,
+            padding:'13px',margin:'-13px',boxSizing:'content-box'}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+          ↗
+        </a>
+      )}
+    </div>
+  </div>
+);
+
 // ── CompanyContactRow ─────────────────────────────────────────────────────────
-// Paired company + contact selects with FK-filtered contact list and auto-select.
+// Company-first contact linker — used by NewTaskForm's WO section.
 const CompanyContactRow = ({ companyLabel, contactLabel, companyValue, contactValue, companyOptions, allContacts, onSaveCompany, onSaveContact, companyLink, isMobile }) => {
   const filteredContacts = useMemo(
     () => companyValue ? allContacts.filter(c => c.vendor_id === companyValue || c.tenant_id === companyValue) : allContacts,
@@ -346,38 +432,19 @@ const CompanyContactRow = ({ companyLabel, contactLabel, companyValue, contactVa
   }, [companyValue, filteredContacts.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const contactObj = allContacts.find(c => c.id === contactValue);
   const contactLink = contactObj ? `/contacts/${contactObj.podio_id ?? 'X'+contactObj.id.slice(-6)}` : null;
-  const lbl = { fontSize:F.sm, fontWeight:'600', color:'#6B7280', marginBottom:'4px' };
-  const lnk = { fontSize:F.xs, color:T.accent, marginTop:'4px', display:'block', textDecoration:'none' };
-  const companyCol = (
-    <div style={{ flex:1, minWidth:0 }}>
-      <div style={lbl}>{companyLabel}</div>
-      <InlineSelect value={companyValue} options={companyOptions} onSave={onSaveCompany}/>
-      {companyLink&&<a href={companyLink} style={lnk}
-        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-        {companyOptions.find(o=>o.value===companyValue)?.label} ↗
-      </a>}
-    </div>
-  );
-  const contactCol = (
-    <div style={{ flex:1, minWidth:0 }}>
-      <div style={lbl}>{contactLabel}</div>
-      <InlineSelect
-        value={contactValue}
-        options={filteredContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')})) }
-        onSave={onSaveContact}
-      />
-      {contactLink&&<a href={contactLink} style={lnk}
-        onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-        onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
-        {contactObj?.full_name} ↗
-      </a>}
-    </div>
-  );
+
   return (
-    <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 12px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-      {companyCol}
-      {contactCol}
+    <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
+      <FieldWithBadge label={contactLabel} link={contactLink}>
+        <InlineSelect
+          value={contactValue}
+          options={filteredContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')})) }
+          onSave={onSaveContact}
+        />
+      </FieldWithBadge>
+      <FieldWithBadge label={companyLabel} link={companyLink}>
+        <InlineSelect value={companyValue} options={companyOptions} onSave={onSaveCompany}/>
+      </FieldWithBadge>
     </div>
   );
 };
@@ -661,7 +728,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   const [search,setSearch]           = useState('');
   const [sortCol,setSortCol]         = useState('priority');
   const [sortDir,setSortDir]         = useState('asc');
-  const [typeCounts,setTypeCounts]   = useState({work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0});
+  const [typeCounts,setTypeCounts]   = useState({work_order:0,task:0,project:0,acp_task:0,sg_task:0});
   const [dateFilters,setDateFilters] = useState({opened:null,updated:null,closed:null});
   const [moreOpen,setMoreOpen]       = useState(false);
   const [priorityFilter,setPriorityFilter] = useState('All');
@@ -727,7 +794,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         const taskIds = (tcRows||[]).map(r=>r.task_id);
         if (!taskIds.length) {
           setTasks([]);
-          setTypeCounts({work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0});
+          setTypeCounts({work_order:0,task:0,project:0,acp_task:0,sg_task:0});
           setLoading(false);
           return;
         }
@@ -760,7 +827,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
         sbFetchAll('tasks',`select=record_type&${shared.join('&')}`),
       ]);
       setTasks(data);
-      const counts={work_order:0,task:0,note:0,project:0,acp_task:0,sg_task:0};
+      const counts={work_order:0,task:0,project:0,acp_task:0,sg_task:0};
       countData.forEach(r=>{if(counts[r.record_type]!==undefined)counts[r.record_type]++;});
       setTypeCounts(counts);
       setLoading(false);
@@ -770,8 +837,8 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
   },[filtersReady,statusFilter,typeFilter,propFilter.join(','),filterPropCode,filterVendorId,filterTenantId,filterContactId,search,refreshKey]);
 
   useEffect(()=>{
-    sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
-    sbFetch('tenants','select=id,tenant_dba&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+    sbFetch('vendors','select=id,company_dba&order=company_dba.asc').then(setVendors).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     if (!filterPropCode) {
       sbFetch('properties','select=prop_code&status=eq.active&order=prop_code.asc')
         .then(d=>setPropCodes(d.map(r=>r.prop_code)))
@@ -884,7 +951,6 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
     {key:'project',   label:'Proj.'},
     {key:'acp_task',  label:'ACP'},
     {key:'sg_task',   label:'S&G'},
-    {key:'note',      label:'Note'},
   ];
 
   const propBtn=active=>({
@@ -1251,13 +1317,19 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const [isMobile,setIsMobile] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   const [rightCollapsed,setRightCollapsed] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   const [rightWidth,setRightWidth] = useState(300);
-  const [copied,setCopied]       = useState(false);
   const [detailTab,setDetailTab] = useState('details');
   const [navList,setNavList]     = useState(null);
   const [navIdx,setNavIdx]       = useState(-1);
   const [navLoading,setNavLoading] = useState(false);
   const [driveFolderLoading,setDriveFolderLoading] = useState(false);
   const [sysOpen,setSysOpen] = useState(false);
+  const [woFinOpen,setWoFinOpen] = useState(false);
+  const [woCloseOpen,setWoCloseOpen] = useState(false);
+  const [contactModalType,setContactModalType] = useState(null); // 'vendor' | 'tenant' | null
+  const [contactModalForm,setContactModalForm] = useState({});
+  const [contactModalSaving,setContactModalSaving] = useState(false);
+  const [contactModalError,setContactModalError] = useState('');
+  const [saveError,setSaveError] = useState(null);
   const resizingRight = useRef(false);
 
   useEffect(()=>{
@@ -1289,8 +1361,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
 
   useEffect(()=>{
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
-    sbFetch('vendors','select=id,company_dba,podio_id&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
-    sbFetch('tenants','select=id,tenant_dba,podio_id&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+    sbFetch('vendors','select=id,company_dba,podio_id&order=company_dba.asc').then(setVendors).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba,podio_id,prop_code&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
@@ -1339,10 +1411,87 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
 
   const save=async(field,val)=>{
     const updates={[field]:val??null};
-    await sbPatch('tasks',data.id,updates);
-    const updated={...data,...updates};
-    setData(updated);
-    onUpdate?.(updated);
+    try{
+      await sbPatch('tasks',data.id,updates);
+      const updated={...data,...updates};
+      setData(updated);
+      onUpdate?.(updated);
+      setSaveError(null);
+    }catch(e){
+      setSaveError(e.message);
+      throw e; // re-throw so InlineBlurField can revert the displayed value
+    }
+  };
+
+  const saveMany=async updates=>{
+    const patched=Object.fromEntries(Object.entries(updates).map(([k,v])=>[k,v??null]));
+    try{
+      await sbPatch('tasks',data.id,patched);
+      const updated={...data,...patched};
+      setData(updated);
+      onUpdate?.(updated);
+      setSaveError(null);
+    }catch(e){
+      setSaveError(e.message);
+    }
+  };
+
+  const handleContactChange=async(type,row)=>{
+    const companyId=row?(row.vendor_id??row.tenant_id??null):null;
+    await saveMany({[`${type}_contact_id`]:row?row.id:null,[`${type}_id`]:companyId});
+  };
+
+  const openContactModal=type=>{
+    setContactModalType(type);
+    setContactModalForm({full_name:'',company_dba:'',primary_phone:'',email:''});
+    setContactModalError('');
+  };
+
+  const handleContactModalSave=async()=>{
+    if(!contactModalForm.full_name?.trim()){setContactModalError('Name is required.');return;}
+    setContactModalSaving(true);
+    setContactModalError('');
+    try{
+      const isVendor=contactModalType==='vendor';
+      // Vendor-side: resolve or auto-create a vendor row when a company name was typed.
+      // Tenant-side intentionally excluded — new tenants must go through the leasing pipeline,
+      // not be created ad hoc from a task detail page.
+      let vendorId=isVendor?(data.vendor_id||null):null;
+      if(isVendor&&contactModalForm.company_dba?.trim()){
+        const trimmedName=contactModalForm.company_dba.trim();
+        try{
+          const existing=await sbFetch('vendors',`company_dba=ilike.${encodeURIComponent(trimmedName)}&select=id,company_dba,podio_id&limit=1`);
+          if(existing&&existing.length>0){
+            vendorId=existing[0].id;
+          }else{
+            const created=await sbPost('vendors',{company_dba:trimmedName,vendor_status:'Active'});
+            const newVendorRow=Array.isArray(created)?created[0]:created;
+            vendorId=newVendorRow.id;
+            setVendors(prev=>[...prev,newVendorRow]);
+          }
+        }catch(e){
+          setContactModalError('Could not create/find vendor company. '+(e?.message||''));
+          return;
+        }
+      }
+      const payload={
+        full_name:contactModalForm.full_name,
+        company_dba:contactModalForm.company_dba||null,
+        primary_phone:contactModalForm.primary_phone||null,
+        email:contactModalForm.email||null,
+        category:isVendor?'Vendor':'Tenant',
+        vendor_id:vendorId,
+        tenant_id:!isVendor?(data.tenant_id||null):null,
+      };
+      const r=await sbPost('contacts',payload);
+      const newRow=Array.isArray(r)?r[0]:r;
+      await handleContactChange(contactModalType,newRow);
+      setContactModalType(null);
+    }catch(e){
+      setContactModalError('Could not create contact. '+(e?.message||''));
+    }finally{
+      setContactModalSaving(false);
+    }
   };
 
   const handleStatusChange=async newStatus=>{
@@ -1366,12 +1515,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     const updated={...data,record_type:newType};
     setData(updated);
     onUpdate?.(updated);
-  };
-
-  const copyLink=()=>{
-    if(!data)return;
-    const url=`${window.location.origin}/tasks/${data.task_num}`;
-    navigator.clipboard.writeText(url).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);});
   };
 
   const createDriveFolder=async()=>{
@@ -1416,6 +1559,13 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const goNavRef = useRef(goNav);
   goNavRef.current = goNav;
 
+  const contactsFieldRef     = useRef(null);
+  const contactsBtnRef       = useRef(null);
+  const vendorContactRef     = useRef(null);
+  const vendorContactBtnRef  = useRef(null);
+  const tenantContactRef     = useRef(null);
+  const tenantContactBtnRef  = useRef(null);
+
   useEffect(()=>{
     const onArrow=e=>{
       if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
@@ -1444,6 +1594,20 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const vendorLink=vid=>{const v=vendors.find(x=>x.id===vid);if(!v)return null;return v.podio_id?`/vendors/${v.podio_id}`:`/vendors/X${v.id.slice(-6)}`;};
   const tenantLink=tid=>{const t=tenants.find(x=>x.id===tid);if(!t)return null;return t.podio_id?`/tenants/${t.podio_id}`:`/tenants/X${t.id.slice(-6)}`;};
 
+  const contactCompanyName = row => {
+    if (row.vendor_id) return vendors.find(v=>v.id===row.vendor_id)?.company_dba;
+    if (row.tenant_id) return tenants.find(t=>t.id===row.tenant_id)?.tenant_dba;
+    return null;
+  };
+  const contactTitle = row => {
+    const co = contactCompanyName(row);
+    return co ? `${row.full_name} — ${co}` : row.full_name;
+  };
+  const contactPropCode = row => {
+    if (row.tenant_id) return tenants.find(t=>t.id===row.tenant_id)?.prop_code;
+    return null;
+  };
+
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
       {/* Header */}
@@ -1459,12 +1623,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           {data.prop_code&&<span style={{fontSize:F.xs,background:'#1a2e3a',color:T.accent,padding:'2px 8px',borderRadius:'3px',fontWeight:'600',flexShrink:0}}>{data.prop_code}</span>}
           <StatusBadge status={data.priority}/>
           <StatusBadge status={data.status}/>
-          <button onClick={copyLink}
-            style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'3px 8px',color:copied?T.success:T.text2,fontSize:F.xs,cursor:'pointer',transition:'color 0.2s',flexShrink:0}}
-            onMouseEnter={e=>{if(!copied)e.currentTarget.style.color=T.text0;}}
-            onMouseLeave={e=>{if(!copied)e.currentTarget.style.color=T.text2;}}>
-            {copied?'✓ Copied':'⧉ Copy Link'}
-          </button>
           {data.record_type==='work_order'&&(
             data.drive_folder_id
               ? <a href={data.drive_folder_url} target="_blank" rel="noopener noreferrer"
@@ -1501,7 +1659,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           )}
         </div>
         {/* Type conversion pills */}
-        {(()=>{const TYPE_SHORT={work_order:'WO',task:'TSK',note:'Note',project:'Proj.',acp_task:'ACP',sg_task:'S&G'};return(
+        {(()=>{const TYPE_SHORT={work_order:'WO',task:'TSK',project:'Proj.',acp_task:'ACP',sg_task:'S&G'};return(
         <div className="crm-task-type-pills" style={{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
           <span style={{fontSize:F.xs,color:T.text3,fontWeight:'600'}}>Type:</span>
           {Object.keys(TYPE_PREFIX).map(key=>{
@@ -1538,12 +1696,13 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             </button>
           ))}
         </div>
+        {saveError&&<div style={{padding:'6px 16px',background:'rgba(220,38,38,0.1)',borderBottom:`0.5px solid ${T.danger}`,fontSize:F.xs,color:T.danger,flexShrink:0}}>{saveError}</div>}
         {/* Content row */}
         <div style={{display:'flex',flex:1,overflow:'hidden'}}>
           {detailTab!=='comms'&&<div style={{flex:1,overflowY:'auto',minWidth:0}}>
-          {/* Base fields */}
-          <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px',overflow:'hidden'}}>
-            {/* Title — icon + large editable field */}
+          {/* 1 — CORE */}
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px 0',overflow:'hidden'}}>
+            <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Core</div>
             <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,minHeight:'52px'}}
               onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.04)'}
               onMouseLeave={e=>e.currentTarget.style.background=''}>
@@ -1555,22 +1714,13 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               </div>
             </div>
             <FieldRow label="Property" topAlign>
-              <InlineSelect value={data.prop_code} options={activeProps.map(p=>({value:p.prop_code,label:`${p.prop_code} — ${p.property_name}`}))} onSave={v=>save('prop_code',v)}/>
+              <CodeOnlySelect value={data.prop_code} options={activeProps.map(p=>({value:p.prop_code,label:`${p.prop_code} — ${p.property_name}`}))} onSave={v=>save('prop_code',v)}/>
               {propInfo&&(
                 <div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px 10px'}}>
                   <div style={{fontSize:F.sm,fontWeight:'500',color:T.text0}}>{propInfo.property_name}</div>
                   {propLine2&&<div style={{fontSize:F.xs,color:T.text2,marginTop:'2px'}}>{propLine2}</div>}
                 </div>
               )}
-            </FieldRow>
-            <FieldRow label="Alert">
-              <InlineBlurField value={data.alert||''} onSave={v=>save('alert',v)}/>
-            </FieldRow>
-            <FieldRow label="FU Date">
-              <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
-            </FieldRow>
-            <FieldRow label="FU Notes" topAlign>
-              <RichTextEditor value={data.follow_up_notes} onSave={v=>save('follow_up_notes',v)} minRows={5}/>
             </FieldRow>
             <FieldRow label="Priority"><PriorityPills value={data.priority} onSave={v=>save('priority',v)}/></FieldRow>
             <FieldRow label="Assigned To">
@@ -1586,6 +1736,222 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 <InlineSelect value={data.category} options={categoryOpts} onSave={v=>save('category',v)}/>
               </FieldRow>
             )}
+          </div>
+
+          {/* 2 — FOLLOW-UP */}
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
+            <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Follow-Up</div>
+            <FieldRow label="Alert">
+              <InlineBlurField value={data.alert||''} onSave={v=>save('alert',v)}/>
+            </FieldRow>
+            <FieldRow label="FU Date">
+              <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
+            </FieldRow>
+            <FieldRow label="FU Notes" topAlign>
+              <RichTextEditor value={data.follow_up_notes} onSave={v=>save('follow_up_notes',v)} minRows={5}/>
+            </FieldRow>
+          </div>
+
+          {/* 3 — CONTACTS */}
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden',padding:'10px 16px 14px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+              <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Contacts</span>
+              <button ref={contactsBtnRef} onClick={()=>contactsFieldRef.current?.openPanel()}
+                title="Add new item"
+                style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <Plus size={14} weight="bold"/>
+              </button>
+            </div>
+            <LinkField
+              ref={contactsFieldRef}
+              excludeRef={contactsBtnRef}
+              joinTable="task_contacts"
+              parentIdField="task_id"
+              parentId={data.id}
+              linkedTable="contacts"
+              linkedIdField="contact_id"
+              linkedFields="id,full_name,company_dba,podio_id,category,created_at,primary_phone,email,vendor_id,tenant_id"
+              searchFields={['full_name','company_dba']}
+              titleField={contactTitle}
+              titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
+              subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+              badgeField={contactPropCode}
+              sectionLabel="contact"
+              allowCreate={true}
+              createFields={['full_name','company_dba','primary_phone','email']}
+              onCreate={async fields=>{const r=await sbPost('contacts',fields);return Array.isArray(r)?r[0]:r;}}
+              compact={true}
+              hideTrigger={true}
+            />
+          </div>
+
+          {/* 4 — LINKED COMPANIES */}
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden',padding:'10px 16px 14px'}}>
+            <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Linked Companies</div>
+            {/* Vendor row — flat 4-child grid: label, label, LinkField, Company card */}
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gridAutoRows:'auto',gap:'6px 12px',marginBottom:'12px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Contact</span>
+                <button ref={vendorContactBtnRef} onClick={()=>vendorContactRef.current?.openPanel()}
+                  title="Change vendor contact"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
+              <div style={{display:'flex',alignItems:'center'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Company</span>
+              </div>
+              <LinkField
+                ref={vendorContactRef}
+                excludeRef={vendorContactBtnRef}
+                mode="single"
+                hideTrigger={true}
+                value={data.vendor_contact_id}
+                onChange={row=>handleContactChange('vendor',row)}
+                onCreateNew={()=>openContactModal('vendor')}
+                linkedTable="contacts"
+                linkedFields="id,full_name,company_dba,podio_id,vendor_id,tenant_id,primary_phone,email"
+                searchFields={['full_name','company_dba']}
+                titleField={contactTitle}
+                titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
+                subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+                badgeField={contactPropCode}
+                allowCreate={true}
+                sectionLabel="contact"
+                compact={true}
+              />
+              {(() => {
+                const v = vendors.find(x=>x.id===data.vendor_id);
+                return <CompanyLinkCard icon={Truck} name={v?.company_dba} link={data.vendor_id?vendorLink(data.vendor_id):null} />;
+              })()}
+            </div>
+            {/* Tenant row — same flat 4-child grid pattern */}
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gridAutoRows:'auto',gap:'6px 12px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Contact</span>
+                <button ref={tenantContactBtnRef} onClick={()=>tenantContactRef.current?.openPanel()}
+                  title="Change tenant contact"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
+              <div style={{display:'flex',alignItems:'center'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Company</span>
+              </div>
+              <LinkField
+                ref={tenantContactRef}
+                excludeRef={tenantContactBtnRef}
+                mode="single"
+                hideTrigger={true}
+                value={data.tenant_contact_id}
+                onChange={row=>handleContactChange('tenant',row)}
+                onCreateNew={()=>openContactModal('tenant')}
+                linkedTable="contacts"
+                linkedFields="id,full_name,company_dba,podio_id,vendor_id,tenant_id,primary_phone,email"
+                searchFields={['full_name','company_dba']}
+                titleField={contactTitle}
+                titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
+                subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+                badgeField={contactPropCode}
+                allowCreate={true}
+                sectionLabel="contact"
+                compact={true}
+              />
+              {(() => {
+                const t = tenants.find(x=>x.id===data.tenant_id);
+                return <CompanyLinkCard icon={Storefront} name={t?.tenant_dba} link={data.tenant_id?tenantLink(data.tenant_id):null} badge={t?.prop_code} />;
+              })()}
+            </div>
+          </div>
+
+          {/* 4 — WORK ORDER DETAILS (WO only) */}
+          {data.record_type==='work_order'&&(
+            <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
+              <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg3}}>
+                <span style={{fontSize:F.xs,fontWeight:'700',color:'#E8630A',textTransform:'uppercase',letterSpacing:'0.07em',display:'flex',alignItems:'center',gap:'6px'}}>
+                  <Wrench size={13} weight="bold"/>Work Order Details
+                </span>
+              </div>
+              <FieldRow label="WO Category">
+                <InlineSelect value={data.wo_category} options={CATEGORY_OPTIONS.work_order} onSave={v=>save('wo_category',v)}/>
+              </FieldRow>
+              <FieldRow label="Budget Item?">
+                <BoolPill value={data.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>save('is_budget_item',v)}/>
+              </FieldRow>
+              <FieldRow label="Keys / Key Safe">
+                <InlineBlurField value={data.key_safe_info||''} onSave={v=>save('key_safe_info',v)}/>
+              </FieldRow>
+              <FieldRow label="WO Type">
+                <GenericPills value={data.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>save('wo_type',v)}/>
+              </FieldRow>
+              <FieldRow label="WO Instructions to Vendor" topAlign>
+                <RichTextEditor value={data.instructions_to_vendor} onSave={v=>save('instructions_to_vendor',v)} minRows={5}/>
+              </FieldRow>
+              <FieldRow label="Email Request To Vendor">
+                <GenericPills value={data.email_request_sent} options={EMAIL_REQUEST_OPTIONS} onSave={v=>save('email_request_sent',v)}/>
+              </FieldRow>
+              {/* Financials sub-panel */}
+              <button onClick={()=>setWoFinOpen(o=>!o)}
+                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 16px',background:T.bg3,border:'none',cursor:'pointer',color:T.text2,fontSize:F.xs,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em',borderTop:`0.5px solid ${T.border}`,borderBottom:woFinOpen?`0.5px solid ${T.border}`:'none',minHeight:'44px'}}>
+                <span>{woFinOpen ? '− Financials' : '+ Financials'}</span>
+                <span>{woFinOpen ? '▲' : '▼'}</span>
+              </button>
+              {woFinOpen&&(
+                <>
+                  <FieldRow label="Estimate Amount">
+                    <InlineBlurField value={data.estimate_amount!=null?String(data.estimate_amount):''} moneyFormat onSave={v=>save('estimate_amount',v?parseFloat(String(v).replace(/[^0-9.-]/g,'')):null)}/>
+                  </FieldRow>
+                  <FieldRow label="Log" topAlign>
+                    <RichTextEditor value={data.estimate_log} onSave={v=>save('estimate_log',v)} minRows={5}/>
+                  </FieldRow>
+                  <FieldRow label="Pmt Instructions to BK">
+                    <InlineBlurField value={data.pmt_instructions_to_bk||''} onSave={v=>save('pmt_instructions_to_bk',v)}/>
+                  </FieldRow>
+                  <FieldRow label="Invoice Location">
+                    <GenericPills value={data.invoice_location} options={INVOICE_LOCATION_OPTIONS} onSave={v=>save('invoice_location',v)}/>
+                  </FieldRow>
+                  <FieldRow label="Invoice Stage">
+                    <GenericPills value={data.invoice_stage} options={INVOICE_STAGE_OPTIONS} onSave={v=>save('invoice_stage',v)}/>
+                  </FieldRow>
+                  <FieldRow label="Invoice Paid">
+                    <BoolPill value={data.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" onSave={v=>save('invoice_paid',v)}/>
+                  </FieldRow>
+                </>
+              )}
+              {/* Closeout sub-panel */}
+              <button onClick={()=>setWoCloseOpen(o=>!o)}
+                style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 16px',background:T.bg3,border:'none',cursor:'pointer',color:T.text2,fontSize:F.xs,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em',borderTop:`0.5px solid ${T.border}`,borderBottom:woCloseOpen?`0.5px solid ${T.border}`:'none',minHeight:'44px'}}>
+                <span>{woCloseOpen ? '− Closeout' : '+ Closeout'}</span>
+                <span>{woCloseOpen ? '▲' : '▼'}</span>
+              </button>
+              {woCloseOpen&&(
+                <>
+                  <FieldRow label="Final Close-Out Notes" topAlign>
+                    <RichTextEditor value={data.final_closeout_notes} onSave={v=>save('final_closeout_notes',v)} minRows={5}/>
+                  </FieldRow>
+                  <FieldRow label="Work Stage">
+                    <GenericPills value={data.stage} options={WORK_STAGE_OPTIONS} onSave={v=>save('stage',v)}/>
+                  </FieldRow>
+                  <FieldRow label="Make Recurring">
+                    <BoolPill value={data.make_recurring} labelTrue="Yes" labelFalse="No" onSave={v=>save('make_recurring',v)}/>
+                  </FieldRow>
+                  <FieldRow label="Bid Status">
+                    <InlineBlurField value={data.bid_status||''} onSave={v=>save('bid_status',v)}/>
+                  </FieldRow>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* 5 — NOTES AND RELATIONSHIPS */}
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
+            <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Notes &amp; Relationships</div>
             <FieldRow label="Details" topAlign>
               <RichTextEditor value={data.details} onSave={v=>save('details',v)} minRows={5}/>
             </FieldRow>
@@ -1608,16 +1974,21 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 </FieldRow>
               </>
             )}
-            {isClosed&&(
-              <FieldRow label="Close Date">
-                <InlineBlurField type="date" value={data.close_date||''} onSave={v=>save('close_date',v)}/>
-              </FieldRow>
-            )}
-            <FieldRow label="Created" hoverable={false}>
-              <InlineBlurField readOnly value={data.created_at?fmtDate(data.created_at):''}/>
-            </FieldRow>
-            <FieldRow label="Last Updated" hoverable={false}>
-              <InlineBlurField readOnly value={data.updated_at?fmtDate(data.updated_at):''}/>
+          </div>
+
+          {/* 6 — DOCUMENTS */}
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
+            <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Documents</div>
+            <FieldRow label="Drive Folder" hoverable={false}>
+              {data.drive_folder_url
+                ?<a href={data.drive_folder_url} target="_blank" rel="noopener noreferrer"
+                  style={{display:'inline-block',padding:'4px 12px',border:`1px solid #E8630A`,borderRadius:'4px',color:'#E8630A',fontSize:F.sm,textDecoration:'none',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='rgba(232,99,10,0.08)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  📁 Open Drive Folder
+                </a>
+                :<span style={{fontSize:F.sm,color:T.text2}}>No Drive folder linked</span>
+              }
             </FieldRow>
             {data.podio_url&&(
               <FieldRow label="Podio Link" hoverable={false}>
@@ -1631,101 +2002,21 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             )}
           </div>
 
-          {/* Work Order section */}
-          {data.record_type==='work_order'&&(
-            <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden'}}>
-              <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg3}}>
-                <span style={{fontSize:F.xs,fontWeight:'700',color:'#E8630A',textTransform:'uppercase',letterSpacing:'0.07em',display:'flex',alignItems:'center',gap:'6px'}}>
-                  <Wrench size={13} weight="bold"/>Work Order Details
-                </span>
-              </div>
-              <FieldRow label="WO Category">
-                <InlineSelect value={data.wo_category} options={CATEGORY_OPTIONS.work_order} onSave={v=>save('wo_category',v)}/>
-              </FieldRow>
-              <FieldRow label="Budget Item?">
-                <BoolPill value={data.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>save('is_budget_item',v)}/>
-              </FieldRow>
-              <FieldRow label="WO Instructions to Vendor" topAlign>
-                <RichTextEditor value={data.instructions_to_vendor} onSave={v=>save('instructions_to_vendor',v)} minRows={5}/>
-              </FieldRow>
-              <FieldRow label="Keys / Key Safe">
-                <InlineBlurField value={data.key_safe_info||''} onSave={v=>save('key_safe_info',v)}/>
-              </FieldRow>
-              <CompanyContactRow
-                companyLabel="Vendor Company"
-                contactLabel="Vendor Contact"
-                companyValue={data.vendor_id}
-                contactValue={data.vendor_contact_id}
-                companyOptions={vendors.map(v=>({value:v.id,label:v.company_dba}))}
-                allContacts={vendorContacts}
-                onSaveCompany={v=>save('vendor_id',v)}
-                onSaveContact={v=>save('vendor_contact_id',v)}
-                companyLink={data.vendor_id?vendorLink(data.vendor_id):null}
-                isMobile={isMobile}
-              />
-              <CompanyContactRow
-                companyLabel="Tenant Company"
-                contactLabel="Tenant Contact"
-                companyValue={data.tenant_id}
-                contactValue={data.tenant_contact_id}
-                companyOptions={tenants.map(t=>({value:t.id,label:t.tenant_dba}))}
-                allContacts={tenantContacts}
-                onSaveCompany={v=>save('tenant_id',v)}
-                onSaveContact={v=>save('tenant_contact_id',v)}
-                companyLink={data.tenant_id?tenantLink(data.tenant_id):null}
-                isMobile={isMobile}
-              />
-              <FieldRow label="WO Type">
-                <GenericPills value={data.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>save('wo_type',v)}/>
-              </FieldRow>
-              <FieldRow label="Email Request To Vendor">
-                <GenericPills value={data.email_request_sent} options={EMAIL_REQUEST_OPTIONS} onSave={v=>save('email_request_sent',v)}/>
-              </FieldRow>
-              <FieldRow label="Estimate Amount">
-                <InlineBlurField value={data.estimate_amount!=null?String(data.estimate_amount):''} moneyFormat onSave={v=>save('estimate_amount',v?parseFloat(String(v).replace(/[^0-9.-]/g,'')):null)}/>
-              </FieldRow>
-              <FieldRow label="Log" topAlign>
-                <RichTextEditor value={data.estimate_log} onSave={v=>save('estimate_log',v)} minRows={5}/>
-              </FieldRow>
-              <FieldRow label="Pmt Instructions to BK">
-                <InlineBlurField value={data.pmt_instructions_to_bk||''} onSave={v=>save('pmt_instructions_to_bk',v)}/>
-              </FieldRow>
-              <FieldRow label="Invoice Location">
-                <GenericPills value={data.invoice_location} options={INVOICE_LOCATION_OPTIONS} onSave={v=>save('invoice_location',v)}/>
-              </FieldRow>
-              <FieldRow label="Invoice Stage">
-                <GenericPills value={data.invoice_stage} options={INVOICE_STAGE_OPTIONS} onSave={v=>save('invoice_stage',v)}/>
-              </FieldRow>
-              <FieldRow label="Invoice Paid">
-                <BoolPill value={data.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" onSave={v=>save('invoice_paid',v)}/>
-              </FieldRow>
-              <FieldRow label="Final Close-Out Notes" topAlign>
-                <RichTextEditor value={data.final_closeout_notes} onSave={v=>save('final_closeout_notes',v)} minRows={5}/>
-              </FieldRow>
-              <FieldRow label="Work Stage">
-                <GenericPills value={data.stage} options={WORK_STAGE_OPTIONS} onSave={v=>save('stage',v)}/>
-              </FieldRow>
-              <FieldRow label="Make Recurring">
-                <BoolPill value={data.make_recurring} labelTrue="Yes" labelFalse="No" onSave={v=>save('make_recurring',v)}/>
-              </FieldRow>
-              <FieldRow label="Bid Status">
-                <InlineBlurField value={data.bid_status||''} onSave={v=>save('bid_status',v)}/>
-              </FieldRow>
-              <FieldRow label="Drive Folder" hoverable={false}>
-                {data.drive_folder_url
-                  ?<a href={data.drive_folder_url} target="_blank" rel="noopener noreferrer"
-                    style={{display:'inline-block',padding:'4px 12px',border:`1px solid #E8630A`,borderRadius:'4px',color:'#E8630A',fontSize:F.sm,textDecoration:'none',cursor:'pointer'}}
-                    onMouseEnter={e=>e.currentTarget.style.background='rgba(232,99,10,0.08)'}
-                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                    📁 Open Drive Folder
-                  </a>
-                  :<span style={{fontSize:F.sm,color:T.text2}}>No Drive folder linked</span>
-                }
-              </FieldRow>
-            </div>
-          )}
+          {/* 7 — DATES */}
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
+            <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Dates</div>
+            <FieldRow label="Created" hoverable={false}>
+              <InlineBlurField readOnly value={data.created_at?fmtDate(data.created_at):''}/>
+            </FieldRow>
+            <FieldRow label="Last Updated" hoverable={false}>
+              <InlineBlurField readOnly value={data.updated_at?fmtDate(data.updated_at):''}/>
+            </FieldRow>
+            <FieldRow label="Close Date">
+              <InlineBlurField type="date" value={data.close_date||''} onSave={v=>save('close_date',v)}/>
+            </FieldRow>
+          </div>
           {/* System Info — collapsible */}
-          <div style={{margin:'0 16px 12px',background:T.bg2,borderRadius:'8px',overflow:'hidden'}}>
+          <div style={{margin:'10px 16px 12px',background:T.bg2,borderRadius:'8px',overflow:'hidden'}}>
             <button onClick={()=>setSysOpen(o=>!o)}
               style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 16px',background:T.bg3,border:'none',cursor:'pointer',color:T.text2,fontSize:F.xs,fontWeight:'600',textTransform:'uppercase',letterSpacing:'0.06em',borderBottom:sysOpen?`0.5px solid ${T.border}`:'none'}}>
               <span>System Info</span>
@@ -1783,6 +2074,49 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           <ChatCircle size={26} weight="fill" color="white"/>
         </button>
       )}
+      {/* Create contact modal — opened from Linked Companies LinkField single mode */}
+      {contactModalType&&(
+        <StackedFormModal
+          title={`New ${contactModalType==='vendor'?'Vendor':'Tenant'} Contact`}
+          onClose={()=>!contactModalSaving&&setContactModalType(null)}
+          zIndex={310}
+          footer={
+            <div style={{display:'flex',justifyContent:'flex-end',gap:'8px'}}>
+              <button
+                onClick={()=>setContactModalType(null)}
+                disabled={contactModalSaving}
+                style={{background:'transparent',border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 12px',color:T.text1,fontSize:F.sm,cursor:'pointer',minHeight:'32px'}}>
+                Cancel
+              </button>
+              <button
+                onClick={handleContactModalSave}
+                disabled={contactModalSaving}
+                style={{background:'#E8630A',border:'none',borderRadius:'4px',padding:'5px 12px',color:'#fff',fontSize:F.sm,cursor:contactModalSaving?'wait':'pointer',minHeight:'32px'}}>
+                {contactModalSaving?'Saving…':'Save'}
+              </button>
+            </div>
+          }
+        >
+          {contactModalError&&<div style={{fontSize:F.xs,color:T.danger,marginBottom:'10px'}}>{contactModalError}</div>}
+          {[
+            {key:'full_name',label:'Name *',required:true},
+            {key:'company_dba',label:'Company'},
+            {key:'primary_phone',label:'Phone'},
+            {key:'email',label:'Email'},
+          ].map(({key,label})=>(
+            <div key={key} style={{marginBottom:'12px'}}>
+              <div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',marginBottom:'4px'}}>{label}</div>
+              <input
+                type={key==='email'?'email':key==='primary_phone'?'tel':'text'}
+                value={contactModalForm[key]||''}
+                onChange={e=>setContactModalForm(p=>({...p,[key]:e.target.value}))}
+                onKeyDown={e=>{if(e.key==='Enter'&&key==='email')handleContactModalSave();}}
+                style={{display:'block',width:'100%',boxSizing:'border-box',background:T.bg3,border:`1px solid ${T.border}`,borderRadius:'4px',padding:'5px 8px',color:T.text0,fontSize:F.base,outline:'none',minHeight:'36px'}}
+              />
+            </div>
+          ))}
+        </StackedFormModal>
+      )}
     </div>
   );
 };
@@ -1836,8 +2170,8 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const [tenantContacts,setTenantContacts] = useState([]);
   const [activeProps,setActiveProps] = useState([]);
   useEffect(()=>{
-    sbFetch('vendors','select=id,company_dba&vendor_status=eq.Active&order=company_dba.asc').then(setVendors).catch(()=>{});
-    sbFetch('tenants','select=id,tenant_dba&tenant_status=eq.Active&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+    sbFetch('vendors','select=id,company_dba&order=company_dba.asc').then(setVendors).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('properties','select=prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});

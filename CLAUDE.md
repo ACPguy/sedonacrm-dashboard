@@ -120,6 +120,7 @@ Every tab uses **lazy loading** — data fetches only when tab is clicked, never
   shared/
     TasksTable.jsx     — reference only (no longer used in embedded contexts)
     WorkOrdersTable.jsx, TenantsTable.jsx, SuitesTable.jsx, IssuesTable.jsx, ContactsTable.jsx
+    StackedFormModal.jsx — generic overlay shell for full-form create flows (Contact, Vendor, future). Props: title, onClose, children, footer, maxWidth, zIndex. No backdrop/Escape-to-close. Caller passes increasing zIndex for stacked modals. No consumers wired yet — shell-only as of 2026-07-17.
 
 lib/
   gmail.js               — getGmailClient(), setupWatch()
@@ -132,61 +133,20 @@ pages/
   home.jsx               — renders <SedonaCRM /> at clean /home URL (HomeView by default)
 
 pages/api/agents/
-  morning-briefing.js  — GET today's briefing; cron/POST runs 14 parallel queries, saves to briefings table
-  lease-watch.js       — GET active drafts; cron/POST iterates tenants, calls Claude API, saves drafts
-  new-inquiry.js       — GET active drafts; cron/POST keyword filter → Claude draft → pipeline insert → thread link; dismiss action
-  work-order-agent.js  — GET today's wo_agent_runs row; cron/POST nudges (past-due + no-activity) + high-cost flags (≥$2,500)
+  morning-briefing.js, lease-watch.js, new-inquiry.js, work-order-agent.js
 
 pages/api/gmail/
-  renew-watch.js      — POST/GET renews Gmail Pub/Sub watch; cron every 6 days
-  webhook.js          — processes Pub/Sub push notifications, syncs email_threads + email_messages
-  sync-now.js         — POST syncs Gmail history + polls INBOX; GET returns current state
-  batch-action.js     — POST { threadIds, action: archive|spam|delete } — calls Gmail API + updates Supabase; auth: x-briefing-secret
+  renew-watch.js, webhook.js, sync-now.js, batch-action.js
 
 pages/api/pipeline/
-  lead-capture.js       — POST: create leasing_pipeline at New Inquiry (inbound lead)
-  transition.js         — POST: advance/exit stage; handles NA-skip for stage_5_state/stage_7_state
-  submit-application.js — POST: write lease_applications row + link via pipeline_id FK
-  loi-draft.js          — POST: Claude API LOI draft (draft only, no auto-send)
-  movein-clearance.js   — GET: check 5 clearance gates (lease signed, invoices, COI, blocking WOs)
-  notice-to-vacate.js   — POST: set suite "Vacant / For Lease — Pending" + auto-create notice_triggered pipeline record
+  lead-capture.js, transition.js, submit-application.js, loi-draft.js, movein-clearance.js, notice-to-vacate.js
 ```
 
 ## Phase Status
 
 - **Phases 0–3:** Complete
-- **Phase 4:** IN PROGRESS
-  - Agent 7 Morning Briefing: Complete (cron `0 12 * * *` = 5am AZ)
-  - Agent 1 Lease Watch: Complete (cron `0 13 * * *` = 6am AZ)
-  - Agent 3 New Inquiry: Complete (cron `0 15,17,19,21,23,1 * * *` = 8am–6pm AZ, 6x/day)
-  - Gmail Watch Auto-Renewal: Complete (cron `0 11 */6 * *` = every 6 days; renewed 2026-06-26, expires 2026-07-03)
-  - Agent 4 Work Order Agent: Complete — nudge logic (Urgent=2d, High=7d, Normal=10d past due + 14d no-activity), high-cost flag ($2,500+), stores to `wo_agent_runs`; WorkOrderAgentDrafts card in BriefingView; cron `0 14 * * *` (7am AZ, daily)
-  - Remaining Phase 4: Agent 9
-- **Phase 4 Supporting work (complete):**
-  - BriefingView: 5 collapsible agent sections, `propCode` prop, mobile pass, `embedded` prop
-  - Drive folders: date-first naming, auto-create on save for ALL task types
-  - LeaseWatchDrafts + NewInquiryDrafts: collapsible headers + scrollable bodies
-  - HomeView: "Home" header + HouseLine icon, collapsible weather strip, larger fonts
-  - BriefingView: ↻ dropdown (Refresh + Re-run), Expand/Collapse All; all 5 sections default closed
-  - Cron auth fixes (2026-07-03): all 5 cron routes now accept GET (Vercel sends GET) + CRON_SECRET Bearer header
-  - Home URL (2026-07-03): clean `/home` route; `/?view=morning-briefing` 307-redirects to `/home`
-  - Gmail sync fixes (2026-07-07): skip SPAM/TRASH in history.list loop; outbound emails matched to contacts via "to" header
-  - EmailInbox prev/next nav (2026-07-07): ‹ › buttons + ArrowLeft/Right keyboard nav in thread detail; steps through in-memory threads array
-  - EmailInbox batch select (2026-07-07): checkboxes on thread rows + batch toolbar (Archive/Spam/Delete); batch-action.js calls Gmail API for each action
-  - handleArchive bug fix (2026-07-07): single-thread Archive now also calls Gmail API (removeLabelIds INBOX) via batch-action endpoint
-  - EmailInbox compact rows (2026-07-07): single-line ThreadListItem with sender name (130px col, hidden mobile), subject+snippet combined, paperclip icon, small indicator badges; shift-click range select; row height ~32px
-  - EmailInbox resizable list panel (2026-07-07): draggable 4px divider between list and detail; width persists to localStorage (key: sedonacrm_inbox_list_width); bounds 280–700px; offset calculated via containerRef.getBoundingClientRect().left (works with variable sidebar width); sender col uses flex clamp(70px,28%,200px) for proportional growth
-  - EmailInbox grid columns (2026-07-07): ThreadListItem refactored to Fragment of 6 cells (no wrapper div); grid container uses `gridTemplateColumns:'32px 20px fit-content(180px) minmax(0,1fr) 64px 60px'`; sender col auto-sizes to content (no dead space); formatSmartTime shows clock time today, short date otherwise; select-all checkbox inline with filter pills (indeterminate when partial)
-  - EmailInbox fixes (2026-07-07): indicator col fixed to 64px (was auto — could spill), overflow:hidden + justifyContent:flex-end on cell; listWidthRef now initialised from listWidth (not hardcoded 340); mount-time useEffect re-reads localStorage after hydration; handleDividerMouseDown syncs ref to current state before starting drag
-  - EmailInbox Inbox tab (2026-07-07): added 'inbox' as first/default filter tab; buildQuery filters `is_archived=eq.false&is_deleted=eq.false`; replaces 'unread' as default; empty-state reads "Inbox is empty."
-  - EmailInbox sender col + sort (2026-07-07): sender column cap tightened 180px→130px; buildQuery base uses `order=last_message_at.desc.nullslast` so NULL timestamps always sort to bottom on all tabs
-  - Agent cards propCode filtering (2026-07-09): LeaseWatchDrafts, NewInquiryDrafts, WorkOrderAgentDrafts all accept propCode prop and filter client-side; new-inquiry GET joins leasing_pipeline(prop_code); snapshot strip removed from BriefingView
-  - BriefingView embedded in Property Dashboard tab (2026-07-09): `<BriefingView propCode={data.prop_code} embedded={true} />` inserted below stat card grid in SedonaCRM.jsx dashboard tab
-- **Phase 5:** IN PROGRESS
-  - Stage 1 — DB Schema: Complete (2026-07-11)
-  - Stage 2 — Pipeline API routes: Complete (2026-07-11)
-  - Stage 4 (part 1) — PipelineView.jsx: Complete (2026-07-11); list+board view, dual nav, /pipeline route, mobile responsive, .crm-mobile-only CSS added
-  - Stage 3 (Dropbox Sign) + Stage 4 parts 2–3 (detail panel, prop embed): Pending
+- **Phase 4:** Complete except Agent 9. All agents, BriefingView, EmailInbox, Drive folders, Home URL canonical route, cron auth — all done.
+- **Phase 5:** IN PROGRESS — Stages 1 (DB), 2 (API routes), 4-part-1 (PipelineView list+board) complete. Stage 3 (Dropbox Sign) + Stage 4 parts 2–3 (detail panel, prop embed) pending.
 
 ## Agents Env Vars (Vercel) — all set ✅
 
@@ -197,55 +157,79 @@ pages/api/pipeline/
 
 - Vercel Pro: $20/mo | Claude API: ~$10–15/mo | Supabase: $0 | Total: ~$30–35/mo
 
-## Gmail Inbox — Session Summary (2026-07-07)
-
-Extensive session, ~10 commits on preview, none yet merged to main. In order:
-
-1. Spam/Trash exclusion — webhook.js + sync-now.js history.list loops now skip messages labeled SPAM/TRASH (previously synced into inbox unfiltered)
-2. Outbound contact linking — matching logic extended to check the "to" address for outbound mail (previously only inbound sender was checked)
-3. Prev/Next thread navigation — buttons + arrow keys, steps through in-memory thread list
-4. Batch select + batch actions — checkboxes, Archive/Spam/Delete via new pages/api/gmail/batch-action.js (also fixed a pre-existing bug where Archive only updated the DB and never actually archived in Gmail)
-5. Compact single-line inbox rows — CSS Grid layout (6 columns: checkbox, unread dot, sender, subject+snippet, indicators, time) replacing the old 3-line stacked card design
-6. Sender name + attachment display — new email_threads columns (last_sender_name, last_sender_address, has_attachment) populated on every sync; paperclip icon shown when has_attachment is true
-7. Shift-click range select — matches Gmail's range-selection behavior
-8. Resizable divider between thread list and detail pane — width saved to localStorage (persistence still has a known bug, see Known Gaps)
-9. Grid column dead-space fix — sender column uses fit-content(130px) instead of a fixed percentage, so short names don't leave wasted space
-10. Gmail-style time format — clock time for today's mail, short date otherwise
-11. Select-all checkbox with indeterminate state
-12. New default "Inbox" filter tab — excludes archived/deleted, shows read+unread (mirrors actual Gmail Inbox); tab order is now Inbox, Unread, All, Linked, Flagged
-13. Defensive nullslast ordering on all filter queries — prevents any future NULL last_message_at row from sorting to the top
-14. One-time data cleanup — deleted a single junk test row (id c77641cc-077f-44c7-9ef0-6b9d6528483d, gmail_thread_id 'test-123') that had no real Gmail data and was causing incorrect sort order
-
-New schema this session: email_threads gained last_sender_name, last_sender_address, has_attachment, is_deleted; email_messages gained has_attachment. New endpoint: pages/api/gmail/batch-action.js.
-
 ## Known Gaps
 
-- **CRITICAL — Podio migration status:** All current Supabase data is placeholder/test data only, imported via .xlsx exports. Podio remains the live system of record; staff continue working in Podio normally throughout the build. Two-stage sync plan: (1) parallel test sync — full Podio API pull of record data + inter-table links + comments + file attachments into a test environment, run alongside live Podio for several weeks to validate the new DB and find bugs; (2) final cutover sync — complete verified full sync, then Podio shutdown + CRM go-live. Never treat xlsx-imported data as final/production-ready. Never suggest the CRM is ready to cut over until the final Podio API sync is verified complete.
+- **CRITICAL — Podio migration status:** All Supabase data is placeholder/xlsx-import only. Podio is the live system of record. Two-stage sync planned: (1) parallel test sync, (2) final cutover + go-live. Never treat xlsx-imported data as production-ready; never suggest CRM is ready to cut over until the final Podio API sync is verified complete.
 - **PENDING: S&G prop_code** — set up as a property (like ACP) with dedicated Drive folder; Scott will supply Drive folder ID for `drivePropertyFolders.js`
-- **Inbox divider width persistence — NOT resolved, deprioritized with a workaround (2026-07-09 session).** Confirmed root cause of one failure mode: window-level mousemove/mouseup listeners never fire if the mouse is released outside page content (e.g. over the browser address bar), leaving drag state stuck and silently re-saving a wrong width before refresh. Fixed via Pointer Events API + setPointerCapture/releasePointerCapture (commit `1b4f799`), confirmed via console logging to correctly fire pointerdown/pointerup and save/read the right value in a full successful test. However, Scott's later retest still showed the width snapping back on hard refresh in the same "release over address bar" scenario. Second root cause not identified — do not assume the pointer-capture fix is sufficient. Workaround shipped instead: default width hardcoded to 570px (commit `019d6c8`), so the inbox looks reasonable on load regardless of whether persistence holds. The pointer-capture drag mechanism is still live and works correctly within a session; only cross-refresh persistence is unreliable. If revisiting: do NOT re-attempt blind fixes — re-instrument with console logging first (pattern used this session) and get real evidence before changing code.
-- **Inbox indicator badges (CON/LEA/WOR/ISS/TEN/TAS/red dot/paperclip) — RESOLVED (2026-07-09 session).** Legend added via a "?" info button next to the Sync button in the Inbox header; toggles a panel listing all badge meanings. Commit `f19fe66`. Confirmed working via screenshot.
-- **New Inquiry agent (Agent 3) — auto-create scope finalized 2026-07-11 (second pass).** Weak-phrase tier (2+ weak matches = pass) and known-contact bypass (matched contacts skipped phrase check) both removed after causing false positives in testing. Agent now auto-creates only on: (1) NumberBarn hotline voicemail (voicemail@numberbarn.com + "399-4040"/"FOR LEASE LINE"), (2) automation.podio.com + "New Leasing Call" subject, (3) STRONG_PHRASES match. Known-contact lookup still runs but only as a tag (source_note) on records that already passed — never as a pass reason. Manual **+LSG** button added to EmailInbox for ambiguous cases — one-click pipeline creation from an email thread; source='manual_lsg' to distinguish from agent-created ('email') records. lead-capture.js accepts thread_id param and links the email_thread on create (link_status='manual_linked'). Future: if manual +LSG usage exceeds ~10/day, revisit with a Claude-API-based classifier using +LSG-confirmed examples as reference data instead of further keyword tuning.
-- **EmailInbox.jsx +LSG modal caused a ReferenceError (lsgThread out of scope) that crashed the whole inbox on thread click — fixed 2026-07-11, was a scoping issue from the +LSG feature added earlier same day.** Modal JSX had been placed inside `ThreadDetail`'s return instead of `EmailInbox`'s return; all `lsg*` state lives in `EmailInbox`.
-- **75 email_threads rows had dangling leasing_pipeline links after the Agent 3 false-positive cleanup (2026-07-11) — link fields cleared same day so +LSG button and LEA badge display correctly again.** Cleared via UPDATE setting linked_record_type/linked_record_id/link_status = NULL where linked_record_id NOT IN leasing_pipeline; 20 legitimate links verified untouched.
-- **+LSG modal property dropdown scoped to Scott's confirmed 14 active properties (CR1, DCM, LAP, LEEN, LPP, MYN, OMP, PWP, RHS, SAC, SSB, VDN, VVP, WSP) — NOT the same as properties.status='active' (16 rows, includes OLY/WNT which are excluded per Scott 2026-07-11). Property field is optional for general inquiries with no specific building.** Hardcoded as `LSG_PROPERTIES` array with code+name in EmailInbox.jsx; lead-capture.js now allows null prop_code.
-- **PipelineView.jsx fetch bug fixed 2026-07-11 — was filtering on stale `status` field instead of `stage`, and had no row limit (silently capped at PostgREST's 1000-row default). Both fixed.** Filter now uses `stage=not.in.(Dead,On Hold,Landlord Declined Use)`; limit set to 5000. Revisit with real pagination if leasing_pipeline approaches 5000 rows.
-- **leasing_pipeline reset 2026-07-11 — bulk Podio xlsx import (2408 rows) and non-leasing agent false-positives (16 rows) deleted, leaving 5 real records + 13 seeded 'TEST — ' records spanning all pipeline stages for UI testing.** Full historical Podio data remains untouched in Podio itself and the original xlsx in Drive; this was disposable placeholder data only, never production data. Delete all 'TEST — ' prefixed records before go-live.
+- **Inbox divider width persistence — NOT resolved, deprioritized.** Default width hardcoded to 570px. setPointerCapture fix is live but persistence still unreliable on hard refresh. If revisiting: re-instrument with console logging first — do NOT attempt blind fixes.
+- **New Inquiry agent (Agent 3)** — uses LEASING_KEYWORDS filter. Manual **+LSG** button in EmailInbox for ambiguous cases (source='manual_lsg'). `LSG_PROPERTIES` array hardcoded in EmailInbox.jsx with 14 active properties (OLY/WNT excluded per Scott). lead-capture.js allows null prop_code. Future: Claude-API classifier if +LSG usage exceeds ~10/day.
+- **leasing_pipeline working set** — 18 records (5 real + 13 'TEST — ' seeded) after 2026-07-11 reset. Delete all 'TEST — ' prefixed records before go-live. Stage filter: `stage=not.in.(Dead,On Hold,Landlord Declined Use)`; limit 5000.
 
 ## Next Priorities
 
 1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
-2. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
-3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
-4. (Optional, low priority) Revisit inbox divider persistence if it becomes a real pain point — see Known Gaps for what's already been ruled out
+2. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency
+3. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
+4. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
+5. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
+6. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
+7. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
+8. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
+9. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
 
-## Schema Notes — leasing_pipeline FK gap (permanent)
+## LinkField Architecture (permanent)
 
-`leasing_pipeline` has NO FK to `properties`. It links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline queries. Always query properties separately by prop_code when needed.
+`components/shared/LinkField.jsx` — canonical many-to-many relationship field. Config-driven, zero hardcoded table names. Piloted on Task ↔ Contacts via `task_contacts`.
+
+**Props:** `mode` ('multi' default | 'single'), `value` (single mode: current FK id), `onChange` (single mode: (row|null)=>void — caller persists), `onCreateNew` (single mode: ()=>void — caller opens modal), `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `subtitleField` (fn/string, optional — phone/email line), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`, `variant` ('card' default | 'chip'), `badgeField` (fn(row)=>string|null — small pill after title, works in multi + single card variants), `excludeRef` (React ref — clicks on this element do NOT count as "outside" for panel close; use when the trigger button lives outside the LinkField layout).
+
+**variant='card' (default):** Podio-style stacked cards — UserCircle icon + title link (T.accent + ↗) + optional badge pill + optional subtitle (phone/email) + meta line. Each multi-mode card has a Trash icon button (absolute-positioned right, 32×32 hit target) that removes the link immediately on click — no confirm dialog. Trigger button says "Add / remove"; in multi mode the panel no longer shows chips at the top (removed — unlinking is via the trash icon on the card instead). ContactsView "Linked Tasks" (readOnly, no subtitleField) renders as cards with just icon + title + meta, no subtitle gap.
+
+**compact prop (default false):** When true — reduced card padding (7px 10px vs 10px 12px), icon size 32px (2×, both multi and single mode cards), `paddingRight:'36px'` on card text div, `alignItems:'center'` on the row. Removal is via Trash icon button (absolute-positioned right, 32×32 hit target) on the card itself — applies to both multi mode (calls unlink) and single mode (calls onChange(null)). The old in-panel "✕ Remove" row in compact single mode is gone. Non-compact single mode still uses the inline × clear button on the right of the card. When false (default): renders exactly as before. Currently used on: TaskDetail Contacts card, Vendor Contact, Tenant Contact (compact=true).
+
+**Outside-click boundary (compact mode):** `panelRef` is attached to the panel root div itself (via `renderPanel`), not the outer compact wrapper. This means clicking on linked cards while the panel is open correctly closes it, because the cards are outside the panel. The outer compact wrapper no longer holds `ref={panelRef}`.
+
+**hideTrigger prop (default false, requires compact=true):** When true, LinkField renders NO trigger button when closed — the parent is fully responsible for opening the panel. The parent must hold a `ref` to the LinkField and call `ref.current.openPanel()` (exposed via `useImperativeHandle`). Use this when the "Add / Remove" button needs to live outside the LinkField's layout (e.g., inline next to a label on the same row). When searchOpen becomes true, the panel renders in-flow regardless of hideTrigger. LinkField is a `React.forwardRef` component; all existing JSX call sites (`<LinkField ... />`) are unaffected — forwardRef only changes direct static-property access, which doesn't exist.
+
+**Flat-grid alignment pattern for 2-column label+card layouts:** Use a single `display:grid, gridTemplateColumns:'1fr 1fr', gridAutoRows:'auto'` parent with 4 direct children: [label1 div, label2 div, card1 (LinkField), card2 (company card)]. CSS grid auto-sizes each row to its tallest cell, so both label divs share row height and both cards start together — alignment is enforced structurally, not by matching heights manually. The old nested-div-per-column approach (label + card in independent column divs) breaks if one label is taller than the other.
+
+**variant='chip':** compact inline pills with × unlink. Pass `variant="chip"` explicitly on any call site that wants the old look.
+
+**mode='multi' (default):** self-persisting join-table mode. Inserts/deletes join rows; caller owns nothing.
+
+**mode='single':** pure controlled picker — no table writes. `onChange(row|null)` on pick/clear (caller persists). `onCreateNew()` on "+ Create new" (caller opens StackedFormModal then calls onChange). joinTable/parentId fields unused. Card + × clear shown when value set; dashed trigger always visible ("Change …" / "+ Add …"). First production consumer: TaskDetail Linked Companies card (Vendor Contact + Tenant Contact pickers).
+
+**⚠️ Rendering guard rule:** `variant='card'` and `variant='chip'` blocks MUST include `mode !== 'single'`. Without it, both blocks mount alongside the dedicated `{mode === 'single' && (...)}` block, sharing `panelRef`/`searchOpen` — panelRef.current gets overwritten, breaking the outside-click listener (fires before onClick, swallowing picks). Correct: `{!loadingLinks && variant === 'card' && mode !== 'single' && (` / `{!loadingLinks && variant === 'chip' && mode !== 'single' && (`.
+
+**Forward mode** (TaskDetail Contacts, allowCreate=true): add/remove/search/create inline. **Reverse/read-only** (ContactDetail Linked Tasks): same join table, opposite direction; no add/create UI.
+
+**To add another relationship:** drop in `<LinkField .../>` with the correct props — no new state/effects/functions needed in the parent view.
+
+**`CompanyLinkCard` (`components/shared/CompanyLinkCard.jsx`):** canonical read-only display card for a linked company. Props: `icon` (Phosphor component), `name` (string|null — renders '—' when falsy), `link` (url|null), `badge` (string|null). Use this anywhere a vendor/tenant company name needs to display — never re-inline the JSX. Any future company-link display (Owners, other modules) should use it.
+
+**External link icon:** uses ↗ character inline (~11px), consistent with FieldWithBadge pattern. No circular badge.
+
+**Search result row click priority:** In `renderPanel()` (shared by all card/chip/single call sites), the result row's outer `div onClick` is the primary "select/link this" action. The contact name is rendered as a plain colored `<span>` — NOT an anchor — so clicking it selects the result. A small secondary `↗` anchor after the name (with `onClick stopPropagation`) opens the record in a new tab without triggering the row's select. Do NOT regress this to the old pattern where the name was the anchor — that made clicking the most prominent element open a new tab instead of linking.
+
+## TaskDetail Architecture Notes (permanent)
+
+- **Details tab — 7 section cards (in order):** Core → Follow-Up → Contacts (LinkField, all types) → Linked Companies (LinkField mode='single', always visible) → Work Order Details (WO only; Financials + Closeout collapsed sub-panels) → Notes & Relationships → Documents → Dates. System Info collapsible block at end.
+- **Category:** shown in Core for all record types EXCEPT `work_order` (WO has its own WO Category field in the WO Details card).
+- **Property field** in TaskDetail closed state: `CodeOnlySelect` component shows just prop_code; dropdown options show "code — name".
+- **Linked Companies:** uses `LinkField mode='single'` for both Vendor Contact and Tenant Contact. Picking a contact auto-fills the read-only Company box via `handleContactChange` (reads `vendor_id`/`tenant_id` FK from the contact row, saves both fields via `saveMany`). "+ Create new" opens `StackedFormModal` (zIndex 310) with a 4-field form (name/company/phone/email). **Deliberate asymmetry:** Vendor Contact modal auto-creates (or reuses via case-insensitive exact ilike match on company_dba) a `vendors` row when a company name is typed — new vendor row appended to local state immediately so Company box fills without refresh. Tenant Contact modal intentionally does NOT create a `tenants` row — new tenants must go through the leasing pipeline; company_dba is free-text only on the contact. `ContactFirstRow` was retired; `CompanyContactRow` kept for NewTaskForm WO section (company-first flow).
+- **`CompanyContactRow`** kept intact for NewTaskForm WO section (company-first flow).
+- **Vendor/Tenant Company lookups** (TasksList rows, TaskDetail display, NewTaskForm picker) load ALL vendors/tenants regardless of status — do NOT add an Active-only filter back. A prior version filtered to `vendor_status=eq.Active` / `tenant_status=eq.Active`, which silently blanked out correctly-linked companies whenever the linked vendor/tenant wasn't Active (affected ~74% of vendors, ~65% of tenants). Fixed 2026-07-20.
+- **Vendor Company / Tenant Company fields** (Linked Companies card) rendered via `CompanyLinkCard` — icon (Truck/Storefront) + clickable company name with ↗ + optional badge. Blank state shows '—'. Do not re-inline this JSX.
+- **Tenant Company** shows a `prop_code` badge (sourced from `tenants.prop_code`). Vendor Company intentionally has no badge — vendors aren't tied to a single property.
+- **Contacts, Vendor Contact, Tenant Contact trigger buttons** are all `Plus` icon (14px) with a `title` tooltip. Each button ref is passed as `excludeRef` to its LinkField so clicking the button while the panel is open doesn't immediately re-close it (`contactsBtnRef`, `vendorContactBtnRef`, `tenantContactBtnRef`).
+- **Contacts section panel (multi-mode card):** removable chips in the panel header are gone. Removal is via Trash icon (absolute-positioned right, 32×32) on each card. All contacts show a `badgeField` prop_code pill when `tenant_id` resolves to a tenant with a `prop_code`.
+- **Vendor Contact / Tenant Contact single-mode cards:** also use Trash icon (compact mode — replaces the old "✕ Remove" panel row). Both also pass `badgeField={contactPropCode}` — shows prop_code pill when the selected contact has a `tenant_id`.
+- **CompanyLinkCard icon** is 32px to match the unified contact icon size across all three fields.
 
 ## Current Git State
 
-- main: `019d6c8` — fix: widen inbox list panel default to 570px, strip divider diagnostic logs (2026-07-09)
-- preview: `f79c976` — data: reset leasing_pipeline to clean testable working set (2026-07-11)
+- main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
+- preview: `6e0ea88` — feat: unify linker template — click-outside fix, 32px icons, trash-on-card for Vendor/Tenant Contact
 
 ---
 
@@ -294,6 +278,7 @@ Use `psql` only — `export DB='postgresql://postgres.edxcvyleielzevpappui:Sedon
 10. **Filter state in URL query params** on every filter change; restore on mount via `hasMounted` ref
 11. **Search queries: server-side LIMIT cap of 5 results per module** — never unbounded queries
 12. **grep -n before editing any large JSX file** — CC frequently misidentifies line numbers without this step
+13. **Supabase pagination required for any table that may exceed 1,000 rows** — PostgREST's default max-rows silently truncates with no error. Use `.range()`/offset loop. Known to have silently truncated PipelineView (2026-07-11) and the Contacts linking script (2026-07-20).
 13. **Claude.ai single instruction rule** — give one clear instruction at a time. Never counter an instruction with an alternative in the same response.
 14. **AI agents draft only — Scott approves everything. Nothing sends autonomously, ever.** Applies to all agents (Lease Watch, CAM Reconciliation, New Inquiry, Work Order, Rent Collection, Insurance Cert, Morning Briefing, Owner Reporting, Re-Engagement, Portfolio Analyst).
 15. **Every record requires:** unique URL, copy-link button, communication thread, audit log, AI summarize button, Drive file attachments. Audit log and AI summarize are not yet built on most record types — treat as an open build item per module, not as already satisfied.
@@ -386,41 +371,32 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - `briefings`: run_date (UNIQUE), status, urgent/attention/fyi/snapshot (jsonb)
 - `lease_watch_drafts`: tenant_id + milestone (UNIQUE pair), subject, body, status
 - `inquiry_drafts`: thread_id (UNIQUE), pipeline_id FK, prospect_name, prospect_email, subject, body, status
-- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — ✅ migration run 2026-07-09, table + RLS live
-- `email_threads`: added `is_deleted boolean DEFAULT false` (2026-07-07) — set by batch-action delete action
-- `email_threads`: added `last_sender_name text`, `last_sender_address text`, `has_attachment boolean DEFAULT false` (2026-07-07) — populated by webhook.js + sync-now.js on every new message; old threads show null/false until re-synced
-- `email_messages`: added `has_attachment boolean DEFAULT false` (2026-07-07)
-- **Phase 5 Stage 1 — 2026-07-11:**
-- `leasing_pipeline`: +30 columns — stage_5_state/stage_7_state (pending/complete/NA 3-way), pipeline_source (inbound/notice_triggered), departing_tenant_id FK→tenants, dead_reason/dead_notes, landlord_declined_reason/landlord_declined_notes, on_hold_date/on_hold_notes, qual_business_type/qual_credit_indication/qual_capital/qual_notes/qual_passed/qual_passed_date, app_sent_date/app_received_date, loi_submitted_at/loi_proposed_rent/loi_proposed_term/loi_proposed_start_date/loi_counter_at/loi_counter_rent/loi_counter_term/loi_approved_at/loi_notes, broker_contact_id FK→contacts/broker_commission_pct/broker_commission_note
-- `suites`: status CHECK extended with 6th value `'Vacant / For Lease — Pending'` (auto-triggered by notice-to-vacate, internal-only status while current tenancy still active)
-- `lease_amendments` + `tenants`: added `restoration_obligations text` (filled at move-out from lease review, per spec item #15)
-- `key_handovers`: NEW table — one row per key type per move-in (key_type: suite/dumpster/restroom/key_safe/other); FKs to leasing_pipeline + tenants + properties; RLS (employee/admin only, no anon read)
-- `lease_applications`: NEW table — 106-column prospect self-submit intake form; FK to leasing_pipeline; includes computed GENERATED STORED columns for total_assets/total_liabilities/net_worth; consent fields normalized to boolean+timestamp; RLS (employee/admin only, no anon read — contains SSN, financial data)
-- **Stage data migration — 2026-07-11:** `leasing_pipeline.stage` was raw Podio placeholder data (Untouched/Replied/Showing/LS APP/LOI/Lease + status field for closed records) until 2026-07-11, when it was mapped to the real 10-stage model. Original raw values preserved in `stage_raw_podio` (text column, added same session) for audit. `dead_reason` backfilled: 'unresponsive' (684 hang-up records), 'duplicate' (8 duplicate records). CHECK constraint `leasing_pipeline_stage_check` added covering all 13 valid stage values. Mapping: Untouched/Inquiry→New Inquiry, Replied→Info Sent, Showing→Showing Scheduled, LS APP→Application Sent, LOI→LOI, LS-Out For Sigs→Lease Drafting, LS-Signed/Lease→Fully Executed, CLOSED-New TNT→Move-In, Closed-Hang-up/CLOSED-Hang-up/Duplicate→Dead.
-- **Post-migration stage counts (2026-07-11):** New Inquiry=833, Info Sent=399, Showing Scheduled=37, Application Sent=22, LOI=11, Lease Drafting=1, Fully Executed=75, Move-In=433, Dead=692 — total 2503.
+- `wo_agent_runs`: run_date (UNIQUE), status, nudge_items/high_cost_items (jsonb) — table + RLS live
+- `email_threads`: `is_deleted boolean DEFAULT false` (batch-action delete); `last_sender_name`, `last_sender_address`, `has_attachment boolean DEFAULT false` (populated by webhook + sync-now; old threads null/false until re-synced)
+- `email_messages`: `has_attachment boolean DEFAULT false`
+- **Phase 5 Stage 1 — 2026-07-11:** `leasing_pipeline` +30 cols (stage_5/7_state, pipeline_source, LOI negotiation fields, qual fields, broker fields, on_hold/dead fields). `suites` status CHECK +6th value `'Vacant / For Lease — Pending'`. `key_handovers` NEW table (employee/admin RLS only). `lease_applications` NEW table 106-col (employee/admin RLS only — contains SSN/financial data). `leasing_pipeline.stage` migrated from Podio values to 13-value model; original in `stage_raw_podio`; CHECK constraint added.
+- **`task_contacts` RLS (confirmed 2026-07-16):** Anon key has SELECT (already listed above) + INSERT + DELETE. Intentional — CRM is internal; LinkField uses anon key client-side for link/unlink. If tightening needed, add service-role API routes.
+- **`contacts` anon INSERT policy (2026-07-17):** `"anon can insert contacts"` WITH CHECK (true). Required for LinkField `allowCreate` (create-and-link from TaskDetail). Without it, the create POST 400s.
+- **`vendors` anon INSERT policy (2026-07-18):** `"anon can insert vendors"` WITH CHECK (true). Required for Vendor Contact modal auto-create-company in `handleContactModalSave`. Previously anon had SELECT only.
+- **`vendors.podio_id` backfill (2026-07-20):** 621/622 rows populated via `scripts/podio-vendors-backfill.js` (Podio app auth, company_dba case-insensitive exact match). One row intentionally NULL — duplicate "Alliance Land Surveying LLC" (id `8137893e-315e-42b8-82be-cac8c5ae2d23`), flagged for Scott to review/delete. Script lives at `scripts/podio-vendors-backfill.js`; re-runnable with `--write` flag. Podio API creds in `.env.local` as PODIO_CLIENT_ID/SECRET/APP_ID/APP_TOKEN.
+- **`contacts.vendor_id` / `contacts.tenant_id` backfill (2026-07-20):** 429 vendor + 311 tenant = 740 contacts linked via `scripts/podio-contacts-linking.js`. Method: Podio relationship fields (`type: app`) on each contact, using linked record's `item_id` (global) to match `vendors.podio_id` and `app_item_id` (per-app sequential) to match `tenants.podio_id`. **Do NOT use `contacts.company_dba` for vendor/tenant matching** — it is a free-text field on the contact itself, not a reliable FK. 37 rows left null (25 ambiguous/multi-link, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — manual review needed. Script re-runnable with `--write`. Contacts Podio app ID: 7286881.
+- **`tasks` anon UPDATE policy (2026-07-18):** `"anon_update_tasks"` USING (true) WITH CHECK (true). **Critical — was missing, causing ALL task field saves (every InlineBlurField, saveMany, etc.) to silently return 200 + empty array without touching any row.** Root cause: only `authenticated` roles had UPDATE. `sbPatch` now also throws explicitly if response array is empty, so this class of failure is no longer silent. `save` and `saveMany` in TaskDetail now catch errors and surface them via a visible banner below the tab bar. Future direct-write helpers must follow the same "throw if 0 rows" convention.
+- **`automation_agents` (2026-07-20):** Automations registry — one row per scheduled cron agent. Columns: id, name (unique), description, code_location, cron_schedule, last_run_at, last_run_status, created_at, updated_at. RLS enabled, **zero anon policies** — internal-only, same pattern as `key_handovers`/`lease_applications`. All reads/writes via service-role API routes only. Seeded with 4 rows: Morning Briefing, Lease Watch, New Inquiry, Work Order Agent.
+- **`automation_triggers` (2026-07-20):** Per-record automation trigger registry — button/event/date triggers. Columns: id, name, module, trigger_type (CHECK: button_click/item_created/item_updated/date_field), trigger_detail, condition_display, action_display, config (jsonb), status (CHECK: active/paused), recurs (CHECK: one_time/repeating), last_fired_at, fire_count, why_not_view, code_location, last_modified_by, change_note, created_at, updated_at. RLS enabled, **zero anon policies**. Currently empty — rows added as WO button/date triggers are built.
+- **`leasing_pipeline` has NO FK to `properties`** — links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline. Query properties separately by prop_code.
+- **Postgres RPC suffix-lookup functions (2026-07-17):** `find_contact_by_id_suffix(p_suffix text)` and `find_issue_by_id_suffix(p_suffix text)` — both SECURITY INVOKER, granted to anon. Used by X-prefix detail-page lookup for tables >1000 rows (Supabase max-rows=1000 cap prevents fetch-all). Add similar functions for any other large table needing X-prefix lookup.
 
 ## Drive Folder Architecture (permanent)
 
 - Trigger: auto-created on task save (fire-and-forget) for ALL record types; also manual `+ Drive Folder` button in WO header
 - Structure: `[Property Root]/Work History/[YYYY-MM-DD] — [displayId] — [title]/`
 - Hardcoded in `lib/drivePropertyFolders.js` (14 active properties; S&G folder ID pending)
-- Index PDF upload silently failing (pdf-lib issue) — independent of folder creation
 
 ## Embedded TasksView Architecture (permanent)
 
-All 5 embedded Tasks tab contexts use `<TasksView embeddedMode hidePropertyPills filterXxx={...}/>`:
-| Context | Props |
-|---|---|
-| Property detail (SedonaCRM.jsx) | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
-| Owner detail (OwnersView.jsx) | `filterPropCode={data.prop_code} hidePropertyPills embeddedMode` |
-| Tenant detail (TenantsView.jsx) | `filterTenantId={data.id} hidePropertyPills embeddedMode` |
-| Vendor detail (VendorsView.jsx) | `filterVendorId={data.id} hidePropertyPills embeddedMode` |
-| Contact detail (ContactsView.jsx) | `filterContactId={data.id} hidePropertyPills embeddedMode` |
+All 5 contexts use `<TasksView embeddedMode hidePropertyPills filterXxx={...}/>`:
+Property/Owner → `filterPropCode={data.prop_code}` | Tenant → `filterTenantId={data.id}` | Vendor → `filterVendorId={data.id}` | Contact → `filterContactId={data.id}`
 
-## Valid prop_codes (48 total, 14 active)
+## Valid prop_codes
 
-```
-1McC, 777, ACP, ART, ARVS, ATS, CDY, CHQ, COB, CPP, CR1, CRMS, CVP, DCC, DCM, DCP,
-DEM, DON, FOX, KOD, KTA, LAP, LASO, LEEN, LPP, MILL, MYN, OLY, OMP, PLZ, PW213, PWP,
-RHS, RR, SAC, SEP, SS, SSB, STP, SUNT, SWV, SYC, VDN, VVP, WAL, WNT, WSP, YAV
-```
+48 total (14 active). Full list: `drivePropertyFolders.js` and Supabase `properties` table.

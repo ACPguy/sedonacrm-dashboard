@@ -16,11 +16,20 @@ export default function PropertyDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    let filter;
-    if (id.includes('-')) filter = `id=eq.${id}`;
-    else if (/^\d+$/.test(id)) filter = `podio_id=eq.${id}`;
-    else filter = `prop_code=eq.${id}`;
-    sbFetch('properties', `select=*&${filter}`)
+    let fetchPromise;
+    if (id.includes('-')) {
+      fetchPromise = sbFetch('properties', `select=*&id=eq.${id}`);
+    } else if (id.startsWith('X')) {
+      const suffix = id.slice(1);
+      fetchPromise = sbFetch('properties', 'select=*').then(rows =>
+        (rows || []).filter(p => p.id && p.id.slice(-6) === suffix)
+      );
+    } else if (/^\d+$/.test(id)) {
+      fetchPromise = sbFetch('properties', `select=*&podio_id=eq.${id}`);
+    } else {
+      fetchPromise = sbFetch('properties', `select=*&prop_code=eq.${id}`);
+    }
+    fetchPromise
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Property not found');

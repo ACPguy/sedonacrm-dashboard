@@ -16,8 +16,24 @@ export default function ContactDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
-    sbFetch('contacts', `select=*&${filter}`)
+    let fetchPromise;
+    if (id.includes('-')) {
+      fetchPromise = sbFetch('contacts', `select=*&id=eq.${id}`);
+    } else if (id.startsWith('X')) {
+      const suffix = id.slice(1);
+      fetchPromise = fetch('https://edxcvyleielzevpappui.supabase.co/rest/v1/rpc/find_contact_by_id_suffix', {
+        method: 'POST',
+        headers: {
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkeGN2eWxlaWVsemV2cGFwcHVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNjU3MjMsImV4cCI6MjA5Mjc0MTcyM30.OYSzunKtdw88PkhMyI9GSIa8MyIZ2paTgZ-Mg_oS4Yw',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_suffix: suffix }),
+      }).then(r => r.json());
+    } else {
+      fetchPromise = sbFetch('contacts', `select=*&podio_id=eq.${id}`);
+    }
+    fetchPromise
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Contact not found');

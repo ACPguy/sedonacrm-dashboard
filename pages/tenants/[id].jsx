@@ -16,8 +16,18 @@ export default function TenantDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    const filter = id.includes('-') ? `id=eq.${id}` : `podio_id=eq.${id}`;
-    sbFetch('tenants', `select=*&${filter}`)
+    let fetchPromise;
+    if (id.includes('-')) {
+      fetchPromise = sbFetch('tenants', `select=*&id=eq.${id}`);
+    } else if (id.startsWith('X')) {
+      const suffix = id.slice(1);
+      fetchPromise = sbFetch('tenants', 'select=*').then(rows =>
+        (rows || []).filter(t => t.id && t.id.slice(-6) === suffix)
+      );
+    } else {
+      fetchPromise = sbFetch('tenants', `select=*&podio_id=eq.${id}`);
+    }
+    fetchPromise
       .then(data => {
         if (!Array.isArray(data) || data.length === 0) {
           setError('Tenant not found');

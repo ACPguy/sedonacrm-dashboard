@@ -20,12 +20,20 @@ function SettingsPage() {
   const router = useRouter();
   const [gmailStatus, setGmailStatus] = useState(null);
   const [banner, setBanner] = useState(null);
+  const [automations, setAutomations] = useState(null);
 
   useEffect(() => {
     fetch('/api/auth/gmail/status')
       .then(r => r.json())
       .then(setGmailStatus)
       .catch(() => setGmailStatus({ connected: false }));
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/settings/automations')
+      .then(r => r.json())
+      .then(setAutomations)
+      .catch(() => setAutomations({ agents: [], triggers: [] }));
   }, []);
 
   useEffect(() => {
@@ -68,6 +76,98 @@ function SettingsPage() {
             {banner.msg}
           </div>
         )}
+
+        {/* Automations Registry card */}
+        <div style={{
+          background: T.bg0, border: `0.5px solid ${T.border}`, borderRadius: '8px',
+          padding: '20px 24px', marginBottom: '16px',
+        }}>
+          <div style={{ marginBottom: '16px' }}>
+            <span style={{ fontSize: F.md, fontWeight: '600', color: T.text0 }}>Automations Registry</span>
+            <p style={{ fontSize: F.sm, color: T.text1, marginTop: '4px' }}>
+              Every scheduled agent and workflow trigger running in SedonaCRM, in one place.
+            </p>
+          </div>
+
+          {/* Agents subsection */}
+          <div style={{ marginBottom: '4px' }}>
+            <span style={{ fontSize: F.xs, fontWeight: '600', color: T.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Scheduled Agents
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', marginTop: '8px' }}>
+            {!automations ? (
+              <span style={{ fontSize: F.sm, color: T.text2 }}>Loading…</span>
+            ) : automations.agents.length === 0 ? (
+              <span style={{ fontSize: F.sm, color: T.text2 }}>No agents registered.</span>
+            ) : automations.agents.map(agent => (
+              <div key={agent.id} style={{
+                padding: '10px 12px', borderRadius: '6px', background: T.bg1,
+                border: `0.5px solid ${T.border}`,
+                marginBottom: '6px',
+              }}>
+                <div style={{ fontWeight: '600', fontSize: F.sm, color: T.text0 }}>{agent.name}</div>
+                {agent.description && (
+                  <div style={{ fontSize: F.sm, color: T.text1, marginTop: '2px', lineHeight: '1.5' }}>
+                    {agent.description}
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '6px' }}>
+                  {agent.cron_schedule && (
+                    <span style={{ fontSize: F.xs, color: T.text2, fontFamily: 'monospace' }}>
+                      cron: {agent.cron_schedule}
+                    </span>
+                  )}
+                  {agent.code_location && (
+                    <span style={{ fontSize: F.xs, color: T.text2, fontFamily: 'monospace' }}>
+                      {agent.code_location}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Triggers subsection */}
+          <div style={{ marginTop: '16px', marginBottom: '4px' }}>
+            <span style={{ fontSize: F.xs, fontWeight: '600', color: T.text2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Workflow Triggers
+            </span>
+          </div>
+          <div style={{ marginTop: '8px' }}>
+            {!automations ? (
+              <span style={{ fontSize: F.sm, color: T.text2 }}>Loading…</span>
+            ) : automations.triggers.length === 0 ? (
+              <span style={{ fontSize: F.sm, color: T.text2 }}>
+                No triggers registered yet — added as Work Order automations are built.
+              </span>
+            ) : automations.triggers.map(trigger => (
+              <div key={trigger.id} style={{
+                padding: '10px 12px', borderRadius: '6px', background: T.bg1,
+                border: `0.5px solid ${T.border}`, marginBottom: '6px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: '600', fontSize: F.sm, color: T.text0 }}>{trigger.name}</span>
+                  <span style={{ fontSize: F.xs, color: T.text2 }}>{trigger.module}</span>
+                  <span style={{
+                    fontSize: F.xs, padding: '1px 6px', borderRadius: '10px',
+                    background: trigger.status === 'active' ? 'rgba(106,176,106,0.12)' : 'rgba(90,98,114,0.2)',
+                    color: trigger.status === 'active' ? T.success : T.text2,
+                    border: `1px solid ${trigger.status === 'active' ? T.success : T.border}`,
+                  }}>{trigger.status}</span>
+                </div>
+                {trigger.action_display && (
+                  <div style={{ fontSize: F.sm, color: T.text1, marginTop: '2px' }}>{trigger.action_display}</div>
+                )}
+                {trigger.code_location && (
+                  <div style={{ fontSize: F.xs, color: T.text2, fontFamily: 'monospace', marginTop: '4px' }}>
+                    {trigger.code_location}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Gmail Integration card */}
         <div style={{
