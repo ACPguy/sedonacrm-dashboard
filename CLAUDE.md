@@ -210,7 +210,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: TBD after this commit
+- preview: `1a2a8b5` — feat: contacts vendor_id/tenant_id backfill via Podio relationship fields (740 rows)
 
 ---
 
