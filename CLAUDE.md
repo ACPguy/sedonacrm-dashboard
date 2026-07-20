@@ -212,7 +212,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: TBD after this commit
+- preview: `5d48d30` — feat: Vendor/Tenant Company fields — icon + clickable link card style (Truck/Storefront)
 
 ---
 
