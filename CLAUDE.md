@@ -167,8 +167,7 @@ pages/api/pipeline/
 
 ## Next Priorities
 
-1. Automations registry Settings UI — read `automation_agents` + `automation_triggers` via API route (service-role only; no anon client access)
-2. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
+1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
 3. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
 4. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
 5. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
@@ -209,7 +208,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `d4eadb4` — chore: add automation_agents + automation_triggers schema + seed (CLAUDE.md only)
+- preview: (commit pending this session)
 
 ---
 
