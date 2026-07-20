@@ -209,8 +209,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `ae2e934` — fix: tasks RLS (anon_update_tasks added), sbPatch empty-array guard, save/saveMany error surface, duplicate badge, result-row click priority
-- (CLAUDE.md only update pending — see session commit below)
+- preview: `d4eadb4` — chore: add automation_agents + automation_triggers schema + seed (CLAUDE.md only)
 
 ---
 
