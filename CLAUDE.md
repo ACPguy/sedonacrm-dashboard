@@ -220,7 +220,7 @@ pages/api/pipeline/
 ## Current Git State
 
 - main: `9ce6031` — merged from preview 2026-07-11 (Scott-approved)
-- preview: `[pending commit]`
+- preview: `1bbc130` — feat: Add/Remove buttons next to labels + forwardRef openPanel + flat-grid alignment
 
 ---
 
