@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router';
 import {
   Wrench, CheckFat, FolderOpen, Buildings, House, Star, ClipboardText, ChatCircle,
-  CaretLeft, CaretRight, Truck, Storefront,
+  CaretLeft, CaretRight, Truck, Storefront, Plus,
 } from '@phosphor-icons/react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -16,6 +16,7 @@ import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
 import LinkField from './shared/LinkField';
 import StackedFormModal from './shared/StackedFormModal';
+import CompanyLinkCard from './shared/CompanyLinkCard';
 import { getTaskPrefix } from '../utils/taskPrefix';
 import { T } from '../lib/theme';
 
@@ -1559,6 +1560,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   goNavRef.current = goNav;
 
   const contactsFieldRef  = useRef(null);
+  const contactsBtnRef    = useRef(null);
   const vendorContactRef  = useRef(null);
   const tenantContactRef  = useRef(null);
 
@@ -1598,6 +1600,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const contactTitle = row => {
     const co = contactCompanyName(row);
     return co ? `${row.full_name} — ${co}` : row.full_name;
+  };
+  const contactPropCode = row => {
+    if (row.tenant_id) return tenants.find(t=>t.id===row.tenant_id)?.prop_code;
+    return null;
   };
 
   return (
@@ -1748,15 +1754,17 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden',padding:'10px 16px 14px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
               <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Contacts</span>
-              <button onClick={()=>contactsFieldRef.current?.openPanel()}
-                style={{fontSize:F.xs,fontWeight:'600',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'5px 10px',cursor:'pointer'}}
+              <button ref={contactsBtnRef} onClick={()=>contactsFieldRef.current?.openPanel()}
+                title="Add new item"
+                style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                 onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                Add / Remove
+                <Plus size={14} weight="bold"/>
               </button>
             </div>
             <LinkField
               ref={contactsFieldRef}
+              excludeRef={contactsBtnRef}
               joinTable="task_contacts"
               parentIdField="task_id"
               parentId={data.id}
@@ -1767,6 +1775,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               titleField={contactTitle}
               titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
               subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+              badgeField={contactPropCode}
               sectionLabel="contact"
               allowCreate={true}
               createFields={['full_name','company_dba','primary_phone','email']}
@@ -1784,10 +1793,11 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                 <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Contact</span>
                 <button onClick={()=>vendorContactRef.current?.openPanel()}
-                  style={{fontSize:F.xs,fontWeight:'600',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 9px',cursor:'pointer'}}
+                  title="Change vendor contact"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                  Add / Remove
+                  <Plus size={14} weight="bold"/>
                 </button>
               </div>
               <div style={{display:'flex',alignItems:'center'}}>
@@ -1812,23 +1822,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               />
               {(() => {
                 const v = vendors.find(x=>x.id===data.vendor_id);
-                const link = data.vendor_id ? vendorLink(data.vendor_id) : null;
-                return v ? (
-                  <div style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'8px'}}>
-                    <Truck size={16} weight="bold" style={{color:T.text2,flexShrink:0}}/>
-                    <div style={{flex:1,minWidth:0}}>
-                      {link ? (
-                        <a href={link} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
-                          style={{color:T.accent,fontSize:F.sm,fontWeight:'500',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:'3px'}}>
-                          {v.company_dba}
-                          <span style={{fontSize:'10px',color:T.text2,lineHeight:1}}>↗</span>
-                        </a>
-                      ) : <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{v.company_dba}</span>}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{fontSize:F.sm,color:T.text3,padding:'7px 10px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px'}}>—</div>
-                );
+                return <CompanyLinkCard icon={Truck} name={v?.company_dba} link={data.vendor_id?vendorLink(data.vendor_id):null} />;
               })()}
             </div>
             {/* Tenant row — same flat 4-child grid pattern */}
@@ -1836,10 +1830,11 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                 <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Contact</span>
                 <button onClick={()=>tenantContactRef.current?.openPanel()}
-                  style={{fontSize:F.xs,fontWeight:'600',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px 9px',cursor:'pointer'}}
+                  title="Change tenant contact"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                  Add / Remove
+                  <Plus size={14} weight="bold"/>
                 </button>
               </div>
               <div style={{display:'flex',alignItems:'center'}}>
@@ -1864,28 +1859,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               />
               {(() => {
                 const t = tenants.find(x=>x.id===data.tenant_id);
-                const link = data.tenant_id ? tenantLink(data.tenant_id) : null;
-                return t ? (
-                  <div style={{background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px',padding:'7px 10px',display:'flex',alignItems:'center',gap:'8px'}}>
-                    <Storefront size={16} weight="bold" style={{color:T.text2,flexShrink:0}}/>
-                    <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap'}}>
-                      {link ? (
-                        <a href={link} target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
-                          style={{color:T.accent,fontSize:F.sm,fontWeight:'500',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:'3px'}}>
-                          {t.tenant_dba}
-                          <span style={{fontSize:'10px',color:T.text2,lineHeight:1}}>↗</span>
-                        </a>
-                      ) : <span style={{color:T.accent,fontSize:F.sm,fontWeight:'500'}}>{t.tenant_dba}</span>}
-                      {t.prop_code && (
-                        <span style={{fontSize:'10px',fontWeight:'600',color:T.text1,background:T.bg2,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'1px 6px'}}>
-                          {t.prop_code}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{fontSize:F.sm,color:T.text3,padding:'7px 10px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px'}}>—</div>
-                );
+                return <CompanyLinkCard icon={Storefront} name={t?.tenant_dba} link={data.tenant_id?tenantLink(data.tenant_id):null} badge={t?.prop_code} />;
               })()}
             </div>
           </div>

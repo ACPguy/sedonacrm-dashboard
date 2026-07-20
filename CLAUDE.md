@@ -167,22 +167,23 @@ pages/api/pipeline/
 
 ## Next Priorities
 
-1. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency, once Scott confirms this look on the WO/task page
-2. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
-2. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
-3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
-4. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
-5. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
-6. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
-7. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
+1. **Port Contacts linker template to Vendor/Tenant Contact single-mode fields** — once Scott confirms Contacts version (trash icon on card, icon + button, click-outside excludeRef). Deliberate follow-up session.
+2. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency
+3. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
+4. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
+5. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
+6. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
+7. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
+8. Extend LinkField to Vendor/Tenant join tables and future relationships (Key Safes, COIs, Vendor Services) once proper join tables exist
+9. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
 
 ## LinkField Architecture (permanent)
 
 `components/shared/LinkField.jsx` — canonical many-to-many relationship field. Config-driven, zero hardcoded table names. Piloted on Task ↔ Contacts via `task_contacts`.
 
-**Props:** `mode` ('multi' default | 'single'), `value` (single mode: current FK id), `onChange` (single mode: (row|null)=>void — caller persists), `onCreateNew` (single mode: ()=>void — caller opens modal), `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `subtitleField` (fn/string, optional — phone/email line), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`, `variant` ('card' default | 'chip').
+**Props:** `mode` ('multi' default | 'single'), `value` (single mode: current FK id), `onChange` (single mode: (row|null)=>void — caller persists), `onCreateNew` (single mode: ()=>void — caller opens modal), `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `subtitleField` (fn/string, optional — phone/email line), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`, `variant` ('card' default | 'chip'), `badgeField` (fn(row)=>string|null — small pill after title, works in multi + single card variants), `excludeRef` (React ref — clicks on this element do NOT count as "outside" for panel close; use when the trigger button lives outside the LinkField layout).
 
-**variant='card' (default):** Podio-style stacked cards — UserCircle icon + title link (T.accent + ↗) + optional subtitle (phone/email) + meta line. No × on the card itself. Trigger button says "Add / remove"; opening the panel shows currently-linked items as removable chips at the top so unlinking is still possible. ContactsView "Linked Tasks" (readOnly, no subtitleField) renders as cards with just icon + title + meta, no subtitle gap.
+**variant='card' (default):** Podio-style stacked cards — UserCircle icon + title link (T.accent + ↗) + optional badge pill + optional subtitle (phone/email) + meta line. Each multi-mode card has a Trash icon button (absolute-positioned right, 32×32 hit target) that removes the link immediately on click — no confirm dialog. Trigger button says "Add / remove"; in multi mode the panel no longer shows chips at the top (removed — unlinking is via the trash icon on the card instead). ContactsView "Linked Tasks" (readOnly, no subtitleField) renders as cards with just icon + title + meta, no subtitle gap.
 
 **compact prop (default false):** When true — reduced card padding (7px 10px vs 10px 12px), icon size 16 vs 20, `paddingRight:'36px'` on card text div. In single mode, the inline × clear button is removed from the card; a "✕ Remove" row appears at the top of the search panel instead. When false (default): renders exactly as before — no existing call site is affected. Currently used on: TaskDetail Contacts card, Vendor Contact, Tenant Contact (compact=true).
 
@@ -202,6 +203,8 @@ pages/api/pipeline/
 
 **To add another relationship:** drop in `<LinkField .../>` with the correct props — no new state/effects/functions needed in the parent view.
 
+**`CompanyLinkCard` (`components/shared/CompanyLinkCard.jsx`):** canonical read-only display card for a linked company. Props: `icon` (Phosphor component), `name` (string|null — renders '—' when falsy), `link` (url|null), `badge` (string|null). Use this anywhere a vendor/tenant company name needs to display — never re-inline the JSX. Any future company-link display (Owners, other modules) should use it.
+
 **External link icon:** uses ↗ character inline (~11px), consistent with FieldWithBadge pattern. No circular badge.
 
 **Search result row click priority:** In `renderPanel()` (shared by all card/chip/single call sites), the result row's outer `div onClick` is the primary "select/link this" action. The contact name is rendered as a plain colored `<span>` — NOT an anchor — so clicking it selects the result. A small secondary `↗` anchor after the name (with `onClick stopPropagation`) opens the record in a new tab without triggering the row's select. Do NOT regress this to the old pattern where the name was the anchor — that made clicking the most prominent element open a new tab instead of linking.
@@ -214,8 +217,10 @@ pages/api/pipeline/
 - **Linked Companies:** uses `LinkField mode='single'` for both Vendor Contact and Tenant Contact. Picking a contact auto-fills the read-only Company box via `handleContactChange` (reads `vendor_id`/`tenant_id` FK from the contact row, saves both fields via `saveMany`). "+ Create new" opens `StackedFormModal` (zIndex 310) with a 4-field form (name/company/phone/email). **Deliberate asymmetry:** Vendor Contact modal auto-creates (or reuses via case-insensitive exact ilike match on company_dba) a `vendors` row when a company name is typed — new vendor row appended to local state immediately so Company box fills without refresh. Tenant Contact modal intentionally does NOT create a `tenants` row — new tenants must go through the leasing pipeline; company_dba is free-text only on the contact. `ContactFirstRow` was retired; `CompanyContactRow` kept for NewTaskForm WO section (company-first flow).
 - **`CompanyContactRow`** kept intact for NewTaskForm WO section (company-first flow).
 - **Vendor/Tenant Company lookups** (TasksList rows, TaskDetail display, NewTaskForm picker) load ALL vendors/tenants regardless of status — do NOT add an Active-only filter back. A prior version filtered to `vendor_status=eq.Active` / `tenant_status=eq.Active`, which silently blanked out correctly-linked companies whenever the linked vendor/tenant wasn't Active (affected ~74% of vendors, ~65% of tenants). Fixed 2026-07-20.
-- **Vendor Company / Tenant Company fields** (Linked Companies card) match the Contact card visual pattern — icon (Truck/Storefront, same as AppShell nav) + clickable company name with ↗ (opens `/vendors/[podio_id]` or `/tenants/[podio_id]`) instead of the old FieldWithBadge corner-badge pattern. Blank state still shows '—' in a plain box.
-- **Tenant Company** shows a `prop_code` badge after the company name (sourced from `tenants.prop_code`). Vendor Company intentionally has no equivalent badge — vendors aren't tied to a single property.
+- **Vendor Company / Tenant Company fields** (Linked Companies card) rendered via `CompanyLinkCard` — icon (Truck/Storefront) + clickable company name with ↗ + optional badge. Blank state shows '—'. Do not re-inline this JSX.
+- **Tenant Company** shows a `prop_code` badge (sourced from `tenants.prop_code`). Vendor Company intentionally has no badge — vendors aren't tied to a single property.
+- **Contacts section trigger button** is now a `Plus` icon (14px) with `title="Add new item"`. Uses `contactsBtnRef` passed as `excludeRef` to `LinkField` so clicking the button while the panel is open doesn't immediately re-close it.
+- **Contacts section panel (multi-mode card):** removable chips in the panel header are gone. Removal is via Trash icon button (absolute-positioned, right edge of each card). Linked contacts show a `badgeField` prop_code pill when the contact's `tenant_id` resolves to a tenant with a `prop_code`.
 
 ## Current Git State
 

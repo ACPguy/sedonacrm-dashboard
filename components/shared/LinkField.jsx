@@ -3,7 +3,7 @@
 // Canonical implementation; pilot: Task <-> Contacts via task_contacts
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react';
-import { UserCircle } from '@phosphor-icons/react';
+import { UserCircle, Trash } from '@phosphor-icons/react';
 import { T } from '../../lib/theme';
 
 const SUPABASE_URL      = 'https://edxcvyleielzevpappui.supabase.co';
@@ -99,6 +99,8 @@ const LinkField = React.forwardRef(function LinkField({
   variant = 'card',   // 'card' | 'chip'
   compact = false,    // compact card style
   hideTrigger = false, // when true, no trigger button rendered — parent drives openPanel() via ref
+  badgeField,    // optional fn(row) => string|null, rendered as a small pill after the title
+  excludeRef,    // optional ref — clicks on this element don't count as "outside" for panel close
 }, ref) {
   const [linked,       setLinked]       = useState([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
@@ -188,7 +190,9 @@ const LinkField = React.forwardRef(function LinkField({
   useEffect(() => {
     if (!searchOpen) return;
     const h = e => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
+      const inPanel = panelRef.current && panelRef.current.contains(e.target);
+      const inExcluded = excludeRef?.current && excludeRef.current.contains(e.target);
+      if (!inPanel && !inExcluded) {
         setSearchOpen(false);
         setQuery('');
         setResults([]);
@@ -266,40 +270,6 @@ const LinkField = React.forwardRef(function LinkField({
           onMouseEnter={e => e.currentTarget.style.background = T.bg2}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           ✕ Remove {sectionLabel || ''}
-        </div>
-      )}
-
-      {/* Currently-linked chips with unlink — card variant multi mode only */}
-      {variant === 'card' && mode !== 'single' && linked.length > 0 && (
-        <div style={{
-          padding: '8px 10px', borderBottom: `0.5px solid ${T.border}`,
-          display: 'flex', flexWrap: 'wrap', gap: '5px',
-        }}>
-          {linked.map(row => {
-            const title = resolve(titleField, row);
-            return (
-              <span key={row._joinId} style={{
-                display: 'inline-flex', alignItems: 'center', gap: '3px',
-                background: T.bg2, border: `0.5px solid ${T.border}`,
-                borderRadius: '20px', padding: '2px 5px 2px 8px',
-                fontSize: F.xs, color: T.text0,
-              }}>
-                {title}
-                <button
-                  onClick={() => unlink(row._joinId)}
-                  style={{
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    color: T.text2, fontSize: '12px', lineHeight: 1,
-                    padding: '1px 2px', borderRadius: '50%', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    minWidth: '18px', minHeight: '18px',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.color = T.danger}
-                  onMouseLeave={e => e.currentTarget.style.color = T.text2}
-                  title="Remove link">×</button>
-              </span>
-            );
-          })}
         </div>
       )}
 
@@ -473,6 +443,7 @@ const LinkField = React.forwardRef(function LinkField({
                   <div key={row._joinId} style={{
                     background: T.bg3, border: `0.5px solid ${T.border}`,
                     borderRadius: '6px', padding: compact ? '7px 10px' : '10px 12px',
+                    position: 'relative',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                       <UserCircle size={compact ? 16 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0, marginTop: '1px' }} />
@@ -490,6 +461,11 @@ const LinkField = React.forwardRef(function LinkField({
                         ) : (
                           <span style={{ color: T.accent, fontSize: F.sm, fontWeight: '500' }}>{title}</span>
                         )}
+                        {badgeField && resolve(badgeField, row) && (
+                          <span style={{ display: 'inline-block', marginLeft: '6px', fontSize: '10px', fontWeight: '600', color: T.text1, background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '1px 6px' }}>
+                            {resolve(badgeField, row)}
+                          </span>
+                        )}
                         {subtitle && (
                           <div style={{ fontSize: F.xs, color: T.text2, marginTop: '2px' }}>{subtitle}</div>
                         )}
@@ -497,6 +473,22 @@ const LinkField = React.forwardRef(function LinkField({
                     </div>
                     {meta && !compact && (
                       <div style={{ fontSize: '11px', color: T.text3, marginTop: '5px' }}>{meta}</div>
+                    )}
+                    {!readOnly && (
+                      <button
+                        onClick={() => unlink(row._joinId)}
+                        title={`Remove ${title}`}
+                        style={{
+                          position: 'absolute', top: '50%', right: '6px', transform: 'translateY(-50%)',
+                          width: '32px', height: '32px', padding: '8px', margin: '-6px',
+                          background: 'transparent', border: 'none', cursor: 'pointer',
+                          color: T.text2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          borderRadius: '4px',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = T.danger; e.currentTarget.style.background = T.bg2; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = T.text2; e.currentTarget.style.background = 'transparent'; }}>
+                        <Trash size={18} weight="bold" />
+                      </button>
                     )}
                   </div>
                 );
@@ -636,6 +628,11 @@ const LinkField = React.forwardRef(function LinkField({
                       </a>
                     ) : (
                       <span style={{ color: T.accent, fontSize: F.sm, fontWeight: '500' }}>{resolve(titleField, singleValue)}</span>
+                    )}
+                    {badgeField && resolve(badgeField, singleValue) && (
+                      <span style={{ display: 'inline-block', marginLeft: '6px', fontSize: '10px', fontWeight: '600', color: T.text1, background: T.bg2, border: `0.5px solid ${T.border}`, borderRadius: '4px', padding: '1px 6px' }}>
+                        {resolve(badgeField, singleValue)}
+                      </span>
                     )}
                     {subtitleField && resolve(subtitleField, singleValue) && (
                       <div style={{ fontSize: F.xs, color: T.text2, marginTop: '2px' }}>{resolve(subtitleField, singleValue)}</div>
