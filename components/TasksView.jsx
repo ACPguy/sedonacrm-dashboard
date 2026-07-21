@@ -1841,7 +1841,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
               <div style={{display:'flex',alignItems:'center'}}>
                 <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Company</span>
               </div>
-              <LinkField
+              <RelationField
+                rel="tenantContact"
                 ref={tenantContactRef}
                 excludeRef={tenantContactBtnRef}
                 mode="single"
@@ -1849,14 +1850,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 value={data.tenant_contact_id}
                 onChange={row=>handleContactChange('tenant',row)}
                 onCreateNew={()=>openContactModal('tenant')}
-                linkedTable="contacts"
-                linkedFields="id,full_name,company_dba,podio_id,vendor_id,tenant_id,primary_phone,email"
-                searchFields={['full_name','company_dba']}
                 titleField={contactTitle}
-                titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
-                subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
                 badgeField={contactPropCode}
-                allowCreate={true}
                 sectionLabel="contact"
                 compact={true}
               />

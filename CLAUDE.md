@@ -174,7 +174,7 @@ pages/api/pipeline/
 5. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
 6. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
 7. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
-8. Migrate remaining LinkField call sites to the RelationField/relations.js pattern (Tenant Contact, Contacts, Related Records, reverseFK Vendor/Tenant Contacts) — one relationship at a time, verify zero-visual-diff each time, same approach as the Property/Vendor Contact pilots.
+8. Migrate remaining LinkField call sites to the RelationField/relations.js pattern (Contacts, Related Records, reverseFK Vendor/Tenant Contacts) — one relationship at a time, verify zero-visual-diff each time, same approach as the Property/Vendor Contact/Tenant Contact pilots.
 
 **Completed this session (2026-07-21):**
 - TenantDetail Contacts tab rebuilt as reverseFK LinkField (matches VendorDetail)
@@ -182,6 +182,7 @@ pages/api/pipeline/
 - LinkField: titleTarget prop added (default _blank; _self for same-tab navigation)
 - RelationField/relations.js registry piloted on Property (TaskDetail + NewTaskForm) — centralizes query/display config to prevent config drift between call sites
 - RelationField/relations.js extended to Vendor Contact (TaskDetail Linked Companies) — titleField/badgeField kept caller-supplied since they close over local vendors/tenants state
+- RelationField/relations.js extended to Tenant Contact (TaskDetail Linked Companies) — confirmed byte-identical config to Vendor Contact by reading fresh, shared contactTitle/contactPropCode helpers, no-auto-create-tenant modal behavior unchanged
 
 ## Canonical Linker Architecture (permanent — locked in 2026-07-20)
 
@@ -190,6 +191,8 @@ LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any 
 **RelationField / relations.js registry (piloted 2026-07-21, extended to Vendor Contact 2026-07-21):** `RelationField` (`components/shared/RelationField.jsx`) is a thin config-lookup wrapper around LinkField, backed by `lib/relations.js`. Purpose: centralize per-relationship query/display config (table, fields, search, title/subtitle formatting, icon) so it can't drift between call sites the way NewTaskForm's Property fetch once did (missing `id` field, fixed 2026-07-21). Usage: `<RelationField rel="property" ... />` — caller still passes value/onChange/mode/compact/etc.; the registry entry supplies linkedTable/linkedFields/searchFields/titleField/titleHref/subtitleField/icon/allowCreate. LinkField itself is unchanged and still used directly by every other relationship (Contacts, Tenant Contact, Related Records, reverseFK Vendor/Tenant Contacts tabs) — those are NOT yet migrated to the registry pattern. Write-side logic (which FK column, denormalized-field syncing like property_id+prop_code) intentionally stays as caller-supplied onChange, not centralized — that's genuine per-relationship logic, not duplication.
 
 **Vendor Contact (`relations.vendorContact`, migrated 2026-07-21):** single call site (TaskDetail Linked Companies) — not a drift-prevention case like Property, just pattern consistency ahead of a possible second call site later. Registry supplies linkedTable/linkedFields/searchFields/titleHref/subtitleField/icon/allowCreate. **titleField and badgeField deliberately stayed OUT of the registry and remain caller-supplied props** — TaskDetail's `contactTitle` and `contactPropCode` helpers close over its local `vendors`/`tenants` state arrays (to show the authoritative linked vendor/tenant name, not the contact's own unreliable free-text `company_dba`), so they can't be moved into a standalone module without breaking. This is the same "don't force impure config into the registry" rule that governs badgeField generally — confirmed here to apply to titleField too, not just badgeField, whenever a title/badge function reads component closure state instead of only its `row` argument.
+
+**Tenant Contact (`relations.tenantContact`, migrated 2026-07-21):** third migration, TaskDetail Linked Companies (Tenant Contact field). Confirmed by reading the live block fresh (not assumed from Vendor Contact symmetry) that `tenantContact`'s registry-able config is byte-identical to `vendorContact` — same `linkedTable`/`linkedFields`/`searchFields`/`titleHref`/`subtitleField`/`icon`/`allowCreate` — and that `titleField={contactTitle}`/`badgeField={contactPropCode}` are the exact same shared helpers Vendor Contact uses (not separate copies), so they stay caller-supplied for the same closure-over-state reason. Confirmed the "Tenant Contact modal does NOT auto-create a `tenants` row" behavior (`handleContactModalSave`) is untouched — it's local logic invoked via `onCreateNew`, entirely outside the registry/RelationField boundary.
 
 CompanyLinkCard.jsx (`components/shared/CompanyLinkCard.jsx`) is the ONLY component for read-only derived entity display cards (e.g. Vendor Company, Tenant Company) — same "build once" rule applies as new derived-display use cases come up.
 
@@ -272,7 +275,7 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 ## Current Git State
 
 - main: `53933cd` — merge: Related Records fix (4069921) into main (merged 2026-07-21)
-- preview: `b43e6d7` — refactor: RelationField/relations.js extended to Vendor Contact (2026-07-21, not yet merged to main)
+- preview: `57ac2a8` — refactor: RelationField/relations.js extended to Tenant Contact (2026-07-21, not yet merged to main)
 
 ---
 
