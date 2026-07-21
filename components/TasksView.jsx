@@ -1693,8 +1693,11 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 <InlineBlurField value={data.title} onSave={v=>save('title',v)} bigTitle/>
               </div>
             </div>
-            <FieldRow label="Property" topAlign>
+            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 14px'}}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.04)'}
+              onMouseLeave={e=>e.currentTarget.style.background=''}>
               <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Property</span>
                 <button ref={propertyBtnRef} onClick={()=>propertyLinkRef.current?.openPanel()}
                   title="Change property"
                   style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
@@ -1715,11 +1718,12 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 searchFields={['prop_code','property_name']}
                 titleField={row=>`${row.prop_code} — ${row.property_name}`}
                 subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
+                icon={Buildings}
                 allowCreate={false}
                 sectionLabel="property"
                 compact={true}
               />
-            </FieldRow>
+            </div>
             <FieldRow label="Priority"><PriorityPills value={data.priority} onSave={v=>save('priority',v)}/></FieldRow>
             <FieldRow label="Assigned To">
               <select value={data.assigned_to||''} onChange={async e=>save('assigned_to',e.target.value||null)}
@@ -2292,8 +2296,11 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
               {titleError&&<div style={{fontSize:F.xs,color:T.danger,marginTop:'2px'}}>Title is required</div>}
             </div>
           </div>
-          <FieldRow label="Property" topAlign>
+          <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 14px'}}
+            onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.04)'}
+            onMouseLeave={e=>e.currentTarget.style.background=''}>
             <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+              <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Property</span>
               <button ref={newPropertyBtnRef} onClick={()=>newPropertyLinkRef.current?.openPanel()}
                 title="Change property"
                 style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
@@ -2314,11 +2321,12 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
               searchFields={['prop_code','property_name']}
               titleField={row=>`${row.prop_code} — ${row.property_name}`}
               subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
+              icon={Buildings}
               allowCreate={false}
               sectionLabel="property"
               compact={true}
             />
-          </FieldRow>
+          </div>
           <FieldRow label="Alert">
             <InlineBlurField value={formData.alert||''} onSave={v=>set('alert',v)}/>
           </FieldRow>

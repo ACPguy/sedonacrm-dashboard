@@ -167,15 +167,14 @@ pages/api/pipeline/
 
 ## Next Priorities
 
-1. Add `icon` prop to LinkField — icon is currently hardcoded to UserCircle, showing a person icon on the Property linker and any future non-contact target. Add `icon` prop before wiring LinkField to Key Safes, COIs, or other non-contact entity types.
-2. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
-3. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
-4. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
-5. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency
-6. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
-7. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
-8. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
-9. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
+1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
+2. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
+3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
+4. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency
+5. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
+6. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
+7. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
+8. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
 
 ## Canonical Linker Architecture (permanent — locked in 2026-07-20)
 
@@ -195,12 +194,12 @@ Full prop reference: `mode` ('multi'|'single'), `compact`, `hideTrigger`, `badge
 If this template needs to change in the future: change `LinkField.jsx` / `CompanyLinkCard.jsx` ONCE. Every call site inherits it. Do not patch individual call sites.
 
 **Live single-mode LinkField targets (as of 2026-07-21):**
-- **Properties** (`tasks` → `properties`, direct FK `property_id`): TaskDetail + NewTaskForm. `linkedFields="id,prop_code,property_name,address,city,state"`, search on `prop_code`+`property_name`, `titleField=row=>\`${row.prop_code} — ${row.property_name}\``, subtitleField = address/city/state, `allowCreate=false`, `compact=true`, `hideTrigger=true`. `handlePropertyChange` saves both `property_id` and `prop_code` together so all existing prop_code-based filters/badges keep working.
+- **Properties** (`tasks` → `properties`, direct FK `property_id`): TaskDetail + NewTaskForm. `linkedFields="id,prop_code,property_name,address,city,state"`, search on `prop_code`+`property_name`, `titleField=row=>\`${row.prop_code} — ${row.property_name}\``, subtitleField = address/city/state, `icon={Buildings}`, `allowCreate=false`, `compact=true`, `hideTrigger=true`. Layout: bare div (no FieldRow wrapper) — FieldRow's 160px label column is dead space for self-contained linker sections. `handlePropertyChange` saves both `property_id` and `prop_code` together so all existing prop_code-based filters/badges keep working.
 - **Contacts** (join table `task_contacts`): multi-mode — see TaskDetail Contacts section.
 - **Vendor Contact / Tenant Contact** (`contacts` table): single-mode — see TaskDetail Linked Companies section.
 
 **Three things to handle BEFORE pointing LinkField at a new relationship type:**
-1. Icon is currently hardcoded to `UserCircle` inside LinkField — not yet a prop. Needs an `icon` prop added before use on non-contact entities (Key Safes, Insurance, Projects, etc.) so each linker shows the right glyph instead of always a person icon. The Property linker currently shows a person icon — acceptable for now; fix before next non-contact target.
+1. ~~Icon hardcoded to UserCircle~~ **RESOLVED (2026-07-21)** — `icon` prop added to LinkField, defaults to `UserCircle`. Pass `icon={SomePhosphorComponent}` at the call site for any non-contact entity. Contacts/Vendor Contact/Tenant Contact call sites unchanged (omitting `icon` keeps UserCircle). Property linker uses `icon={Buildings}`.
 2. LinkField is the UI/interaction layer only — it does not create the underlying relationship. Each new linker target (Insurance↔Properties, Key Safes↔Work Orders, etc.) needs its own schema decision first (direct FK for one-to-many, join table for many-to-many), same pattern as `task_contacts`. Design the relationship, then wire LinkField to it — two steps, not one.
 3. LinkField currently reads/writes via the anon Supabase key. Fine for contacts/vendors/tenants/properties (anon-readable tables). Any future linker target that's deliberately RLS-locked (e.g. `automation_agents`, or future sensitive/financial tables) will NOT be reachable by LinkField as-is — it would need a server-route mode instead of direct anon calls. Check RLS/anon grants on the target table before wiring a new linker to it.
 
