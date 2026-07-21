@@ -174,7 +174,6 @@ pages/api/pipeline/
 5. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
 6. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
 7. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
-8. (Optional, low priority — newly discovered 2026-07-21) Migrate ContactsView.jsx's 3 remaining direct `<LinkField>` call sites to the RelationField/relations.js pattern (Vendor Company picker ~line 903, Tenant Company picker ~line 922, read-only reverse "Linked Tasks" ~line 998) — these were never part of the 6-migration series and were not previously tracked; same approach as the prior six pilots.
 
 **Completed this session (2026-07-21):**
 - TenantDetail Contacts tab rebuilt as reverseFK LinkField (matches VendorDetail)
@@ -236,7 +235,11 @@ The six LinkField call sites have all been migrated to this pattern (2026-07-21)
 
 **Vendor Contacts / Tenant Contacts (`relations.vendorContacts` / `relations.tenantContacts`):** sixth migration — VendorDetail's and TenantDetail's Contacts tabs (`VendorsView.jsx`/`TenantsView.jsx`), `mode='reverseFK'`. One call site each. The two configs are identical except `reverseField` (`'vendor_id'` vs `'tenant_id'`) and the FK column name inside `linkedFields` — kept as two separate registry entries (unifying `linkedFields` to select both FK columns would change the live query, a real behavior change). `mode:'reverseFK'` itself is baked into each entry. Unlike every prior Vendor/Tenant Contact migration, `titleField`/`subtitleField`/`titleHref` here ARE pure — `VendorsView.jsx`/`TenantsView.jsx` have no TaskDetail-style closures — so everything registry-able made it in.
 
-**Series status — open item:** the six-migration series (Property → Vendor Contact → Tenant Contact → Contacts multi-mode → Related Records → Vendor/Tenant Contacts reverseFK) is complete and merged to main. **`ContactsView.jsx` still has three direct `<LinkField>` call sites that were never part of this series and are not yet migrated:** a Vendor Company picker (single-mode, `vendors` table, ~line 903), a Tenant Company picker (single-mode, `tenants` table, ~line 922), and a read-only reverse-direction "Linked Tasks" display (multi-mode via `task_contacts`, ~line 998). See Next Priorities.
+**Contact Vendor/Tenant Company (`relations.contactVendorCompany` / `relations.contactTenantCompany`):** ContactDetail's own Vendor/Tenant Company pickers (`ContactsView.jsx`), single-mode, writing `contacts.vendor_id`/`contacts.tenant_id` — the opposite direction from `vendorContacts`/`tenantContacts` (which pick Contacts belonging to a Vendor/Tenant) and a different relationship again from `vendorContact`/`tenantContact` (TaskDetail's pickers, which write a contact FK onto a *task*). `mode:'single'` is baked in as a per-relationship constant. `titleField`/`titleHref`/`subtitleField`/`badgeField` here ARE pure functions of `row` — `ContactsView.jsx` has no TaskDetail-style closures — first migration where `badgeField` itself is genuinely registry-able (`contactTenantCompany`'s `prop_code` pill).
+
+**Linked Tasks (`relations.contactLinkedTasks`):** ContactDetail's read-only reverse view of `task_contacts` — same join table as `taskContacts` but the opposite direction (`parentIdField:'contact_id'`, `linkedIdField:'task_id'`, `linkedTable:'tasks'`), so it's a distinct registry entry rather than reusing `taskContacts`. `readOnly:true` is baked in as a per-relationship constant, same treatment as `mode:'reverseFK'` for the Vendor/Tenant Contacts tabs — this view has no create-task-from-contact flow, so read-only isn't call-site-variable here.
+
+**Series status:** the LinkField→RelationField migration is now complete across the entire app. `grep -rn "<LinkField"` shows it appears literally nowhere except inside `RelationField.jsx` itself — zero remaining direct callers.
 
 **Three things to handle BEFORE pointing LinkField at a new relationship type:**
 1. `icon` prop defaults to `UserCircle` — pass `icon={SomePhosphorComponent}` at the call site for any non-contact entity (e.g. Property linker uses `icon={Buildings}`).
@@ -265,7 +268,7 @@ The six LinkField call sites have all been migrated to this pattern (2026-07-21)
 ## Current Git State
 
 - main: `8b9ed67` — merge: six RelationField/relations.js migrations (d9087ad) into main (merged 2026-07-21)
-- preview: `bd9d28d` — docs: consolidate Canonical Linker Architecture + LinkField Architecture (2026-07-21, not yet merged to main)
+- preview: `b28ffe8` — refactor: migrate ContactsView.jsx's remaining LinkField call sites — LinkField->RelationField series complete (2026-07-21, not yet merged to main)
 
 ---
 
