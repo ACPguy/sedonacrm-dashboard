@@ -1766,22 +1766,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 <Plus size={14} weight="bold"/>
               </button>
             </div>
-            <LinkField
+            <RelationField
+              rel="taskContacts"
               ref={contactsFieldRef}
               excludeRef={contactsBtnRef}
-              joinTable="task_contacts"
-              parentIdField="task_id"
               parentId={data.id}
-              linkedTable="contacts"
-              linkedIdField="contact_id"
-              linkedFields="id,full_name,company_dba,podio_id,category,created_at,primary_phone,email,vendor_id,tenant_id"
-              searchFields={['full_name','company_dba']}
               titleField={contactTitle}
-              titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
-              subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
               badgeField={contactPropCode}
               sectionLabel="contact"
-              allowCreate={true}
               createFields={['full_name','company_dba','primary_phone','email']}
               onCreate={async fields=>{const r=await sbPost('contacts',fields);return Array.isArray(r)?r[0]:r;}}
               compact={true}

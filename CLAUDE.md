@@ -174,7 +174,7 @@ pages/api/pipeline/
 5. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
 6. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
 7. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
-8. Migrate remaining LinkField call sites to the RelationField/relations.js pattern (Contacts, Related Records, reverseFK Vendor/Tenant Contacts) — one relationship at a time, verify zero-visual-diff each time, same approach as the Property/Vendor Contact/Tenant Contact pilots.
+8. Migrate remaining LinkField call sites to the RelationField/relations.js pattern (Related Records, reverseFK Vendor/Tenant Contacts) — one relationship at a time, verify zero-visual-diff each time, same approach as the Property/Vendor Contact/Tenant Contact/Contacts pilots.
 
 **Completed this session (2026-07-21):**
 - TenantDetail Contacts tab rebuilt as reverseFK LinkField (matches VendorDetail)
@@ -183,6 +183,7 @@ pages/api/pipeline/
 - RelationField/relations.js registry piloted on Property (TaskDetail + NewTaskForm) — centralizes query/display config to prevent config drift between call sites
 - RelationField/relations.js extended to Vendor Contact (TaskDetail Linked Companies) — titleField/badgeField kept caller-supplied since they close over local vendors/tenants state
 - RelationField/relations.js extended to Tenant Contact (TaskDetail Linked Companies) — confirmed byte-identical config to Vendor Contact by reading fresh, shared contactTitle/contactPropCode helpers, no-auto-create-tenant modal behavior unchanged
+- RelationField/relations.js extended to Contacts multi-mode (taskContacts, TaskDetail Contacts section) — first multi-mode migration; joinTable/parentIdField/linkedIdField added to registry shape; linkedFields differs from Vendor/Tenant Contact (adds category+created_at); createFields/onCreate kept local with parentId; link+unlink verified identical via mocked fetch harness
 
 ## Canonical Linker Architecture (permanent — locked in 2026-07-20)
 
@@ -193,6 +194,8 @@ LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any 
 **Vendor Contact (`relations.vendorContact`, migrated 2026-07-21):** single call site (TaskDetail Linked Companies) — not a drift-prevention case like Property, just pattern consistency ahead of a possible second call site later. Registry supplies linkedTable/linkedFields/searchFields/titleHref/subtitleField/icon/allowCreate. **titleField and badgeField deliberately stayed OUT of the registry and remain caller-supplied props** — TaskDetail's `contactTitle` and `contactPropCode` helpers close over its local `vendors`/`tenants` state arrays (to show the authoritative linked vendor/tenant name, not the contact's own unreliable free-text `company_dba`), so they can't be moved into a standalone module without breaking. This is the same "don't force impure config into the registry" rule that governs badgeField generally — confirmed here to apply to titleField too, not just badgeField, whenever a title/badge function reads component closure state instead of only its `row` argument.
 
 **Tenant Contact (`relations.tenantContact`, migrated 2026-07-21):** third migration, TaskDetail Linked Companies (Tenant Contact field). Confirmed by reading the live block fresh (not assumed from Vendor Contact symmetry) that `tenantContact`'s registry-able config is byte-identical to `vendorContact` — same `linkedTable`/`linkedFields`/`searchFields`/`titleHref`/`subtitleField`/`icon`/`allowCreate` — and that `titleField={contactTitle}`/`badgeField={contactPropCode}` are the exact same shared helpers Vendor Contact uses (not separate copies), so they stay caller-supplied for the same closure-over-state reason. Confirmed the "Tenant Contact modal does NOT auto-create a `tenants` row" behavior (`handleContactModalSave`) is untouched — it's local logic invoked via `onCreateNew`, entirely outside the registry/RelationField boundary.
+
+**Contacts / `taskContacts` (`relations.taskContacts`, migrated 2026-07-21):** fourth migration, first **multi-mode** one (previous three were all single-mode). Single call site (TaskDetail Contacts section, backed by the `task_contacts` join table) — confirmed via `grep` for `joinTable=` that no second call site exists (NewTaskForm has no Contacts field). Multi-mode needs `joinTable`/`parentIdField`/`linkedIdField` as explicit config props (LinkField doesn't infer them) — these are pure per-relationship config and now live in the registry alongside `linkedTable`/`linkedFields`/`searchFields`/`titleHref`/`subtitleField`/`allowCreate`; `parentId` stays caller-supplied since it's the specific task's id, not relationship config. **`linkedFields` here is NOT identical to `vendorContact`/`tenantContact`** — it additionally selects `category` and `created_at` — confirmed by reading the live block, not assumed from the single-mode entries' shape. `titleField`/`badgeField` stay caller-supplied (same shared `contactTitle`/`contactPropCode` closures as Vendor/Tenant Contact). **`createFields` + `onCreate` (the inline create-new-contact mini-form) also stay local**, kept together at the call site rather than split across files — they're tightly coupled write-side behavior (the field-name list must match what `onCreate`'s handler expects), not query/display config, same category as `onChange`/`onCreateNew` staying local for single-mode.
 
 CompanyLinkCard.jsx (`components/shared/CompanyLinkCard.jsx`) is the ONLY component for read-only derived entity display cards (e.g. Vendor Company, Tenant Company) — same "build once" rule applies as new derived-display use cases come up.
 
@@ -275,7 +278,7 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 ## Current Git State
 
 - main: `53933cd` — merge: Related Records fix (4069921) into main (merged 2026-07-21)
-- preview: `57ac2a8` — refactor: RelationField/relations.js extended to Tenant Contact (2026-07-21, not yet merged to main)
+- preview: `4f68a1c` — refactor: RelationField/relations.js extended to Contacts multi-mode (taskContacts) (2026-07-21, not yet merged to main)
 
 ---
 
