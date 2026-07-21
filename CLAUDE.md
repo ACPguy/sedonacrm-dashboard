@@ -176,6 +176,11 @@ pages/api/pipeline/
 7. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
 8. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
 
+**Completed this session (2026-07-21):**
+- TenantDetail Contacts tab rebuilt as reverseFK LinkField (matches VendorDetail)
+- Related Records: wrong record fix (?rt= hint), back button fix (?from= + titleTarget=_self)
+- LinkField: titleTarget prop added (default _blank; _self for same-tab navigation)
+
 ## Canonical Linker Architecture (permanent — locked in 2026-07-20)
 
 LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any interactive relationship field anywhere in SedonaCRM — not just contacts/companies. This is the universal relationship layer for the whole database: Work Orders/Tasks ↔ Projects, Insurance ↔ Properties/Tenants/Vendors, Key Safes ↔ Work Orders, Reports ↔ Properties, and every future relationship. Single-select or multi-select, any table, any relationship. Do NOT build a new picker/connector/linker component for any future module — extend LinkField's props instead.
@@ -256,8 +261,8 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 
 ## Current Git State
 
-- main: `afe731a` — merge: Property Linker + icon prop + layout fixes (merged 2026-07-21)
-- preview: `7a1e697` — fix: property name link opens property detail from Task/WO (2026-07-21)
+- main: `4069921` — fix: Related Records links navigate to correct record + back button returns to source (merged 2026-07-21)
+- preview: in sync with main
 
 ---
 
