@@ -4,10 +4,10 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Storefront, CaretLeft, CaretRight, ClipboardText, UserCircle, Plus } from '@phosphor-icons/react';
+import { Storefront, CaretLeft, CaretRight, ClipboardText, Plus } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
-import LinkField from './shared/LinkField';
+import RelationField from './shared/RelationField';
 import TasksView from './TasksView';
 import CommunicationTimeline from './CommunicationTimeline';
 import { T } from '../lib/theme';
@@ -1129,19 +1129,11 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
                   <Plus size={14} weight="bold"/>
                 </button>
               </div>
-              <LinkField
+              <RelationField
+                rel="tenantContacts"
                 ref={tenantContactsRef}
                 excludeRef={tenantContactsBtnRef}
-                mode="reverseFK"
                 parentId={data.id}
-                linkedTable="contacts"
-                reverseField="tenant_id"
-                linkedFields="id,full_name,primary_phone,email,podio_id,tenant_id,created_at"
-                searchFields={['full_name','company_dba']}
-                titleField={row=>row.full_name}
-                titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
-                subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
-                icon={UserCircle}
                 sectionLabel="contact"
                 compact={true}
                 hideTrigger={true}
