@@ -44,6 +44,19 @@ const lfDelete = async (table, params) => {
   return res.json();
 };
 
+const lfPatch = async (table, params, body) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+};
+
 const resolve = (fn, row) => (typeof fn === 'function' ? fn(row) : (row?.[fn] ?? ''));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -101,6 +114,7 @@ const LinkField = React.forwardRef(function LinkField({
   hideTrigger = false, // when true, no trigger button rendered — parent drives openPanel() via ref
   badgeField,    // optional fn(row) => string|null, rendered as a small pill after the title
   excludeRef,    // optional ref — clicks on this element don't count as "outside" for panel close
+  reverseField = null,   // reverseFK mode: FK column on linkedTable (e.g. 'vendor_id'); set parentId/null on link/unlink
   icon: Icon = UserCircle, // icon component rendered on each card; defaults to UserCircle
   iconField = null,      // optional fn(row) => Icon component — overrides icon per card when provided
   searchFilter = null,   // optional PostgREST filter string appended to search query (e.g. "id.neq.xyz")
@@ -145,24 +159,29 @@ const LinkField = React.forwardRef(function LinkField({
     if (!parentId) { setLinked([]); return; }
     setLoadingLinks(true);
     try {
-      const joinRows = await lfFetch(
-        joinTable,
-        `${parentIdField}=eq.${parentId}&select=id,${linkedIdField},created_at&order=created_at.asc`
-      );
-      if (!joinRows.length) { setLinked([]); setLoadingLinks(false); return; }
-      const ids = joinRows.map(r => r[linkedIdField]).join(',');
-      const linkedRows = await lfFetch(linkedTable, `id=in.(${ids})&select=${linkedFields}`);
-      const byId = Object.fromEntries(linkedRows.map(r => [r.id, r]));
-      setLinked(
-        joinRows
-          .map(jr => ({ _joinId: jr.id, _joinCreatedAt: jr.created_at, ...byId[jr[linkedIdField]] }))
-          .filter(r => r.id)
-      );
+      if (mode === 'reverseFK') {
+        const rows = await lfFetch(linkedTable, `${reverseField}=eq.${parentId}&select=${linkedFields}&order=created_at.asc`);
+        setLinked((rows || []).map(r => ({ _joinId: r.id, ...r })));
+      } else {
+        const joinRows = await lfFetch(
+          joinTable,
+          `${parentIdField}=eq.${parentId}&select=id,${linkedIdField},created_at&order=created_at.asc`
+        );
+        if (!joinRows.length) { setLinked([]); setLoadingLinks(false); return; }
+        const ids = joinRows.map(r => r[linkedIdField]).join(',');
+        const linkedRows = await lfFetch(linkedTable, `id=in.(${ids})&select=${linkedFields}`);
+        const byId = Object.fromEntries(linkedRows.map(r => [r.id, r]));
+        setLinked(
+          joinRows
+            .map(jr => ({ _joinId: jr.id, _joinCreatedAt: jr.created_at, ...byId[jr[linkedIdField]] }))
+            .filter(r => r.id)
+        );
+      }
     } catch {
       setLinked([]);
     }
     setLoadingLinks(false);
-  }, [parentId, joinTable, parentIdField, linkedIdField, linkedTable, linkedFields]);
+  }, [mode, parentId, reverseField, joinTable, parentIdField, linkedIdField, linkedTable, linkedFields]);
 
   useEffect(() => {
     if (mode === 'single') return;
@@ -210,9 +229,14 @@ const LinkField = React.forwardRef(function LinkField({
   const link = async row => {
     setError('');
     try {
-      const jr    = await lfPost(joinTable, { [parentIdField]: parentId, [linkedIdField]: row.id });
-      const newJr = Array.isArray(jr) ? jr[0] : jr;
-      setLinked(prev => [...prev, { _joinId: newJr.id, _joinCreatedAt: newJr.created_at, ...row }]);
+      if (mode === 'reverseFK') {
+        await lfPatch(linkedTable, `id=eq.${row.id}`, { [reverseField]: parentId });
+        setLinked(prev => [...prev, { _joinId: row.id, ...row, [reverseField]: parentId }]);
+      } else {
+        const jr    = await lfPost(joinTable, { [parentIdField]: parentId, [linkedIdField]: row.id });
+        const newJr = Array.isArray(jr) ? jr[0] : jr;
+        setLinked(prev => [...prev, { _joinId: newJr.id, _joinCreatedAt: newJr.created_at, ...row }]);
+      }
       setSearchOpen(false);
       setQuery('');
       setResults([]);
@@ -225,7 +249,11 @@ const LinkField = React.forwardRef(function LinkField({
   const unlink = async joinId => {
     setError('');
     try {
-      await lfDelete(joinTable, `id=eq.${joinId}`);
+      if (mode === 'reverseFK') {
+        await lfPatch(linkedTable, `id=eq.${joinId}`, { [reverseField]: null });
+      } else {
+        await lfDelete(joinTable, `id=eq.${joinId}`);
+      }
       setLinked(prev => prev.filter(r => r._joinId !== joinId));
     } catch (e) {
       setError('Failed to remove: ' + e.message);

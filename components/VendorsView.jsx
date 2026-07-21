@@ -3,7 +3,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Truck, Eye, EyeSlash, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
+import { Truck, Eye, EyeSlash, CaretLeft, CaretRight, ClipboardText, UserCircle, Plus } from '@phosphor-icons/react';
+import LinkField from './shared/LinkField';
 import { useRouter } from 'next/router';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
@@ -799,8 +800,10 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
   const [navIdx, setNavIdx]                   = useState(-1);
   const [navLoading, setNavLoading]           = useState(false);
   const [vendorTab, setVendorTab]             = useState('tasks');
-  const resizingRight = useRef(false);
-  const referRef      = useRef(null);
+  const resizingRight        = useRef(false);
+  const referRef             = useRef(null);
+  const vendorContactsRef    = useRef(null);
+  const vendorContactsBtnRef = useRef(null);
 
   // Fetch linked contacts + vendor services on mount
   useEffect(() => {
@@ -1003,7 +1006,7 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
 
       {/* Tab bar */}
       <div style={{display:'flex',gap:'2px',padding:'0 16px',borderBottom:`1px solid ${T.border}`,background:T.bg1,flexShrink:0}}>
-        {[['tasks','Tasks'],['info','Vendor Info']].map(([k,label])=>(
+        {[['tasks','Tasks'],['contacts','Contacts'],['info','Vendor Info']].map(([k,label])=>(
           <button key={k} onClick={()=>setVendorTab(k)} style={{
             padding:'8px 14px',fontSize:'13px',fontWeight:vendorTab===k?'600':'400',
             color:vendorTab===k?T.accent:T.text1,background:'none',border:'none',
@@ -1020,6 +1023,41 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
       {vendorTab==='tasks'&&(
         <div style={{flex:1,overflow:'hidden'}}>
           {data?.id&&<TasksView filterVendorId={data.id} hidePropertyPills embeddedMode/>}
+        </div>
+      )}
+
+      {/* Contacts tab */}
+      {vendorTab==='contacts'&&(
+        <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
+          <div style={{background:T.bg2,borderRadius:'8px',overflow:'hidden',padding:'10px 16px 14px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+              <span style={{fontSize:'11px',fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Contacts</span>
+              <button ref={vendorContactsBtnRef} onClick={()=>vendorContactsRef.current?.openPanel()}
+                title="Link a contact"
+                style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <Plus size={14} weight="bold"/>
+              </button>
+            </div>
+            <LinkField
+              ref={vendorContactsRef}
+              excludeRef={vendorContactsBtnRef}
+              mode="reverseFK"
+              parentId={data.id}
+              linkedTable="contacts"
+              reverseField="vendor_id"
+              linkedFields="id,full_name,primary_phone,email,podio_id,vendor_id,created_at"
+              searchFields={['full_name','company_dba']}
+              titleField={row=>row.full_name}
+              titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
+              subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+              icon={UserCircle}
+              sectionLabel="contact"
+              compact={true}
+              hideTrigger={true}
+            />
+          </div>
         </div>
       )}
 

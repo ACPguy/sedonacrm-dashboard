@@ -182,7 +182,7 @@ LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any 
 
 CompanyLinkCard.jsx (`components/shared/CompanyLinkCard.jsx`) is the ONLY component for read-only derived entity display cards (e.g. Vendor Company, Tenant Company) — same "build once" rule applies as new derived-display use cases come up.
 
-Full prop reference: `mode` ('multi'|'single'), `compact`, `hideTrigger`, `badgeField`, `excludeRef`, `variant` ('card'|'chip'), `allowCreate`, `titleField`, `titleHref`, `subtitleField`, `sectionLabel`, `onCreate`. See existing TaskDetail Vendor/Tenant Contact + Contacts usage as the reference implementation.
+Full prop reference: `mode` ('multi'|'single'|'reverseFK'), `compact`, `hideTrigger`, `badgeField`, `excludeRef`, `variant` ('card'|'chip'), `allowCreate`, `titleField`, `titleHref`, `subtitleField`, `sectionLabel`, `onCreate`, `reverseField`, `iconField`, `searchFilter`. See existing TaskDetail Vendor/Tenant Contact + Contacts usage as the reference implementation.
 
 **Compact-mode linker template (as of 2026-07-20, current standard look/behavior):**
 - 32px icon, centered row alignment
@@ -220,6 +220,8 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 **Flat-grid alignment pattern for 2-column label+card layouts:** Use a single `display:grid, gridTemplateColumns:'1fr 1fr', gridAutoRows:'auto'` parent with 4 direct children: [label1 div, label2 div, card1 (LinkField), card2 (company card)]. CSS grid auto-sizes each row to its tallest cell, so both label divs share row height and both cards start together — alignment is enforced structurally, not by matching heights manually. The old nested-div-per-column approach (label + card in independent column divs) breaks if one label is taller than the other.
 
 **variant='chip':** compact inline pills with × unlink. Pass `variant="chip"` explicitly on any call site that wants the old look.
+
+**mode='reverseFK':** direct FK reverse lookup — no join table. Queries `linkedTable WHERE reverseField=parentId`. Link sets `reverseField=parentId` on the target row (PATCH); unlink sets `reverseField=null`. Requires anon UPDATE on linkedTable. Used for VendorDetail→Contacts (vendor_id) and TenantDetail→Contacts (tenant_id). Reusable for any one-to-many FK where the FK lives on the child table. `lfPatch` internal helper added to support this mode.
 
 **mode='multi' (default):** self-persisting join-table mode. Inserts/deletes join rows; caller owns nothing.
 
@@ -412,6 +414,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - **`leasing_pipeline` has NO FK to `properties`** — links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline. Query properties separately by prop_code.
 - **`tasks.property_id` (2026-07-21):** `uuid FK → properties(id)`, backfilled from `prop_code` match (4,153/4,374 rows — 221 had null prop_code and remain null). Index: `idx_tasks_property_id`. Covered by existing `anon_update_tasks` policy. Used by the Property single-mode LinkField in TaskDetail + NewTaskForm; `handlePropertyChange` saves both `property_id` and `prop_code` atomically so legacy prop_code filters stay intact.
 - **Postgres RPC suffix-lookup functions (2026-07-17):** `find_contact_by_id_suffix(p_suffix text)` and `find_issue_by_id_suffix(p_suffix text)` — both SECURITY INVOKER, granted to anon. Used by X-prefix detail-page lookup for tables >1000 rows (Supabase max-rows=1000 cap prevents fetch-all). Add similar functions for any other large table needing X-prefix lookup.
+- **`contacts` anon UPDATE policy (2026-07-21):** `"anon update contacts"` USING (true) WITH CHECK (true). Required for reverseFK mode LinkField to set/clear vendor_id and tenant_id from VendorDetail/TenantDetail Contacts tab.
 - **`task_relations` (2026-07-21):** Self-referential many-to-many join table for related records. Columns: id, task_id FK→tasks(id) ON DELETE CASCADE, related_task_id FK→tasks(id) ON DELETE CASCADE, created_at. UNIQUE(task_id, related_task_id). RLS: anon SELECT + INSERT + DELETE. Designed to expand to cross-module links (insurance items, COIs, etc.) in the future; currently links tasks/WOs/projects to other tasks/WOs/projects.
 
 ## Drive Folder Architecture (permanent)

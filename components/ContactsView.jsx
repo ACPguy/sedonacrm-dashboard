@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { UserCircle, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
+import { UserCircle, CaretLeft, CaretRight, ClipboardText, Truck, Storefront, Plus } from '@phosphor-icons/react';
 import TasksView from './TasksView';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
@@ -566,6 +566,12 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
   const [vendorTab, setVendorTab] = useState({ rows: null, loading: false });
   const [issueTab,  setIssueTab]  = useState({ rows: null, loading: false });
 
+  // Refs for vendor/tenant company single-mode LinkFields
+  const vendorLinkRef    = useRef(null);
+  const vendorLinkBtnRef = useRef(null);
+  const tenantLinkRef    = useRef(null);
+  const tenantLinkBtnRef = useRef(null);
+
   // Document title
   useEffect(() => {
     document.title = `${data.full_name || 'Contact'} | SedonaCRM`;
@@ -841,11 +847,70 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
               </div>
             </div>
 
-            {/* Quick Links — deferred until FK columns added */}
+            {/* Vendor / Tenant Company links */}
             <div style={{...css.card, gridColumn:'1 / -1'}}>
-              <div style={css.secTitle}>Linked Records</div>
-              <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic'}}>
-                Tenant, vendor, and owner links will appear here after Podio sync adds the FK columns.
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gridAutoRows:'auto',gap:'6px 16px'}}>
+                {/* Vendor Company */}
+                <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                  <span style={{fontSize:'12px',fontWeight:'600',color:'#6B7280'}}>Vendor Company</span>
+                  <button ref={vendorLinkBtnRef} onClick={()=>vendorLinkRef.current?.openPanel()}
+                    title="Change vendor company"
+                    style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px',cursor:'pointer'}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                    <Plus size={12} weight="bold"/>
+                  </button>
+                </div>
+                {/* Tenant Company */}
+                <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                  <span style={{fontSize:'12px',fontWeight:'600',color:'#6B7280'}}>Tenant Company</span>
+                  <button ref={tenantLinkBtnRef} onClick={()=>tenantLinkRef.current?.openPanel()}
+                    title="Change tenant company"
+                    style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'4px',cursor:'pointer'}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                    <Plus size={12} weight="bold"/>
+                  </button>
+                </div>
+                <LinkField
+                  ref={vendorLinkRef}
+                  excludeRef={vendorLinkBtnRef}
+                  mode="single"
+                  value={data.vendor_id}
+                  onChange={async row => {
+                    await save('vendor_id', row ? row.id : null);
+                  }}
+                  linkedTable="vendors"
+                  linkedFields="id,company_dba,podio_id,vendor_status"
+                  searchFields={['company_dba']}
+                  titleField={row=>row.company_dba}
+                  titleHref={row=>row.podio_id?`/vendors/${row.podio_id}`:`/vendors/X${row.id.slice(-6)}`}
+                  subtitleField={row=>row.vendor_status||''}
+                  icon={Truck}
+                  sectionLabel="vendor"
+                  compact={true}
+                  hideTrigger={true}
+                />
+                <LinkField
+                  ref={tenantLinkRef}
+                  excludeRef={tenantLinkBtnRef}
+                  mode="single"
+                  value={data.tenant_id}
+                  onChange={async row => {
+                    await save('tenant_id', row ? row.id : null);
+                  }}
+                  linkedTable="tenants"
+                  linkedFields="id,tenant_dba,podio_id,prop_code,tenant_status"
+                  searchFields={['tenant_dba']}
+                  titleField={row=>row.tenant_dba}
+                  titleHref={row=>row.podio_id?`/tenants/${row.podio_id}`:`/tenants/X${row.id.slice(-6)}`}
+                  subtitleField={row=>row.prop_code||''}
+                  badgeField={row=>row.prop_code||null}
+                  icon={Storefront}
+                  sectionLabel="tenant"
+                  compact={true}
+                  hideTrigger={true}
+                />
               </div>
             </div>
           </div>
