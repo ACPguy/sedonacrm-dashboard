@@ -25,6 +25,10 @@ export default function TaskDetailPage() {
       <TaskDetail
         prefixedId={id}
         onBack={() => {
+          if (typeof window !== 'undefined' && window.innerWidth <= 639) {
+            router.back();
+            return;
+          }
           const back = typeof sessionStorage !== 'undefined'
             ? sessionStorage.getItem('tasksBackUrl')
             : null;
