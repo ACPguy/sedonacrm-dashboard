@@ -101,6 +101,7 @@ const LinkField = React.forwardRef(function LinkField({
   hideTrigger = false, // when true, no trigger button rendered — parent drives openPanel() via ref
   badgeField,    // optional fn(row) => string|null, rendered as a small pill after the title
   excludeRef,    // optional ref — clicks on this element don't count as "outside" for panel close
+  icon: Icon = UserCircle, // icon component rendered on each card; defaults to UserCircle
 }, ref) {
   const [linked,       setLinked]       = useState([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
@@ -430,7 +431,7 @@ const LinkField = React.forwardRef(function LinkField({
                     position: 'relative',
                   }}>
                     <div style={{ display: 'flex', alignItems: compact ? 'center' : 'flex-start', gap: '10px' }}>
-                      <UserCircle size={compact ? 32 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />
+                      <Icon size={compact ? 32 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0, paddingRight: compact ? '36px' : 0 }}>
                         {href ? (
                           <a href={href} target="_blank" rel="noopener noreferrer"
@@ -599,7 +600,7 @@ const LinkField = React.forwardRef(function LinkField({
                 position: 'relative',
               }}>
                 <div style={{ display: 'flex', alignItems: compact ? 'center' : 'flex-start', gap: '10px' }}>
-                  <UserCircle size={compact ? 32 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />
+                  <Icon size={compact ? 32 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0, paddingRight: compact ? '36px' : 0 }}>
                     {titleHref?.(singleValue) ? (
                       <a href={titleHref(singleValue)} target="_blank" rel="noopener noreferrer"
