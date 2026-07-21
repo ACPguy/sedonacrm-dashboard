@@ -768,7 +768,11 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
       if (filterTenantId) shared.push(`tenant_id=eq.${filterTenantId}`);
       if (filterContactId) {
         const tcRows = await sbFetch('task_contacts', `contact_id=eq.${filterContactId}&select=task_id`);
-        const taskIds = (tcRows||[]).map(r=>r.task_id);
+        const joinIds = new Set((tcRows||[]).map(r=>r.task_id));
+        // Also include tasks where this contact is the vendor_contact or tenant_contact
+        const directRows = await sbFetch('tasks', `or=(vendor_contact_id.eq.${filterContactId},tenant_contact_id.eq.${filterContactId})&select=id`);
+        (directRows||[]).forEach(r=>joinIds.add(r.id));
+        const taskIds = [...joinIds];
         if (!taskIds.length) {
           setTasks([]);
           setTypeCounts({work_order:0,task:0,project:0,acp_task:0,sg_task:0});

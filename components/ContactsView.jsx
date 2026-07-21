@@ -572,6 +572,22 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
   const tenantLinkRef    = useRef(null);
   const tenantLinkBtnRef = useRef(null);
 
+  // Header company badges — fetch on mount when FK is set
+  const [vendorCompany, setVendorCompany] = useState(null);
+  const [tenantCompany, setTenantCompany] = useState(null);
+  useEffect(() => {
+    if (!data.vendor_id) { setVendorCompany(null); return; }
+    sbFetch('vendors', `id=eq.${data.vendor_id}&select=id,company_dba,podio_id`)
+      .then(rows => setVendorCompany(rows?.[0] || null))
+      .catch(() => setVendorCompany(null));
+  }, [data.vendor_id]);
+  useEffect(() => {
+    if (!data.tenant_id) { setTenantCompany(null); return; }
+    sbFetch('tenants', `id=eq.${data.tenant_id}&select=id,tenant_dba,podio_id`)
+      .then(rows => setTenantCompany(rows?.[0] || null))
+      .catch(() => setTenantCompany(null));
+  }, [data.tenant_id]);
+
   // Document title
   useEffect(() => {
     document.title = `${data.full_name || 'Contact'} | SedonaCRM`;
@@ -759,6 +775,18 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
           {data.category && <span style={css.badge(T.text1, T.bg3)}>{data.category}</span>}
           <ContactStatusBadge status={data.status}/>
           {data.prop_code && <span style={css.badge(T.accent, '#1a2e3a')}>{data.prop_code}</span>}
+          {vendorCompany && (
+            <a href={vendorCompany.podio_id?`/vendors/${vendorCompany.podio_id}`:`/vendors/X${vendorCompany.id.slice(-6)}`}
+              style={{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:F.xs,fontWeight:'600',color:T.accent,background:'rgba(110,159,216,0.12)',border:`0.5px solid rgba(110,159,216,0.3)`,borderRadius:'3px',padding:'2px 7px',textDecoration:'none'}}>
+              <Truck size={11} weight="bold"/>{vendorCompany.company_dba}
+            </a>
+          )}
+          {tenantCompany && (
+            <a href={tenantCompany.podio_id?`/tenants/${tenantCompany.podio_id}`:`/tenants/X${tenantCompany.id.slice(-6)}`}
+              style={{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:F.xs,fontWeight:'600',color:T.accent,background:'rgba(110,159,216,0.12)',border:`0.5px solid rgba(110,159,216,0.3)`,borderRadius:'3px',padding:'2px 7px',textDecoration:'none'}}>
+              <Storefront size={11} weight="bold"/>{tenantCompany.tenant_dba}
+            </a>
+          )}
           {data.podio_id && (
             <span style={{display:'flex', alignItems:'center', gap:'3px'}}>
               <span style={{fontSize:F.xs, color:T.text3, textTransform:'uppercase', letterSpacing:'0.04em'}}>Podio</span>
