@@ -255,7 +255,7 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 ## Current Git State
 
 - main: `1364ed4` — docs: add Canonical Linker Architecture permanent section (merged 2026-07-20)
-- preview: `9bbd786` — feat: Property Linker for Tasks/Work Orders via LinkField (2026-07-21)
+- preview: `fdbd5a7` — fix: Property Linker icon prop + layout corrections (2026-07-21)
 
 ---
 
