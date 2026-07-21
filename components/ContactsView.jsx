@@ -7,7 +7,7 @@ import { UserCircle, CaretLeft, CaretRight, ClipboardText, Truck, Storefront, Pl
 import TasksView from './TasksView';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
-import LinkField from './shared/LinkField';
+import RelationField from './shared/RelationField';
 import { T } from '../lib/theme';
 
 const SUPABASE_URL = 'https://edxcvyleielzevpappui.supabase.co';
@@ -900,41 +900,26 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
                     <Plus size={12} weight="bold"/>
                   </button>
                 </div>
-                <LinkField
+                <RelationField
+                  rel="contactVendorCompany"
                   ref={vendorLinkRef}
                   excludeRef={vendorLinkBtnRef}
-                  mode="single"
                   value={data.vendor_id}
                   onChange={async row => {
                     await save('vendor_id', row ? row.id : null);
                   }}
-                  linkedTable="vendors"
-                  linkedFields="id,company_dba,podio_id,vendor_status"
-                  searchFields={['company_dba']}
-                  titleField={row=>row.company_dba}
-                  titleHref={row=>row.podio_id?`/vendors/${row.podio_id}`:`/vendors/X${row.id.slice(-6)}`}
-                  subtitleField={row=>row.vendor_status||''}
-                  icon={Truck}
                   sectionLabel="vendor"
                   compact={true}
                   hideTrigger={true}
                 />
-                <LinkField
+                <RelationField
+                  rel="contactTenantCompany"
                   ref={tenantLinkRef}
                   excludeRef={tenantLinkBtnRef}
-                  mode="single"
                   value={data.tenant_id}
                   onChange={async row => {
                     await save('tenant_id', row ? row.id : null);
                   }}
-                  linkedTable="tenants"
-                  linkedFields="id,tenant_dba,podio_id,prop_code,tenant_status"
-                  searchFields={['tenant_dba']}
-                  titleField={row=>row.tenant_dba}
-                  titleHref={row=>row.podio_id?`/tenants/${row.podio_id}`:`/tenants/X${row.id.slice(-6)}`}
-                  subtitleField={row=>row.prop_code||''}
-                  badgeField={row=>row.prop_code||null}
-                  icon={Storefront}
                   sectionLabel="tenant"
                   compact={true}
                   hideTrigger={true}
@@ -995,18 +980,9 @@ export const ContactDetail = ({ contact, onBack, onUpdate }) => {
             {/* Linked Tasks — full width, reverse read-only direction */}
             <div style={{...css.card, gridColumn:'1 / -1'}}>
               <div style={css.secTitle}>Linked Tasks</div>
-              <LinkField
-                joinTable="task_contacts"
-                parentIdField="contact_id"
+              <RelationField
+                rel="contactLinkedTasks"
                 parentId={data.id}
-                linkedTable="tasks"
-                linkedIdField="task_id"
-                linkedFields="id,title,task_num,record_type,prop_code"
-                searchFields={[]}
-                titleField={row => row.title || 'Untitled'}
-                titleHref={row => `/tasks/${row.task_num}`}
-                summaryField={row => [row.record_type, row.prop_code].filter(Boolean).join(' · ')}
-                readOnly
               />
             </div>
           </div>
