@@ -1902,6 +1902,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               subtitleField={row=>[row.prop_code,row.status].filter(Boolean).join(' · ')}
               searchFilter={`id.neq.${data.id}`}
               icon={Link}
+              iconField={row=>({work_order:Wrench,task:CheckFat,project:FolderOpen,sg_task:House,acp_task:Buildings}[row.record_type]||Link)}
               sectionLabel="related record"
               compact={true}
               hideTrigger={true}
