@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router';
 import {
   Wrench, CheckFat, FolderOpen, Buildings, House, Star, ClipboardText, ChatCircle,
-  CaretLeft, CaretRight, Truck, Storefront, Plus, Link,
+  CaretLeft, CaretRight, Truck, Storefront, Plus,
 } from '@phosphor-icons/react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -14,7 +14,6 @@ import {
 } from '@dnd-kit/core';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
-import LinkField from './shared/LinkField';
 import RelationField from './shared/RelationField';
 import StackedFormModal from './shared/StackedFormModal';
 import CompanyLinkCard from './shared/CompanyLinkCard';
@@ -1866,23 +1865,13 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 <Plus size={14} weight="bold"/>
               </button>
             </div>
-            <LinkField
+            <RelationField
+              rel="relatedRecords"
               ref={relatedLinksRef}
               excludeRef={relatedLinksBtnRef}
-              joinTable="task_relations"
-              parentIdField="task_id"
               parentId={data.id}
-              linkedTable="tasks"
-              linkedIdField="related_task_id"
-              linkedFields="id,record_type,task_num,title,prop_code,status"
-              searchFields={['title']}
-              titleField={row=>`${getTaskPrefix(row)} — ${row.title}`}
               titleHref={row=>`/tasks/${row.task_num}?rt=${row.record_type}&from=${encodeURIComponent('/tasks/'+data.task_num)}`}
-              titleTarget="_self"
-              subtitleField={row=>[row.prop_code,row.status].filter(Boolean).join(' · ')}
               searchFilter={`id.neq.${data.id}`}
-              icon={Link}
-              iconField={row=>({work_order:Wrench,task:CheckFat,project:FolderOpen,sg_task:House,acp_task:Buildings}[row.record_type]||Link)}
               sectionLabel="related record"
               compact={true}
               hideTrigger={true}
