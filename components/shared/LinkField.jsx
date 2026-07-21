@@ -178,10 +178,8 @@ const LinkField = React.forwardRef(function LinkField({
     setSearching(true);
     const q         = encodeURIComponent(query.trim());
     const linkedIds = mode === 'single' ? (value ? [value] : []) : linked.map(r => r.id);
-    const filter    = searchFields.length === 1
-      ? `${searchFields[0]}.ilike.*${q}*`
-      : `or=(${searchFields.map(f => `${f}.ilike.*${q}*`).join(',')})`;
-    const extra = searchFilter ? `&${searchFilter}` : '';
+    const filter = `or=(${searchFields.map(f => `${f}.ilike.*${q}*`).join(',')})`;
+    const extra  = searchFilter ? `&${searchFilter}` : '';
     lfFetch(linkedTable, `${filter}&select=${linkedFields}&limit=10${extra}`)
       .then(rows => {
         setResults(rows.filter(r => !linkedIds.includes(r.id)));
