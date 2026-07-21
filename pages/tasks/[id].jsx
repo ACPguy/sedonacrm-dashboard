@@ -4,7 +4,7 @@ import { TaskDetail, NewTaskForm } from '../../components/TasksView';
 
 export default function TaskDetailPage() {
   const router = useRouter();
-  const { id, type, prop_code, tenant_id, vendor_id } = router.query;
+  const { id, type, prop_code, tenant_id, vendor_id, rt, from } = router.query;
   if (!id) return null;
 
   if (id === 'new') {
@@ -24,10 +24,16 @@ export default function TaskDetailPage() {
     <AppShell activeView="tasks">
       <TaskDetail
         prefixedId={id}
+        recordTypeHint={rt || null}
         onBack={() => {
-          const back = typeof sessionStorage !== 'undefined'
-            ? sessionStorage.getItem('tasksBackUrl')
-            : null;
+          if (typeof window !== 'undefined' && window.innerWidth <= 639) {
+            router.back();
+            return;
+          }
+          // ?from= (Related Records navigation) takes priority over sessionStorage
+          const back = from
+            ? decodeURIComponent(from)
+            : (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('tasksBackUrl') : null);
           router.push(back || '/tasks');
         }}
       />

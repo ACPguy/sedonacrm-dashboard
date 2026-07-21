@@ -4,9 +4,10 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Storefront, CaretLeft, CaretRight, ClipboardText } from '@phosphor-icons/react';
+import { Storefront, CaretLeft, CaretRight, ClipboardText, UserCircle, Plus } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
+import LinkField from './shared/LinkField';
 import TasksView from './TasksView';
 import CommunicationTimeline from './CommunicationTimeline';
 import { T } from '../lib/theme';
@@ -639,13 +640,14 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
   const [navLoading, setNavLoading] = useState(false);
 
   // Lazy-loaded tab data
-  const [contacts,         setContacts]         = useState(null);
   const [rent,             setRent]             = useState(null);
   const [cois,             setCois]             = useState(null);
   const [issues,           setIssues]           = useState(null);
   const [workOrders,       setWorkOrders]       = useState(null);
   const [rentStatusFilter, setRentStatusFilter] = useState(new Set(['Current', 'Future']));
   const loaded = useRef(new Set());
+  const tenantContactsRef    = useRef(null);
+  const tenantContactsBtnRef = useRef(null);
 
   // Load property + suite immediately (needed for Info tab)
   useEffect(() => {
@@ -658,20 +660,6 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
         .then(r => setSuite(r[0] || null)).catch(() => {});
     }
   }, [data.prop_code, data.suite_num]);
-
-  // Lazy load Contacts tab
-  useEffect(() => {
-    if (tab !== 'contacts' || loaded.current.has('contacts')) return;
-    loaded.current.add('contacts');
-    const ids = [data.primary_contact_id, data.accounting_contact_id].filter(Boolean);
-    if (ids.length === 0) { setContacts({ primary: null, accounting: null }); return; }
-    Promise.all([
-      data.primary_contact_id    ? sbFetch('contacts', `select=*&id=eq.${data.primary_contact_id}`)    : Promise.resolve([]),
-      data.accounting_contact_id ? sbFetch('contacts', `select=*&id=eq.${data.accounting_contact_id}`) : Promise.resolve([]),
-    ]).then(([pc, ac]) => {
-      setContacts({ primary: pc[0] || null, accounting: ac[0] || null });
-    }).catch(() => setContacts({ primary: null, accounting: null }));
-  }, [tab, data.primary_contact_id, data.accounting_contact_id]);
 
   // Lazy load Rent tab (also needed for Overview)
   useEffect(() => {
@@ -1129,49 +1117,35 @@ export const TenantDetail = ({ tenant, onBack, onUpdate }) => {
 
         {/* ── CONTACTS TAB ── */}
         {tab === 'contacts' && (
-          <div>
-            {/* Primary + Accounting linked contacts */}
-            {contacts === null ? (
-              <div style={{padding:'24px', textAlign:'center', color:T.text3, fontSize:F.sm}}>Loading contacts…</div>
-            ) : (
-              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:'16px', marginBottom:'16px'}}>
-                {/* Primary Contact */}
-                <div style={css.card}>
-                  <div style={css.secTitle}>Primary Contact</div>
-                  {contacts.primary ? (
-                    <>
-                      <ReadonlyField label="Name"   value={contacts.primary.full_name}/>
-                      <ReadonlyField label="Title"  value={contacts.primary.title}/>
-                      <ReadonlyField label="Phone"  value={contacts.primary.primary_phone || contacts.primary.main_office_phone}/>
-                      <ReadonlyField label="Email"  value={contacts.primary.email}/>
-                      {contacts.primary.company_dba && <ReadonlyField label="Company" value={contacts.primary.company_dba}/>}
-                    </>
-                  ) : (
-                    <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic', padding:'8px 0'}}>No primary contact linked.</div>
-                  )}
-                </div>
-
-                {/* Accounting Contact */}
-                <div style={css.card}>
-                  <div style={css.secTitle}>Accounting Contact</div>
-                  {contacts.accounting ? (
-                    <>
-                      <ReadonlyField label="Name"   value={contacts.accounting.full_name}/>
-                      <ReadonlyField label="Title"  value={contacts.accounting.title}/>
-                      <ReadonlyField label="Phone"  value={contacts.accounting.primary_phone || contacts.accounting.main_office_phone}/>
-                      <ReadonlyField label="Email"  value={contacts.accounting.email}/>
-                      {contacts.accounting.company_dba && <ReadonlyField label="Company" value={contacts.accounting.company_dba}/>}
-                    </>
-                  ) : (
-                    <div style={{fontSize:F.sm, color:T.text3, fontStyle:'italic', padding:'8px 0'}}>No accounting contact linked.</div>
-                  )}
-                </div>
+          <div style={{flex:1,overflowY:'auto',padding:'16px'}}>
+            <div style={{background:T.bg2,borderRadius:'8px',overflow:'hidden',padding:'10px 16px 14px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+                <span style={{fontSize:'11px',fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Contacts</span>
+                <button ref={tenantContactsBtnRef} onClick={()=>tenantContactsRef.current?.openPanel()}
+                  title="Link a contact"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
               </div>
-            )}
-
-            {/* All contacts for this tenant */}
-            <div style={{height:'400px', overflow:'hidden', border:`0.5px solid ${T.border}`, borderRadius:'6px'}}>
-              <ContactsTable filterTenantId={data.id} hidePropertyFilter={true}/>
+              <LinkField
+                ref={tenantContactsRef}
+                excludeRef={tenantContactsBtnRef}
+                mode="reverseFK"
+                parentId={data.id}
+                linkedTable="contacts"
+                reverseField="tenant_id"
+                linkedFields="id,full_name,primary_phone,email,podio_id,tenant_id,created_at"
+                searchFields={['full_name','company_dba']}
+                titleField={row=>row.full_name}
+                titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
+                subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
+                icon={UserCircle}
+                sectionLabel="contact"
+                compact={true}
+                hideTrigger={true}
+              />
             </div>
           </div>
         )}
