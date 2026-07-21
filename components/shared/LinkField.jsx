@@ -102,6 +102,7 @@ const LinkField = React.forwardRef(function LinkField({
   badgeField,    // optional fn(row) => string|null, rendered as a small pill after the title
   excludeRef,    // optional ref — clicks on this element don't count as "outside" for panel close
   icon: Icon = UserCircle, // icon component rendered on each card; defaults to UserCircle
+  searchFilter = null,   // optional PostgREST filter string appended to search query (e.g. "id.neq.xyz")
 }, ref) {
   const [linked,       setLinked]       = useState([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
@@ -179,7 +180,8 @@ const LinkField = React.forwardRef(function LinkField({
     const filter    = searchFields.length === 1
       ? `${searchFields[0]}.ilike.*${q}*`
       : `or=(${searchFields.map(f => `${f}.ilike.*${q}*`).join(',')})`;
-    lfFetch(linkedTable, `${filter}&select=${linkedFields}&limit=10`)
+    const extra = searchFilter ? `&${searchFilter}` : '';
+    lfFetch(linkedTable, `${filter}&select=${linkedFields}&limit=10${extra}`)
       .then(rows => {
         setResults(rows.filter(r => !linkedIds.includes(r.id)));
         setSearching(false);
