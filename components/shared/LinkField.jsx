@@ -118,6 +118,7 @@ const LinkField = React.forwardRef(function LinkField({
   icon: Icon = UserCircle, // icon component rendered on each card; defaults to UserCircle
   iconField = null,      // optional fn(row) => Icon component — overrides icon per card when provided
   searchFilter = null,   // optional PostgREST filter string appended to search query (e.g. "id.neq.xyz")
+  titleTarget = '_blank', // link target for card title anchors; pass '_self' for same-tab in-app navigation
 }, ref) {
   const [linked,       setLinked]       = useState([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
@@ -464,14 +465,14 @@ const LinkField = React.forwardRef(function LinkField({
                       <CardIcon size={compact ? 32 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0, paddingRight: compact ? '36px' : 0 }}>
                         {href ? (
-                          <a href={href} target="_blank" rel="noopener noreferrer"
+                          <a href={href} target={titleTarget} rel={titleTarget==='_blank'?'noopener noreferrer':undefined}
                             onClick={e => e.stopPropagation()}
                             style={{
                               color: T.accent, fontSize: F.sm, fontWeight: '500',
                               textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px',
                             }}>
                             {title}
-                            <span style={{ fontSize: '11px', color: T.text2, lineHeight: 1 }}>↗</span>
+                            {titleTarget==='_blank' && <span style={{ fontSize: '11px', color: T.text2, lineHeight: 1 }}>↗</span>}
                           </a>
                         ) : (
                           <span style={{ color: T.accent, fontSize: F.sm, fontWeight: '500' }}>{title}</span>
@@ -562,14 +563,14 @@ const LinkField = React.forwardRef(function LinkField({
                   fontSize: F.sm, color: T.text0,
                 }}>
                   {href ? (
-                    <a href={href} target="_blank" rel="noopener noreferrer"
+                    <a href={href} target={titleTarget} rel={titleTarget==='_blank'?'noopener noreferrer':undefined}
                       onClick={e => e.stopPropagation()}
                       style={{
                         color: 'inherit', textDecoration: 'none',
                         display: 'inline-flex', alignItems: 'center', gap: '3px',
                       }}>
                       {title}
-                      <span style={{ fontSize: '11px', color: T.text2, lineHeight: 1 }}>↗</span>
+                      {titleTarget==='_blank' && <span style={{ fontSize: '11px', color: T.text2, lineHeight: 1 }}>↗</span>}
                     </a>
                   ) : title}
                   {!readOnly && (
@@ -633,14 +634,14 @@ const LinkField = React.forwardRef(function LinkField({
                   {(()=>{ const CardIcon = iconField ? iconField(singleValue) : Icon; return <CardIcon size={compact ? 32 : 20} weight="bold" style={{ color: T.text2, flexShrink: 0 }} />; })()}
                   <div style={{ flex: 1, minWidth: 0, paddingRight: compact ? '36px' : 0 }}>
                     {titleHref?.(singleValue) ? (
-                      <a href={titleHref(singleValue)} target="_blank" rel="noopener noreferrer"
+                      <a href={titleHref(singleValue)} target={titleTarget} rel={titleTarget==='_blank'?'noopener noreferrer':undefined}
                         onClick={e => e.stopPropagation()}
                         style={{
                           color: T.accent, fontSize: F.sm, fontWeight: '500',
                           textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px',
                         }}>
                         {resolve(titleField, singleValue)}
-                        <span style={{ fontSize: '11px', color: T.text2, lineHeight: 1 }}>↗</span>
+                        {titleTarget==='_blank' && <span style={{ fontSize: '11px', color: T.text2, lineHeight: 1 }}>↗</span>}
                       </a>
                     ) : (
                       <span style={{ color: T.accent, fontSize: F.sm, fontWeight: '500' }}>{resolve(titleField, singleValue)}</span>

@@ -1286,7 +1286,7 @@ const TasksList = ({ onSelect, filterPropCode, filterType: initType, refreshKey=
 // ─────────────────────────────────────────────────────────────────────────────
 // TaskDetail — named export, used by list inline and /tasks/[id] cold-load
 // ─────────────────────────────────────────────────────────────────────────────
-export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) => {
+export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBack, onUpdate }) => {
   const [data,setData]           = useState(initialTask||null);
   const [loading,setLoading]     = useState(!initialTask);
   const [notFound,setNotFound]   = useState(false);
@@ -1318,9 +1318,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     if (!prefixedId) return;
     const parsed=parsePrefixedId(prefixedId);
     if (!parsed){setNotFound(true);setLoading(false);return;}
-    // For in-app navigation, record_type is stored in sessionStorage navList.
-    // Bare task_num cold loads (no navList match) fall back to work_order-wins ordering.
-    let recordType=parsed.recordType;
+    // Priority: parsed prefix > ?rt= hint > sessionStorage navList > fallback ordering
+    let recordType=parsed.recordType||recordTypeHint||null;
     if (!recordType) {
       try {
         const navL=JSON.parse(sessionStorage.getItem('tasksNavList')||'[]');
@@ -1338,7 +1337,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
         setData(rows[0]);setLoading(false);
       })
       .catch(()=>{setNotFound(true);setLoading(false);});
-  },[prefixedId,initialTask]);
+  },[prefixedId,initialTask,recordTypeHint]);
 
   useEffect(()=>{
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
@@ -1902,7 +1901,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               linkedFields="id,record_type,task_num,title,prop_code,status"
               searchFields={['title']}
               titleField={row=>`${getTaskPrefix(row)} — ${row.title}`}
-              titleHref={row=>`/tasks/${row.task_num}`}
+              titleHref={row=>`/tasks/${row.task_num}?rt=${row.record_type}&from=${encodeURIComponent('/tasks/'+data.task_num)}`}
+              titleTarget="_self"
               subtitleField={row=>[row.prop_code,row.status].filter(Boolean).join(' · ')}
               searchFilter={`id.neq.${data.id}`}
               icon={Link}
