@@ -1714,9 +1714,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
                 value={data.property_id}
                 onChange={handlePropertyChange}
                 linkedTable="properties"
-                linkedFields="id,prop_code,property_name,address,city,state"
+                linkedFields="id,podio_id,prop_code,property_name,address,city,state"
                 searchFields={['prop_code','property_name']}
                 titleField={row=>`${row.prop_code} — ${row.property_name}`}
+                titleHref={row=>`/properties/${row.podio_id??'X'+row.id.slice(-6)}`}
                 subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
                 icon={Buildings}
                 allowCreate={false}
@@ -2317,9 +2318,10 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
               value={formData.property_id}
               onChange={handlePropertyChangeForm}
               linkedTable="properties"
-              linkedFields="id,prop_code,property_name,address,city,state"
+              linkedFields="id,podio_id,prop_code,property_name,address,city,state"
               searchFields={['prop_code','property_name']}
               titleField={row=>`${row.prop_code} — ${row.property_name}`}
+              titleHref={row=>`/properties/${row.podio_id??'X'+row.id.slice(-6)}`}
               subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
               icon={Buildings}
               allowCreate={false}
