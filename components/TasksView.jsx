@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router';
 import {
   Wrench, CheckFat, FolderOpen, Buildings, House, Star, ClipboardText, ChatCircle,
-  CaretLeft, CaretRight, Truck, Storefront, Plus,
+  CaretLeft, CaretRight, Truck, Storefront, Plus, Link,
 } from '@phosphor-icons/react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -1548,6 +1548,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const vendorContactBtnRef  = useRef(null);
   const tenantContactRef     = useRef(null);
   const tenantContactBtnRef  = useRef(null);
+  const relatedLinksRef      = useRef(null);
+  const relatedLinksBtnRef   = useRef(null);
 
   useEffect(()=>{
     const onArrow=e=>{
@@ -1873,7 +1875,41 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
             </div>
           </div>
 
-          {/* 4 — WORK ORDER DETAILS (WO only) */}
+          {/* 4 — RELATED RECORDS */}
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden',padding:'10px 16px 14px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+              <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Related Records</span>
+              <button ref={relatedLinksBtnRef} onClick={()=>relatedLinksRef.current?.openPanel()}
+                title="Link a related record"
+                style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <Plus size={14} weight="bold"/>
+              </button>
+            </div>
+            <LinkField
+              ref={relatedLinksRef}
+              excludeRef={relatedLinksBtnRef}
+              joinTable="task_relations"
+              parentIdField="task_id"
+              parentId={data.id}
+              linkedTable="tasks"
+              linkedIdField="related_task_id"
+              linkedFields="id,record_type,task_num,title,prop_code,status"
+              searchFields={['title']}
+              titleField={row=>`${getTaskPrefix(row)} — ${row.title}`}
+              titleHref={row=>`/tasks/${row.task_num}`}
+              subtitleField={row=>[row.prop_code,row.status].filter(Boolean).join(' · ')}
+              searchFilter={`id.neq.${data.id}`}
+              icon={Link}
+              iconField={row=>({work_order:Wrench,task:CheckFat,project:FolderOpen,sg_task:House,acp_task:Buildings}[row.record_type]||Link)}
+              sectionLabel="related record"
+              compact={true}
+              hideTrigger={true}
+            />
+          </div>
+
+          {/* 5 — WORK ORDER DETAILS (WO only) */}
           {data.record_type==='work_order'&&(
             <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
               <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg3}}>

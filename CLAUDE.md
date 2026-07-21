@@ -239,7 +239,7 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 
 ## TaskDetail Architecture Notes (permanent)
 
-- **Details tab — 7 section cards (in order):** Core → Follow-Up → Contacts (LinkField, all types) → Linked Companies (LinkField mode='single', always visible) → Work Order Details (WO only; Financials + Closeout collapsed sub-panels) → Notes & Relationships → Documents → Dates. System Info collapsible block at end.
+- **Details tab — 8 section cards (in order):** Core → Follow-Up → Contacts (LinkField, all types) → Linked Companies (LinkField mode='single', always visible) → Related Records (LinkField multi, task_relations join table, all types) → Work Order Details (WO only; Financials + Closeout collapsed sub-panels) → Notes & Relationships → Documents → Dates. System Info collapsible block at end.
 - **Category:** shown in Core for all record types EXCEPT `work_order` (WO has its own WO Category field in the WO Details card).
 - **Property field** in TaskDetail closed state: `CodeOnlySelect` component shows just prop_code; dropdown options show "code — name".
 - **Linked Companies:** uses `LinkField mode='single'` for both Vendor Contact and Tenant Contact. Picking a contact auto-fills the read-only Company box via `handleContactChange` (reads `vendor_id`/`tenant_id` FK from the contact row, saves both fields via `saveMany`). "+ Create new" opens `StackedFormModal` (zIndex 310) with a 4-field form (name/company/phone/email). **Deliberate asymmetry:** Vendor Contact modal auto-creates (or reuses via case-insensitive exact ilike match on company_dba) a `vendors` row when a company name is typed — new vendor row appended to local state immediately so Company box fills without refresh. Tenant Contact modal intentionally does NOT create a `tenants` row — new tenants must go through the leasing pipeline; company_dba is free-text only on the contact. `ContactFirstRow` was retired; `CompanyContactRow` kept for NewTaskForm WO section (company-first flow).
@@ -254,8 +254,8 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 
 ## Current Git State
 
-- main: `1364ed4` — docs: add Canonical Linker Architecture permanent section (merged 2026-07-20)
-- preview: `fdbd5a7` — fix: Property Linker icon prop + layout corrections (2026-07-21)
+- main: `afe731a` — merge: Property Linker + icon prop + layout fixes (merged 2026-07-21)
+- preview: `7a1e697` — fix: property name link opens property detail from Task/WO (2026-07-21)
 
 ---
 
@@ -412,6 +412,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - **`leasing_pipeline` has NO FK to `properties`** — links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline. Query properties separately by prop_code.
 - **`tasks.property_id` (2026-07-21):** `uuid FK → properties(id)`, backfilled from `prop_code` match (4,153/4,374 rows — 221 had null prop_code and remain null). Index: `idx_tasks_property_id`. Covered by existing `anon_update_tasks` policy. Used by the Property single-mode LinkField in TaskDetail + NewTaskForm; `handlePropertyChange` saves both `property_id` and `prop_code` atomically so legacy prop_code filters stay intact.
 - **Postgres RPC suffix-lookup functions (2026-07-17):** `find_contact_by_id_suffix(p_suffix text)` and `find_issue_by_id_suffix(p_suffix text)` — both SECURITY INVOKER, granted to anon. Used by X-prefix detail-page lookup for tables >1000 rows (Supabase max-rows=1000 cap prevents fetch-all). Add similar functions for any other large table needing X-prefix lookup.
+- **`task_relations` (2026-07-21):** Self-referential many-to-many join table for related records. Columns: id, task_id FK→tasks(id) ON DELETE CASCADE, related_task_id FK→tasks(id) ON DELETE CASCADE, created_at. UNIQUE(task_id, related_task_id). RLS: anon SELECT + INSERT + DELETE. Designed to expand to cross-module links (insurance items, COIs, etc.) in the future; currently links tasks/WOs/projects to other tasks/WOs/projects.
 
 ## Drive Folder Architecture (permanent)
 
