@@ -3,8 +3,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Truck, Eye, EyeSlash, CaretLeft, CaretRight, ClipboardText, UserCircle, Plus } from '@phosphor-icons/react';
-import LinkField from './shared/LinkField';
+import { Truck, Eye, EyeSlash, CaretLeft, CaretRight, ClipboardText, Plus } from '@phosphor-icons/react';
+import RelationField from './shared/RelationField';
 import { useRouter } from 'next/router';
 import RichTextEditor from './RichTextEditor';
 import ContactsTable from './shared/ContactsTable';
@@ -1040,19 +1040,11 @@ export const VendorDetail = ({ vendor, onBack, onUpdate }) => {
                 <Plus size={14} weight="bold"/>
               </button>
             </div>
-            <LinkField
+            <RelationField
+              rel="vendorContacts"
               ref={vendorContactsRef}
               excludeRef={vendorContactsBtnRef}
-              mode="reverseFK"
               parentId={data.id}
-              linkedTable="contacts"
-              reverseField="vendor_id"
-              linkedFields="id,full_name,primary_phone,email,podio_id,vendor_id,created_at"
-              searchFields={['full_name','company_dba']}
-              titleField={row=>row.full_name}
-              titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
-              subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
-              icon={UserCircle}
               sectionLabel="contact"
               compact={true}
               hideTrigger={true}

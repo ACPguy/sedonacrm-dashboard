@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router';
 import {
   Wrench, CheckFat, FolderOpen, Buildings, House, Star, ClipboardText, ChatCircle,
-  CaretLeft, CaretRight, Truck, Storefront, Plus, Link,
+  CaretLeft, CaretRight, Truck, Storefront, Plus,
 } from '@phosphor-icons/react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
-import LinkField from './shared/LinkField';
+import RelationField from './shared/RelationField';
 import StackedFormModal from './shared/StackedFormModal';
 import CompanyLinkCard from './shared/CompanyLinkCard';
 import { getTaskPrefix } from '../utils/taskPrefix';
@@ -1711,21 +1711,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                   <Plus size={14} weight="bold"/>
                 </button>
               </div>
-              <LinkField
+              <RelationField
+                rel="property"
                 ref={propertyLinkRef}
                 excludeRef={propertyBtnRef}
                 mode="single"
                 hideTrigger={true}
                 value={data.property_id}
                 onChange={handlePropertyChange}
-                linkedTable="properties"
-                linkedFields="id,podio_id,prop_code,property_name,address,city,state"
-                searchFields={['prop_code','property_name']}
-                titleField={row=>`${row.prop_code} — ${row.property_name}`}
-                titleHref={row=>`/properties/${row.podio_id??'X'+row.id.slice(-6)}`}
-                subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
-                icon={Buildings}
-                allowCreate={false}
                 sectionLabel="property"
                 compact={true}
               />
@@ -1772,22 +1765,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 <Plus size={14} weight="bold"/>
               </button>
             </div>
-            <LinkField
+            <RelationField
+              rel="taskContacts"
               ref={contactsFieldRef}
               excludeRef={contactsBtnRef}
-              joinTable="task_contacts"
-              parentIdField="task_id"
               parentId={data.id}
-              linkedTable="contacts"
-              linkedIdField="contact_id"
-              linkedFields="id,full_name,company_dba,podio_id,category,created_at,primary_phone,email,vendor_id,tenant_id"
-              searchFields={['full_name','company_dba']}
               titleField={contactTitle}
-              titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
-              subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
               badgeField={contactPropCode}
               sectionLabel="contact"
-              allowCreate={true}
               createFields={['full_name','company_dba','primary_phone','email']}
               onCreate={async fields=>{const r=await sbPost('contacts',fields);return Array.isArray(r)?r[0]:r;}}
               compact={true}
@@ -1813,7 +1798,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
               <div style={{display:'flex',alignItems:'center'}}>
                 <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Company</span>
               </div>
-              <LinkField
+              <RelationField
+                rel="vendorContact"
                 ref={vendorContactRef}
                 excludeRef={vendorContactBtnRef}
                 mode="single"
@@ -1821,14 +1807,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 value={data.vendor_contact_id}
                 onChange={row=>handleContactChange('vendor',row)}
                 onCreateNew={()=>openContactModal('vendor')}
-                linkedTable="contacts"
-                linkedFields="id,full_name,company_dba,podio_id,vendor_id,tenant_id,primary_phone,email"
-                searchFields={['full_name','company_dba']}
                 titleField={contactTitle}
-                titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
-                subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
                 badgeField={contactPropCode}
-                allowCreate={true}
                 sectionLabel="contact"
                 compact={true}
               />
@@ -1852,7 +1832,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
               <div style={{display:'flex',alignItems:'center'}}>
                 <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Company</span>
               </div>
-              <LinkField
+              <RelationField
+                rel="tenantContact"
                 ref={tenantContactRef}
                 excludeRef={tenantContactBtnRef}
                 mode="single"
@@ -1860,14 +1841,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 value={data.tenant_contact_id}
                 onChange={row=>handleContactChange('tenant',row)}
                 onCreateNew={()=>openContactModal('tenant')}
-                linkedTable="contacts"
-                linkedFields="id,full_name,company_dba,podio_id,vendor_id,tenant_id,primary_phone,email"
-                searchFields={['full_name','company_dba']}
                 titleField={contactTitle}
-                titleHref={row=>`/contacts/${row.podio_id??'X'+row.id.slice(-6)}`}
-                subtitleField={row=>[row.primary_phone,row.email].filter(Boolean).join(' · ')}
                 badgeField={contactPropCode}
-                allowCreate={true}
                 sectionLabel="contact"
                 compact={true}
               />
@@ -1890,23 +1865,13 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 <Plus size={14} weight="bold"/>
               </button>
             </div>
-            <LinkField
+            <RelationField
+              rel="relatedRecords"
               ref={relatedLinksRef}
               excludeRef={relatedLinksBtnRef}
-              joinTable="task_relations"
-              parentIdField="task_id"
               parentId={data.id}
-              linkedTable="tasks"
-              linkedIdField="related_task_id"
-              linkedFields="id,record_type,task_num,title,prop_code,status"
-              searchFields={['title']}
-              titleField={row=>`${getTaskPrefix(row)} — ${row.title}`}
               titleHref={row=>`/tasks/${row.task_num}?rt=${row.record_type}&from=${encodeURIComponent('/tasks/'+data.task_num)}`}
-              titleTarget="_self"
-              subtitleField={row=>[row.prop_code,row.status].filter(Boolean).join(' · ')}
               searchFilter={`id.neq.${data.id}`}
-              icon={Link}
-              iconField={row=>({work_order:Wrench,task:CheckFat,project:FolderOpen,sg_task:House,acp_task:Buildings}[row.record_type]||Link)}
               sectionLabel="related record"
               compact={true}
               hideTrigger={true}
@@ -2350,21 +2315,14 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
                 <Plus size={14} weight="bold"/>
               </button>
             </div>
-            <LinkField
+            <RelationField
+              rel="property"
               ref={newPropertyLinkRef}
               excludeRef={newPropertyBtnRef}
               mode="single"
               hideTrigger={true}
               value={formData.property_id}
               onChange={handlePropertyChangeForm}
-              linkedTable="properties"
-              linkedFields="id,podio_id,prop_code,property_name,address,city,state"
-              searchFields={['prop_code','property_name']}
-              titleField={row=>`${row.prop_code} — ${row.property_name}`}
-              titleHref={row=>`/properties/${row.podio_id??'X'+row.id.slice(-6)}`}
-              subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
-              icon={Buildings}
-              allowCreate={false}
               sectionLabel="property"
               compact={true}
             />
