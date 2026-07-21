@@ -167,7 +167,7 @@ pages/api/pipeline/
 
 ## Next Priorities
 
-1. Add `icon` prop to LinkField before first non-contact use — icon is currently hardcoded to UserCircle. Design schema (FK or join table) for next linker target before wiring it up.
+1. Add `icon` prop to LinkField — icon is currently hardcoded to UserCircle, showing a person icon on the Property linker and any future non-contact target. Add `icon` prop before wiring LinkField to Key Safes, COIs, or other non-contact entity types.
 2. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
 3. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
 4. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
@@ -194,10 +194,15 @@ Full prop reference: `mode` ('multi'|'single'), `compact`, `hideTrigger`, `badge
 
 If this template needs to change in the future: change `LinkField.jsx` / `CompanyLinkCard.jsx` ONCE. Every call site inherits it. Do not patch individual call sites.
 
+**Live single-mode LinkField targets (as of 2026-07-21):**
+- **Properties** (`tasks` → `properties`, direct FK `property_id`): TaskDetail + NewTaskForm. `linkedFields="id,prop_code,property_name,address,city,state"`, search on `prop_code`+`property_name`, `titleField=row=>\`${row.prop_code} — ${row.property_name}\``, subtitleField = address/city/state, `allowCreate=false`, `compact=true`, `hideTrigger=true`. `handlePropertyChange` saves both `property_id` and `prop_code` together so all existing prop_code-based filters/badges keep working.
+- **Contacts** (join table `task_contacts`): multi-mode — see TaskDetail Contacts section.
+- **Vendor Contact / Tenant Contact** (`contacts` table): single-mode — see TaskDetail Linked Companies section.
+
 **Three things to handle BEFORE pointing LinkField at a new relationship type:**
-1. Icon is currently hardcoded to `UserCircle` inside LinkField — not yet a prop. Needs an `icon` prop added before use on non-contact entities (Properties, Insurance, Projects, etc.) so each linker shows the right glyph instead of always a person icon.
+1. Icon is currently hardcoded to `UserCircle` inside LinkField — not yet a prop. Needs an `icon` prop added before use on non-contact entities (Key Safes, Insurance, Projects, etc.) so each linker shows the right glyph instead of always a person icon. The Property linker currently shows a person icon — acceptable for now; fix before next non-contact target.
 2. LinkField is the UI/interaction layer only — it does not create the underlying relationship. Each new linker target (Insurance↔Properties, Key Safes↔Work Orders, etc.) needs its own schema decision first (direct FK for one-to-many, join table for many-to-many), same pattern as `task_contacts`. Design the relationship, then wire LinkField to it — two steps, not one.
-3. LinkField currently reads/writes via the anon Supabase key. Fine for contacts/vendors/tenants (anon-readable tables). Any future linker target that's deliberately RLS-locked (e.g. `automation_agents`, or future sensitive/financial tables) will NOT be reachable by LinkField as-is — it would need a server-route mode instead of direct anon calls. Check RLS/anon grants on the target table before wiring a new linker to it.
+3. LinkField currently reads/writes via the anon Supabase key. Fine for contacts/vendors/tenants/properties (anon-readable tables). Any future linker target that's deliberately RLS-locked (e.g. `automation_agents`, or future sensitive/financial tables) will NOT be reachable by LinkField as-is — it would need a server-route mode instead of direct anon calls. Check RLS/anon grants on the target table before wiring a new linker to it.
 
 ## LinkField Architecture (permanent)
 
@@ -406,6 +411,7 @@ All detail views support keyboard (ArrowLeft/Right) and button (‹ ›) navigat
 - **`automation_agents` (2026-07-20):** Automations registry — one row per scheduled cron agent. Columns: id, name (unique), description, code_location, cron_schedule, last_run_at, last_run_status, created_at, updated_at. RLS enabled, **zero anon policies** — internal-only, same pattern as `key_handovers`/`lease_applications`. All reads/writes via service-role API routes only. Seeded with 4 rows: Morning Briefing, Lease Watch, New Inquiry, Work Order Agent.
 - **`automation_triggers` (2026-07-20):** Per-record automation trigger registry — button/event/date triggers. Columns: id, name, module, trigger_type (CHECK: button_click/item_created/item_updated/date_field), trigger_detail, condition_display, action_display, config (jsonb), status (CHECK: active/paused), recurs (CHECK: one_time/repeating), last_fired_at, fire_count, why_not_view, code_location, last_modified_by, change_note, created_at, updated_at. RLS enabled, **zero anon policies**. Currently empty — rows added as WO button/date triggers are built.
 - **`leasing_pipeline` has NO FK to `properties`** — links via `prop_code` (text) only. PostgREST join syntax `properties(...)` will NOT work from leasing_pipeline. Query properties separately by prop_code.
+- **`tasks.property_id` (2026-07-21):** `uuid FK → properties(id)`, backfilled from `prop_code` match (4,153/4,374 rows — 221 had null prop_code and remain null). Index: `idx_tasks_property_id`. Covered by existing `anon_update_tasks` policy. Used by the Property single-mode LinkField in TaskDetail + NewTaskForm; `handlePropertyChange` saves both `property_id` and `prop_code` atomically so legacy prop_code filters stay intact.
 - **Postgres RPC suffix-lookup functions (2026-07-17):** `find_contact_by_id_suffix(p_suffix text)` and `find_issue_by_id_suffix(p_suffix text)` — both SECURITY INVOKER, granted to anon. Used by X-prefix detail-page lookup for tables >1000 rows (Supabase max-rows=1000 cap prevents fetch-all). Add similar functions for any other large table needing X-prefix lookup.
 
 ## Drive Folder Architecture (permanent)

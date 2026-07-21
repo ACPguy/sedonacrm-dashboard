@@ -370,29 +370,6 @@ const InlineSelect = ({ value, options, onSave }) => (
   </select>
 );
 
-// ── CodeOnlySelect ────────────────────────────────────────────────────────────
-// Closed state shows just the code value; dropdown shows full "code — name" labels.
-const CodeOnlySelect = ({ value, options, onSave }) => {
-  const [open,setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(()=>{ if(open) ref.current?.focus(); },[open]);
-  return open ? (
-    <select ref={ref} value={value||''} autoFocus
-      onChange={async e=>{ await onSave(e.target.value||null); setOpen(false); }}
-      onBlur={()=>setOpen(false)}
-      style={{width:'100%',boxSizing:'border-box',background:T.bg2,border:`1px solid ${T.accent}`,borderRadius:'4px',padding:'5px 8px',color:value?T.text0:T.text3,fontSize:F.base,outline:'none',cursor:'pointer'}}>
-      <option value="">—</option>
-      {options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  ) : (
-    <div onClick={()=>setOpen(true)} title="Click to edit"
-      style={{fontSize:F.base,color:value?T.text0:T.text3,cursor:'text',padding:'4px 0',minHeight:'24px',border:'1px solid transparent',lineHeight:'1.4',borderRadius:'4px'}}
-      onMouseEnter={e=>e.currentTarget.style.border=`1px solid ${T.border}`}
-      onMouseLeave={e=>e.currentTarget.style.border='1px solid transparent'}>
-      {value||<span style={{color:T.text3,fontStyle:'italic',fontSize:F.sm}}>—</span>}
-    </div>
-  );
-};
 
 // ── FieldWithBadge ────────────────────────────────────────────────────────────
 // Wraps any field with an optional corner icon-badge (↗) link. Badge opens the
@@ -1441,6 +1418,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
     await saveMany({[`${type}_contact_id`]:row?row.id:null,[`${type}_id`]:companyId});
   };
 
+  const handlePropertyChange=async row=>{
+    await saveMany({property_id:row?row.id:null,prop_code:row?row.prop_code:null});
+  };
+
   const openContactModal=type=>{
     setContactModalType(type);
     setContactModalForm({full_name:'',company_dba:'',primary_phone:'',email:''});
@@ -1559,6 +1540,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
   const goNavRef = useRef(goNav);
   goNavRef.current = goNav;
 
+  const propertyLinkRef      = useRef(null);
+  const propertyBtnRef       = useRef(null);
   const contactsFieldRef     = useRef(null);
   const contactsBtnRef       = useRef(null);
   const vendorContactRef     = useRef(null);
@@ -1586,9 +1569,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
 
   const displayId=getTaskPrefix(data);
   const categoryOpts=CATEGORY_OPTIONS[data.record_type]||[];
-  const propInfo=activeProps.find(p=>p.prop_code===data.prop_code);
-  const addr2=propInfo?[propInfo.city,propInfo.state,propInfo.zip].filter(Boolean).join(' '):'';
-  const propLine2=propInfo?(propInfo.address?(addr2?`${propInfo.address}, ${addr2}`:propInfo.address):addr2):'';
   const isClosed=data.status==='Closed'||data.status==='Cancelled';
 
   const vendorLink=vid=>{const v=vendors.find(x=>x.id===vid);if(!v)return null;return v.podio_id?`/vendors/${v.podio_id}`:`/vendors/X${v.id.slice(-6)}`;};
@@ -1714,13 +1694,31 @@ export const TaskDetail = ({ task: initialTask, prefixedId, onBack, onUpdate }) 
               </div>
             </div>
             <FieldRow label="Property" topAlign>
-              <CodeOnlySelect value={data.prop_code} options={activeProps.map(p=>({value:p.prop_code,label:`${p.prop_code} — ${p.property_name}`}))} onSave={v=>save('prop_code',v)}/>
-              {propInfo&&(
-                <div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px 10px'}}>
-                  <div style={{fontSize:F.sm,fontWeight:'500',color:T.text0}}>{propInfo.property_name}</div>
-                  {propLine2&&<div style={{fontSize:F.xs,color:T.text2,marginTop:'2px'}}>{propLine2}</div>}
-                </div>
-              )}
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <button ref={propertyBtnRef} onClick={()=>propertyLinkRef.current?.openPanel()}
+                  title="Change property"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
+              <LinkField
+                ref={propertyLinkRef}
+                excludeRef={propertyBtnRef}
+                mode="single"
+                hideTrigger={true}
+                value={data.property_id}
+                onChange={handlePropertyChange}
+                linkedTable="properties"
+                linkedFields="id,prop_code,property_name,address,city,state"
+                searchFields={['prop_code','property_name']}
+                titleField={row=>`${row.prop_code} — ${row.property_name}`}
+                subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
+                allowCreate={false}
+                sectionLabel="property"
+                compact={true}
+              />
             </FieldRow>
             <FieldRow label="Priority"><PriorityPills value={data.priority} onSave={v=>save('priority',v)}/></FieldRow>
             <FieldRow label="Assigned To">
@@ -2132,6 +2130,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
     status: 'Open',
     priority: '???',
     prop_code: initPropCode,
+    property_id: null,
     tenant_id: initTenantId,
     vendor_id: initVendorId,
     vendor_contact_id: null,
@@ -2172,7 +2171,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba&order=tenant_dba.asc').then(setTenants).catch(()=>{});
-    sbFetch('properties','select=prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
+    sbFetch('properties','select=id,prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
@@ -2182,7 +2181,20 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
     return ()=>{document.title='SedonaCRM';};
   },[]);
 
+  useEffect(()=>{
+    if(initPropCode&&activeProps.length){
+      const match=activeProps.find(p=>p.prop_code===initPropCode);
+      if(match)setFormData(prev=>({...prev,property_id:match.id}));
+    }
+  },[initPropCode,activeProps]);
+
   const set=(field,val)=>setFormData(prev=>({...prev,[field]:val}));
+
+  const newPropertyLinkRef = useRef(null);
+  const newPropertyBtnRef  = useRef(null);
+  const handlePropertyChangeForm = row => {
+    setFormData(prev=>({...prev,property_id:row?row.id:null,prop_code:row?row.prop_code:null}));
+  };
 
   const handleSave=async()=>{
     if(!formData.title?.trim()){
@@ -2216,7 +2228,6 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
 
   const TYPE_SHORT_NEW={work_order:'WO',task:'TSK',project:'Proj.',acp_task:'ACP',sg_task:'S&G'};
   const categoryOpts=CATEGORY_OPTIONS[formData.record_type]||[];
-  const propInfo=activeProps.find(p=>p.prop_code===formData.prop_code);
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',overflow:'hidden'}}>
@@ -2282,10 +2293,31 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             </div>
           </div>
           <FieldRow label="Property" topAlign>
-            <InlineSelect value={formData.prop_code} options={activeProps.map(p=>({value:p.prop_code,label:`${p.prop_code} — ${p.property_name}`}))} onSave={v=>set('prop_code',v)}/>
-            {propInfo&&<div style={{marginTop:'5px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px 10px'}}>
-              <div style={{fontSize:F.sm,fontWeight:'500',color:T.text0}}>{propInfo.property_name}</div>
-            </div>}
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+              <button ref={newPropertyBtnRef} onClick={()=>newPropertyLinkRef.current?.openPanel()}
+                title="Change property"
+                style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <Plus size={14} weight="bold"/>
+              </button>
+            </div>
+            <LinkField
+              ref={newPropertyLinkRef}
+              excludeRef={newPropertyBtnRef}
+              mode="single"
+              hideTrigger={true}
+              value={formData.property_id}
+              onChange={handlePropertyChangeForm}
+              linkedTable="properties"
+              linkedFields="id,prop_code,property_name,address,city,state"
+              searchFields={['prop_code','property_name']}
+              titleField={row=>`${row.prop_code} — ${row.property_name}`}
+              subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
+              allowCreate={false}
+              sectionLabel="property"
+              compact={true}
+            />
           </FieldRow>
           <FieldRow label="Alert">
             <InlineBlurField value={formData.alert||''} onSave={v=>set('alert',v)}/>
