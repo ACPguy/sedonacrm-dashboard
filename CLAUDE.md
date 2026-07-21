@@ -170,11 +170,15 @@ pages/api/pipeline/
 1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
 2. Phase 5 Stage 4 (part 3): Pipeline embed in Property detail Leasing tab — replace inline tab with `<PipelineView propCode={data.prop_code} />` per TODO comment at SedonaCRM.jsx:888
 3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
-4. Consider rolling compact={true} out to other LinkField call sites (ContactsView, etc.) for consistency
-5. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
-6. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
-7. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
-8. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
+4. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
+5. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
+6. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
+7. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
+
+**Completed this session (2026-07-21):**
+- TenantDetail Contacts tab rebuilt as reverseFK LinkField (matches VendorDetail)
+- Related Records: wrong record fix (?rt= hint), back button fix (?from= + titleTarget=_self)
+- LinkField: titleTarget prop added (default _blank; _self for same-tab navigation)
 
 ## Canonical Linker Architecture (permanent — locked in 2026-07-20)
 
@@ -182,7 +186,7 @@ LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any 
 
 CompanyLinkCard.jsx (`components/shared/CompanyLinkCard.jsx`) is the ONLY component for read-only derived entity display cards (e.g. Vendor Company, Tenant Company) — same "build once" rule applies as new derived-display use cases come up.
 
-Full prop reference: `mode` ('multi'|'single'|'reverseFK'), `compact`, `hideTrigger`, `badgeField`, `excludeRef`, `variant` ('card'|'chip'), `allowCreate`, `titleField`, `titleHref`, `subtitleField`, `sectionLabel`, `onCreate`, `reverseField`, `iconField`, `searchFilter`. See existing TaskDetail Vendor/Tenant Contact + Contacts usage as the reference implementation.
+Full prop reference: `mode` ('multi'|'single'|'reverseFK'), `compact`, `hideTrigger`, `badgeField`, `excludeRef`, `variant` ('card'|'chip'), `allowCreate`, `titleField`, `titleHref`, `subtitleField`, `sectionLabel`, `onCreate`, `reverseField`, `iconField`, `searchFilter`, `titleTarget`. See existing TaskDetail Vendor/Tenant Contact + Contacts usage as the reference implementation.
 
 **Compact-mode linker template (as of 2026-07-20, current standard look/behavior):**
 - 32px icon, centered row alignment
@@ -207,7 +211,7 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 
 `components/shared/LinkField.jsx` — canonical many-to-many relationship field. Config-driven, zero hardcoded table names. Piloted on Task ↔ Contacts via `task_contacts`.
 
-**Props:** `mode` ('multi' default | 'single'), `value` (single mode: current FK id), `onChange` (single mode: (row|null)=>void — caller persists), `onCreateNew` (single mode: ()=>void — caller opens modal), `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `subtitleField` (fn/string, optional — phone/email line), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`, `variant` ('card' default | 'chip'), `badgeField` (fn(row)=>string|null — small pill after title, works in multi + single card variants), `excludeRef` (React ref — clicks on this element do NOT count as "outside" for panel close; use when the trigger button lives outside the LinkField layout).
+**Props:** `mode` ('multi' default | 'single'), `value` (single mode: current FK id), `onChange` (single mode: (row|null)=>void — caller persists), `onCreateNew` (single mode: ()=>void — caller opens modal), `joinTable`, `parentIdField`, `parentId`, `linkedTable`, `linkedIdField`, `linkedFields` (select clause), `searchFields`, `titleField` (string or fn), `titleHref` (fn), `titleTarget` (string, default '_blank'; pass '_self' for same-tab in-app navigation — also hides ↗ arrow), `subtitleField` (fn/string, optional — phone/email line), `summaryField` (fn/string), `metaField` (fn/string), `readOnly`, `allowCreate`, `createFields`, `onCreate` (async fn → new row), `sectionLabel`, `variant` ('card' default | 'chip'), `badgeField` (fn(row)=>string|null — small pill after title, works in multi + single card variants), `excludeRef` (React ref — clicks on this element do NOT count as "outside" for panel close; use when the trigger button lives outside the LinkField layout).
 
 **variant='card' (default):** Podio-style stacked cards — UserCircle icon + title link (T.accent + ↗) + optional badge pill + optional subtitle (phone/email) + meta line. Each multi-mode card has a Trash icon button (absolute-positioned right, 32×32 hit target) that removes the link immediately on click — no confirm dialog. Trigger button says "Add / remove"; in multi mode the panel no longer shows chips at the top (removed — unlinking is via the trash icon on the card instead). ContactsView "Linked Tasks" (readOnly, no subtitleField) renders as cards with just icon + title + meta, no subtitle gap.
 
@@ -216,6 +220,10 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 **Outside-click boundary (compact mode):** `panelRef` is attached to the panel root div itself (via `renderPanel`), not the outer compact wrapper. This means clicking on linked cards while the panel is open correctly closes it, because the cards are outside the panel. The outer compact wrapper no longer holds `ref={panelRef}`.
 
 **hideTrigger prop (default false, requires compact=true):** When true, LinkField renders NO trigger button when closed — the parent is fully responsible for opening the panel. The parent must hold a `ref` to the LinkField and call `ref.current.openPanel()` (exposed via `useImperativeHandle`). Use this when the "Add / Remove" button needs to live outside the LinkField's layout (e.g., inline next to a label on the same row). When searchOpen becomes true, the panel renders in-flow regardless of hideTrigger. LinkField is a `React.forwardRef` component; all existing JSX call sites (`<LinkField ... />`) are unaffected — forwardRef only changes direct static-property access, which doesn't exist.
+
+**titleTarget prop (default '_blank'):** Controls the anchor target on card title links. Pass `'_self'` for same-tab in-app navigation (e.g. Related Records linking tasks to tasks). When `'_self'`, the ↗ external-link arrow is hidden since it implies new tab. The search panel ↗ always stays `_blank`. Used by Related Records linker in TaskDetail; all other linkers keep default `_blank`.
+
+**Related Records back-navigation pattern:** titleHref encodes `?rt=${record_type}&from=${encodeURIComponent(sourceUrl)}`. The `tasks/[id].jsx` page reads `rt` as `recordTypeHint` (fixes wrong-record lookup when task_num is shared across record_types) and `from` as the back URL (takes priority over sessionStorage `tasksBackUrl`). On mobile, `router.back()` works naturally since navigation is same-tab.
 
 **Flat-grid alignment pattern for 2-column label+card layouts:** Use a single `display:grid, gridTemplateColumns:'1fr 1fr', gridAutoRows:'auto'` parent with 4 direct children: [label1 div, label2 div, card1 (LinkField), card2 (company card)]. CSS grid auto-sizes each row to its tallest cell, so both label divs share row height and both cards start together — alignment is enforced structurally, not by matching heights manually. The old nested-div-per-column approach (label + card in independent column divs) breaks if one label is taller than the other.
 
@@ -256,8 +264,8 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 
 ## Current Git State
 
-- main: `afe731a` — merge: Property Linker + icon prop + layout fixes (merged 2026-07-21)
-- preview: `7a1e697` — fix: property name link opens property detail from Task/WO (2026-07-21)
+- main: `4069921` — fix: Related Records links navigate to correct record + back button returns to source (merged 2026-07-21)
+- preview: in sync with main
 
 ---
 
