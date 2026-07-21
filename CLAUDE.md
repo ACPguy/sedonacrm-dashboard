@@ -174,15 +174,19 @@ pages/api/pipeline/
 5. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
 6. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
 7. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
+8. Migrate remaining LinkField call sites to the RelationField/relations.js pattern (Vendor Contact, Tenant Contact, Related Records, reverseFK Vendor/Tenant Contacts) — one relationship at a time, verify zero-visual-diff each time, same approach as the Property pilot.
 
 **Completed this session (2026-07-21):**
 - TenantDetail Contacts tab rebuilt as reverseFK LinkField (matches VendorDetail)
 - Related Records: wrong record fix (?rt= hint), back button fix (?from= + titleTarget=_self)
 - LinkField: titleTarget prop added (default _blank; _self for same-tab navigation)
+- RelationField/relations.js registry piloted on Property (TaskDetail + NewTaskForm) — centralizes query/display config to prevent config drift between call sites
 
 ## Canonical Linker Architecture (permanent — locked in 2026-07-20)
 
 LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any interactive relationship field anywhere in SedonaCRM — not just contacts/companies. This is the universal relationship layer for the whole database: Work Orders/Tasks ↔ Projects, Insurance ↔ Properties/Tenants/Vendors, Key Safes ↔ Work Orders, Reports ↔ Properties, and every future relationship. Single-select or multi-select, any table, any relationship. Do NOT build a new picker/connector/linker component for any future module — extend LinkField's props instead.
+
+**RelationField / relations.js registry (piloted 2026-07-21):** `RelationField` (`components/shared/RelationField.jsx`) is a thin config-lookup wrapper around LinkField, backed by `lib/relations.js`. Piloted on Property only. Purpose: centralize per-relationship query/display config (table, fields, search, title/subtitle formatting, icon) so it can't drift between call sites the way NewTaskForm's Property fetch once did (missing `id` field, fixed 2026-07-21). Usage: `<RelationField rel="property" ... />` — caller still passes value/onChange/mode/compact/etc.; the registry entry supplies linkedTable/linkedFields/searchFields/titleField/titleHref/subtitleField/icon/allowCreate. LinkField itself is unchanged and still used directly by every other relationship (Contacts, Vendor/Tenant Contact, Related Records, reverseFK Vendor/Tenant Contacts tabs) — those are NOT yet migrated to the registry pattern. Write-side logic (which FK column, denormalized-field syncing like property_id+prop_code) intentionally stays as caller-supplied onChange, not centralized — that's genuine per-relationship logic, not duplication.
 
 CompanyLinkCard.jsx (`components/shared/CompanyLinkCard.jsx`) is the ONLY component for read-only derived entity display cards (e.g. Vendor Company, Tenant Company) — same "build once" rule applies as new derived-display use cases come up.
 
@@ -265,7 +269,7 @@ If this template needs to change in the future: change `LinkField.jsx` / `Compan
 ## Current Git State
 
 - main: `53933cd` — merge: Related Records fix (4069921) into main (merged 2026-07-21)
-- preview: in sync with main
+- preview: `75ca988` — refactor: RelationField/relations.js registry piloted on Property (2026-07-21, not yet merged to main)
 
 ---
 

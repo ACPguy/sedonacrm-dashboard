@@ -15,6 +15,7 @@ import {
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
 import LinkField from './shared/LinkField';
+import RelationField from './shared/RelationField';
 import StackedFormModal from './shared/StackedFormModal';
 import CompanyLinkCard from './shared/CompanyLinkCard';
 import { getTaskPrefix } from '../utils/taskPrefix';
@@ -1711,21 +1712,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                   <Plus size={14} weight="bold"/>
                 </button>
               </div>
-              <LinkField
+              <RelationField
+                rel="property"
                 ref={propertyLinkRef}
                 excludeRef={propertyBtnRef}
                 mode="single"
                 hideTrigger={true}
                 value={data.property_id}
                 onChange={handlePropertyChange}
-                linkedTable="properties"
-                linkedFields="id,podio_id,prop_code,property_name,address,city,state"
-                searchFields={['prop_code','property_name']}
-                titleField={row=>`${row.prop_code} — ${row.property_name}`}
-                titleHref={row=>`/properties/${row.podio_id??'X'+row.id.slice(-6)}`}
-                subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
-                icon={Buildings}
-                allowCreate={false}
                 sectionLabel="property"
                 compact={true}
               />
@@ -2350,21 +2344,14 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
                 <Plus size={14} weight="bold"/>
               </button>
             </div>
-            <LinkField
+            <RelationField
+              rel="property"
               ref={newPropertyLinkRef}
               excludeRef={newPropertyBtnRef}
               mode="single"
               hideTrigger={true}
               value={formData.property_id}
               onChange={handlePropertyChangeForm}
-              linkedTable="properties"
-              linkedFields="id,podio_id,prop_code,property_name,address,city,state"
-              searchFields={['prop_code','property_name']}
-              titleField={row=>`${row.prop_code} — ${row.property_name}`}
-              titleHref={row=>`/properties/${row.podio_id??'X'+row.id.slice(-6)}`}
-              subtitleField={row=>[row.address,row.city,row.state].filter(Boolean).join(', ')}
-              icon={Buildings}
-              allowCreate={false}
               sectionLabel="property"
               compact={true}
             />
