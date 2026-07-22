@@ -271,7 +271,7 @@ The six LinkField call sites have all been migrated to this pattern (2026-07-21)
 ## Current Git State
 
 - main: `1aa0101` — merge: Key Safe linker (preview 189b8ef) into main (merged 2026-07-22)
-- preview: `6ded972` — feat: expand Key Safe search/display, hide Alert + legacy key-safe fields (2026-07-22, not yet merged to main)
+- preview: `4a1e71f` — feat: add keySafe linker to NewTaskForm, remove its free-text field (2026-07-22, not yet merged to main)
 
 ---
 
