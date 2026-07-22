@@ -156,33 +156,45 @@ const LinkField = React.forwardRef(function LinkField({
   }, [mode, value, linkedTable, linkedFields]);
 
   // ── Load linked records (multi mode only) ─────────────────────────────────
+  // fetchLinkedOnce does the actual work; loadLinked wraps it with a single
+  // retry after a short delay before giving up. Without this, a lone
+  // transient network hiccup (confirmed live 2026-07-22 on a flaky/mobile
+  // connection) silently leaves `linked` at [] with no error shown and no
+  // way to recover short of a full page reload — the card/section renders,
+  // just permanently empty, which reads as "this section doesn't work".
+  const fetchLinkedOnce = useCallback(async () => {
+    if (mode === 'reverseFK') {
+      const rows = await lfFetch(linkedTable, `${reverseField}=eq.${parentId}&select=${linkedFields}&order=created_at.asc`);
+      return (rows || []).map(r => ({ _joinId: r.id, ...r }));
+    }
+    const joinRows = await lfFetch(
+      joinTable,
+      `${parentIdField}=eq.${parentId}&select=id,${linkedIdField},created_at&order=created_at.asc`
+    );
+    if (!joinRows.length) return [];
+    const ids = joinRows.map(r => r[linkedIdField]).join(',');
+    const linkedRows = await lfFetch(linkedTable, `id=in.(${ids})&select=${linkedFields}`);
+    const byId = Object.fromEntries(linkedRows.map(r => [r.id, r]));
+    return joinRows
+      .map(jr => ({ _joinId: jr.id, _joinCreatedAt: jr.created_at, ...byId[jr[linkedIdField]] }))
+      .filter(r => r.id);
+  }, [mode, parentId, reverseField, joinTable, parentIdField, linkedIdField, linkedTable, linkedFields]);
+
   const loadLinked = useCallback(async () => {
     if (!parentId) { setLinked([]); return; }
     setLoadingLinks(true);
     try {
-      if (mode === 'reverseFK') {
-        const rows = await lfFetch(linkedTable, `${reverseField}=eq.${parentId}&select=${linkedFields}&order=created_at.asc`);
-        setLinked((rows || []).map(r => ({ _joinId: r.id, ...r })));
-      } else {
-        const joinRows = await lfFetch(
-          joinTable,
-          `${parentIdField}=eq.${parentId}&select=id,${linkedIdField},created_at&order=created_at.asc`
-        );
-        if (!joinRows.length) { setLinked([]); setLoadingLinks(false); return; }
-        const ids = joinRows.map(r => r[linkedIdField]).join(',');
-        const linkedRows = await lfFetch(linkedTable, `id=in.(${ids})&select=${linkedFields}`);
-        const byId = Object.fromEntries(linkedRows.map(r => [r.id, r]));
-        setLinked(
-          joinRows
-            .map(jr => ({ _joinId: jr.id, _joinCreatedAt: jr.created_at, ...byId[jr[linkedIdField]] }))
-            .filter(r => r.id)
-        );
-      }
+      setLinked(await fetchLinkedOnce());
     } catch {
-      setLinked([]);
+      try {
+        await new Promise(r => setTimeout(r, 800));
+        setLinked(await fetchLinkedOnce());
+      } catch {
+        setLinked([]);
+      }
     }
     setLoadingLinks(false);
-  }, [mode, parentId, reverseField, joinTable, parentIdField, linkedIdField, linkedTable, linkedFields]);
+  }, [parentId, fetchLinkedOnce]);
 
   useEffect(() => {
     if (mode === 'single') return;
@@ -671,7 +683,7 @@ const LinkField = React.forwardRef(function LinkField({
                       title="Clear">×</button>
                   )}
                 </div>
-                {metaField && !compact && resolve(metaField, singleValue) && (
+                {metaField && resolve(metaField, singleValue) && (
                   <div style={{ fontSize: '11px', color: T.text3, marginTop: '5px' }}>{resolve(metaField, singleValue)}</div>
                 )}
                 {!readOnly && compact && (
