@@ -257,7 +257,7 @@ LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any 
 ## Current Git State
 
 - main: `1aa0101` — merge: Key Safe linker (preview 189b8ef) into main (merged 2026-07-22)
-- preview: pending this session's commit (NewTaskForm Company-hidden-until-saved, isMobile fix, Tenant Contact property scoping, Key Safe investigation — see commit log for hash)
+- preview: `247eadb` — fix: hide Vendor/Tenant Company until saved, scope Tenant Contact by property (2026-07-22, not yet merged to main)
 
 ---
 
