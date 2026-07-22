@@ -371,57 +371,82 @@ const InlineSelect = ({ value, options, onSave }) => (
 );
 
 
-// ── FieldWithBadge ────────────────────────────────────────────────────────────
-// Wraps any field with an optional corner icon-badge (↗) link. Badge opens the
-// linked record in a new tab. Uses a negative-margin padding trick so the
-// visual size stays ~18px while the touch target reaches 44px.
-const FieldWithBadge = ({ label, link, children }) => (
-  <div style={{ flex:1, minWidth:0 }}>
-    {label&&<div style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280',marginBottom:'4px'}}>{label}</div>}
-    <div style={{ position:'relative' }}>
-      {children}
-      {link&&(
-        <a href={link} target="_blank" rel="noopener noreferrer"
-          onClick={e=>e.stopPropagation()}
-          title="Open record"
-          style={{position:'absolute',top:'-6px',right:'-6px',width:'18px',height:'18px',borderRadius:'50%',background:T.bg3,border:`1px solid ${T.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',color:T.accent,textDecoration:'none',lineHeight:1,zIndex:1,
-            padding:'13px',margin:'-13px',boxSizing:'content-box'}}
-          onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-          onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-          ↗
-        </a>
-      )}
-    </div>
-  </div>
-);
-
 // ── CompanyContactRow ─────────────────────────────────────────────────────────
-// Company-first contact linker — used by NewTaskForm's WO section.
-const CompanyContactRow = ({ companyLabel, contactLabel, companyValue, contactValue, companyOptions, allContacts, onSaveCompany, onSaveContact, companyLink, isMobile }) => {
+// Company-first contact linker — used by NewTaskForm's WO section. Company
+// picks first, narrowing Contact's search to that company via searchFilter;
+// Contact auto-selects when exactly one contact matches the picked company
+// (computed from the full allContacts list already held in NewTaskForm state
+// — no extra query needed for this, since that list was already being
+// fetched). Both fields are RelationField (searchable) rather than the old
+// native <select> — full-screen scroll-wheel selects with hundreds of
+// options were unusable on iOS Safari (no type-to-search). 2026-07-22.
+const CompanyContactRow = ({ companyLabel, contactLabel, companyRel, contactRel, companyFkField, companyValue, contactValue, allContacts, onSaveCompany, onSaveContact, contactTitleField, contactBadgeField, isMobile }) => {
   const filteredContacts = useMemo(
-    () => companyValue ? allContacts.filter(c => c.vendor_id === companyValue || c.tenant_id === companyValue) : allContacts,
-    [companyValue, allContacts],
+    () => companyValue ? allContacts.filter(c => c[companyFkField] === companyValue) : allContacts,
+    [companyValue, allContacts, companyFkField],
   );
   useEffect(() => {
     if (filteredContacts.length === 1 && contactValue !== filteredContacts[0].id) {
       onSaveContact(filteredContacts[0].id);
     }
   }, [companyValue, filteredContacts.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  const contactObj = allContacts.find(c => c.id === contactValue);
-  const contactLink = contactObj ? `/contacts/${contactObj.podio_id ?? 'X'+contactObj.id.slice(-6)}` : null;
+
+  const contactLinkRef = useRef(null);
+  const contactBtnRef  = useRef(null);
+  const companyLinkRef = useRef(null);
+  const companyBtnRef  = useRef(null);
 
   return (
     <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-      <FieldWithBadge label={contactLabel} link={contactLink}>
-        <InlineSelect
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+          <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>{contactLabel}</span>
+          <button ref={contactBtnRef} onClick={()=>contactLinkRef.current?.openPanel()}
+            title={`Change ${contactLabel}`}
+            style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+            <Plus size={14} weight="bold"/>
+          </button>
+        </div>
+        <RelationField
+          rel={contactRel}
+          ref={contactLinkRef}
+          excludeRef={contactBtnRef}
+          mode="single"
+          hideTrigger={true}
+          compact={true}
           value={contactValue}
-          options={filteredContacts.map(c=>({value:c.id,label:c.full_name+(c.company_dba?` — ${c.company_dba}`:'')})) }
-          onSave={onSaveContact}
+          onChange={row=>onSaveContact(row?row.id:null)}
+          searchFilter={companyValue?`${companyFkField}.eq.${companyValue}`:undefined}
+          titleField={contactTitleField}
+          badgeField={contactBadgeField}
+          sectionLabel="contact"
         />
-      </FieldWithBadge>
-      <FieldWithBadge label={companyLabel} link={companyLink}>
-        <InlineSelect value={companyValue} options={companyOptions} onSave={onSaveCompany}/>
-      </FieldWithBadge>
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+          <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>{companyLabel}</span>
+          <button ref={companyBtnRef} onClick={()=>companyLinkRef.current?.openPanel()}
+            title={`Change ${companyLabel}`}
+            style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+            <Plus size={14} weight="bold"/>
+          </button>
+        </div>
+        <RelationField
+          rel={companyRel}
+          ref={companyLinkRef}
+          excludeRef={companyBtnRef}
+          mode="single"
+          hideTrigger={true}
+          compact={true}
+          value={companyValue}
+          onChange={row=>onSaveCompany(row?row.id:null)}
+          sectionLabel="company"
+        />
+      </div>
     </div>
   );
 };
@@ -2206,7 +2231,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const [activeProps,setActiveProps] = useState([]);
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&order=company_dba.asc').then(setVendors).catch(()=>{});
-    sbFetch('tenants','select=id,tenant_dba&order=tenant_dba.asc').then(setTenants).catch(()=>{});
+    sbFetch('tenants','select=id,tenant_dba,prop_code&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('properties','select=id,prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
@@ -2236,6 +2261,24 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const newKeySafeBtnRef  = useRef(null);
   const handleKeySafeChangeForm = row => {
     setFormData(prev=>({...prev,key_safe_id:row?row.id:null}));
+  };
+
+  // Same FK-based lookup as TaskDetail's contactTitle/contactPropCode (not
+  // the contact's own free-text company_dba — see CLAUDE.md Vendor/Tenant
+  // Company lookups note). Closes over this form's own vendors/tenants
+  // state, so stays local rather than registry-able.
+  const contactCompanyName = row => {
+    if (row.vendor_id) return vendors.find(v=>v.id===row.vendor_id)?.company_dba;
+    if (row.tenant_id) return tenants.find(t=>t.id===row.tenant_id)?.tenant_dba;
+    return null;
+  };
+  const contactTitle = row => {
+    const co = contactCompanyName(row);
+    return co ? `${row.full_name} — ${co}` : row.full_name;
+  };
+  const contactPropCode = row => {
+    if (row.tenant_id) return tenants.find(t=>t.id===row.tenant_id)?.prop_code;
+    return null;
   };
 
   const handleSave=async()=>{
@@ -2432,25 +2475,31 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             <CompanyContactRow
               companyLabel="Vendor Company"
               contactLabel="Vendor Contact"
+              companyRel="taskVendorCompany"
+              contactRel="vendorContact"
+              companyFkField="vendor_id"
               companyValue={formData.vendor_id}
               contactValue={formData.vendor_contact_id}
-              companyOptions={vendors.map(v=>({value:v.id,label:v.company_dba}))}
               allContacts={vendorContacts}
               onSaveCompany={v=>set('vendor_id',v)}
               onSaveContact={v=>set('vendor_contact_id',v)}
-              companyLink={null}
+              contactTitleField={contactTitle}
+              contactBadgeField={contactPropCode}
               isMobile={false}
             />
             <CompanyContactRow
               companyLabel="Tenant Company"
               contactLabel="Tenant Contact"
+              companyRel="taskTenantCompany"
+              contactRel="tenantContact"
+              companyFkField="tenant_id"
               companyValue={formData.tenant_id}
               contactValue={formData.tenant_contact_id}
-              companyOptions={tenants.map(t=>({value:t.id,label:t.tenant_dba}))}
               allContacts={tenantContacts}
               onSaveCompany={v=>set('tenant_id',v)}
               onSaveContact={v=>set('tenant_contact_id',v)}
-              companyLink={null}
+              contactTitleField={contactTitle}
+              contactBadgeField={contactPropCode}
               isMobile={false}
             />
             <FieldRow label="WO Type">
