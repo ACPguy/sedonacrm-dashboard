@@ -371,85 +371,63 @@ const InlineSelect = ({ value, options, onSave }) => (
 );
 
 
-// ── CompanyContactRow ─────────────────────────────────────────────────────────
-// Company-first contact linker — used by NewTaskForm's WO section. Company
-// picks first, narrowing Contact's search to that company via searchFilter;
-// Contact auto-selects when exactly one contact matches the picked company
-// (computed from the full allContacts list already held in NewTaskForm state
-// — no extra query needed for this, since that list was already being
-// fetched). Both fields are RelationField (searchable) rather than the old
-// native <select> — full-screen scroll-wheel selects with hundreds of
-// options were unusable on iOS Safari (no type-to-search). 2026-07-22.
-const CompanyContactRow = ({ companyLabel, contactLabel, companyRel, contactRel, companyFkField, companyValue, contactValue, allContacts, onSaveCompany, onSaveContact, contactTitleField, contactBadgeField, isMobile }) => {
-  const filteredContacts = useMemo(
-    () => companyValue ? allContacts.filter(c => c[companyFkField] === companyValue) : allContacts,
-    [companyValue, allContacts, companyFkField],
-  );
-  useEffect(() => {
-    if (filteredContacts.length === 1 && contactValue !== filteredContacts[0].id) {
-      onSaveContact(filteredContacts[0].id);
-    }
-  }, [companyValue, filteredContacts.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const contactLinkRef = useRef(null);
-  const contactBtnRef  = useRef(null);
-  const companyLinkRef = useRef(null);
-  const companyBtnRef  = useRef(null);
-
+// ── NewTaskContactField / AvailableAfterSaving ───────────────────────────────
+// NewTaskContactField: Contact-only linker for NewTaskForm's WO section.
+// Vendor/Tenant Company are hidden entirely until the task is saved (no `id`
+// exists yet to link a company-first cascade against), so this is unscoped
+// by default — search covers all contacts, same as the old CompanyContactRow's
+// empty-company state (searchFilter can still be passed for other scoping,
+// e.g. Tenant Contact's property filter). Replaces CompanyContactRow
+// (2026-07-22 removal — see CLAUDE.md Section 1 note); once the task exists,
+// TaskDetail's own Vendor/Tenant Contact + Company fields take over unchanged.
+// AvailableAfterSaving: consistent placeholder for anything that needs a real
+// task id to function (Company fields, Contacts, Related Records) — styled to
+// match LinkField's own single-mode empty-state box.
+const NewTaskContactField = ({ label, rel, value, onChange, titleField, badgeField, searchFilter }) => {
+  const linkRef = useRef(null);
+  const btnRef  = useRef(null);
   return (
-    <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
-          <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>{contactLabel}</span>
-          <button ref={contactBtnRef} onClick={()=>contactLinkRef.current?.openPanel()}
-            title={`Change ${contactLabel}`}
-            style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-            <Plus size={14} weight="bold"/>
-          </button>
-        </div>
-        <RelationField
-          rel={contactRel}
-          ref={contactLinkRef}
-          excludeRef={contactBtnRef}
-          mode="single"
-          hideTrigger={true}
-          compact={true}
-          value={contactValue}
-          onChange={row=>onSaveContact(row?row.id:null)}
-          searchFilter={companyValue?`${companyFkField}.eq.${companyValue}`:undefined}
-          titleField={contactTitleField}
-          badgeField={contactBadgeField}
-          sectionLabel="contact"
-        />
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+        <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>{label}</span>
+        <button ref={btnRef} onClick={()=>linkRef.current?.openPanel()}
+          title={`Change ${label}`}
+          style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+          <Plus size={14} weight="bold"/>
+        </button>
       </div>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
-          <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>{companyLabel}</span>
-          <button ref={companyBtnRef} onClick={()=>companyLinkRef.current?.openPanel()}
-            title={`Change ${companyLabel}`}
-            style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-            <Plus size={14} weight="bold"/>
-          </button>
-        </div>
-        <RelationField
-          rel={companyRel}
-          ref={companyLinkRef}
-          excludeRef={companyBtnRef}
-          mode="single"
-          hideTrigger={true}
-          compact={true}
-          value={companyValue}
-          onChange={row=>onSaveCompany(row?row.id:null)}
-          sectionLabel="company"
-        />
-      </div>
+      <RelationField
+        rel={rel}
+        ref={linkRef}
+        excludeRef={btnRef}
+        mode="single"
+        hideTrigger={true}
+        compact={true}
+        value={value}
+        onChange={row=>onChange(row?row.id:null)}
+        searchFilter={searchFilter}
+        titleField={titleField}
+        badgeField={badgeField}
+        sectionLabel="contact"
+      />
     </div>
   );
 };
+
+const AvailableAfterSaving = ({ label }) => (
+  <div style={{flex:1,minWidth:0}}>
+    {label && (
+      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+        <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>{label}</span>
+      </div>
+    )}
+    <div style={{fontSize:F.sm,color:T.text3,fontStyle:'italic',padding:'7px 10px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px'}}>
+      Available after saving
+    </div>
+  </div>
+);
 
 // ── PriorityPills ─────────────────────────────────────────────────────────────
 const PriorityPills = ({ value, onSave }) => {
@@ -1897,6 +1875,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 badgeField={contactPropCode}
                 sectionLabel="contact"
                 compact={true}
+                searchFilter={`prop_code.eq.${data.prop_code}`}
               />
               {(() => {
                 const t = tenants.find(x=>x.id===data.tenant_id);
@@ -2250,20 +2229,23 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const [assignedToError,setAssignedToError] = useState(false);
   const [vendors,setVendors] = useState([]);
   const [tenants,setTenants] = useState([]);
-  const [vendorContacts,setVendorContacts] = useState([]);
-  const [tenantContacts,setTenantContacts] = useState([]);
   const [activeProps,setActiveProps] = useState([]);
+  const [isMobile,setIsMobile] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba,prop_code&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('properties','select=id,prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
 
   useEffect(()=>{
     document.title='New Task | SedonaCRM';
     return ()=>{document.title='SedonaCRM';};
+  },[]);
+
+  useEffect(()=>{
+    const onResize=()=>setIsMobile(window.innerWidth<640);
+    window.addEventListener('resize',onResize);
+    return ()=>window.removeEventListener('resize',onResize);
   },[]);
 
   useEffect(()=>{
@@ -2454,6 +2436,16 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             <RichTextEditor value={formData.internal_notes} onSave={v=>set('internal_notes',v)} minRows={5}/>
           </FieldRow>
         </div>
+        {/* CONTACTS — needs a real task id (multi-mode join table); not available until saved */}
+        <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
+          <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Contacts</div>
+          <AvailableAfterSaving/>
+        </div>
+        {/* RELATED RECORDS — needs a real task id (task_relations join table); not available until saved */}
+        <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
+          <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Related Records</div>
+          <AvailableAfterSaving/>
+        </div>
         {/* WO-specific section */}
         {formData.record_type==='work_order'&&(
           <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden'}}>
@@ -2496,36 +2488,29 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
                 </button>
               </div>
             </FieldRow>
-            <CompanyContactRow
-              companyLabel="Vendor Company"
-              contactLabel="Vendor Contact"
-              companyRel="taskVendorCompany"
-              contactRel="vendorContact"
-              companyFkField="vendor_id"
-              companyValue={formData.vendor_id}
-              contactValue={formData.vendor_contact_id}
-              allContacts={vendorContacts}
-              onSaveCompany={v=>set('vendor_id',v)}
-              onSaveContact={v=>set('vendor_contact_id',v)}
-              contactTitleField={contactTitle}
-              contactBadgeField={contactPropCode}
-              isMobile={false}
-            />
-            <CompanyContactRow
-              companyLabel="Tenant Company"
-              contactLabel="Tenant Contact"
-              companyRel="taskTenantCompany"
-              contactRel="tenantContact"
-              companyFkField="tenant_id"
-              companyValue={formData.tenant_id}
-              contactValue={formData.tenant_contact_id}
-              allContacts={tenantContacts}
-              onSaveCompany={v=>set('tenant_id',v)}
-              onSaveContact={v=>set('tenant_contact_id',v)}
-              contactTitleField={contactTitle}
-              contactBadgeField={contactPropCode}
-              isMobile={false}
-            />
+            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
+              <NewTaskContactField
+                label="Vendor Contact"
+                rel="vendorContact"
+                value={formData.vendor_contact_id}
+                onChange={v=>set('vendor_contact_id',v)}
+                titleField={contactTitle}
+                badgeField={contactPropCode}
+              />
+              <AvailableAfterSaving label="Vendor Company"/>
+            </div>
+            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
+              <NewTaskContactField
+                label="Tenant Contact"
+                rel="tenantContact"
+                value={formData.tenant_contact_id}
+                onChange={v=>set('tenant_contact_id',v)}
+                searchFilter={`prop_code.eq.${formData.prop_code}`}
+                titleField={contactTitle}
+                badgeField={contactPropCode}
+              />
+              <AvailableAfterSaving label="Tenant Company"/>
+            </div>
             <FieldRow label="WO Type">
               <GenericPills value={formData.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>set('wo_type',v)}/>
             </FieldRow>
