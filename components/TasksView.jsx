@@ -1425,6 +1425,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
     await saveMany({property_id:row?row.id:null,prop_code:row?row.prop_code:null});
   };
 
+  const handleKeySafeChange=async row=>{
+    await saveMany({key_safe_id:row?row.id:null});
+  };
+
   const openContactModal=type=>{
     setContactModalType(type);
     setContactModalForm({full_name:'',company_dba:'',primary_phone:'',email:''});
@@ -1553,6 +1557,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
   const tenantContactBtnRef  = useRef(null);
   const relatedLinksRef      = useRef(null);
   const relatedLinksBtnRef   = useRef(null);
+  const keySafeLinkRef       = useRef(null);
+  const keySafeBtnRef        = useRef(null);
 
   useEffect(()=>{
     const onArrow=e=>{
@@ -1891,6 +1897,31 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
               </FieldRow>
               <FieldRow label="Budget Item?">
                 <BoolPill value={data.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>save('is_budget_item',v)}/>
+              </FieldRow>
+              <FieldRow label="Key Safe">
+                <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <RelationField
+                      rel="keySafe"
+                      ref={keySafeLinkRef}
+                      excludeRef={keySafeBtnRef}
+                      mode="single"
+                      hideTrigger={true}
+                      compact={true}
+                      value={data.key_safe_id}
+                      onChange={handleKeySafeChange}
+                      searchFilter={`prop_code.eq.${data.prop_code}`}
+                      sectionLabel="key safe"
+                    />
+                  </div>
+                  <button ref={keySafeBtnRef} onClick={()=>keySafeLinkRef.current?.openPanel()}
+                    title="Change key safe"
+                    style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer',flexShrink:0}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                    <Plus size={14} weight="bold"/>
+                  </button>
+                </div>
               </FieldRow>
               <FieldRow label="Keys / Key Safe">
                 <InlineBlurField value={data.key_safe_info||''} onSave={v=>save('key_safe_info',v)}/>
