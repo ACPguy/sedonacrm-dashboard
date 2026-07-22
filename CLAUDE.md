@@ -271,8 +271,8 @@ The six LinkField call sites have all been migrated to this pattern (2026-07-21)
 
 ## Current Git State
 
-- main: `8b9ed67` — merge: six RelationField/relations.js migrations (d9087ad) into main (merged 2026-07-21)
-- preview: `b28ffe8` — refactor: migrate ContactsView.jsx's remaining LinkField call sites — LinkField->RelationField series complete (2026-07-21, not yet merged to main)
+- main: `1aa0101` — merge: Key Safe linker (preview 189b8ef) into main (merged 2026-07-22)
+- preview: `6ded972` — feat: expand Key Safe search/display, hide Alert + legacy key-safe fields (2026-07-22, not yet merged to main)
 
 ---
 
