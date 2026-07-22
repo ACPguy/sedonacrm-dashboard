@@ -172,7 +172,7 @@ pages/api/pipeline/
 3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
 4. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
 5. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
-6. Extend LinkField to new relationship types (Key Safes↔WOs, COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture)
+6. Extend LinkField to new relationship types (COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture). Key Safes↔WOs done: `tasks.key_safe_id` + `relations.js` `keySafe` entry wired into WO Details card; card title now leads with prop_code + a status badge pill, matching how this data reads in Podio.
 7. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
 
 **Completed this session (2026-07-21):**
