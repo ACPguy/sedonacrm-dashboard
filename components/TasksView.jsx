@@ -2182,6 +2182,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
     is_budget_item: null,
     instructions_to_vendor: null,
     key_safe_info: null,
+    key_safe_id: null,
     wo_type: null,
     email_request_sent: null,
     estimate_amount: null,
@@ -2229,6 +2230,12 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const newPropertyBtnRef  = useRef(null);
   const handlePropertyChangeForm = row => {
     setFormData(prev=>({...prev,property_id:row?row.id:null,prop_code:row?row.prop_code:null}));
+  };
+
+  const newKeySafeLinkRef = useRef(null);
+  const newKeySafeBtnRef  = useRef(null);
+  const handleKeySafeChangeForm = row => {
+    setFormData(prev=>({...prev,key_safe_id:row?row.id:null}));
   };
 
   const handleSave=async()=>{
@@ -2397,8 +2404,30 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             <FieldRow label="WO Instructions to Vendor" topAlign>
               <RichTextEditor value={formData.instructions_to_vendor} onSave={v=>set('instructions_to_vendor',v)} minRows={5}/>
             </FieldRow>
-            <FieldRow label="Keys / Key Safe">
-              <InlineBlurField value={formData.key_safe_info||''} onSave={v=>set('key_safe_info',v)}/>
+            <FieldRow label="Key Safe">
+              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <RelationField
+                    rel="keySafe"
+                    ref={newKeySafeLinkRef}
+                    excludeRef={newKeySafeBtnRef}
+                    mode="single"
+                    hideTrigger={true}
+                    compact={true}
+                    value={formData.key_safe_id}
+                    onChange={handleKeySafeChangeForm}
+                    searchFilter={`prop_code.eq.${formData.prop_code}`}
+                    sectionLabel="key safe"
+                  />
+                </div>
+                <button ref={newKeySafeBtnRef} onClick={()=>newKeySafeLinkRef.current?.openPanel()}
+                  title="Change key safe"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer',flexShrink:0}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
             </FieldRow>
             <CompanyContactRow
               companyLabel="Vendor Company"
