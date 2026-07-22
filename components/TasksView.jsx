@@ -1372,6 +1372,30 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
     sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
 
+  // Vendor/Tenant Company (CompanyLinkCard) look up data.vendor_id/tenant_id
+  // against the bulk vendors/tenants lists fetched above via a silent
+  // .catch(()=>{}) — if that bulk fetch fails, races, or is simply slow (the
+  // reported symptom, confirmed live 2026-07-22: Vendor Contact picks fine,
+  // Vendor Company silently stays "—" even though tasks.vendor_id saved
+  // correctly), the .find() below permanently returns undefined with no
+  // retry. Self-heal by fetching just the one missing row directly whenever
+  // the FK is set but not present in the already-loaded list — a single-row
+  // fetch is far less likely to fail than the full unfiltered list, and this
+  // runs regardless of why the bulk list didn't have it.
+  useEffect(()=>{
+    if(!data?.vendor_id || vendors.some(v=>v.id===data.vendor_id)) return;
+    sbFetch('vendors',`id=eq.${data.vendor_id}&select=id,company_dba,podio_id`)
+      .then(rows=>{ if(rows?.[0]) setVendors(prev=>prev.some(v=>v.id===rows[0].id)?prev:[...prev,rows[0]]); })
+      .catch(()=>{});
+  },[data?.vendor_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(()=>{
+    if(!data?.tenant_id || tenants.some(t=>t.id===data.tenant_id)) return;
+    sbFetch('tenants',`id=eq.${data.tenant_id}&select=id,tenant_dba,podio_id,prop_code`)
+      .then(rows=>{ if(rows?.[0]) setTenants(prev=>prev.some(t=>t.id===rows[0].id)?prev:[...prev,rows[0]]); })
+      .catch(()=>{});
+  },[data?.tenant_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(()=>{
     try{
       const list=JSON.parse(sessionStorage.getItem('tasksNavList')||'null');
