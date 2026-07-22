@@ -671,7 +671,7 @@ const LinkField = React.forwardRef(function LinkField({
                       title="Clear">×</button>
                   )}
                 </div>
-                {metaField && !compact && resolve(metaField, singleValue) && (
+                {metaField && resolve(metaField, singleValue) && (
                   <div style={{ fontSize: '11px', color: T.text3, marginTop: '5px' }}>{resolve(metaField, singleValue)}</div>
                 )}
                 {!readOnly && compact && (

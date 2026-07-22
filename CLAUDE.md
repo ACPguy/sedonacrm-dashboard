@@ -172,8 +172,10 @@ pages/api/pipeline/
 3. Phase 5 Stage 3: Dropbox Sign integration (two-part sequential signing, webhook endpoint)
 4. Review/delete duplicate Alliance Land Surveying LLC vendor row (`8137893e-315e-42b8-82be-cac8c5ae2d23`) — nothing references it
 5. Review 37 contacts left null in backfill (25 ambiguous, 2 unresolved vendor, 1 unresolved tenant, 9 unknown app) — see dry-run report
-6. Extend LinkField to new relationship types (COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture). Key Safes↔WOs done: `tasks.key_safe_id` + `relations.js` `keySafe` entry wired into WO Details card; card title now leads with prop_code + a status badge pill, matching how this data reads in Podio.
+6. Extend LinkField to new relationship types (COIs, Vendor Services) — design schema first, then wire (see Canonical Linker Architecture). Key Safes↔WOs done: `tasks.key_safe_id` + `relations.js` `keySafe` entry wired into WO Details card; card title leads with prop_code + a status badge pill (matching Podio), plus a contents second line via `metaField` (required removing LinkField's single-mode `!compact` gate on `metaField` — confirmed no other registry entry used `metaField` before this, so no other card's appearance changed). Search now covers key_safe_code/on_site_location/contents/id_num/prop_code, still scoped to the WO's own prop_code by the call site's `searchFilter`.
 7. (Optional, low priority) Revisit inbox divider persistence — see Known Gaps for what's already been ruled out
+8. **Podio sync → key_safe_id mapping (go-live blocker):** the old `tasks.key_safe_info` free-text field is what Podio sync will likely keep writing into — there's currently no logic mapping that (or whatever Podio sends) into the new `key_safe_id` FK. `key_safes.podio_id` already exists as a plausible matching key. Needs real sync-design work before go-live; not attempted yet.
+9. NewTaskForm's WO section still only has the free-text `key_safe_info` field (no `keySafe` RelationField linker) — TaskDetail's WO Details card has both today, intentionally left as the only place the free-text field was hidden (see below), since removing it from NewTaskForm too would leave WO creation with no key-safe field at all. Add the linker to NewTaskForm when convenient.
 
 **Completed this session (2026-07-21):**
 - TenantDetail Contacts tab rebuilt as reverseFK LinkField (matches VendorDetail)
@@ -264,6 +266,8 @@ The six LinkField call sites have all been migrated to this pattern (2026-07-21)
 - **Contacts section panel (multi-mode card):** removable chips in the panel header are gone. Removal is via Trash icon (absolute-positioned right, 32×32) on each card. All contacts show a `badgeField` prop_code pill when `tenant_id` resolves to a tenant with a `prop_code`.
 - **Vendor Contact / Tenant Contact single-mode cards:** also use Trash icon (compact mode — replaces the old "✕ Remove" panel row). Both also pass `badgeField={contactPropCode}` — shows prop_code pill when the selected contact has a `tenant_id`.
 - **CompanyLinkCard icon** is 32px to match the unified contact icon size across all three fields.
+- **Alert field removed from Follow-Up** (TaskDetail + NewTaskForm, both had it) — UI only, `tasks.alert` column untouched, nothing else in the codebase reads it.
+- **"Keys / Key Safe" free-text field (`tasks.key_safe_info`)** hidden from TaskDetail's WO Details card only — UI only, column untouched. NOT removed from NewTaskForm's WO section, which still only has this free-text field (no `keySafe` linker there yet) — removing it there would leave WO creation with no key-safe field at all. See Next Priorities #8/#9 for the Podio-sync mapping gap and the NewTaskForm linker gap this leaves open.
 
 ## Current Git State
 

@@ -1748,9 +1748,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
           {/* 2 — FOLLOW-UP */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
             <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Follow-Up</div>
-            <FieldRow label="Alert">
-              <InlineBlurField value={data.alert||''} onSave={v=>save('alert',v)}/>
-            </FieldRow>
             <FieldRow label="FU Date">
               <InlineBlurField type="date" value={data.follow_up_date||''} onSave={v=>save('follow_up_date',v)}/>
             </FieldRow>
@@ -1922,9 +1919,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                     <Plus size={14} weight="bold"/>
                   </button>
                 </div>
-              </FieldRow>
-              <FieldRow label="Keys / Key Safe">
-                <InlineBlurField value={data.key_safe_info||''} onSave={v=>save('key_safe_info',v)}/>
               </FieldRow>
               <FieldRow label="WO Type">
                 <GenericPills value={data.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>save('wo_type',v)}/>
@@ -2358,9 +2352,6 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
               compact={true}
             />
           </div>
-          <FieldRow label="Alert">
-            <InlineBlurField value={formData.alert||''} onSave={v=>set('alert',v)}/>
-          </FieldRow>
           <FieldRow label="FU Date">
             <InlineBlurField type="date" value={formData.follow_up_date||''} onSave={v=>set('follow_up_date',v)}/>
           </FieldRow>
