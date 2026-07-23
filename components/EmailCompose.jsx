@@ -182,6 +182,7 @@ export default function EmailCompose({
   prefilledTo = [],
   defaultSubject = '',
   initialBody = '',
+  initialAttachments = [],
   fromAccount = 'scott@andersoncp.com',
   onSend,
   onClose,
@@ -194,6 +195,10 @@ export default function EmailCompose({
   const [showCc,  setShowCc]  = useState(false);
   const [showBcc, setShowBcc] = useState(false);
   const [files,   setFiles]   = useState([]);
+  // Drive-sourced attachments (e.g. RFP vendor email "with files" send) —
+  // distinct from `files` above, which are local browser File objects from
+  // the drag-and-drop zone. Sent to /api/gmail/send as {driveFileId,filename,mimeType}.
+  const [driveAttachments, setDriveAttachments] = useState(initialAttachments || []);
   const [sending, setSending] = useState(false);
   const [error,   setError]   = useState('');
   const dropRef = useRef(null);
@@ -281,6 +286,9 @@ export default function EmailCompose({
           crmRecordId:        crmRecordId        || null,
           crmRecordLabel:     crmRecordLabel     || null,
           crmRecordUrl:       crmRecordUrl       || null,
+          attachments: driveAttachments.map(a => ({
+            driveFileId: a.driveFileId, filename: a.filename, mimeType: a.mimeType,
+          })),
         }),
       });
       const data = await res.json();
@@ -385,12 +393,25 @@ export default function EmailCompose({
             background:T.bg2, flexShrink:0,
           }}
         >
-          {files.length === 0 ? (
+          {files.length === 0 && driveAttachments.length === 0 ? (
             <div style={{ display:'flex', alignItems:'center', gap:'6px', color:T.text3, fontSize:F.xs }}>
               <Paperclip size={14}/> Drop files to attach
             </div>
           ) : (
             <div style={{ display:'flex', flexWrap:'wrap', gap:'4px' }}>
+              {driveAttachments.map((a, i) => (
+                <span key={`drive-${i}`} style={{
+                  display:'inline-flex', alignItems:'center', gap:'4px',
+                  padding:'2px 8px', borderRadius:'3px',
+                  background:T.bg3, border:`0.5px solid ${T.accent}`,
+                  fontSize:F.xs, color:T.text1,
+                }}>
+                  <Paperclip size={11}/> {a.filename}
+                  <button type="button"
+                    onClick={() => setDriveAttachments(al => al.filter((_, j) => j !== i))}
+                    style={{ background:'none', border:'none', color:T.text3, cursor:'pointer', padding:'0 1px', fontSize:'11px' }}>✕</button>
+                </span>
+              ))}
               {files.map((f, i) => (
                 <span key={i} style={{
                   display:'inline-flex', alignItems:'center', gap:'4px',
