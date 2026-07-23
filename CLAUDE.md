@@ -259,7 +259,7 @@ The original six LinkField call sites were migrated to this pattern 2026-07-21 (
 
 - main: `1aa0101` — merge: Key Safe linker (preview 189b8ef) into main (merged 2026-07-22)
 - preview: `4342e5d` — fix: retry LinkField multi-mode load once on failure (2026-07-22, not yet merged to main)
-- `claude/contact-company-rebuild-us7o49` (this session's branch, per remote-session branch requirements — NOT preview): pending, see follow-up docs commit for the real hash once pushed
+- `claude/contact-company-rebuild-us7o49` (this session's branch, per remote-session branch requirements — NOT preview): `7b8657a` — Decouple Contact and Company on tasks: independent fields, not derived (2026-07-23, pushed, not yet merged to preview or main)
 
 ---
 
