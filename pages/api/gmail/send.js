@@ -1,5 +1,19 @@
 import { createServerClient } from '../../../lib/supabaseServer';
 import { getGmailClient } from '../../../lib/gmail';
+import { getDriveClient } from '../../../lib/drive';
+
+// Attachment support (RFP vendor email build, Part 3c): filenames come from
+// Drive file names the account owner created, but are still sanitized before
+// landing in a MIME header — strip CR/LF (header injection) and quotes.
+const sanitizeFilename = name => String(name || 'attachment').replace(/[\r\n]/g, '').replace(/"/g, "'");
+
+async function fetchDriveAttachmentBase64(drive, fileId) {
+  const res = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' });
+  return Buffer.from(res.data).toString('base64');
+}
+
+// RFC 2045 caps base64 body lines at 76 chars
+const wrapBase64 = b64 => b64.replace(/(.{76})/g, '$1\r\n');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -8,6 +22,7 @@ export default async function handler(req, res) {
     fromAccount, to, cc, bcc, subject, bodyHtml,
     inReplyToMessageId, gmailThreadId,
     crmRecordType, crmRecordId, crmRecordLabel, crmRecordUrl,
+    attachments,
   } = req.body || {};
 
   if (!fromAccount || !Array.isArray(to) || to.length === 0 || !subject) {
@@ -56,9 +71,40 @@ export default async function handler(req, res) {
       lines.push(`X-SedonaCRM-Record: ${crmRecordType}:${crmRecordId}`);
     }
     lines.push('MIME-Version: 1.0');
-    lines.push('Content-Type: text/html; charset=UTF-8');
-    lines.push('');
-    lines.push(fullBodyHtml);
+
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+
+    if (!hasAttachments) {
+      lines.push('Content-Type: text/html; charset=UTF-8');
+      lines.push('');
+      lines.push(fullBodyHtml);
+    } else {
+      const drive = await getDriveClient(account.id);
+      const boundary = `----=_SedonaCRM_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+      lines.push('');
+      lines.push(`--${boundary}`);
+      lines.push('Content-Type: text/html; charset=UTF-8');
+      lines.push('');
+      lines.push(fullBodyHtml);
+      lines.push('');
+
+      for (const att of attachments) {
+        const filename = sanitizeFilename(att.filename);
+        const mimeType = att.mimeType || 'application/octet-stream';
+        const base64Content = await fetchDriveAttachmentBase64(drive, att.driveFileId);
+
+        lines.push(`--${boundary}`);
+        lines.push(`Content-Type: ${mimeType}; name="${filename}"`);
+        lines.push('Content-Transfer-Encoding: base64');
+        lines.push(`Content-Disposition: attachment; filename="${filename}"`);
+        lines.push('');
+        lines.push(wrapBase64(base64Content));
+        lines.push('');
+      }
+      lines.push(`--${boundary}--`);
+    }
 
     const raw = Buffer.from(lines.join('\r\n')).toString('base64url');
     const sendPayload = { userId: 'me', requestBody: { raw } };

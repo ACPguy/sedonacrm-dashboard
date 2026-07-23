@@ -14,9 +14,11 @@ import {
 } from '@dnd-kit/core';
 import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
+import EmailCompose from './EmailCompose';
 import RelationField from './shared/RelationField';
 import StackedFormModal from './shared/StackedFormModal';
 import { getTaskPrefix } from '../utils/taskPrefix';
+import { buildRfpEmailHtml } from '../lib/rfpEmailTemplate';
 import { T } from '../lib/theme';
 
 const SUPABASE_URL      = 'https://edxcvyleielzevpappui.supabase.co';
@@ -524,6 +526,30 @@ const GenericPills = ({ value, options, onSave }) => {
         );
       })}
     </div>
+  );
+};
+
+// ── EmailRequestPill ──────────────────────────────────────────────────────────
+// "Send Request - NO FILES" / "Send Request - WITH FILES" — the WO Details
+// card's existing Email Request To Vendor field, repurposed (2026-07-24 RFP
+// vendor email build, Part 3) so these two options are action buttons that
+// build+open the RFP email instead of just setting a status. Visual language
+// matches GenericPills exactly; `active` still reflects data.email_request_sent
+// so a previously-sent state stays visibly highlighted after reload. The third
+// option, "Discussed In-Person", stays a plain status pill via GenericPills
+// unchanged — no email flow for it.
+const EmailRequestPill = ({ label, active, loading, onClick }) => {
+  const [hov,setHov] = useState(false);
+  return (
+    <button onClick={onClick} disabled={loading}
+      onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{padding:'3px 12px',borderRadius:20,fontSize:12,cursor:loading?'wait':'pointer',transition:'all 0.15s ease',
+        border:`1px solid ${active?'#E8630A':(hov?'#E8630A':T.border)}`,
+        background:active?'#E8630A':'transparent',
+        color:active?'#fff':(hov?'#E8630A':T.text2),
+        fontWeight:active?600:'normal',opacity:loading?0.6:1}}>
+      {loading ? 'Preparing…' : label}
+    </button>
   );
 };
 
@@ -1330,6 +1356,9 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
   const [contactModalSaving,setContactModalSaving] = useState(false);
   const [contactModalError,setContactModalError] = useState('');
   const [saveError,setSaveError] = useState(null);
+  const [rfpSending,setRfpSending] = useState(null); // 'no_files' | 'with_files' | null — resolving data before compose opens
+  const [rfpCompose,setRfpCompose] = useState(null); // { prefilledTo, defaultSubject, initialBody, driveAttachments, sentValue } | null
+  const [rfpError,setRfpError] = useState('');
   const resizingRight = useRef(false);
 
   useEffect(()=>{
@@ -1471,6 +1500,54 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
 
   const handleVendorCompanyChange=async row=>{
     await saveMany({vendor_id:row?row.id:null});
+  };
+
+  // RFP vendor email (2026-07-24 build, Part 3) — resolves the data
+  // buildRfpEmailHtml needs (vendor contact, property, key safe, tenant
+  // contact, and — for the "with files" send — the task's Drive folder
+  // listing), builds the HTML, and opens it in EmailCompose pre-filled.
+  // Nothing is sent here; EmailCompose's own Send button does that, and
+  // onSend below is what actually records email_request_sent.
+  const openRfpEmail=async(withFiles)=>{
+    setRfpError('');
+    if (!data.vendor_contact_id) { setRfpError('Set a Vendor Contact before sending an RFP.'); return; }
+    setRfpSending(withFiles?'with_files':'no_files');
+    try{
+      const [vendorContactRows,keySafeRows,tenantContactRows]=await Promise.all([
+        sbFetch('contacts',`id=eq.${data.vendor_contact_id}&select=full_name,title,company_dba,primary_phone,email,category`),
+        data.key_safe_id?sbFetch('key_safes',`id=eq.${data.key_safe_id}&select=key_safe_code,on_site_location`):Promise.resolve([]),
+        data.tenant_contact_id?sbFetch('contacts',`id=eq.${data.tenant_contact_id}&select=full_name,primary_phone`):Promise.resolve([]),
+      ]);
+      const vendorContact=vendorContactRows[0];
+      if (!vendorContact?.email) { setRfpError('Vendor Contact has no email address on file.'); setRfpSending(null); return; }
+      const keySafe=keySafeRows[0]||null;
+      const tenantContact=tenantContactRows[0]||null;
+      const property=activeProps.find(p=>p.prop_code===data.prop_code)||{};
+
+      let attachmentFiles=[];
+      if (withFiles) {
+        if (!data.drive_folder_id) { setRfpError('This task has no Drive folder yet — create one first.'); setRfpSending(null); return; }
+        const res=await fetch(`/api/tasks/list-attachments?folderId=${data.drive_folder_id}`);
+        const json=await res.json();
+        if (!res.ok) throw new Error(json.error||'Failed to list Drive attachments');
+        attachmentFiles=json.files||[];
+      }
+
+      const taskForTemplate={...data,tenantContact};
+      const html=buildRfpEmailHtml(taskForTemplate,property,vendorContact,keySafe,attachmentFiles);
+
+      setRfpCompose({
+        prefilledTo:[{email:vendorContact.email,name:vendorContact.full_name||''}],
+        defaultSubject:`Request for Proposal — ${displayId}`,
+        initialBody:html,
+        driveAttachments:withFiles?attachmentFiles.map(f=>({driveFileId:f.id,filename:f.name,mimeType:f.mimeType})):[],
+        sentValue:withFiles?'With Files':'No Files',
+      });
+    }catch(e){
+      setRfpError(e.message);
+    }finally{
+      setRfpSending(null);
+    }
   };
 
   const handleTenantCompanyChange=async row=>{
@@ -2032,7 +2109,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 <RichTextEditor value={data.instructions_to_vendor} onSave={v=>save('instructions_to_vendor',v)} minRows={5}/>
               </FieldRow>
               <FieldRow label="Email Request To Vendor">
-                <GenericPills value={data.email_request_sent} options={EMAIL_REQUEST_OPTIONS} onSave={v=>save('email_request_sent',v)}/>
+                <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+                  <div style={{display:'flex',gap:'5px',flexWrap:'wrap'}}>
+                    <EmailRequestPill label="Send Request - NO FILES" active={data.email_request_sent==='No Files'} loading={rfpSending==='no_files'} onClick={()=>openRfpEmail(false)}/>
+                    <EmailRequestPill label="Send Request - WITH FILES" active={data.email_request_sent==='With Files'} loading={rfpSending==='with_files'} onClick={()=>openRfpEmail(true)}/>
+                    <GenericPills value={data.email_request_sent} options={['Discussed In-Person']} onSave={v=>save('email_request_sent',v)}/>
+                  </div>
+                  {rfpError && <div style={{fontSize:F.xs,color:T.danger}}>{rfpError}</div>}
+                </div>
               </FieldRow>
               {/* Financials sub-panel */}
               <button onClick={()=>setWoFinOpen(o=>!o)}
@@ -2254,6 +2338,27 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
             </div>
           ))}
         </StackedFormModal>
+      )}
+      {/* RFP vendor email compose — opened from the two Send Request pills above */}
+      {rfpCompose && (
+        <EmailCompose
+          mode="new"
+          crmRecordType={data.record_type}
+          crmRecordId={data.id}
+          crmRecordLabel={`${displayId}${data.title ? ` — ${data.title}` : ''}`}
+          crmRecordUrl={`/tasks/${data.task_num}`}
+          fromAccount="scott@andersoncp.com"
+          prefilledTo={rfpCompose.prefilledTo}
+          defaultSubject={rfpCompose.defaultSubject}
+          initialBody={rfpCompose.initialBody}
+          initialAttachments={rfpCompose.driveAttachments}
+          onSend={async()=>{
+            const sentValue=rfpCompose.sentValue;
+            setRfpCompose(null);
+            try{ await save('email_request_sent',sentValue); }catch(e){ setRfpError(e.message); }
+          }}
+          onClose={()=>setRfpCompose(null)}
+        />
       )}
     </div>
   );
