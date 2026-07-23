@@ -262,8 +262,8 @@ LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any 
 
 ## Current Git State
 
-- main: `1aa0101` — merge: Key Safe linker (preview 189b8ef) into main (merged 2026-07-22)
-- preview: `102e1ae` — Stage Contacts/Related Records at create time; reconcile NewTaskForm order (2026-07-24: contacts.prop_code correction, staged Contacts/Related Records picking at create time, NewTaskForm/TaskDetail field-order reconciliation, Property/Key Safe/Tenant Contact showAllOnOpen), built on top of `4cd6d4f`, not yet merged to main
+- main: `148d885` — merge: Contact/Company decoupling + searchFilter bug fixes + staged Contacts/Related Records + NewTaskForm field-order reconciliation (preview 00c32d7) into main (merged 2026-07-24, Scott approved: "Yes. Merge to main."). Brings in `247eadb`/`4cd6d4f`/`102e1ae` — see TaskDetail Architecture Notes and Canonical Linker Architecture for what changed.
+- preview: `00c32d7` — same content as main as of this merge (docs: update git state to 102e1ae)
 
 ---
 
