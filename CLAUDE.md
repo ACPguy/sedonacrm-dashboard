@@ -170,6 +170,12 @@ pages/api/pipeline/
 - **New Inquiry agent (Agent 3)** — uses LEASING_KEYWORDS filter. Manual **+LSG** button in EmailInbox for ambiguous cases (source='manual_lsg'). `LSG_PROPERTIES` array hardcoded in EmailInbox.jsx with 14 active properties (OLY/WNT excluded per Scott). lead-capture.js allows null prop_code. Future: Claude-API classifier if +LSG usage exceeds ~10/day.
 - **leasing_pipeline working set** — 18 records (5 real + 13 'TEST — ' seeded) after 2026-07-11 reset. Delete all 'TEST — ' prefixed records before go-live. Stage filter: `stage=not.in.(Dead,On Hold,Landlord Declined Use)`; limit 5000.
 
+## RFP Vendor Email — 3-part build (in progress, this session)
+
+- **Part 1 — DONE:** `public/branding/acp-logo.png` committed. NOTE: the Drive file ID originally given for this (`1yj87nkP50RRhNZot_h7Wbqg3cVJr3HB2`, "Podio PDF V2 - LTR Head Logo size - 2020.12.11.png") was NOT a usable logo — it's a screenshot of a Podio PDF template editor (toolbar + "Insert/edit image" dialog + red annotation arrow). Found and used the real logo instead: `ACP - Large Logo - transparent.png` (Drive id `0BxXST_g3FJFkaGI1VWZNdi15R3M`), transparent PNG, resized from source 2214x894 down to 880x356 (2x retina for ~220px header display width) to trim file size. If either logo Drive file ever needs re-fetching, use this ID, not the one from the original spec.
+- **Part 2 — pending:** `lib/rfpEmailTemplate.js` (`buildRfpEmailHtml`). Blocked on: no `rfp-email-preview.html` file was actually found anywhere in this session's environment despite the spec calling it "attached this session" — will need to confirm with Scott or rebuild from the spec's structural description before writing this file.
+- **Part 3 — pending:** two send buttons + attachment support in `/api/gmail/send`.
+
 ## Next Priorities
 
 1. Phase 5 Stage 4 (part 2): PipelineView click-through detail panel (record detail, stage transition buttons, LOI drafting UI, qual gate form)
