@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router';
 import {
   Wrench, CheckFat, FolderOpen, Buildings, House, Star, ClipboardText, ChatCircle,
-  CaretLeft, CaretRight, Truck, Storefront, Plus,
+  CaretLeft, CaretRight, Plus,
 } from '@phosphor-icons/react';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -16,7 +16,6 @@ import RichTextEditor from './RichTextEditor';
 import CommunicationTimeline from './CommunicationTimeline';
 import RelationField from './shared/RelationField';
 import StackedFormModal from './shared/StackedFormModal';
-import CompanyLinkCard from './shared/CompanyLinkCard';
 import { getTaskPrefix } from '../utils/taskPrefix';
 import { T } from '../lib/theme';
 
@@ -369,87 +368,6 @@ const InlineSelect = ({ value, options, onSave }) => (
     )}
   </select>
 );
-
-
-// ── CompanyContactRow ─────────────────────────────────────────────────────────
-// Company-first contact linker — used by NewTaskForm's WO section. Company
-// picks first, narrowing Contact's search to that company via searchFilter;
-// Contact auto-selects when exactly one contact matches the picked company
-// (computed from the full allContacts list already held in NewTaskForm state
-// — no extra query needed for this, since that list was already being
-// fetched). Both fields are RelationField (searchable) rather than the old
-// native <select> — full-screen scroll-wheel selects with hundreds of
-// options were unusable on iOS Safari (no type-to-search). 2026-07-22.
-const CompanyContactRow = ({ companyLabel, contactLabel, companyRel, contactRel, companyFkField, companyValue, contactValue, allContacts, onSaveCompany, onSaveContact, contactTitleField, contactBadgeField, isMobile }) => {
-  const filteredContacts = useMemo(
-    () => companyValue ? allContacts.filter(c => c[companyFkField] === companyValue) : allContacts,
-    [companyValue, allContacts, companyFkField],
-  );
-  useEffect(() => {
-    if (filteredContacts.length === 1 && contactValue !== filteredContacts[0].id) {
-      onSaveContact(filteredContacts[0].id);
-    }
-  }, [companyValue, filteredContacts.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const contactLinkRef = useRef(null);
-  const contactBtnRef  = useRef(null);
-  const companyLinkRef = useRef(null);
-  const companyBtnRef  = useRef(null);
-
-  return (
-    <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px',display:'flex',flexDirection:isMobile?'column':'row',gap:'12px'}}>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
-          <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>{contactLabel}</span>
-          <button ref={contactBtnRef} onClick={()=>contactLinkRef.current?.openPanel()}
-            title={`Change ${contactLabel}`}
-            style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-            <Plus size={14} weight="bold"/>
-          </button>
-        </div>
-        <RelationField
-          rel={contactRel}
-          ref={contactLinkRef}
-          excludeRef={contactBtnRef}
-          mode="single"
-          hideTrigger={true}
-          compact={true}
-          value={contactValue}
-          onChange={row=>onSaveContact(row?row.id:null)}
-          searchFilter={companyValue?`${companyFkField}.eq.${companyValue}`:undefined}
-          titleField={contactTitleField}
-          badgeField={contactBadgeField}
-          sectionLabel="contact"
-        />
-      </div>
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
-          <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>{companyLabel}</span>
-          <button ref={companyBtnRef} onClick={()=>companyLinkRef.current?.openPanel()}
-            title={`Change ${companyLabel}`}
-            style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-            <Plus size={14} weight="bold"/>
-          </button>
-        </div>
-        <RelationField
-          rel={companyRel}
-          ref={companyLinkRef}
-          excludeRef={companyBtnRef}
-          mode="single"
-          hideTrigger={true}
-          compact={true}
-          value={companyValue}
-          onChange={row=>onSaveCompany(row?row.id:null)}
-          sectionLabel="company"
-        />
-      </div>
-    </div>
-  );
-};
 
 // ── PriorityPills ─────────────────────────────────────────────────────────────
 const PriorityPills = ({ value, onSave }) => {
@@ -1318,8 +1236,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
   const [activeProps,setActiveProps] = useState([]);
   const [vendors,setVendors]     = useState([]);
   const [tenants,setTenants]     = useState([]);
-  const [vendorContacts,setVendorContacts] = useState([]);
-  const [tenantContacts,setTenantContacts] = useState([]);
   const [isMobile,setIsMobile] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   const [rightCollapsed,setRightCollapsed] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   const [rightWidth,setRightWidth] = useState(300);
@@ -1368,20 +1284,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
     sbFetch('properties','select=prop_code,property_name,address,city,state,zip&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
     sbFetch('vendors','select=id,company_dba,podio_id&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba,podio_id,prop_code&order=tenant_dba.asc').then(setTenants).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
 
-  // Vendor/Tenant Company (CompanyLinkCard) look up data.vendor_id/tenant_id
-  // against the bulk vendors/tenants lists fetched above via a silent
-  // .catch(()=>{}) — if that bulk fetch fails, races, or is simply slow (the
-  // reported symptom, confirmed live 2026-07-22: Vendor Contact picks fine,
-  // Vendor Company silently stays "—" even though tasks.vendor_id saved
-  // correctly), the .find() below permanently returns undefined with no
-  // retry. Self-heal by fetching just the one missing row directly whenever
-  // the FK is set but not present in the already-loaded list — a single-row
-  // fetch is far less likely to fail than the full unfiltered list, and this
-  // runs regardless of why the bulk list didn't have it.
+  // Vendor/Tenant Company now render via RelationField (taskVendorCompany/
+  // taskTenantCompany), which does its own per-id fetch independent of this
+  // bulk list. These two self-heal effects still matter for a different
+  // reader, though: contactTitle below resolves a Contact's "Name — Company"
+  // display off this same vendors/tenants state, so it stays kept in sync
+  // whenever a linked contact's company isn't already in the bulk list.
   useEffect(()=>{
     if(!data?.vendor_id || vendors.some(v=>v.id===data.vendor_id)) return;
     sbFetch('vendors',`id=eq.${data.vendor_id}&select=id,company_dba,podio_id`)
@@ -1465,9 +1375,12 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
     }
   };
 
+  // Contact and Company are fully decoupled on existing tasks — picking a
+  // Contact only ever writes {type}_contact_id, never vendor_id/tenant_id.
+  // The old auto-derive-company-from-contact behavior only applies once, at
+  // task creation (see the fallback in /api/tasks/create.js) — never here.
   const handleContactChange=async(type,row)=>{
-    const companyId=row?(row.vendor_id??row.tenant_id??null):null;
-    await saveMany({[`${type}_contact_id`]:row?row.id:null,[`${type}_id`]:companyId});
+    await saveMany({[`${type}_contact_id`]:row?row.id:null});
   };
 
   const handlePropertyChange=async row=>{
@@ -1476,6 +1389,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
 
   const handleKeySafeChange=async row=>{
     await saveMany({key_safe_id:row?row.id:null});
+  };
+
+  const handleVendorCompanyChange=async row=>{
+    await saveMany({vendor_id:row?row.id:null});
+  };
+
+  const handleTenantCompanyChange=async row=>{
+    await saveMany({tenant_id:row?row.id:null});
   };
 
   const openContactModal=type=>{
@@ -1604,6 +1525,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
   const vendorContactBtnRef  = useRef(null);
   const tenantContactRef     = useRef(null);
   const tenantContactBtnRef  = useRef(null);
+  const vendorCompanyRef     = useRef(null);
+  const vendorCompanyBtnRef  = useRef(null);
+  const tenantCompanyRef     = useRef(null);
+  const tenantCompanyBtnRef  = useRef(null);
   const relatedLinksRef      = useRef(null);
   const relatedLinksBtnRef   = useRef(null);
   const keySafeLinkRef       = useRef(null);
@@ -1630,9 +1555,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
   const displayId=getTaskPrefix(data);
   const categoryOpts=CATEGORY_OPTIONS[data.record_type]||[];
   const isClosed=data.status==='Closed'||data.status==='Cancelled';
-
-  const vendorLink=vid=>{const v=vendors.find(x=>x.id===vid);if(!v)return null;return v.podio_id?`/vendors/${v.podio_id}`:`/vendors/X${v.id.slice(-6)}`;};
-  const tenantLink=tid=>{const t=tenants.find(x=>x.id===tid);if(!t)return null;return t.podio_id?`/tenants/${t.podio_id}`:`/tenants/X${t.id.slice(-6)}`;};
 
   const contactCompanyName = row => {
     if (row.vendor_id) return vendors.find(v=>v.id===row.vendor_id)?.company_dba;
@@ -1818,7 +1740,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
               </button>
             </div>
             <RelationField
-              rel="taskContacts"
+              rel="contact"
               ref={contactsFieldRef}
               excludeRef={contactsBtnRef}
               parentId={data.id}
@@ -1832,12 +1754,14 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
             />
           </div>
 
-          {/* 4 — LINKED COMPANIES */}
+          {/* 4 — VENDOR / TENANT CONTACT */}
+          {/* Contact and Company are fully decoupled here (2026-07-23 rebuild) —
+              picking a Contact never touches vendor_id/tenant_id (see
+              handleContactChange), and this card has no Company field at all. */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden',padding:'10px 16px 14px'}}>
-            <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Linked Companies</div>
-            {/* Vendor row — flat 4-child grid: label, label, LinkField, Company card */}
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gridAutoRows:'auto',gap:'6px 12px',marginBottom:'12px'}}>
-              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+            <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Vendor / Tenant Contact</div>
+            <div style={{marginBottom:'12px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
                 <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Contact</span>
                 <button ref={vendorContactBtnRef} onClick={()=>vendorContactRef.current?.openPanel()}
                   title="Change vendor contact"
@@ -1847,11 +1771,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                   <Plus size={14} weight="bold"/>
                 </button>
               </div>
-              <div style={{display:'flex',alignItems:'center'}}>
-                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Company</span>
-              </div>
               <RelationField
-                rel="vendorContact"
+                rel="contact"
                 ref={vendorContactRef}
                 excludeRef={vendorContactBtnRef}
                 mode="single"
@@ -1859,19 +1780,15 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 value={data.vendor_contact_id}
                 onChange={row=>handleContactChange('vendor',row)}
                 onCreateNew={()=>openContactModal('vendor')}
+                searchFilter="vendor_id.not.is.null"
                 titleField={contactTitle}
                 badgeField={contactPropCode}
                 sectionLabel="contact"
                 compact={true}
               />
-              {(() => {
-                const v = vendors.find(x=>x.id===data.vendor_id);
-                return <CompanyLinkCard icon={Truck} name={v?.company_dba} link={data.vendor_id?vendorLink(data.vendor_id):null} />;
-              })()}
             </div>
-            {/* Tenant row — same flat 4-child grid pattern */}
-            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gridAutoRows:'auto',gap:'6px 12px'}}>
-              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
                 <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Contact</span>
                 <button ref={tenantContactBtnRef} onClick={()=>tenantContactRef.current?.openPanel()}
                   title="Change tenant contact"
@@ -1881,11 +1798,8 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                   <Plus size={14} weight="bold"/>
                 </button>
               </div>
-              <div style={{display:'flex',alignItems:'center'}}>
-                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Company</span>
-              </div>
               <RelationField
-                rel="tenantContact"
+                rel="contact"
                 ref={tenantContactRef}
                 excludeRef={tenantContactBtnRef}
                 mode="single"
@@ -1893,19 +1807,70 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 value={data.tenant_contact_id}
                 onChange={row=>handleContactChange('tenant',row)}
                 onCreateNew={()=>openContactModal('tenant')}
+                searchFilter="tenant_id.not.is.null"
                 titleField={contactTitle}
                 badgeField={contactPropCode}
                 sectionLabel="contact"
                 compact={true}
               />
-              {(() => {
-                const t = tenants.find(x=>x.id===data.tenant_id);
-                return <CompanyLinkCard icon={Storefront} name={t?.tenant_dba} link={data.tenant_id?tenantLink(data.tenant_id):null} badge={t?.prop_code} />;
-              })()}
             </div>
           </div>
 
-          {/* 4 — RELATED RECORDS */}
+          {/* 5 — VENDOR / TENANT COMPANY */}
+          {/* Independently pickable — not derived from Contact. Uses the same
+              taskVendorCompany/taskTenantCompany registry entries NewTaskForm's
+              WO section already wrote to tasks.vendor_id/tasks.tenant_id. */}
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden',padding:'10px 16px 14px'}}>
+            <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Vendor / Tenant Company</div>
+            <div style={{marginBottom:'12px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Company</span>
+                <button ref={vendorCompanyBtnRef} onClick={()=>vendorCompanyRef.current?.openPanel()}
+                  title="Change vendor company"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
+              <RelationField
+                rel="taskVendorCompany"
+                ref={vendorCompanyRef}
+                excludeRef={vendorCompanyBtnRef}
+                mode="single"
+                hideTrigger={true}
+                value={data.vendor_id}
+                onChange={handleVendorCompanyChange}
+                sectionLabel="company"
+                compact={true}
+              />
+            </div>
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Company</span>
+                <button ref={tenantCompanyBtnRef} onClick={()=>tenantCompanyRef.current?.openPanel()}
+                  title="Change tenant company"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
+              <RelationField
+                rel="taskTenantCompany"
+                ref={tenantCompanyRef}
+                excludeRef={tenantCompanyBtnRef}
+                mode="single"
+                hideTrigger={true}
+                value={data.tenant_id}
+                onChange={handleTenantCompanyChange}
+                sectionLabel="company"
+                compact={true}
+              />
+            </div>
+          </div>
+
+          {/* 6 — RELATED RECORDS */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden',padding:'10px 16px 14px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
               <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Related Records</span>
@@ -1930,7 +1895,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
             />
           </div>
 
-          {/* 5 — WORK ORDER DETAILS (WO only) */}
+          {/* 7 — WORK ORDER DETAILS (WO only) */}
           {data.record_type==='work_order'&&(
             <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
               <div style={{padding:'10px 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg3}}>
@@ -2031,7 +1996,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
             </div>
           )}
 
-          {/* 5 — NOTES AND RELATIONSHIPS */}
+          {/* 8 — NOTES AND RELATIONSHIPS */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
             <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Notes &amp; Relationships</div>
             <FieldRow label="Details" topAlign>
@@ -2058,7 +2023,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
             )}
           </div>
 
-          {/* 6 — DOCUMENTS */}
+          {/* 9 — DOCUMENTS */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
             <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Documents</div>
             <FieldRow label="Drive Folder" hoverable={false}>
@@ -2084,7 +2049,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
             )}
           </div>
 
-          {/* 7 — DATES */}
+          {/* 10 — DATES */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'10px 16px 0',overflow:'hidden'}}>
             <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Dates</div>
             <FieldRow label="Created" hoverable={false}>
@@ -2250,15 +2215,11 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const [assignedToError,setAssignedToError] = useState(false);
   const [vendors,setVendors] = useState([]);
   const [tenants,setTenants] = useState([]);
-  const [vendorContacts,setVendorContacts] = useState([]);
-  const [tenantContacts,setTenantContacts] = useState([]);
   const [activeProps,setActiveProps] = useState([]);
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba,prop_code&order=tenant_dba.asc').then(setTenants).catch(()=>{});
     sbFetch('properties','select=id,prop_code,property_name&status=eq.active&order=prop_code.asc').then(setActiveProps).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba,podio_id,vendor_id&category=eq.Vendor&status=eq.active&order=full_name.asc').then(rows=>setVendorContacts(rows)).catch(()=>{});
-    sbFetch('contacts','select=id,full_name,company_dba,podio_id,tenant_id&category=eq.Tenant&status=eq.active&order=full_name.asc').then(rows=>setTenantContacts(rows)).catch(()=>{});
   },[]);
 
   useEffect(()=>{
@@ -2286,6 +2247,18 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const handleKeySafeChangeForm = row => {
     setFormData(prev=>({...prev,key_safe_id:row?row.id:null}));
   };
+
+  // Vendor/Tenant Contact and Vendor/Tenant Company — independently pickable,
+  // no cascade between them (the old CompanyContactRow company-first cascade
+  // was retired in the 2026-07-23 Contact/Company decoupling rebuild).
+  const newVendorContactRef    = useRef(null);
+  const newVendorContactBtnRef = useRef(null);
+  const newVendorCompanyRef    = useRef(null);
+  const newVendorCompanyBtnRef = useRef(null);
+  const newTenantContactRef    = useRef(null);
+  const newTenantContactBtnRef = useRef(null);
+  const newTenantCompanyRef    = useRef(null);
+  const newTenantCompanyBtnRef = useRef(null);
 
   // Same FK-based lookup as TaskDetail's contactTitle/contactPropCode (not
   // the contact's own free-text company_dba — see CLAUDE.md Vendor/Tenant
@@ -2496,36 +2469,104 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
                 </button>
               </div>
             </FieldRow>
-            <CompanyContactRow
-              companyLabel="Vendor Company"
-              contactLabel="Vendor Contact"
-              companyRel="taskVendorCompany"
-              contactRel="vendorContact"
-              companyFkField="vendor_id"
-              companyValue={formData.vendor_id}
-              contactValue={formData.vendor_contact_id}
-              allContacts={vendorContacts}
-              onSaveCompany={v=>set('vendor_id',v)}
-              onSaveContact={v=>set('vendor_contact_id',v)}
-              contactTitleField={contactTitle}
-              contactBadgeField={contactPropCode}
-              isMobile={false}
-            />
-            <CompanyContactRow
-              companyLabel="Tenant Company"
-              contactLabel="Tenant Contact"
-              companyRel="taskTenantCompany"
-              contactRel="tenantContact"
-              companyFkField="tenant_id"
-              companyValue={formData.tenant_id}
-              contactValue={formData.tenant_contact_id}
-              allContacts={tenantContacts}
-              onSaveCompany={v=>set('tenant_id',v)}
-              onSaveContact={v=>set('tenant_contact_id',v)}
-              contactTitleField={contactTitle}
-              contactBadgeField={contactPropCode}
-              isMobile={false}
-            />
+            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 14px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Contact</span>
+                <button ref={newVendorContactBtnRef} onClick={()=>newVendorContactRef.current?.openPanel()}
+                  title="Change vendor contact"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
+              <RelationField
+                rel="contact"
+                ref={newVendorContactRef}
+                excludeRef={newVendorContactBtnRef}
+                mode="single"
+                hideTrigger={true}
+                compact={true}
+                value={formData.vendor_contact_id}
+                onChange={row=>set('vendor_contact_id',row?row.id:null)}
+                searchFilter="vendor_id.not.is.null"
+                titleField={contactTitle}
+                badgeField={contactPropCode}
+                sectionLabel="contact"
+              />
+            </div>
+            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 14px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Vendor Company</span>
+                <button ref={newVendorCompanyBtnRef} onClick={()=>newVendorCompanyRef.current?.openPanel()}
+                  title="Change vendor company"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
+              <RelationField
+                rel="taskVendorCompany"
+                ref={newVendorCompanyRef}
+                excludeRef={newVendorCompanyBtnRef}
+                mode="single"
+                hideTrigger={true}
+                compact={true}
+                value={formData.vendor_id}
+                onChange={row=>set('vendor_id',row?row.id:null)}
+                sectionLabel="company"
+              />
+            </div>
+            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 14px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Contact</span>
+                <button ref={newTenantContactBtnRef} onClick={()=>newTenantContactRef.current?.openPanel()}
+                  title="Change tenant contact"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
+              <RelationField
+                rel="contact"
+                ref={newTenantContactRef}
+                excludeRef={newTenantContactBtnRef}
+                mode="single"
+                hideTrigger={true}
+                compact={true}
+                value={formData.tenant_contact_id}
+                onChange={row=>set('tenant_contact_id',row?row.id:null)}
+                searchFilter="tenant_id.not.is.null"
+                titleField={contactTitle}
+                badgeField={contactPropCode}
+                sectionLabel="contact"
+              />
+            </div>
+            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 14px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
+                <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>Tenant Company</span>
+                <button ref={newTenantCompanyBtnRef} onClick={()=>newTenantCompanyRef.current?.openPanel()}
+                  title="Change tenant company"
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                  <Plus size={14} weight="bold"/>
+                </button>
+              </div>
+              <RelationField
+                rel="taskTenantCompany"
+                ref={newTenantCompanyRef}
+                excludeRef={newTenantCompanyBtnRef}
+                mode="single"
+                hideTrigger={true}
+                compact={true}
+                value={formData.tenant_id}
+                onChange={row=>set('tenant_id',row?row.id:null)}
+                sectionLabel="company"
+              />
+            </div>
             <FieldRow label="WO Type">
               <GenericPills value={formData.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>set('wo_type',v)}/>
             </FieldRow>
