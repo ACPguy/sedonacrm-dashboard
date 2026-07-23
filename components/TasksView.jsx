@@ -93,16 +93,21 @@ export const sbDelete = async (table, params) => {
 // standard URL query-string parsing splits on '&' then '=' (verified via
 // Node's querystring.parse against the exact string LinkField builds),
 // since direct network access to Supabase isn't available in this
-// environment to test PostgREST's response directly. `contacts` also has
-// no `prop_code` column of its own (confirmed by reading every place this
-// codebase queries `contacts` — property is only ever resolved via the
-// `tenant_id` FK to `tenants.prop_code`), so scoping a contacts search by
-// property can't be a single `prop_code=eq.X` filter on `contacts` at
-// all — it has to go through the tenant ids that actually belong to that
-// property. Builds `tenant_id=in.(id1,id2,...)` from tenants already
-// loaded in local state; falls back to a filter that can never match any
-// row when no tenants belong to the property, so the search never
-// silently reverts to unscoped.
+// environment to test PostgREST's response directly.
+//
+// CORRECTION (2026-07-23): an earlier version of this comment claimed
+// `contacts` has no `prop_code` column at all — that was wrong. It exists
+// and is populated for the large majority of tenant-linked contacts
+// (confirmed live: 9/10 sampled contacts with `tenant_id` set had
+// `prop_code` correctly populated; one had it null despite a valid
+// `tenant_id`). This helper is kept anyway, deliberately — not because the
+// column is missing, but because deriving from `tenants` via `tenant_id`
+// is the more robust choice: it can't go stale independently of the FK the
+// way a denormalized `contacts.prop_code` can, so it correctly handles the
+// occasional contact where that column is unpopulated. Builds
+// `tenant_id=in.(id1,id2,...)` from tenants already loaded in local state;
+// falls back to a filter that can never match any row when no tenants
+// belong to the property, so the search never silently reverts to unscoped.
 const tenantIdsSearchFilterFor = (tenants, propCode) => {
   const ids = tenants.filter(t => t.prop_code === propCode).map(t => t.id);
   return ids.length ? `tenant_id=in.(${ids.join(',')})` : 'id=eq.00000000-0000-0000-0000-000000000000';
@@ -396,19 +401,19 @@ const InlineSelect = ({ value, options, onSave }) => (
 );
 
 
-// ── NewTaskLinkField / AvailableAfterSaving ──────────────────────────────────
-// NewTaskLinkField: generic single-mode linker for NewTaskForm's WO section —
-// used for both Vendor/Tenant Contact AND Vendor/Tenant Company (Company no
-// longer needs to wait for a real task id: it writes tasks.vendor_id/
-// tasks.tenant_id directly via the caller's onChange into local formData,
-// same as Property/Key Safe already do). Replaces the old CompanyContactRow's
-// company-first cascade (2026-07-22 removal — see CLAUDE.md Contact/Company
-// Decoupling note) — Contact and Company here are two independent instances
-// of this same field, never paired or cascading into each other.
-// AvailableAfterSaving: consistent placeholder for anything that still needs
-// a real task id to function (Contacts multi-list, Related Records) — styled
-// to match LinkField's own single-mode empty-state box.
-const NewTaskLinkField = ({ label, rel, value, onChange, titleField, badgeField, searchFilter, sectionLabel='contact' }) => {
+// ── NewTaskLinkField ──────────────────────────────────────────────────────────
+// Generic single-mode linker for NewTaskForm's WO section — used for both
+// Vendor/Tenant Contact AND Vendor/Tenant Company (Company no longer needs to
+// wait for a real task id: it writes tasks.vendor_id/tasks.tenant_id directly
+// via the caller's onChange into local formData, same as Property/Key Safe
+// already do). Replaces the old CompanyContactRow's company-first cascade
+// (2026-07-22 removal — see CLAUDE.md Contact/Company Decoupling note) —
+// Contact and Company here are two independent instances of this same field,
+// never paired or cascading into each other.
+// (AvailableAfterSaving — the old placeholder for Contacts/Related Records —
+// was removed 2026-07-24 once those became staged-pickable via LinkField's
+// mode='staged'; see handleSave for where staged picks get linked for real.)
+const NewTaskLinkField = ({ label, rel, value, onChange, titleField, badgeField, searchFilter, sectionLabel='contact', showAllOnOpen=false }) => {
   const linkRef = useRef(null);
   const btnRef  = useRef(null);
   return (
@@ -436,23 +441,11 @@ const NewTaskLinkField = ({ label, rel, value, onChange, titleField, badgeField,
         titleField={titleField}
         badgeField={badgeField}
         sectionLabel={sectionLabel}
+        showAllOnOpen={showAllOnOpen}
       />
     </div>
   );
 };
-
-const AvailableAfterSaving = ({ label }) => (
-  <div style={{flex:1,minWidth:0}}>
-    {label && (
-      <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
-        <span style={{fontSize:F.sm,fontWeight:'600',color:'#6B7280'}}>{label}</span>
-      </div>
-    )}
-    <div style={{fontSize:F.sm,color:T.text3,fontStyle:'italic',padding:'7px 10px',background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'6px'}}>
-      Available after saving
-    </div>
-  </div>
-);
 
 // ── PriorityPills ─────────────────────────────────────────────────────────────
 const PriorityPills = ({ value, onSave }) => {
@@ -1899,6 +1892,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                 onChange={row=>handleContactChange('tenant',row)}
                 onCreateNew={()=>openContactModal('tenant')}
                 searchFilter={tenantIdsSearchFilter}
+                showAllOnOpen={true}
                 titleField={contactTitle}
                 badgeField={contactPropCode}
                 sectionLabel="contact"
@@ -2313,6 +2307,13 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const [vendors,setVendors] = useState([]);
   const [tenants,setTenants] = useState([]);
   const [activeProps,setActiveProps] = useState([]);
+  // Staged picking (2026-07-24): Contacts/Related Records need a real task_id
+  // to write a join-table row, which doesn't exist until Save creates the
+  // task — so these hold full row objects locally (LinkField mode='staged',
+  // no writes at all) until handleSave links them for real. See handleSave.
+  const [stagedContacts,setStagedContacts] = useState([]);
+  const [stagedRelatedRecords,setStagedRelatedRecords] = useState([]);
+  const [createdTaskNum,setCreatedTaskNum] = useState(null);
   useEffect(()=>{
     sbFetch('vendors','select=id,company_dba&order=company_dba.asc').then(setVendors).catch(()=>{});
     sbFetch('tenants','select=id,tenant_dba,prop_code&order=tenant_dba.asc').then(setTenants).catch(()=>{});
@@ -2344,6 +2345,11 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
   const handleKeySafeChangeForm = row => {
     setFormData(prev=>({...prev,key_safe_id:row?row.id:null}));
   };
+
+  const stagedContactsFieldRef = useRef(null);
+  const stagedContactsBtnRef   = useRef(null);
+  const stagedRelatedFieldRef  = useRef(null);
+  const stagedRelatedBtnRef    = useRef(null);
 
   // Same FK-based lookup as TaskDetail's contactTitle/contactPropCode (not
   // the contact's own free-text company_dba — see CLAUDE.md Vendor/Tenant
@@ -2384,6 +2390,28 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
       const res=await fetch('/api/tasks/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       const json=await res.json();
       if(!res.ok)throw new Error(json.error||'Failed to create');
+
+      // Staged Contacts/Related Records only exist locally until now — the
+      // task_id they need to link against didn't exist before this point.
+      // The task itself is already created and safe; a failure here is a
+      // partial-success, not a reason to roll back or silently drop it —
+      // surface exactly what failed and let the user finish linking from
+      // the now-real, saved task instead of auto-navigating away from it.
+      const linkErrors=[];
+      for(const c of stagedContacts){
+        try{ await sbPost('task_contacts',{task_id:json.id,contact_id:c.id}); }
+        catch(e){ linkErrors.push(`Contact "${c.full_name||c.id}": ${e.message}`); }
+      }
+      for(const r of stagedRelatedRecords){
+        try{ await sbPost('task_relations',{task_id:json.id,related_task_id:r.id}); }
+        catch(e){ linkErrors.push(`Related record "${r.title||r.id}": ${e.message}`); }
+      }
+      if(linkErrors.length){
+        setCreatedTaskNum(json.task_num);
+        setSaveError(`Task ${formatTaskNum(formData.record_type,json.task_num)} was created, but failed to link: ${linkErrors.join('; ')}. Open the task below to add them manually.`);
+        setSaving(false);
+        return;
+      }
       router.push(`/tasks/${json.task_num}`);
     }catch(err){
       setSaveError(err.message);
@@ -2414,6 +2442,11 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             New {TYPE_LABEL[formData.record_type]||formData.record_type}
           </span>
           {saveError&&<span style={{fontSize:F.xs,color:T.danger}}>{saveError}</span>}
+          {createdTaskNum&&(
+            <a href={`/tasks/${createdTaskNum}`} style={{fontSize:F.xs,color:T.accent,textDecoration:'underline'}}>
+              Open created task →
+            </a>
+          )}
           <button onClick={handleSave} disabled={saving}
             style={{marginLeft:'auto',background:saving?T.bg3:'#22c55e',border:'none',borderRadius:'4px',padding:'6px 16px',color:'#fff',fontSize:F.sm,fontWeight:'600',cursor:saving?'not-allowed':'pointer',flexShrink:0}}>
             {saving?'Saving…':'Save'}
@@ -2487,12 +2520,6 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
               compact={true}
             />
           </div>
-          <FieldRow label="FU Date">
-            <InlineBlurField type="date" value={formData.follow_up_date||''} onSave={v=>set('follow_up_date',v)}/>
-          </FieldRow>
-          <FieldRow label="FU Notes" topAlign>
-            <RichTextEditor value={formData.follow_up_notes} onSave={v=>set('follow_up_notes',v)} minRows={5}/>
-          </FieldRow>
           <FieldRow label="Priority"><PriorityPills value={formData.priority} onSave={v=>set('priority',v)}/></FieldRow>
           <FieldRow label="Assigned To *">
             <select value={formData.assigned_to||''} onChange={e=>{set('assigned_to',e.target.value||null);if(e.target.value)setAssignedToError(false);}}
@@ -2508,22 +2535,112 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
               <InlineSelect value={formData.category} options={categoryOpts} onSave={v=>set('category',v)}/>
             </FieldRow>
           )}
-          <FieldRow label="Details" topAlign>
-            <RichTextEditor value={formData.details} onSave={v=>set('details',v)} minRows={5}/>
+          <FieldRow label="FU Date">
+            <InlineBlurField type="date" value={formData.follow_up_date||''} onSave={v=>set('follow_up_date',v)}/>
           </FieldRow>
-          <FieldRow label="Internal Notes" topAlign>
-            <RichTextEditor value={formData.internal_notes} onSave={v=>set('internal_notes',v)} minRows={5}/>
+          <FieldRow label="FU Notes" topAlign>
+            <RichTextEditor value={formData.follow_up_notes} onSave={v=>set('follow_up_notes',v)} minRows={5}/>
           </FieldRow>
         </div>
-        {/* CONTACTS — needs a real task id (multi-mode join table); not available until saved */}
+        {/* CONTACTS — staged locally (mode="staged"), linked for real in handleSave once a task_id exists */}
         <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
-          <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Contacts</div>
-          <AvailableAfterSaving/>
+          <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+            <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Contacts</span>
+            <button ref={stagedContactsBtnRef} onClick={()=>stagedContactsFieldRef.current?.openPanel()}
+              title="Add new item"
+              style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+              <Plus size={14} weight="bold"/>
+            </button>
+          </div>
+          <RelationField
+            rel="contact"
+            mode="staged"
+            ref={stagedContactsFieldRef}
+            excludeRef={stagedContactsBtnRef}
+            stagedRows={stagedContacts}
+            onStagedChange={setStagedContacts}
+            titleField={contactTitle}
+            badgeField={contactPropCode}
+            sectionLabel="contact"
+            createFields={['full_name','company_dba','primary_phone','email']}
+            onCreate={async fields=>{const r=await sbPost('contacts',fields);return Array.isArray(r)?r[0]:r;}}
+            compact={true}
+            hideTrigger={true}
+          />
         </div>
-        {/* RELATED RECORDS — needs a real task id (task_relations join table); not available until saved */}
+        {/* VENDOR / TENANT CONTACT — matches TaskDetail's always-visible (non-WO-gated) card,
+            not just shown for work_order like the old WO-section placement. Contact and
+            Company independent, never paired in the same row. */}
         <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
-          <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Related Records</div>
-          <AvailableAfterSaving/>
+          <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Vendor / Tenant Contact</div>
+          <div style={{marginBottom:'12px'}}>
+            <NewTaskLinkField
+              label="Vendor Contact"
+              rel="contact"
+              value={formData.vendor_contact_id}
+              onChange={v=>set('vendor_contact_id',v)}
+              searchFilter="vendor_id=not.is.null"
+              titleField={contactTitle}
+              badgeField={contactPropCode}
+            />
+          </div>
+          <NewTaskLinkField
+            label="Tenant Contact"
+            rel="contact"
+            value={formData.tenant_contact_id}
+            onChange={v=>set('tenant_contact_id',v)}
+            searchFilter={tenantIdsSearchFilter}
+            showAllOnOpen={true}
+            titleField={contactTitle}
+            badgeField={contactPropCode}
+          />
+        </div>
+        {/* VENDOR / TENANT COMPANY — same always-visible treatment as Vendor/Tenant Contact above. */}
+        <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
+          <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Vendor / Tenant Company</div>
+          <div style={{marginBottom:'12px'}}>
+            <NewTaskLinkField
+              label="Vendor Company"
+              rel="taskVendorCompany"
+              value={formData.vendor_id}
+              onChange={v=>set('vendor_id',v)}
+              sectionLabel="company"
+            />
+          </div>
+          <NewTaskLinkField
+            label="Tenant Company"
+            rel="taskTenantCompany"
+            value={formData.tenant_id}
+            onChange={v=>set('tenant_id',v)}
+            sectionLabel="company"
+          />
+        </div>
+        {/* RELATED RECORDS — staged locally (mode="staged"), linked for real in handleSave once a task_id exists */}
+        <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+            <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Related Records</span>
+            <button ref={stagedRelatedBtnRef} onClick={()=>stagedRelatedFieldRef.current?.openPanel()}
+              title="Link a related record"
+              style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+              <Plus size={14} weight="bold"/>
+            </button>
+          </div>
+          <RelationField
+            rel="relatedRecords"
+            mode="staged"
+            ref={stagedRelatedFieldRef}
+            excludeRef={stagedRelatedBtnRef}
+            stagedRows={stagedRelatedRecords}
+            onStagedChange={setStagedRelatedRecords}
+            titleHref={row=>`/tasks/${row.task_num}?rt=${row.record_type}`}
+            sectionLabel="related record"
+            compact={true}
+            hideTrigger={true}
+          />
         </div>
         {/* WO-specific section */}
         {formData.record_type==='work_order'&&(
@@ -2538,9 +2655,6 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             </FieldRow>
             <FieldRow label="Budget Item?">
               <BoolPill value={formData.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>set('is_budget_item',v)}/>
-            </FieldRow>
-            <FieldRow label="WO Instructions to Vendor" topAlign>
-              <RichTextEditor value={formData.instructions_to_vendor} onSave={v=>set('instructions_to_vendor',v)} minRows={5}/>
             </FieldRow>
             <FieldRow label="Key Safe">
               <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
@@ -2567,50 +2681,11 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
                 </button>
               </div>
             </FieldRow>
-            {/* Contact and Company are independent fields, never paired in the
-                same row — picking one has no effect on the other. */}
-            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px'}}>
-              <NewTaskLinkField
-                label="Vendor Contact"
-                rel="contact"
-                value={formData.vendor_contact_id}
-                onChange={v=>set('vendor_contact_id',v)}
-                searchFilter="vendor_id=not.is.null"
-                titleField={contactTitle}
-                badgeField={contactPropCode}
-              />
-            </div>
-            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px'}}>
-              <NewTaskLinkField
-                label="Vendor Company"
-                rel="taskVendorCompany"
-                value={formData.vendor_id}
-                onChange={v=>set('vendor_id',v)}
-                sectionLabel="company"
-              />
-            </div>
-            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px'}}>
-              <NewTaskLinkField
-                label="Tenant Contact"
-                rel="contact"
-                value={formData.tenant_contact_id}
-                onChange={v=>set('tenant_contact_id',v)}
-                searchFilter={tenantIdsSearchFilter}
-                titleField={contactTitle}
-                badgeField={contactPropCode}
-              />
-            </div>
-            <div style={{borderBottom:`0.5px solid ${T.border}`,padding:'10px 16px 18px'}}>
-              <NewTaskLinkField
-                label="Tenant Company"
-                rel="taskTenantCompany"
-                value={formData.tenant_id}
-                onChange={v=>set('tenant_id',v)}
-                sectionLabel="company"
-              />
-            </div>
             <FieldRow label="WO Type">
               <GenericPills value={formData.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>set('wo_type',v)}/>
+            </FieldRow>
+            <FieldRow label="WO Instructions to Vendor" topAlign>
+              <RichTextEditor value={formData.instructions_to_vendor} onSave={v=>set('instructions_to_vendor',v)} minRows={5}/>
             </FieldRow>
             <FieldRow label="Email Request To Vendor">
               <GenericPills value={formData.email_request_sent} options={EMAIL_REQUEST_OPTIONS} onSave={v=>set('email_request_sent',v)}/>
@@ -2644,6 +2719,19 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             </FieldRow>
           </div>
         )}
+        {/* NOTES & RELATIONSHIPS — matches TaskDetail's card position (after WO
+            Details, not inside the top card). Depends On Task #/Parent Project
+            fields exist in TaskDetail but not here — stay absent per the field
+            audit, this session only reconciles order, not field coverage. */}
+        <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden'}}>
+          <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Notes &amp; Relationships</div>
+          <FieldRow label="Details" topAlign>
+            <RichTextEditor value={formData.details} onSave={v=>set('details',v)} minRows={5}/>
+          </FieldRow>
+          <FieldRow label="Internal Notes" topAlign>
+            <RichTextEditor value={formData.internal_notes} onSave={v=>set('internal_notes',v)} minRows={5}/>
+          </FieldRow>
+        </div>
         {/* Bottom save/cancel */}
         <div style={{padding:'16px',display:'flex',justifyContent:'center',gap:'12px'}}>
           <button onClick={handleBack}

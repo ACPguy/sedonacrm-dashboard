@@ -73,6 +73,17 @@ const resolve = (fn, row) => (typeof fn === 'function' ? fn(row) : (row?.[fn] ??
 //     StackedFormModal) and then calls onChange with the newly-created row.
 //     joinTable/parentIdField/parentId/linkedIdField are unused in single mode.
 //
+//   mode='staged' (2026-07-24): fully local multi-select, no join-table writes at
+//     all — for picking records before a parent row exists to link against (e.g.
+//     Contacts/Related Records in NewTaskForm, before Save creates the task).
+//     Caller owns the array via stagedRows (row objects, not ids) + onStagedChange
+//     (fn(newArray)=>void); LinkField never fetches, POSTs, or DELETEs. Renders via
+//     the same card/chip UI as 'multi' (search, "+ Create new" via allowCreate/
+//     createFields/onCreate all still work — handleCreate just calls the same link()
+//     that stages instead of persisting). joinTable/parentIdField/parentId/
+//     linkedIdField are unused, same as single mode. The caller is responsible for
+//     writing stagedRows into the real join table once a real parent id exists.
+//
 // compact PROP
 //   When true: reduced card padding (7px 10px vs 10px 12px), smaller icon (16 vs 20).
 //   In single mode, the inline × clear button is removed from the card; a "Remove" row
@@ -86,11 +97,14 @@ const resolve = (fn, row) => (typeof fn === 'function' ? fn(row) : (row?.[fn] ??
 // ─────────────────────────────────────────────────────────────────────────────
 const LinkField = React.forwardRef(function LinkField({
   // mode — see comment above
-  mode = 'multi',   // 'multi' | 'single'
-  // single-mode props (ignored when mode='multi')
+  mode = 'multi',   // 'multi' | 'single' | 'staged'
+  // single-mode props (ignored when mode!=='single')
   value = null,     // current FK id, or null
   onChange,         // (row|null) => void — caller persists to DB
   onCreateNew,      // () => void — caller opens its own creation flow
+  // staged-mode props (ignored when mode!=='staged')
+  stagedRows = null,    // array of full row objects (not ids) — caller owns this array
+  onStagedChange,       // (newArray) => void — caller replaces stagedRows entirely
   // shared props
   joinTable,        // required in multi mode
   parentIdField,    // required in multi mode
@@ -119,6 +133,11 @@ const LinkField = React.forwardRef(function LinkField({
   iconField = null,      // optional fn(row) => Icon component — overrides icon per card when provided
   searchFilter = null,   // optional PostgREST filter string appended to search query (e.g. "id.neq.xyz")
   titleTarget = '_blank', // link target for card title anchors; pass '_self' for same-tab in-app navigation
+  showAllOnOpen = false, // when true, panel shows the full (searchFilter-respecting) list on open with
+                         // no typing required, ordered by searchFields[0] ascending; normal typed
+                         // search takes over the moment the user types anything. Opt-in per call site —
+                         // do NOT default this on globally, large unscoped lists (Contacts, Vendor
+                         // Contact) need to stay type-to-search.
 }, ref) {
   const [linked,       setLinked]       = useState([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
@@ -197,22 +216,42 @@ const LinkField = React.forwardRef(function LinkField({
   }, [parentId, fetchLinkedOnce]);
 
   useEffect(() => {
-    if (mode === 'single') return;
+    if (mode === 'single' || mode === 'staged') return;
     loadLinked();
   }, [loadLinked, mode]);
 
+  // Staged mode never fetches — `linked` (join-table state) is unused; the
+  // caller's stagedRows array IS the source of truth. displayLinked is what
+  // every render path below actually reads, so it's identical to `linked`
+  // for every other mode (zero behavior change there) and swaps in
+  // stagedRows (with a synthetic _joinId=row.id, since there's no join row)
+  // only for 'staged'.
+  const displayLinked = mode === 'staged' ? (stagedRows || []).map(r => ({ _joinId: r.id, ...r })) : linked;
+
   // ── Search ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!searchOpen || query.trim().length < 1 || searchFields.length === 0) {
+    if (!searchOpen) { setResults([]); return; }
+    const trimmed = query.trim();
+    // showAllOnOpen: an empty query fetches the full (searchFilter-respecting)
+    // list ordered by searchFields[0] instead of waiting for typed input — but
+    // the instant the user types anything, this falls through to the normal
+    // typed-search branch below (trimmed.length >= 1), same as every other field.
+    const wantsFullList = showAllOnOpen && trimmed.length < 1;
+    if (!wantsFullList && (trimmed.length < 1 || searchFields.length === 0)) {
       setResults([]);
       return;
     }
     setSearching(true);
-    const q         = encodeURIComponent(query.trim());
-    const linkedIds = mode === 'single' ? (value ? [value] : []) : linked.map(r => r.id);
-    const filter = `or=(${searchFields.map(f => `${f}.ilike.*${q}*`).join(',')})`;
-    const extra  = searchFilter ? `&${searchFilter}` : '';
-    lfFetch(linkedTable, `${filter}&select=${linkedFields}&limit=10${extra}`)
+    const linkedIds = mode === 'single' ? (value ? [value] : []) : displayLinked.map(r => r.id);
+    const extra = searchFilter ? `&${searchFilter}` : '';
+    const params = wantsFullList
+      ? `select=${linkedFields}&limit=100${extra}${searchFields[0] ? `&order=${searchFields[0]}.asc` : ''}`
+      : (() => {
+          const q = encodeURIComponent(trimmed);
+          const filter = `or=(${searchFields.map(f => `${f}.ilike.*${q}*`).join(',')})`;
+          return `${filter}&select=${linkedFields}&limit=10${extra}`;
+        })();
+    lfFetch(linkedTable, params)
       .then(rows => {
         setResults(rows.filter(r => !linkedIds.includes(r.id)));
         setSearching(false);
@@ -241,6 +280,13 @@ const LinkField = React.forwardRef(function LinkField({
   // ── Link an existing record ────────────────────────────────────────────────
   const link = async row => {
     setError('');
+    if (mode === 'staged') {
+      onStagedChange?.([...(stagedRows || []), row]);
+      setSearchOpen(false);
+      setQuery('');
+      setResults([]);
+      return;
+    }
     try {
       if (mode === 'reverseFK') {
         await lfPatch(linkedTable, `id=eq.${row.id}`, { [reverseField]: parentId });
@@ -261,6 +307,10 @@ const LinkField = React.forwardRef(function LinkField({
   // ── Unlink ─────────────────────────────────────────────────────────────────
   const unlink = async joinId => {
     setError('');
+    if (mode === 'staged') {
+      onStagedChange?.((stagedRows || []).filter(r => r.id !== joinId));
+      return;
+    }
     try {
       if (mode === 'reverseFK') {
         await lfPatch(linkedTable, `id=eq.${joinId}`, { [reverseField]: null });
@@ -459,9 +509,9 @@ const LinkField = React.forwardRef(function LinkField({
       {/* ── CARD variant ──────────────────────────────────────────────────── */}
       {!loadingLinks && variant === 'card' && mode !== 'single' && (
         <>
-          {linked.length > 0 && (
+          {displayLinked.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: compact ? 0 : '10px' }}>
-              {linked.map(row => {
+              {displayLinked.map(row => {
                 const title    = resolve(titleField, row);
                 const subtitle = subtitleField ? resolve(subtitleField, row) : '';
                 const meta     = metaField     ? resolve(metaField,     row) : '';
@@ -551,7 +601,7 @@ const LinkField = React.forwardRef(function LinkField({
           {!readOnly && compact && !hideTrigger && (searchOpen ? renderPanel() : null)}
           {!readOnly && compact && hideTrigger && searchOpen && renderPanel()}
 
-          {readOnly && linked.length === 0 && (
+          {readOnly && displayLinked.length === 0 && (
             <div style={{ fontSize: F.xs, color: T.text3, fontStyle: 'italic' }}>None</div>
           )}
         </>
@@ -562,9 +612,9 @@ const LinkField = React.forwardRef(function LinkField({
         <>
           <div style={{
             display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center',
-            marginBottom: (linked.length || !readOnly) ? '8px' : 0,
+            marginBottom: (displayLinked.length || !readOnly) ? '8px' : 0,
           }}>
-            {linked.map(row => {
+            {displayLinked.map(row => {
               const title = resolve(titleField, row);
               const href  = titleHref?.(row);
               return (
@@ -626,7 +676,7 @@ const LinkField = React.forwardRef(function LinkField({
             </div>
           )}
 
-          {readOnly && linked.length === 0 && (
+          {readOnly && displayLinked.length === 0 && (
             <div style={{ fontSize: F.xs, color: T.text3, fontStyle: 'italic' }}>None</div>
           )}
         </>
