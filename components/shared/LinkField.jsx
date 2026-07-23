@@ -754,14 +754,15 @@ const LinkField = React.forwardRef(function LinkField({
                 )}
               </div>
             </div>
-          ) : (
-            /* Empty state */
+          ) : compact ? null : (
+            /* Empty state — compact mode renders nothing here (2026-07-25),
+               matching how Contacts/Related Records already render nothing
+               when empty. Non-compact empty state is unrelated, unchanged. */
             <div style={{
               fontSize: F.sm, color: T.text3,
-              padding: compact ? '7px 10px' : '5px 8px',
+              padding: '5px 8px',
               background: T.bg3, border: `0.5px solid ${T.border}`,
-              borderRadius: compact ? '6px' : '4px',
-              marginBottom: compact ? 0 : undefined,
+              borderRadius: '4px',
             }}>—</div>
           )}
 

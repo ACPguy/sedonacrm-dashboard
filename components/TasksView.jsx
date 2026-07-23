@@ -415,6 +415,12 @@ const InlineSelect = ({ value, options, onSave }) => (
 // (AvailableAfterSaving — the old placeholder for Contacts/Related Records —
 // was removed 2026-07-24 once those became staged-pickable via LinkField's
 // mode='staged'; see handleSave for where staged picks get linked for real.)
+// onChange receives the full row (or null) — NOT unwrapped to just the id —
+// so callers can read fields off the picked row (e.g. the Contact→Company
+// cascade, which needs row.vendor_id/row.tenant_id). Its only 2 remaining
+// call sites (Vendor Contact, Tenant Contact — Vendor/Tenant Company was
+// removed 2026-07-25) both need this now; a caller that only wants the id
+// can still do `onChange={row=>set('field',row?row.id:null)}`.
 const NewTaskLinkField = ({ label, rel, value, onChange, titleField, badgeField, searchFilter, sectionLabel='contact', showAllOnOpen=false }) => {
   const linkRef = useRef(null);
   const btnRef  = useRef(null);
@@ -438,7 +444,7 @@ const NewTaskLinkField = ({ label, rel, value, onChange, titleField, badgeField,
         hideTrigger={true}
         compact={true}
         value={value}
-        onChange={row=>onChange(row?row.id:null)}
+        onChange={onChange}
         searchFilter={searchFilter}
         titleField={titleField}
         badgeField={badgeField}
@@ -1482,12 +1488,24 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
     }
   };
 
-  // Contact and Company are fully decoupled on existing tasks — picking a
-  // Contact only ever writes {type}_contact_id, never vendor_id/tenant_id.
-  // The old auto-derive-company-from-contact behavior only applies once, at
-  // task creation (see the fallback in /api/tasks/create.js) — never here.
+  // Picking a Contact writes {type}_contact_id, and — if the picked contact
+  // has its own linked company (row.vendor_id/tenant_id) — cascades that
+  // into the task's vendor_id/tenant_id in the SAME saveMany call (reversed
+  // 2026-07-25; see CLAUDE.md Canonical Linker Architecture for why the
+  // 2026-07-23 "never cascade" decoupling was reverted). If the picked
+  // contact has no linked company, the task's existing company field is
+  // left untouched — never cleared, since it's simply omitted from the
+  // updates object rather than explicitly nulled. Clearing the contact
+  // (row=null) only clears {type}_contact_id — the company field is never
+  // touched on clear either, manual Company picks stay exactly as-is
+  // (handleVendorCompanyChange/handleTenantCompanyChange, unchanged).
   const handleContactChange=async(type,row)=>{
-    await saveMany({[`${type}_contact_id`]:row?row.id:null});
+    const updates={[`${type}_contact_id`]:row?row.id:null};
+    if(row){
+      const companyId=row[`${type}_id`];
+      if(companyId) updates[`${type}_id`]=companyId;
+    }
+    await saveMany(updates);
   };
 
   const handlePropertyChange=async row=>{
@@ -2451,6 +2469,19 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
     setFormData(prev=>({...prev,key_safe_id:row?row.id:null}));
   };
 
+  // Mirrors TaskDetail's handleContactChange cascade (see that function's
+  // comment) — staged into formData via set() instead of saveMany, since
+  // nothing persists until handleSave creates the task. If the picked
+  // contact has no linked company, the existing formData company value is
+  // left untouched; clearing the contact never touches the company field.
+  const handleContactChangeForm = (type, row) => {
+    set(`${type}_contact_id`, row?row.id:null);
+    if(row){
+      const companyId=row[`${type}_id`];
+      if(companyId) set(`${type}_id`, companyId);
+    }
+  };
+
   const stagedContactsFieldRef = useRef(null);
   const stagedContactsBtnRef   = useRef(null);
   const stagedRelatedFieldRef  = useRef(null);
@@ -2685,7 +2716,7 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
               label="Vendor Contact"
               rel="contact"
               value={formData.vendor_contact_id}
-              onChange={v=>set('vendor_contact_id',v)}
+              onChange={row=>handleContactChangeForm('vendor',row)}
               searchFilter="vendor_id=not.is.null"
               titleField={contactTitle}
               badgeField={contactPropCode}
@@ -2695,31 +2726,11 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             label="Tenant Contact"
             rel="contact"
             value={formData.tenant_contact_id}
-            onChange={v=>set('tenant_contact_id',v)}
+            onChange={row=>handleContactChangeForm('tenant',row)}
             searchFilter={tenantIdsSearchFilter}
             showAllOnOpen={true}
             titleField={contactTitle}
             badgeField={contactPropCode}
-          />
-        </div>
-        {/* VENDOR / TENANT COMPANY — same always-visible treatment as Vendor/Tenant Contact above. */}
-        <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
-          <div style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Vendor / Tenant Company</div>
-          <div style={{marginBottom:'12px'}}>
-            <NewTaskLinkField
-              label="Vendor Company"
-              rel="taskVendorCompany"
-              value={formData.vendor_id}
-              onChange={v=>set('vendor_id',v)}
-              sectionLabel="company"
-            />
-          </div>
-          <NewTaskLinkField
-            label="Tenant Company"
-            rel="taskTenantCompany"
-            value={formData.tenant_id}
-            onChange={v=>set('tenant_id',v)}
-            sectionLabel="company"
           />
         </div>
         {/* RELATED RECORDS — staged locally (mode="staged"), linked for real in handleSave once a task_id exists */}
