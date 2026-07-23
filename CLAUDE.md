@@ -253,7 +253,7 @@ LinkField.jsx (`components/shared/LinkField.jsx`) is the ONLY component for any 
 ## Current Git State
 
 - main: `1aa0101` — merge: Key Safe linker (preview 189b8ef) into main (merged 2026-07-22)
-- preview: pending — see follow-up "docs: update git state" commit for the real hash once pushed (this session's Contact/Company decoupling rebuild, reapplied cleanly against `f8dfda5`/`247eadb` after a prior attempt was built from a stale base and had to be redone — see TaskDetail Architecture Notes)
+- preview: `4cd6d4f` — Decouple Contact and Company on tasks; fix broken searchFilter syntax (2026-07-23, reapplied cleanly against `f8dfda5`/`247eadb` after a prior attempt was built from a stale base and had to be redone — see TaskDetail Architecture Notes), not yet merged to main
 
 ---
 
