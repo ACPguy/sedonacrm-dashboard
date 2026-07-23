@@ -16,6 +16,20 @@ export default async function handler(req, res) {
     if (!SKIP.has(k) && v != null && v !== '') insert[k] = v;
   }
 
+  // First-save-only fallback: if a Contact was picked but Company was left
+  // blank, derive Company from the Contact's own vendor_id/tenant_id. Fires
+  // exactly once, here, at creation — never on any update/PATCH path (those
+  // go through sbPatch directly from the client, never through this route).
+  // Never overrides a manually-picked Company.
+  if (!insert.vendor_id && insert.vendor_contact_id) {
+    const { data: c } = await supabase.from('contacts').select('vendor_id').eq('id', insert.vendor_contact_id).single();
+    if (c?.vendor_id) insert.vendor_id = c.vendor_id;
+  }
+  if (!insert.tenant_id && insert.tenant_contact_id) {
+    const { data: c } = await supabase.from('contacts').select('tenant_id').eq('id', insert.tenant_contact_id).single();
+    if (c?.tenant_id) insert.tenant_id = c.tenant_id;
+  }
+
   const { data, error } = await supabase
     .from('tasks')
     .insert(insert)
