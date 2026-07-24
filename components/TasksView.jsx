@@ -2150,18 +2150,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
                   <FieldRow label="Log" topAlign>
                     <RichTextEditor value={data.estimate_log} onSave={v=>save('estimate_log',v)} minRows={5}/>
                   </FieldRow>
-                  <FieldRow label="Pmt Instructions to BK">
-                    <InlineBlurField value={data.pmt_instructions_to_bk||''} onSave={v=>save('pmt_instructions_to_bk',v)}/>
-                  </FieldRow>
-                  <FieldRow label="Invoice Location">
-                    <GenericPills value={data.invoice_location} options={INVOICE_LOCATION_OPTIONS} onSave={v=>save('invoice_location',v)}/>
-                  </FieldRow>
-                  <FieldRow label="Invoice Stage">
-                    <GenericPills value={data.invoice_stage} options={INVOICE_STAGE_OPTIONS} onSave={v=>save('invoice_stage',v)}/>
-                  </FieldRow>
-                  <FieldRow label="Invoice Paid">
-                    <BoolPill value={data.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" onSave={v=>save('invoice_paid',v)}/>
-                  </FieldRow>
                 </>
               )}
               {/* Closeout sub-panel */}
@@ -2822,18 +2810,6 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             </FieldRow>
             <FieldRow label="Log" topAlign>
               <RichTextEditor value={formData.estimate_log} onSave={v=>set('estimate_log',v)} minRows={5}/>
-            </FieldRow>
-            <FieldRow label="Pmt Instructions to BK">
-              <InlineBlurField value={formData.pmt_instructions_to_bk||''} onSave={v=>set('pmt_instructions_to_bk',v)}/>
-            </FieldRow>
-            <FieldRow label="Invoice Location">
-              <GenericPills value={formData.invoice_location} options={INVOICE_LOCATION_OPTIONS} onSave={v=>set('invoice_location',v)}/>
-            </FieldRow>
-            <FieldRow label="Invoice Stage">
-              <GenericPills value={formData.invoice_stage} options={INVOICE_STAGE_OPTIONS} onSave={v=>set('invoice_stage',v)}/>
-            </FieldRow>
-            <FieldRow label="Invoice Paid">
-              <BoolPill value={formData.invoice_paid} labelTrue="Paid ✓" labelFalse="Unpaid" onSave={v=>set('invoice_paid',v)}/>
             </FieldRow>
             <FieldRow label="Final Close-Out Notes" topAlign>
               <RichTextEditor value={formData.final_closeout_notes} onSave={v=>set('final_closeout_notes',v)} minRows={5}/>
