@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Key, ChatCircle, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import RichTextEditor from './RichTextEditor';
-import { ActivityPanel } from './TasksView';
+import ActivityPanel from './shared/ActivityPanel';
 import { T } from '../lib/theme';
 
 const SUPABASE_URL      = 'https://edxcvyleielzevpappui.supabase.co';

@@ -13,10 +13,10 @@ import {
   useDraggable, useDroppable,
 } from '@dnd-kit/core';
 import RichTextEditor from './RichTextEditor';
-import CommunicationTimeline from './CommunicationTimeline';
 import EmailCompose from './EmailCompose';
 import RelationField from './shared/RelationField';
 import StackedFormModal from './shared/StackedFormModal';
+import ActivityPanel from './shared/ActivityPanel';
 import { getTaskPrefix } from '../utils/taskPrefix';
 import { buildRfpEmailHtml } from '../lib/rfpEmailTemplate';
 import { T } from '../lib/theme';
@@ -268,57 +268,6 @@ const CATEGORY_OPTIONS = {
   project:   ['Bid','Renovation','Maintenance','Administrative','Other'],
   acp_task:  ['Legal','IT','Taxes','Financial','HR','Marketing','Other'],
   sg_task:   ['FIN$','WNT','JMZ','*HLTH','CARS','??','Mom','OLY','JMZ REMOD.','OTHER','Trip','*GOAL','FOX'],
-};
-
-// ── ActivityPanel ─────────────────────────────────────────────────────────────
-export const ActivityPanel = ({ collapsed, onCollapse, width, onMouseDown }) => {
-  const [tab,setTab] = useState('comments');
-  return (
-    <div style={{display:'flex',flexShrink:0,height:'100%'}}>
-      <div onMouseDown={onMouseDown}
-        style={{width:'4px',cursor:'col-resize',background:T.border,flexShrink:0,transition:'background 0.15s'}}
-        onMouseEnter={e=>e.currentTarget.style.background=T.accent}
-        onMouseLeave={e=>e.currentTarget.style.background=T.border}/>
-      <div style={{width:collapsed?'36px':`${width}px`,background:T.bg0,borderLeft:`0.5px solid ${T.border}`,display:'flex',flexDirection:'column',overflow:'hidden',transition:'width 200ms ease',flexShrink:0}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:collapsed?'center':'space-between',padding:collapsed?'9px 0':'8px 12px',borderBottom:`0.5px solid ${T.border}`,minHeight:'42px',flexShrink:0}}>
-          {!collapsed && (
-            <div style={{display:'flex',gap:'2px'}}>
-              {['Comments','Activity'].map(t=>(
-                <button key={t} onClick={()=>setTab(t.toLowerCase())}
-                  style={{background:tab===t.toLowerCase()?T.bg2:'transparent',border:'none',padding:'4px 10px',borderRadius:'4px',cursor:'pointer',fontSize:F.sm,color:tab===t.toLowerCase()?T.accent:T.text1,fontWeight:tab===t.toLowerCase()?'600':'400'}}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          )}
-          <button onClick={onCollapse}
-            style={{background:T.bg3,border:`1px solid ${T.border}`,color:T.text0,cursor:'pointer',padding:'4px 7px',display:'flex',alignItems:'center',borderRadius:'4px',flexShrink:0,fontSize:'14px',lineHeight:1}}
-            onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-            {collapsed?'«':'»'}
-          </button>
-        </div>
-        {!collapsed && (
-          <div style={{flex:1,overflowY:'auto',padding:'12px'}}>
-            {tab==='comments' && (
-              <div style={{...css.card}}>
-                <p style={{fontSize:F.sm,color:T.text2,fontStyle:'italic',lineHeight:'1.6',margin:0}}>
-                  Comments and files will sync from Podio via API at go-live.
-                </p>
-              </div>
-            )}
-            {tab==='activity' && (
-              <div style={{...css.card}}>
-                <p style={{fontSize:F.sm,color:T.text2,fontStyle:'italic',lineHeight:'1.6',margin:0}}>
-                  Activity tracking begins at go-live.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
 };
 
 // ── FieldRow ──────────────────────────────────────────────────────────────────
@@ -1349,7 +1298,6 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
   const [isMobile,setIsMobile] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   const [rightCollapsed,setRightCollapsed] = useState(()=>typeof window!=='undefined'&&window.innerWidth<640);
   const [rightWidth,setRightWidth] = useState(300);
-  const [detailTab,setDetailTab] = useState('details');
   const [navList,setNavList]     = useState(null);
   const [navIdx,setNavIdx]       = useState(-1);
   const [navLoading,setNavLoading] = useState(false);
@@ -1825,22 +1773,10 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
 
       {/* Body */}
       <div style={{display:'flex',flex:1,overflow:'hidden',flexDirection:'column'}}>
-        {/* Comms / Details tab bar */}
-        <div style={{display:'flex',gap:'2px',padding:'0 16px',borderBottom:`0.5px solid ${T.border}`,background:T.bg0,flexShrink:0}}>
-          {['Details','Comms'].map(t=>(
-            <button key={t} onClick={()=>setDetailTab(t.toLowerCase())}
-              style={{background:'transparent',border:'none',padding:'6px 10px',borderRadius:'4px 4px 0 0',cursor:'pointer',fontSize:F.sm,
-                color:detailTab===t.toLowerCase()?T.accent:T.text1,
-                borderBottom:detailTab===t.toLowerCase()?`2px solid ${T.accent}`:'2px solid transparent',
-                fontWeight:detailTab===t.toLowerCase()?'600':'400',transition:'color 0.15s'}}>
-              {t}
-            </button>
-          ))}
-        </div>
         {saveError&&<div style={{padding:'6px 16px',background:'rgba(220,38,38,0.1)',borderBottom:`0.5px solid ${T.danger}`,fontSize:F.xs,color:T.danger,flexShrink:0}}>{saveError}</div>}
         {/* Content row */}
         <div style={{display:'flex',flex:1,overflow:'hidden'}}>
-          {detailTab!=='comms'&&<div style={{flex:1,overflowY:'auto',minWidth:0}}>
+          <div style={{flex:1,overflowY:'auto',minWidth:0}}>
           {/* 1 — CORE */}
           <div style={{background:T.bg2,borderRadius:'8px',margin:'12px 16px 0',overflow:'hidden'}}>
             <div style={{padding:'8px 16px',background:T.bg3,borderBottom:`0.5px solid ${T.border}`,fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Core</div>
@@ -2272,18 +2208,7 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
               </>
             )}
           </div>
-          </div>}
-          {detailTab==='comms'&&(
-            <div style={{flex:1,overflow:'auto',background:T.bg1}}>
-              <CommunicationTimeline
-                recordType={data.record_type}
-                recordId={data.id}
-                fromAccount="scott@andersoncp.com"
-                crmRecordLabel={`${displayId}${data.title ? ` — ${data.title}` : ''}`}
-                crmRecordUrl={`/tasks/${data.task_num}`}
-              />
-            </div>
-          )}
+          </div>
           {/* Desktop: always in flow. Mobile: only when open. */}
           {(!rightCollapsed || !isMobile) && (
             <ActivityPanel
@@ -2291,6 +2216,13 @@ export const TaskDetail = ({ task: initialTask, prefixedId, recordTypeHint, onBa
               onCollapse={()=>setRightCollapsed(c=>!c)}
               width={rightWidth}
               onMouseDown={isMobile ? undefined : startRightResize}
+              commsProps={{
+                recordType: data.record_type,
+                recordId: data.id,
+                fromAccount: "scott@andersoncp.com",
+                crmRecordLabel: `${displayId}${data.title ? ` — ${data.title}` : ''}`,
+                crmRecordUrl: `/tasks/${data.task_num}`
+              }}
             />
           )}
         </div>
