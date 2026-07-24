@@ -2678,34 +2678,39 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             <RichTextEditor value={formData.follow_up_notes} onSave={v=>set('follow_up_notes',v)} minRows={5}/>
           </FieldRow>
         </div>
-        {/* CONTACTS — staged locally (mode="staged"), linked for real in handleSave once a task_id exists */}
-        <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
-          <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
-            <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Contacts</span>
-            <button ref={stagedContactsBtnRef} onClick={()=>stagedContactsFieldRef.current?.openPanel()}
-              title="Add new item"
-              style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-              onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-              <Plus size={14} weight="bold"/>
-            </button>
+        {/* KEY SAFE — WO-type only, standalone card (moved out of Work Order
+            Details 2026-07-25 to sit higher on the page). Matches the
+            label+button-header / field-row-below pattern the removed
+            "Vendor / Tenant Company" card used, folded into a single row
+            since there's only one field here. Refs/handler unchanged, only
+            the surrounding wrapper is new (was a FieldRow inside Work Order
+            Details; now its own card). */}
+        {formData.record_type==='work_order'&&(
+          <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+              <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Key Safe</span>
+              <button ref={newKeySafeBtnRef} onClick={()=>newKeySafeLinkRef.current?.openPanel()}
+                title="Change key safe"
+                style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <Plus size={14} weight="bold"/>
+              </button>
+            </div>
+            <RelationField
+              rel="keySafe"
+              ref={newKeySafeLinkRef}
+              excludeRef={newKeySafeBtnRef}
+              mode="single"
+              hideTrigger={true}
+              compact={true}
+              value={formData.key_safe_id}
+              onChange={handleKeySafeChangeForm}
+              searchFilter={`prop_code=eq.${formData.prop_code}`}
+              sectionLabel="key safe"
+            />
           </div>
-          <RelationField
-            rel="contact"
-            mode="staged"
-            ref={stagedContactsFieldRef}
-            excludeRef={stagedContactsBtnRef}
-            stagedRows={stagedContacts}
-            onStagedChange={setStagedContacts}
-            titleField={contactTitle}
-            badgeField={contactPropCode}
-            sectionLabel="contact"
-            createFields={['full_name','company_dba','primary_phone','email']}
-            onCreate={async fields=>{const r=await sbPost('contacts',fields);return Array.isArray(r)?r[0]:r;}}
-            compact={true}
-            hideTrigger={true}
-          />
-        </div>
+        )}
         {/* VENDOR / TENANT CONTACT — matches TaskDetail's always-visible (non-WO-gated) card,
             not just shown for work_order like the old WO-section placement. Contact and
             Company independent, never paired in the same row. */}
@@ -2731,6 +2736,37 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             showAllOnOpen={true}
             titleField={contactTitle}
             badgeField={contactPropCode}
+          />
+        </div>
+        {/* EMAIL CONTACTS (renamed from "Contacts" 2026-07-25, display label
+            only — rel/refs/state stay "contact"/stagedContacts as before) —
+            staged locally (mode="staged"), linked for real in handleSave
+            once a task_id exists */}
+        <div style={{background:T.bg2,borderRadius:'8px',margin:'0 16px 12px',overflow:'hidden',padding:'10px 16px 14px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}}>
+            <span style={{fontSize:F.xs,fontWeight:'700',color:T.text2,textTransform:'uppercase',letterSpacing:'0.06em'}}>Email Contacts</span>
+            <button ref={stagedContactsBtnRef} onClick={()=>stagedContactsFieldRef.current?.openPanel()}
+              title="Add new item"
+              style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer'}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+              <Plus size={14} weight="bold"/>
+            </button>
+          </div>
+          <RelationField
+            rel="contact"
+            mode="staged"
+            ref={stagedContactsFieldRef}
+            excludeRef={stagedContactsBtnRef}
+            stagedRows={stagedContacts}
+            onStagedChange={setStagedContacts}
+            titleField={contactTitle}
+            badgeField={contactPropCode}
+            sectionLabel="contact"
+            createFields={['full_name','company_dba','primary_phone','email']}
+            onCreate={async fields=>{const r=await sbPost('contacts',fields);return Array.isArray(r)?r[0]:r;}}
+            compact={true}
+            hideTrigger={true}
           />
         </div>
         {/* RELATED RECORDS — staged locally (mode="staged"), linked for real in handleSave once a task_id exists */}
@@ -2771,31 +2807,6 @@ export const NewTaskForm = ({ initType='task', initPropCode=null, initTenantId=n
             </FieldRow>
             <FieldRow label="Budget Item?">
               <BoolPill value={formData.is_budget_item} labelTrue="Yes" labelFalse="No" onSave={v=>set('is_budget_item',v)}/>
-            </FieldRow>
-            <FieldRow label="Key Safe">
-              <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <RelationField
-                    rel="keySafe"
-                    ref={newKeySafeLinkRef}
-                    excludeRef={newKeySafeBtnRef}
-                    mode="single"
-                    hideTrigger={true}
-                    compact={true}
-                    value={formData.key_safe_id}
-                    onChange={handleKeySafeChangeForm}
-                    searchFilter={`prop_code=eq.${formData.prop_code}`}
-                    sectionLabel="key safe"
-                  />
-                </div>
-                <button ref={newKeySafeBtnRef} onClick={()=>newKeySafeLinkRef.current?.openPanel()}
-                  title="Change key safe"
-                  style={{display:'flex',alignItems:'center',justifyContent:'center',color:T.text1,background:T.bg3,border:`0.5px solid ${T.border}`,borderRadius:'4px',padding:'6px',cursor:'pointer',flexShrink:0}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.accent}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                  <Plus size={14} weight="bold"/>
-                </button>
-              </div>
             </FieldRow>
             <FieldRow label="WO Type">
               <GenericPills value={formData.wo_type} options={WO_TYPE_OPTIONS} onSave={v=>set('wo_type',v)}/>
